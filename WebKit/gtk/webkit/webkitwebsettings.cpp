@@ -90,6 +90,9 @@ struct _WebKitWebSettingsPrivate {
     gboolean enable_caret_browsing;
     gboolean enable_html5_database;
     gboolean enable_html5_local_storage;
+
+    gchar* html5_local_storage_path;
+
     gboolean enable_xss_auditor;
     gchar* user_agent;
     gboolean javascript_can_open_windows_automatically;
@@ -130,6 +133,9 @@ enum {
     PROP_ENABLE_CARET_BROWSING,
     PROP_ENABLE_HTML5_DATABASE,
     PROP_ENABLE_HTML5_LOCAL_STORAGE,
+
+    PROP_HTML5_LOCAL_STORAGE_PATH,
+
     PROP_ENABLE_XSS_AUDITOR,
     PROP_USER_AGENT,
     PROP_JAVASCRIPT_CAN_OPEN_WINDOWS_AUTOMATICALLY,
@@ -535,6 +541,16 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          _("Whether to enable HTML5 Local Storage support"),
                                                          TRUE,
                                                          flags));
+
+    g_object_class_install_property(gobject_class,
+                                    PROP_HTML5_LOCAL_STORAGE_PATH,
+                                    g_param_spec_string("html5-local-storage-path",
+                                                         _("HTML5 Local Storage Path"),
+                                                         _("Gives HTML5 Local Storage Path"),
+                                                         "~",
+                                                         flags));
+
+
     /**
     * WebKitWebSettings:enable-xss-auditor
     *
@@ -781,6 +797,11 @@ static void webkit_web_settings_set_property(GObject* object, guint prop_id, con
     case PROP_ENABLE_HTML5_LOCAL_STORAGE:
         priv->enable_html5_local_storage = g_value_get_boolean(value);
         break;
+
+    case PROP_HTML5_LOCAL_STORAGE_PATH:
+        priv->html5_local_storage_path = g_value_dup_string(value);
+        break;
+
     case PROP_ENABLE_SPELL_CHECKING:
         priv->enable_spell_checking = g_value_get_boolean(value);
         break;
@@ -920,6 +941,11 @@ static void webkit_web_settings_get_property(GObject* object, guint prop_id, GVa
     case PROP_ENABLE_HTML5_LOCAL_STORAGE:
         g_value_set_boolean(value, priv->enable_html5_local_storage);
         break;
+
+    case PROP_HTML5_LOCAL_STORAGE_PATH:
+        g_value_set_string(value, priv->html5_local_storage_path);
+	break;
+
     case PROP_ENABLE_SPELL_CHECKING:
         g_value_set_boolean(value, priv->enable_spell_checking);
         break;
@@ -1002,6 +1028,9 @@ WebKitWebSettings* webkit_web_settings_copy(WebKitWebSettings* web_settings)
                  "enable-caret-browsing", priv->enable_caret_browsing,
                  "enable-html5-database", priv->enable_html5_database,
                  "enable-html5-local-storage", priv->enable_html5_local_storage,
+
+		 "html5-local-storage-path", priv->html5_local_storage_path,
+
                  "enable-xss-auditor", priv->enable_xss_auditor,
                  "user-agent", webkit_web_settings_get_user_agent(web_settings),
                  "javascript-can-open-windows-automatically", priv->javascript_can_open_windows_automatically,

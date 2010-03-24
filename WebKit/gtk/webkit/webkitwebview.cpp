@@ -2460,7 +2460,7 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
     WebKitWebSettings* webSettings = priv->webSettings;
     Settings* settings = core(webView)->settings();
 
-    gchar* defaultEncoding, *cursiveFontFamily, *defaultFontFamily, *fantasyFontFamily, *monospaceFontFamily, *sansSerifFontFamily, *serifFontFamily, *userStylesheetUri;
+    gchar* defaultEncoding, *cursiveFontFamily, *defaultFontFamily, *fantasyFontFamily, *monospaceFontFamily, *sansSerifFontFamily, *serifFontFamily, *userStylesheetUri, *html5LocalStoragePath;
     gboolean autoLoadImages, autoShrinkImages, printBackgrounds,
         enableScripts, enablePlugins, enableDeveloperExtras, resizableTextAreas,
         enablePrivateBrowsing, enableCaretBrowsing, enableHTML5Database, enableHTML5LocalStorage,
@@ -2489,6 +2489,9 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
                  "enable-caret-browsing", &enableCaretBrowsing,
                  "enable-html5-database", &enableHTML5Database,
                  "enable-html5-local-storage", &enableHTML5LocalStorage,
+
+		 "html5-local-storage-path", &html5LocalStoragePath,
+
                  "enable-xss-auditor", &enableXSSAuditor,
                  "javascript-can-open-windows-automatically", &javascriptCanOpenWindows,
                  "enable-offline-web-application-cache", &enableOfflineWebAppCache,
@@ -2515,6 +2518,9 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
     settings->setCaretBrowsingEnabled(enableCaretBrowsing);
     settings->setDatabasesEnabled(enableHTML5Database);
     settings->setLocalStorageEnabled(enableHTML5LocalStorage);
+
+    settings->setLocalStorageDatabasePath(html5LocalStoragePath);
+
     settings->setXSSAuditorEnabled(enableXSSAuditor);
     settings->setJavaScriptCanOpenWindowsAutomatically(javascriptCanOpenWindows);
     settings->setOfflineWebApplicationCacheEnabled(enableOfflineWebAppCache);
@@ -2594,6 +2600,10 @@ static void webkit_web_view_settings_notify(WebKitWebSettings* webSettings, GPar
         settings->setCaretBrowsingEnabled(g_value_get_boolean(&value));
     else if (name == g_intern_string("enable-html5-database"))
         settings->setDatabasesEnabled(g_value_get_boolean(&value));
+
+    else if (name == g_intern_string("html5-local-storage-path"))
+        settings->setLocalStorageDatabasePath(g_value_get_string(&value));
+
     else if (name == g_intern_string("enable-html5-local-storage"))
         settings->setLocalStorageEnabled(g_value_get_boolean(&value));
     else if (name == g_intern_string("enable-xss-auditor"))
