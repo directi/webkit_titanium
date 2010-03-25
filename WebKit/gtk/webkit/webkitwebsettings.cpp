@@ -547,7 +547,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                     g_param_spec_string("html5-local-storage-path",
                                                          _("HTML5 Local Storage Path"),
                                                          _("Gives HTML5 Local Storage Path"),
-                                                         "~",
+                                                         "appdata",
                                                          flags));
 
 
