@@ -2535,6 +2535,7 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
     g_free(sansSerifFontFamily);
     g_free(serifFontFamily);
     g_free(userStylesheetUri);
+    g_free(html5LocalStoragePath);
 
     webkit_web_view_screen_changed(GTK_WIDGET(webView), NULL);
 }
