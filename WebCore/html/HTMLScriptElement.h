@@ -33,6 +33,7 @@ class HTMLScriptElement : public HTMLElement, public ScriptElement {
 public:
     static PassRefPtr<HTMLScriptElement> create(const QualifiedName&, Document*, bool createdByParser);
 
+    ScriptEvaluator* findEvaluator() const;
     virtual bool shouldExecuteAsJavaScript() const;
 
     String text() const;
@@ -43,6 +44,7 @@ public:
     virtual String scriptCharset() const;
     
     bool haveFiredLoadEvent() const { return m_data.haveFiredLoadEvent(); }
+	String type() const { return this->typeAttributeValue(); }
 
 private:
     HTMLScriptElement(const QualifiedName&, Document*, bool createdByParser);

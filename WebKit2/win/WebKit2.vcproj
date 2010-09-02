@@ -539,10 +539,6 @@
 					RelativePath="..\Shared\win\WebEventFactory.h"
 					>
 				</File>
-				<File
-					RelativePath="..\Shared\win\WebURLRequestWin.cpp"
-					>
-				</File>
 			</Filter>
 		</Filter>
 		<Filter
@@ -1378,14 +1374,6 @@
 						RelativePath="..\UIProcess\API\C\WKURL.h"
 						>
 					</File>
-					<File
-						RelativePath="..\UIProcess\API\C\WKURLRequest.cpp"
-						>
-					</File>
-					<File
-						RelativePath="..\UIProcess\API\C\WKURLRequest.h"
-						>
-					</File>
 					<Filter
 						Name="cf"
 						>
@@ -1403,10 +1391,6 @@
 						</File>
 						<File
 							RelativePath="..\UIProcess\API\C\cf\WKURLCF.h"
-							>
-						</File>
-						<File
-							RelativePath="..\UIProcess\API\C\cf\WKURLRequestCF.cpp"
 							>
 						</File>
 						<File

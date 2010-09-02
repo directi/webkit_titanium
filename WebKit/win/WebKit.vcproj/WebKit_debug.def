@@ -1,6 +1,7 @@
 LIBRARY    "WebKit_debug"
 
 EXPORTS
+	addScriptEvaluator
         DllGetClassObject   PRIVATE
         DllCanUnloadNow     PRIVATE
         DllRegisterServer   PRIVATE

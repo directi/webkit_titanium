@@ -668,6 +668,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\WebKitTitanium.h"
+				>
+			</File>
+			<File
 				RelativePath="..\WebLocalizableStrings.h"
 				>
 				<FileConfiguration
@@ -1056,6 +1060,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\WebKitTitanium.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\WebMutableURLRequest.cpp"
 				>
 			</File>
@@ -1077,6 +1085,10 @@
 			</File>
 			<File
 				RelativePath="..\WebResource.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\WebScriptElement.cpp"
 				>
 			</File>
 			<File
