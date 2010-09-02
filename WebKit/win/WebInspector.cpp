@@ -31,10 +31,12 @@
 
 #include "WebKitDLL.h"
 #include "WebView.h"
+#include "WebInspectorClient.h"
 #pragma warning(push, 0)
 #include <WebCore/InspectorController.h>
 #include <WebCore/Page.h>
 #pragma warning(pop)
+#include "InspectorClient.h"
 #include <wtf/Assertions.h>
 
 using namespace WebCore;
@@ -296,6 +298,22 @@ HRESULT STDMETHODCALLTYPE WebInspector::setTimelineProfilingEnabled(BOOL enabled
         page->inspectorController()->startTimelineProfiler();
     else
         page->inspectorController()->stopTimelineProfiler();
+
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE WebInspector::setInspectorURL(BSTR url)
+{
+    if (!m_webView)
+        return S_OK;
+
+    Page* page = m_webView->page();
+    if (!page)
+        return S_OK;
+
+    WebInspectorClient* client = static_cast<WebInspectorClient*>(page->inspectorController()->client());
+    String inspectorURLStr(url, SysStringLen(url));
+    client->setInspectorURL(inspectorURLStr);
 
     return S_OK;
 }

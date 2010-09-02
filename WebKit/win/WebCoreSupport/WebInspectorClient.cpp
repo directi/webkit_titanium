@@ -103,7 +103,7 @@ void WebInspectorClient::openInspectorFrontend(InspectorController* inspectorCon
 
     RECT rect;
     GetClientRect(frontendHwnd, &rect);
-    if (FAILED(frontendWebView->initWithFrame(rect, 0, 0)))
+    if (FAILED(frontendWebView->initWithFrame(rect, 0, 0, 0)))
         return;
 
     COMPtr<WebInspectorDelegate> delegate(AdoptCOM, WebInspectorDelegate::createInstance());
@@ -163,11 +163,18 @@ void WebInspectorClient::openInspectorFrontend(InspectorController* inspectorCon
 
     COMPtr<WebMutableURLRequest> request(AdoptCOM, WebMutableURLRequest::createInstance());
 
-    RetainPtr<CFURLRef> htmlURLRef(AdoptCF, CFBundleCopyResourceURL(getWebKitBundle(), CFSTR("inspector"), CFSTR("html"), CFSTR("inspector")));
-    if (!htmlURLRef)
-        return;
+    CFStringRef urlStringRef = NULL;
+    if (m_inspectorURL.length() == 0) {
+        RetainPtr<CFURLRef> htmlURLRef(AdoptCF, CFBundleCopyResourceURL(getWebKitBundle(), CFSTR("inspector"), CFSTR("html"), CFSTR("inspector")));
+        if (!htmlURLRef)
+            return;
 
-    CFStringRef urlStringRef = ::CFURLGetString(htmlURLRef.get());
+        urlStringRef = ::CFURLGetString(htmlURLRef.get());
+    }
+    else {
+        urlStringRef = m_inspectorURL.createCFString();
+    }
+
     if (FAILED(request->initWithURL(BString(urlStringRef), WebURLRequestUseProtocolCachePolicy, 60)))
         return;
 
@@ -240,11 +247,25 @@ void WebInspectorFrontendClient::frontendLoaded()
 
 String WebInspectorFrontendClient::localizedStringsURL()
 {
-    RetainPtr<CFURLRef> url(AdoptCF, CFBundleCopyResourceURL(getWebKitBundle(), CFSTR("localizedStrings"), CFSTR("js"), 0));
-    if (!url)
-        return String();
+    if (m_localizedStringsURL.length() == 0) {
+        RetainPtr<CFURLRef> url(AdoptCF, CFBundleCopyResourceURL(getWebKitBundle(), CFSTR("localizedStrings"), CFSTR("js"), 0));
+        if (!url)
+            return String();
+        return CFURLGetString(url.get());
+    }
+    else {
+        return m_localizedStringsURL;
+    }
+}
 
-    return CFURLGetString(url.get());
+void WebInspectorClient::setInspectorURL(const String& url)
+{
+    m_inspectorURL = url;
+}
+
+void WebInspectorClient::setLocalizedStringsURL(const String& url)
+{
+    m_localizedStringsURL = url;
 }
 
 String WebInspectorFrontendClient::hiddenPanels()

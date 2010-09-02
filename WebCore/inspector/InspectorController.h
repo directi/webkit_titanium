@@ -114,6 +114,8 @@ public:
     Page* inspectedPage() const { return m_inspectedPage; }
     void reloadPage();
 
+	InspectorClient* client() { return m_client; }
+
     String setting(const String& key) const;
     void setSetting(const String& key, const String& value);
     void saveApplicationSettings(const String& settings);
