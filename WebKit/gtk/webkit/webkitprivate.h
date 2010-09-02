@@ -67,6 +67,8 @@
 #include "Settings.h"
 #include <enchant.h>
 #include <wtf/OwnPtr.h>
+// Titanium Patch: Not sure if this is required. 
+//#include "DataObjectGtk.h"
 #include <wtf/text/CString.h>
 
 #include <atk/atk.h>
@@ -179,6 +181,9 @@ extern "C" {
 
         HashMap<GdkDragContext*, RefPtr<WebCore::DataObjectGtk> >* draggingDataObjects;
         HashMap<GdkDragContext*, WebKit::DroppingContext*>* droppingContexts;
+        // Titanium Patch: Not sure if this is required. 
+        RefPtr<WebCore::DataObjectGtk> draggingDataObject;
+        RefPtr<WebCore::DataObjectGtk> droppingDataObject;
     };
 
     #define WEBKIT_WEB_FRAME_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), WEBKIT_TYPE_WEB_FRAME, WebKitWebFramePrivate))

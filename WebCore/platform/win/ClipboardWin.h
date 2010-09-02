@@ -76,6 +76,8 @@ public:
 
     void setExternalDataObject(IDataObject *dataObject);
 
+	String getURIList(bool& success) const;
+
 private:
     ClipboardWin(bool isForDragging, IDataObject*, ClipboardAccessPolicy, Frame*);
     ClipboardWin(bool isForDragging, WCDataObject*, ClipboardAccessPolicy, Frame*);

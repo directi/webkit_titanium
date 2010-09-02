@@ -37,6 +37,43 @@
 
 namespace WebCore {
 
+class PasteboardSelectionData {
+public:
+    PasteboardSelectionData(gchar* text, gchar* markup)
+        : m_text(text)
+        , m_markup(markup) { }
+
+    ~PasteboardSelectionData() {
+        g_free(m_text);
+        g_free(m_markup);
+    }
+
+    const gchar* text() const { return m_text; }
+    const gchar* markup() const { return m_markup; }
+
+private:
+    gchar* m_text;
+    gchar* m_markup;
+};
+
+static void clipboard_get_contents_cb(GtkClipboard *clipboard, GtkSelectionData *selection_data,
+                                      guint info, gpointer data) {
+    PasteboardSelectionData* clipboardData = reinterpret_cast<PasteboardSelectionData*>(data);
+    ASSERT(clipboardData);
+    if (info == Pasteboard::generalPasteboard()->helper()->getIdForTargetType(PasteboardHelper::TargetTypeMarkup))
+        gtk_selection_data_set(selection_data, selection_data->target, 8,
+                               reinterpret_cast<const guchar*>(clipboardData->markup()),
+                               strlen(clipboardData->markup()));
+    else
+        gtk_selection_data_set_text(selection_data, clipboardData->text(), -1);
+}
+
+static void clipboard_clear_contents_cb(GtkClipboard *clipboard, gpointer data) {
+    PasteboardSelectionData* clipboardData = reinterpret_cast<PasteboardSelectionData*>(data);
+    ASSERT(clipboardData);
+    delete clipboardData;
+}
+
 Pasteboard* Pasteboard::generalPasteboard()
 {
     static Pasteboard* pasteboard = new Pasteboard();
@@ -120,14 +157,14 @@ bool Pasteboard::canSmartReplace()
     return false;
 }
 
-PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefPtr<Range> context,
-                                                          bool allowPlainText, bool& chosePlainText)
+PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefPtr<Range> context, bool allowPlainText, bool& chosePlainText)
 {
-    GtkClipboard* clipboard = m_helper->getCurrentClipboard(frame);
+    GdkAtom textHtml = gdk_atom_intern_static_string("text/html");
+    GtkClipboard* clipboard = m_helper->getCurrentTarget(frame);
+    ASSERT(clipboard);
     DataObjectGtk* dataObject = DataObjectGtk::forClipboard(clipboard);
+    ASSERT(dataObject);
     m_helper->getClipboardContents(clipboard);
-
-    chosePlainText = false;
 
     if (dataObject->hasMarkup()) {
         RefPtr<DocumentFragment> fragment = createFragmentFromMarkup(frame->document(), dataObject->markup(), "", FragmentScriptingNotAllowed);
@@ -135,24 +172,19 @@ PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefP
             return fragment.release();
     }
 
-    if (!allowPlainText)
+    if (!allowPlainText || !dataObject->hasText())
         return 0;
-
     if (dataObject->hasText()) {
         chosePlainText = true;
         RefPtr<DocumentFragment> fragment = createFragmentFromText(context.get(), dataObject->text());
         if (fragment)
             return fragment.release();
     }
-
     return 0;
 }
 
 String Pasteboard::plainText(Frame* frame)
 {
-    GtkClipboard* clipboard = m_helper->getCurrentClipboard(frame);
-    DataObjectGtk* dataObject = DataObjectGtk::forClipboard(clipboard);
-
     m_helper->getClipboardContents(clipboard);
     return dataObject->text();
 }

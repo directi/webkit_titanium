@@ -62,6 +62,12 @@ Color DragData::asColor() const
     return Color();
 }
 
+// Titanium Patch: Not sure if this is required. 
+/*PassRefPtr<Clipboard> DragData::createClipboard(ClipboardAccessPolicy policy) const
+{
+    return ClipboardGtk::create(policy, m_platformDragData, true);
+}*/
+
 bool DragData::containsCompatibleContent() const
 {
     return containsPlainText() || containsURL() || m_platformDragData->hasMarkup() || containsColor() || containsFiles();
@@ -75,11 +81,11 @@ bool DragData::containsURL(FilenameConversionPolicy filenamePolicy) const
 String DragData::asURL(FilenameConversionPolicy filenamePolicy, String* title) const
 {
     String url(m_platformDragData->url());
+
     if (title)
         *title = m_platformDragData->urlLabel();
     return url;
 }
-
 
 PassRefPtr<DocumentFragment> DragData::asFragment(Document* document) const
 {

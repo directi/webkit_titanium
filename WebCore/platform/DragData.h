@@ -55,6 +55,7 @@ namespace WebCore {
 class DataObjectGtk;
 }
 typedef WebCore::DataObjectGtk* DragDataRef;
+// Titanium Patch: Not sure if this is required. #include "DragDataRef.h"
 #elif PLATFORM(CHROMIUM)
 #include "DragDataRef.h"
 #elif PLATFORM(HAIKU)

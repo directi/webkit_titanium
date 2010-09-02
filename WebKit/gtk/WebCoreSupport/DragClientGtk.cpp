@@ -33,6 +33,10 @@
 #include "PasteboardHelper.h"
 #include "RenderObject.h"
 #include "webkitprivate.h"
+#include "ClipboardGtk.h"
+#include "Pasteboard.h"
+#include "PasteboardHelper.h"
+#include "PasteboardHelperGtk.h"
 #include "webkitwebview.h"
 #include <gtk/gtk.h>
 
@@ -70,7 +74,6 @@ DragSourceAction DragClient::dragSourceActionMaskForPoint(const IntPoint&)
 void DragClient::startDrag(DragImageRef image, const IntPoint& dragImageOrigin, const IntPoint& eventPos, Clipboard* clipboard, Frame* frame, bool linkDrag)
 {
     ClipboardGtk* clipboardGtk = reinterpret_cast<ClipboardGtk*>(clipboard);
-
     WebKitWebView* webView = webkit_web_frame_get_web_view(kit(frame));
     RefPtr<DataObjectGtk> dataObject = clipboardGtk->dataObject();
     PlatformRefPtr<GtkTargetList> targetList(clipboardGtk->helper()->targetListForDataObject(dataObject.get()));
@@ -83,10 +86,19 @@ void DragClient::startDrag(DragImageRef image, const IntPoint& dragImageOrigin, 
     // happen if a drag is followed very quickly by another click (like in the DRT).
     webView->priv->previousClickTime = 0;
 
+    GRefPtr<GtkTargetList> targetList(clipboardGtk->helper()->targetListForDataObject(dataObject.get()));
+    GdkEvent* event = gdk_event_new(GDK_BUTTON_PRESS);
+    // This will be decremented by gdk_event_free() below.
+    event->button.window = static_cast<GdkWindow*>(g_object_ref(gtk_widget_get_window(GTK_WIDGET(m_webView))));
+    event->button.time = GDK_CURRENT_TIME;
+
+
     if (image)
         gtk_drag_set_icon_pixbuf(context, image, eventPos.x() - dragImageOrigin.x(), eventPos.y() - dragImageOrigin.y());
     else
         gtk_drag_set_icon_default(context);
+
+    gdk_event_free(event);
 }
 
 DragImageRef DragClient::createDragImageForLink(KURL&, const String&, Frame*)

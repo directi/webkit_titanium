@@ -34,6 +34,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
+char* CustomGtkWebInspectorPath = 0;
 static void notifyWebViewDestroyed(WebKitWebView* webView, InspectorFrontendClient* inspectorFrontendClient)
 {
     inspectorFrontendClient->destroyInspectorWindow();
