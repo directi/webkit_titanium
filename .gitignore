@@ -83,7 +83,3 @@ LayoutTests/java/*.class
 /gtk-doc.make
 /INSTALL
 /README
-*.vcproj.*.user
-*.ncb
-*.suo
-
