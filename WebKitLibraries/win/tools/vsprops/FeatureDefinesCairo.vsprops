@@ -123,7 +123,7 @@
 	/>
   <UserMacro
 		Name="ENABLE_NOTIFICATIONS"
-		Value="ENABLE_NOTIFICATIONS"
+		Value=""
 		PerformEnvironmentSet="true"
 	/>
   <UserMacro
