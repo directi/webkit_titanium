@@ -90,6 +90,8 @@ private:
 
 void WebKitInitializeWebDatabasesIfNecessary();
 
+void WebKitSetWebDatabasesPath(String& databasesDirectory);
+
 #endif
 
 #endif

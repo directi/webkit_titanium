@@ -90,6 +90,7 @@
 #include <wtf/text/CString.h>
 
 #include <gdk/gdkkeysyms.h>
+#include "DragActions.h"
 
 /**
  * SECTION:webkitwebview
@@ -211,6 +212,13 @@ static GtkIMContext* webkit_web_view_get_im_context(WebKitWebView*);
 static void destroy_menu_cb(GtkObject* object, gpointer data)
 {
     WEBKIT_WEB_VIEW(data)->priv->currentMenu = 0;
+}
+
+static IntPoint viewPointToGlobalPoint(FrameView* view, IntPoint& viewPoint)
+{
+    int x, y;
+    gdk_window_get_origin(GTK_WIDGET(view->hostWindow()->platformPageClient())->window, &x, &y);
+    return viewPoint + IntSize(x, y);
 }
 
 static void PopupMenuPositionFunc(GtkMenu* menu, gint *x, gint *y, gboolean *pushIn, gpointer userData)
@@ -1372,6 +1380,89 @@ static void webkit_web_view_drag_leave(GtkWidget* widget, GdkDragContext* contex
     // the drag-drop signal. We want the actions for drag-leave to happen after
     // those for drag-drop, so schedule them to happen asynchronously here.
     g_timeout_add(0, reinterpret_cast<GSourceFunc>(doDragLeaveLater), priv->droppingContexts.get(context));
+/* CARL: Titanium Patch
+=======
+    g_timeout_add(0, reinterpret_cast<GSourceFunc>(doDragLeaveLater), priv->droppingContexts->get(context));
+    if (coreAction & DragOperationEvery || coreAction & DragOperationCopy)
+        return GDK_ACTION_COPY;
+    else if (coreAction & DragOperationMove)
+        return GDK_ACTION_MOVE;
+    else if (coreAction & DragOperationLink)
+        return GDK_ACTION_LINK;
+    else
+        return static_cast<GdkDragAction>(0);
+}
+
+static WebCore::DragOperation toDragOperation(GdkDragAction gdkAction)
+{
+    unsigned int action = DragOperationNone;
+    if (gdkAction & GDK_ACTION_COPY)
+        action |= DragOperationCopy;
+    if (gdkAction & GDK_ACTION_MOVE)
+        action |= DragOperationMove;
+    if (gdkAction & GDK_ACTION_LINK)
+        action |= DragOperationLink;
+    if (gdkAction & GDK_ACTION_PRIVATE)
+        action |= DragOperationPrivate;
+    return static_cast<WebCore::DragOperation>(action);
+}
+
+static void webkit_web_view_drag_end(GtkWidget* widget, GdkDragContext* context)
+{
+    WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
+    WebKitWebViewPrivate* priv = WEBKIT_WEB_VIEW_GET_PRIVATE(webView);
+    ASSERT(priv->draggingDataObject);
+    priv->draggingDataObject.clear();
+}
+
+static void webkit_web_view_drag_data_get(GtkWidget* widget, GdkDragContext* context, GtkSelectionData* selectionData, guint info, guint time_)
+{
+    WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
+    WebKitWebViewPrivate* priv = WEBKIT_WEB_VIEW_GET_PRIVATE(webView);
+    ASSERT(priv->draggingDataObject);
+
+    PasteboardHelperGtk::fillSelectionData(selectionData, info, priv->draggingDataObject.get());
+}
+
+static IntPoint lastDragGlobalPoint;
+static IntPoint lastDragWidgetPoint;
+static int pendingDragDataRequests = 0;
+static bool dragDropHappened = false;
+
+static gboolean do_drag_leave(gpointer data)
+{
+    WebKitWebView* webView = reinterpret_cast<WebKitWebView*>(data);
+    WebKitWebViewPrivate* priv = WEBKIT_WEB_VIEW_GET_PRIVATE(webView);
+    ASSERT(priv->droppingDataObject);
+
+    // Don't call dragExited if this was the result of a drop action.
+    if (!dragDropHappened) {
+        Page* page = core(webView);
+        DragData dragData(priv->droppingDataObject,
+                          lastDragWidgetPoint, lastDragGlobalPoint,
+                          DragOperationNone);
+        page->dragController()->dragExited(&dragData);
+    }
+
+    dragDropHappened = false;
+    priv->droppingDataObject.clear();
+    return FALSE;
+}
+ 
+static void webkit_web_view_drag_leave(GtkWidget* widget, GdkDragContext* context, guint time)
+{
+    WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
+    WebKitWebViewPrivate* priv = WEBKIT_WEB_VIEW_GET_PRIVATE(webView);
+    ASSERT(priv->droppingDataObject);
+
+    if (priv->droppingDataObject->dragContext() != context)
+        return;
+
+    // During a drop GTK+ will fire a drag-leave signal right before firing
+    // the drag-drop signal. We want the actions for drag-leave to happen after
+    // those for drag-drop, so schedule them to happen asynchronously here.
+    g_idle_add(do_drag_leave, webView);
+>>>>>>> directi/latest*/
 }
 
 static gboolean webkit_web_view_drag_motion(GtkWidget* widget, GdkDragContext* context, gint x, gint y, guint time)

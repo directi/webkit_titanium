@@ -11,7 +11,7 @@
 	/>
 	<Tool
 		Name="VCLinkerTool"
-		AdditionalDependencies="JavaScriptCore$(WebKitDLLConfigSuffix).lib WebKit$(WebKitDLLConfigSuffix).lib CoreFoundation$(LibraryConfigSuffix).lib"
+		AdditionalDependencies="JavaScriptCore$(WebKitConfigSuffix).lib WebKit$(WebKitConfigSuffix).lib CoreFoundation$(LibraryConfigSuffix).lib"
 		OutputFile="$(OutDir)\$(ProjectName)$(WebKitConfigSuffix).dll"
 	/>
 	<Tool

@@ -131,6 +131,7 @@ namespace WebCore {
 #endif
             , m_scheduledFailureType(ResourceHandle::NoFailure)
             , m_failureTimer(loader, &ResourceHandle::fireFailure)
+            , m_titaniumURL(0)
         {
             const KURL& url = m_firstRequest.url();
             m_user = url.user();
@@ -218,6 +219,7 @@ namespace WebCore {
 
         ResourceHandle::FailureType m_scheduledFailureType;
         Timer<ResourceHandle> m_failureTimer;
+        char* m_titaniumURL;
     };
 
 } // namespace WebCore

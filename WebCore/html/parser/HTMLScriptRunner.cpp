@@ -39,6 +39,8 @@
 #include "NotImplemented.h"
 #include "ScriptElement.h"
 #include "ScriptSourceCode.h"
+#include "ScriptEvaluator.h"
+#include "HTMLScriptElement.h"
 
 namespace WebCore {
 
@@ -148,10 +150,22 @@ void HTMLScriptRunner::executePendingScriptAndDispatchEvent(PendingScript& pendi
 void HTMLScriptRunner::executeScript(const ScriptSourceCode& sourceCode) const
 {
     ASSERT(m_document);
+    ScriptElement* scriptElement = toScriptElement(element);
+    ASSERT(scriptElement);
+	HTMLScriptElement* hse = static_cast<HTMLScriptElement*> (scriptElement);
+	ASSERT(hse);
+	ScriptEvaluator* m_scriptEvaluator = hse->findEvaluator();
+    String m_scriptMimeType = hse->type();
+    if (!(scriptElement->shouldExecuteAsJavaScript() || (m_scriptEvaluator != NULL)))
+        return;
     ASSERT(isExecutingScript());
     if (!m_document->frame())
         return;
-    m_document->frame()->script()->executeScript(sourceCode);
+	if (!m_scriptEvaluator || m_scriptMimeType.length() == 0 || !m_scriptEvaluator->matchesMimeType(m_scriptMimeType)) {
+	    m_document->frame()->script()->executeScript(sourceCode);
+	} else {
+        m_document->frame()->script()->executeScript(sourceCode, m_scriptMimeType, m_scriptEvaluator);
+    }
 }
 
 void HTMLScriptRunner::watchForLoad(PendingScript& pendingScript)

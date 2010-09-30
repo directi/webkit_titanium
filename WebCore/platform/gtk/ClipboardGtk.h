@@ -30,6 +30,7 @@
 #include "CachedResourceClient.h"
 #include "Clipboard.h"
 #include "DataObjectGtk.h"
+#include "PasteboardHelper.h"
 
 namespace WebCore {
     class CachedImage;
@@ -59,6 +60,12 @@ namespace WebCore {
         virtual HashSet<String> types() const;
         virtual PassRefPtr<FileList> files() const;
 
+        // Titanium Patch: Not sure if this is required. 
+		//void setDragImage(CachedImage* image, Node* node, const IntPoint& loc);
+		//virtual void declareAndWriteDragImage(Element*, const KURL&, const String& title, Frame*);
+        //virtual void writeRange(Range*, Frame* frame);
+        //virtual void writeURL(const KURL&, const String&, Frame* frame);
+
         void setDragImage(CachedImage*, const IntPoint&);
         void setDragImageElement(Node*, const IntPoint&);
         void setDragImage(CachedImage*, Node*, const IntPoint&);
@@ -72,6 +79,7 @@ namespace WebCore {
         virtual void writePlainText(const String&);
 
         virtual bool hasData();
+        PassRefPtr<DataObjectGtk> dataObject() { return m_dataObject; }
 
         PasteboardHelper* helper() { return m_helper; }
         PassRefPtr<DataObjectGtk> dataObject() { return m_dataObject; }

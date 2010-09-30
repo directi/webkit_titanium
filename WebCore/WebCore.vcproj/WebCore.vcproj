@@ -27111,6 +27111,14 @@
 					RelativePath="..\platform\network\SocketStreamHandleClient.h"
 					>
 				</File>
+				<File
+					RelativePath="..\platform\network\TitaniumProtocols.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\network\TitaniumProtocols.h"
+					>
+				</File>
 				<Filter
 					Name="cf"
 					>

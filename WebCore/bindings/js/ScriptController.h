@@ -56,6 +56,7 @@ class EventListener;
 class HTMLPlugInElement;
 class Frame;
 class Node;
+class ScriptEvaluator;
 class ScriptSourceCode;
 class ScriptValue;
 class Widget;
@@ -96,6 +97,8 @@ public:
     ScriptValue executeScript(const ScriptSourceCode&, ShouldAllowXSS shouldAllowXSS = DoNotAllowXSS);
     ScriptValue executeScript(const String& script, bool forceUserGesture = false, ShouldAllowXSS shouldAllowXSS = DoNotAllowXSS);
     ScriptValue executeScriptInWorld(DOMWrapperWorld* world, const String& script, bool forceUserGesture = false, ShouldAllowXSS shouldAllowXSS = DoNotAllowXSS);
+
+	ScriptValue executeScript(const ScriptSourceCode& sourceCode, const String& mimeType, ScriptEvaluator* evaluator);
 
     // Returns true if argument is a JavaScript URL.
     bool executeIfJavaScriptURL(const KURL&, bool userGesture = false, ShouldReplaceDocumentIfJavaScriptURL shouldReplaceDocumentIfJavaScriptURL = ReplaceDocumentIfJavaScriptURL);

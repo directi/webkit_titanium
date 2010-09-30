@@ -43,6 +43,16 @@ public:
     PasteboardHelperGtk();
     ~PasteboardHelperGtk();
     virtual guint getIdForTargetType(PasteboardTargetType);
+    virtual void writeClipboardContents(GtkClipboard* clipboard, gpointer data = 0);
+    virtual void getClipboardContents(GtkClipboard*);
+    virtual void fillDataObject(GtkSelectionData*, guint, DataObjectGtk*);
+    virtual GtkTargetList* targetListForDragContext(GdkDragContext* context);
+
+    static void fillSelectionData(GtkSelectionData*, guint, DataObjectGtk*);
+    static GtkTargetList* targetListForDataObject(DataObjectGtk* dataObject);
+
+private:
+    GtkTargetList* m_targetList;
 
 protected:
     virtual bool usePrimarySelectionClipboard(GtkWidget*);

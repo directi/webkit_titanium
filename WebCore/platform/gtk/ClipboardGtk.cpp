@@ -30,6 +30,10 @@
 #include "PasteboardHelper.h"
 #include "RenderImage.h"
 #include "ScriptExecutionContext.h"
+// Titanium Patch: Not sure if this is required. 
+//#include "StringHash.h"
+//#include "Pasteboard.h"
+//#include "PasteboardHelper.h"
 #include "markup.h"
 #include <wtf/text/CString.h>
 #include <wtf/text/StringHash.h>
@@ -296,6 +300,93 @@ void ClipboardGtk::setDragImage(CachedImage* image, Node* element, const IntPoin
     m_dragImageElement = element;
 }
 
+// Titanium Patch: Not sure if this is required. 
+/*
+void ClipboardGtk::writeURL(const KURL& url, const String& label, Frame* frame)
+{
+    String actualLabel(label);
+    if (actualLabel.isEmpty())
+        actualLabel = url;
+
+    Vector<KURL> uriList;
+
+    uriList.append(url);
+    m_dataObject->setURIList(uriList);
+    m_dataObject->setText(url.string());
+
+    // TODO: We should write some markup which includes the label and the URL.
+
+    if (m_clipboard)
+        m_helper->writeClipboardContents(m_clipboard);
+}
+
+void ClipboardGtk::writeRange(Range* range, Frame* frame)
+{
+    ASSERT(range);
+
+    m_dataObject->setText(frame->selectedText());
+    m_dataObject->setMarkup(createMarkup(range, 0, AnnotateForInterchange));
+
+    if (m_clipboard)
+        m_helper->writeClipboardContents(m_clipboard);
+}
+
+void ClipboardGtk::writePlainText(const String& text)
+{
+    m_dataObject->setText(text);
+
+    if (m_clipboard)
+        m_helper->writeClipboardContents(m_clipboard);
+}
+
+bool ClipboardGtk::hasData()
+{
+    if (m_clipboard)
+        m_helper->getClipboardContents(m_clipboard);
+
+    return m_dataObject->hasText() ||
+           m_dataObject->hasMarkup() ||
+           m_dataObject->hasURIList() ||
+           m_dataObject->hasImage();
+}
+
+void ClipboardGtk::setDragImage(CachedImage* image, Node* node, const IntPoint& location)
+{
+    if (policy() != ClipboardImageWritable && policy() != ClipboardWritable)
+        return;
+
+    if (m_dragImage)
+        m_dragImage->removeClient(this);
+
+    m_dragImage = image;
+    if (m_dragImage)
+        m_dragImage->addClient(this);
+
+    m_dragLoc = location;
+    m_dragImageElement = node;
+}
+
+void ClipboardGtk::setDragImageElement(Node* node, const IntPoint& location)
+{
+    setDragImage(0, node, location);
+    GdkPixbuf* result = 0;
+
+    if (m_dragImage) {
+        result = m_dragImage->image()->getGdkPixbuf();
+        location = m_dragLoc;
+    }
+
+    // FIXME: Should we also handle the situation where our
+    // drag image is just a node?
+
+    return result;
+}
+
+void ClipboardGtk::setDragImage(CachedImage* image, const IntPoint& location)
+{
+    setDragImage(image, 0, location);
+} */
+
 DragImageRef ClipboardGtk::createDragImage(IntPoint& location) const
 {
     location = m_dragLoc;
@@ -334,6 +425,9 @@ void ClipboardGtk::declareAndWriteDragImage(Element* element, const KURL& url, c
         return;
 
     m_dataObject->setImage(pixbuf.get());
+    
+	// Titanium Patch: Not sure if this is required. (left in)
+	writeURL(url, label, 0);
 }
 
 void ClipboardGtk::writeURL(const KURL& url, const String& label, Frame*)

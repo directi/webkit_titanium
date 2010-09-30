@@ -184,7 +184,6 @@ private:
     RefPtr<Image> m_seekForwardButton;
     Page* m_page;
     PlatformRefPtr<GHashTable> m_partsTable;
-
 };
 
 }

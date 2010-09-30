@@ -771,6 +771,9 @@ bool WebView::ensureBackingStore()
 
         void* pixels = NULL;
         m_backingStoreBitmap = RefCountedHBITMAP::create(::CreateDIBSection(0, &bitmapInfo, DIB_RGB_COLORS, &pixels, 0, 0));
+
+        if (m_uiDelegate && !m_hostWindow)
+            m_uiDelegate->newBackingStore(this, (OLE_HANDLE) m_backingStoreBitmap.get());
         return true;
     }
 
@@ -948,6 +951,11 @@ void WebView::updateBackingStore(FrameView* frameView, HDC dc, bool backingStore
 
 void WebView::paint(HDC dc, LPARAM options)
 {
+    if (!m_hostWindow) {
+        transparentPaint(dc);
+        return;
+    }
+
     LOCAL_GDI_COUNTER(0, __FUNCTION__);
 
     Frame* coreFrame = core(m_mainFrame);
@@ -2526,7 +2534,8 @@ bool WebView::shouldInitializeTrackPointHack()
 HRESULT STDMETHODCALLTYPE WebView::initWithFrame( 
     /* [in] */ RECT frame,
     /* [in] */ BSTR frameName,
-    /* [in] */ BSTR groupName)
+    /* [in] */ BSTR groupName,
+    /* [in] */ OLE_HANDLE hWndHandle)
 {
     HRESULT hr = S_OK;
 
@@ -2535,8 +2544,11 @@ HRESULT STDMETHODCALLTYPE WebView::initWithFrame(
 
     registerWebViewWindowClass();
 
-    m_viewWindow = CreateWindowEx(0, kWebViewWindowClassName, 0, WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-        frame.left, frame.top, frame.right - frame.left, frame.bottom - frame.top, m_hostWindow ? m_hostWindow : HWND_MESSAGE, 0, gInstance, 0);
+    if (hWndHandle)
+        m_viewWindow = (HWND) hWndHandle;
+    else
+        m_viewWindow = CreateWindowEx(0, kWebViewWindowClassName, 0, WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+            frame.left, frame.top, frame.right - frame.left, frame.bottom - frame.top, m_hostWindow ? m_hostWindow : HWND_MESSAGE, 0, gInstance, 0);
     ASSERT(::IsWindow(m_viewWindow));
 
     if (shouldInitializeTrackPointHack()) {
@@ -2611,7 +2623,8 @@ HRESULT STDMETHODCALLTYPE WebView::initWithFrame(
 
     #pragma warning(suppress: 4244)
     SetWindowLongPtr(m_viewWindow, 0, (LONG_PTR)this);
-    ShowWindow(m_viewWindow, SW_SHOW);
+    if (m_hostWindow)
+        ShowWindow(m_viewWindow, SW_SHOW);
 
     initializeToolTipWindow();
     windowAncestryDidChange();
@@ -2642,9 +2655,13 @@ void WebView::initializeToolTipWindow()
     if (!initCommonControls())
         return;
 
+    HWND parentWindow = 0;
+    if (m_hostWindow)
+        parentWindow = m_viewWindow;
+
     m_toolTipHwnd = CreateWindowEx(WS_EX_TRANSPARENT, TOOLTIPS_CLASS, 0, WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
                                    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-                                   m_viewWindow, 0, 0, 0);
+                                   parentWindow, 0, 0, 0);
     if (!m_toolTipHwnd)
         return;
 
@@ -3150,6 +3167,15 @@ HRESULT STDMETHODCALLTYPE WebView::setPreferences(
     nc->addObserver(this, WebPreferences::webPreferencesChangedNotification(), static_cast<IWebPreferences*>(m_preferences.get()));
 
     m_preferences->postPreferencesChangesNotification();
+    BSTR localStoragePath;
+    if (SUCCEEDED(m_preferences->localStorageDatabasePath(&localStoragePath))) {
+        m_page->settings()->setLocalStorageDatabasePath(String(localStoragePath, SysStringLen(localStoragePath)));
+
+        String databasesDirectory = String(localStoragePath, SysStringLen(localStoragePath));
+        WebKitSetWebDatabasesPath(databasesDirectory);
+
+        SysFreeString(localStoragePath);
+    }
 
     return S_OK;
 }
@@ -3300,6 +3326,9 @@ HRESULT STDMETHODCALLTYPE WebView::searchFor(
 bool WebView::active()
 {
     HWND activeWindow = GetActiveWindow();
+    if (!m_hostWindow && activeWindow == m_viewWindow)
+        return true;
+
     return (activeWindow && m_topLevelParent == findTopLevelParent(activeWindow));
 }
 
@@ -6536,4 +6565,34 @@ Page* core(IWebView* iWebView)
         page = webView->page();
 
     return page;
+}
+
+void WebView::transparentPaint(HDC dc)
+{
+    Frame* coreFrame = core(m_mainFrame);
+    if (!coreFrame)
+        return;
+    FrameView* frameView = coreFrame->view();
+
+    HDC bitmapDC = ::CreateCompatibleDC(GetDC(NULL));
+    bool backingStoreCompletelyDirty = ensureBackingStore();
+    ::SelectObject(bitmapDC, m_backingStoreBitmap.get());
+
+    updateBackingStore(frameView, bitmapDC, backingStoreCompletelyDirty, PaintWebViewAndChildren);
+    GdiFlush();
+
+    ::DeleteDC(bitmapDC);
+
+    if (active())
+        cancelDeleteBackingStoreSoon();
+    else
+        deleteBackingStoreSoon();
+}
+
+HRESULT STDMETHODCALLTYPE WebView::forwardingWindowProc(
+    /* [in] */ OLE_HANDLE hWndHandle, /* [in] */ UINT message,
+    /* [in] */ WPARAM wParam, /* [in] */ LPARAM lParam)
+{
+    return WebViewWndProc(
+        reinterpret_cast<HWND>(hWndHandle), message, wParam, lParam);
 }

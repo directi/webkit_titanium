@@ -5867,6 +5867,42 @@
 			name = "Copy Generated Headers";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		ABCACED40F416D2C00805E73 /* Copy Extra API Headers (Titanium) */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Versions/A/PrivateHeaders/ForwardingHeaders;
+			dstSubfolderSpec = 1;
+			files = (
+				5BCFAEBD117CD123005E2291 /* ScriptEvaluator.h in Copy Extra API Headers (Titanium) */,
+				5BCFAEB0117CD0FD005E2291 /* ScriptSourceProvider.h in Copy Extra API Headers (Titanium) */,
+				5BCFAE98117CD0D8005E2291 /* FrameLoaderTypes.h in Copy Extra API Headers (Titanium) */,
+				5B4C5A7A0FCB7F0E00601793 /* AtomicString.h in Copy Extra API Headers (Titanium) */,
+				5B4C5A7B0FCB7F1600601793 /* AtomicStringHash.h in Copy Extra API Headers (Titanium) */,
+				ABCACF2C0F41736F00805E73 /* ScriptElement.h in Copy Extra API Headers (Titanium) */,
+				ABCACF0B0F416F3300805E73 /* SharedBuffer.h in Copy Extra API Headers (Titanium) */,
+				ABCACF080F416EC200805E73 /* AtomicStringImpl.h in Copy Extra API Headers (Titanium) */,
+				ABCACF090F416EC200805E73 /* StringHash.h in Copy Extra API Headers (Titanium) */,
+				ABCACF0A0F416EC200805E73 /* StringImpl.h in Copy Extra API Headers (Titanium) */,
+				ABCACEFD0F416E7700805E73 /* ResourceResponse.h in Copy Extra API Headers (Titanium) */,
+				ABCACEFE0F416E7700805E73 /* HTTPHeaderMap.h in Copy Extra API Headers (Titanium) */,
+				ABCACEFF0F416E7700805E73 /* ResourceResponseBase.h in Copy Extra API Headers (Titanium) */,
+				ABCACEF50F416E1400805E73 /* PlatformString.h in Copy Extra API Headers (Titanium) */,
+				ABCACEF40F416DF000805E73 /* CachePolicy.h in Copy Extra API Headers (Titanium) */,
+				ABCACEE00F416DC100805E73 /* Timer.h in Copy Extra API Headers (Titanium) */,
+				ABCACEDD0F416DA500805E73 /* TextCodec.h in Copy Extra API Headers (Titanium) */,
+				ABCACEDE0F416DA500805E73 /* TextEncoding.h in Copy Extra API Headers (Titanium) */,
+				ABCACEDF0F416DA500805E73 /* KURL.h in Copy Extra API Headers (Titanium) */,
+				ABCACED90F416D8200805E73 /* CachedResource.h in Copy Extra API Headers (Titanium) */,
+				ABCACEDA0F416D8200805E73 /* CachedResourceClient.h in Copy Extra API Headers (Titanium) */,
+				ABCACEDB0F416D8200805E73 /* CachedResourceHandle.h in Copy Extra API Headers (Titanium) */,
+				ABCACEDC0F416D8200805E73 /* CachedScript.h in Copy Extra API Headers (Titanium) */,
+				ABCACED60F416D5F00805E73 /* CachedScriptSourceProvider.h in Copy Extra API Headers (Titanium) */,
+				ABCACED70F416D5F00805E73 /* ScriptSourceCode.h in Copy Extra API Headers (Titanium) */,
+				ABCACED80F416D5F00805E73 /* StringSourceProvider.h in Copy Extra API Headers (Titanium) */,
+			);
+			name = "Copy Extra API Headers (Titanium)";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -9412,6 +9448,7 @@
 		ABB5419C0ACDDFE4002820EB /* RenderListBox.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = RenderListBox.cpp; sourceTree = "<group>"; };
 		ABB5419D0ACDDFE4002820EB /* RenderListBox.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = RenderListBox.h; sourceTree = "<group>"; };
 		ABC128760B33AA6D00C693D5 /* PopupMenuClient.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = PopupMenuClient.h; sourceTree = "<group>"; };
+		ABCACE7E0F415D7300805E73 /* ScriptEvaluator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ScriptEvaluator.h; sourceTree = "<group>"; };
 		ABDDFE730A5C6E6F00A3E11D /* RenderMenuList.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = RenderMenuList.cpp; sourceTree = "<group>"; };
 		ABDDFE740A5C6E7000A3E11D /* RenderMenuList.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = RenderMenuList.h; sourceTree = "<group>"; };
 		ABFE7E100D32FAF50066F4D2 /* MediaControlElements.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MediaControlElements.cpp; sourceTree = "<group>"; };
@@ -11341,6 +11378,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5BCFAE97117CD0C6005E2291 /* FrameLoaderTypes.h in Frameworks */,
 				93F19B1308245E59001E9ABC /* ApplicationServices.framework in Frameworks */,
 				93F19B1408245E59001E9ABC /* Carbon.framework in Frameworks */,
 				93F19B1508245E59001E9ABC /* Cocoa.framework in Frameworks */,
@@ -17694,6 +17732,7 @@
 				A84D82BF11D3474800972990 /* ScriptableDocumentParser.h */,
 				08A484750E5272C500C3FE76 /* ScriptElement.cpp */,
 				08A484760E5272C500C3FE76 /* ScriptElement.h */,
+				ABCACE7E0F415D7300805E73 /* ScriptEvaluator.h */,
 				E11C9DAF0EB3699500E409DB /* ScriptExecutionContext.cpp */,
 				E11C9D9A0EB3681200E409DB /* ScriptExecutionContext.h */,
 				084AEBE20FB505FA0038483E /* SelectElement.cpp */,
@@ -20598,6 +20637,7 @@
 				1C5F9D760E09A1B400E91D0A /* Streamline Inspector Source */,
 				93F19A0C08245E59001E9ABC /* Sources */,
 				93F19B1208245E59001E9ABC /* Frameworks */,
+				ABCACED40F416D2C00805E73 /* Copy Extra API Headers (Titanium) */,
 				939D050109D9FF6B00984996 /* Check For Global Initializers */,
 				933457E60EBFDF6B00B80894 /* Check For Exit Time Destructors */,
 				5D0D540D0E9862F60029E223 /* Check For Weak VTables and Externals */,
@@ -23103,9 +23143,12 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1CDD45E40BA9C84600F90147 /* DebugRelease.xcconfig */;
 			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1)";
+				ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1 = "ppc i386";
 				DEAD_CODE_STRIPPING = "$(DEAD_CODE_STRIPPING_debug)";
 				DEBUG_DEFINES = "$(DEBUG_DEFINES_debug)";
 				GCC_OPTIMIZATION_LEVEL = "$(GCC_OPTIMIZATION_LEVEL_debug)";
+				ONLY_ACTIVE_ARCH = NO;
 				STRIP_INSTALLED_PRODUCT = "$(STRIP_INSTALLED_PRODUCT_debug)";
 			};
 			name = Debug;
@@ -23114,6 +23157,9 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1CDD45E40BA9C84600F90147 /* DebugRelease.xcconfig */;
 			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1)";
+				ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1 = "ppc i386";
+				ONLY_ACTIVE_ARCH = NO;
 				STRIP_INSTALLED_PRODUCT = NO;
 			};
 			name = Release;
@@ -23122,6 +23168,9 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1CDD45E60BA9C84600F90147 /* Base.xcconfig */;
 			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1)";
+				ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1 = "ppc i386";
+				ONLY_ACTIVE_ARCH = NO;
 			};
 			name = Production;
 		};

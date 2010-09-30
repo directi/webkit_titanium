@@ -569,6 +569,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/XMLNSNames.h
 
 webcore_sources += \
+	WebCore/platform/network/TitaniumProtocols.cpp \
+	WebCore/platform/network/TitaniumProtocols.h \
 	WebCore/accessibility/AccessibilityARIAGridCell.cpp \
 	WebCore/accessibility/AccessibilityARIAGridCell.h \
 	WebCore/accessibility/AccessibilityARIAGrid.cpp \

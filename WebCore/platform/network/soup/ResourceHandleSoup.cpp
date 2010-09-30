@@ -55,6 +55,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include "TitaniumProtocols.h"
 
 namespace WebCore {
 
@@ -135,6 +136,9 @@ ResourceHandleInternal::~ResourceHandleInternal()
         g_source_remove(m_idleHandler);
         m_idleHandler = 0;
     }
+
+    if (m_titaniumURL)
+        free(m_titaniumURL);
 }
 
 ResourceHandle::~ResourceHandle()
@@ -420,6 +424,49 @@ static gboolean parseDataUrl(gpointer callbackData)
     return false;
 }
 
+static gboolean preprocessURL(gpointer callbackData)
+{
+    ResourceHandle* handle = static_cast<ResourceHandle*>(callbackData);
+    ResourceHandleClient* client = handle->client();
+    ResourceHandleInternal* d = handle->getInternal();
+    if (d->m_cancelled)
+        return false;
+
+    d->m_idleHandler = 0;
+
+    ASSERT(client);
+    if (!client)
+        return false;
+
+    String mimeType;
+    String data = TitaniumProtocols::Preprocess(handle->request(), mimeType);
+
+    ResourceResponse response;
+    response.setExpectedContentLength(data.length());
+
+    response.setURL(handle->request().url());
+    response.setMimeType(mimeType);
+    response.setHTTPStatusCode(200);
+    response.setHTTPStatusText("OK");
+    response.setTextEncodingName("UTF-8");
+    response.setLastModifiedDate(time(NULL));
+    client->didReceiveResponse(handle, response);
+
+    if (d->m_cancelled)
+        return false;
+
+    if (data.length() > 0)
+        client->didReceiveData(handle, data.utf8().data(), data.length(), data.length());
+
+    if (d->m_cancelled)
+        return false;
+
+    client->didFinishLoading(handle);
+
+    return false;
+}
+
+
 static bool startData(ResourceHandle* handle, String urlString)
 {
     ASSERT(handle);
@@ -430,6 +477,19 @@ static bool startData(ResourceHandle* handle, String urlString)
     // and webkit won't never know that the data has been parsed even didFinishLoading is called.
     d->m_idleHandler = g_timeout_add(0, parseDataUrl, handle);
     return true;
+}
+
+static bool startPreprocessed(ResourceHandle* handle)
+{
+    ASSERT(handle);
+
+    ResourceHandleInternal* d = handle->getInternal();
+
+    // If preprocessURL is called synchronously the job is not yet effectively started
+    // and webkit won't never know that the data has been parsed even didFinishLoading is called.
+    d->m_idleHandler = g_idle_add(preprocessURL, handle);
+    return true;
+
 }
 
 static SoupSession* createSoupSession()
@@ -596,6 +656,20 @@ bool ResourceHandle::start(NetworkingContext* context)
 
     // Used to set the authentication dialog toplevel; may be NULL
     d->m_context = context;
+
+    if (equalIgnoringCase(protocol, "app") || equalIgnoringCase(protocol, "ti")) {
+        KURL normalized(TitaniumProtocols::NormalizeURL(url));
+        bool isNormalized = strcmp(normalized.string().utf8().data(), url.string().utf8().data()) == 0;
+
+        if (isNormalized && TitaniumProtocols::CanPreprocess(request())) {
+            return startPreprocessed(this);
+
+        } else {
+            d->m_titaniumURL = strdup(url.string().utf8().data());
+            KURL fileURL = TitaniumProtocols::URLToFileURL(url);
+            return startGio(this, fileURL);
+        }
+    }
 
     if (equalIgnoringCase(protocol, "data"))
         return startData(this, urlString);
@@ -826,9 +900,11 @@ static void queryInfoCallback(GObject* source, GAsyncResult* res, gpointer)
 
     ResourceResponse response;
 
-    char* uri = g_file_get_uri(d->m_gfile);
-    response.setURL(KURL(KURL(), uri));
-    g_free(uri);
+    if (!d->m_titaniumURL) {
+        char* uri = g_file_get_uri(d->m_gfile);
+        response.setURL(KURL(KURL(), uri));
+        g_free(uri);
+    }
 
     GError* error = 0;
     GFileInfo* info = g_file_query_info_finish(d->m_gfile, res, &error);
@@ -864,6 +940,28 @@ static void queryInfoCallback(GObject* source, GAsyncResult* res, gpointer)
         cleanupGioOperation(handle.get());
         client->didFail(handle.get(), resourceError);
         return;
+    }
+
+    if (d->m_titaniumURL) {
+        KURL url = d->m_request.url();
+        KURL normalized(TitaniumProtocols::NormalizeURL(url));
+        if (strcmp(normalized.string().utf8().data(), url.string().utf8().data())) {
+
+            response.setURL(url);
+            response.setHTTPStatusCode(200);
+            response.setHTTPStatusText("Permanently Moved");
+            response.setHTTPHeaderField("Location", normalized.string().utf8().data());
+
+            ResourceRequest newRequest = handle->request();
+            newRequest.setURL(normalized);
+            if (d->client())
+                d->client()->willSendRequest(handle.get(), newRequest, response);
+
+        } else {
+            response.setURL(KURL(KURL(), d->m_titaniumURL));
+            response.setHTTPStatusCode(200);
+            response.setHTTPStatusText("OK");
+        }
     }
 
     response.setMimeType(g_file_info_get_content_type(info));

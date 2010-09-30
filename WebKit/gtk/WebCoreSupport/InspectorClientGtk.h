@@ -45,7 +45,10 @@ namespace WebKit {
 
     class InspectorFrontendClient;
 
-    class InspectorClient : public WebCore::InspectorClient {
+	// Titanium Patch: Not sure if this is required. 
+	//extern char* CustomGtkWebInspectorPath;
+
+	class InspectorClient : public WebCore::InspectorClient {
     public:
         InspectorClient(WebKitWebView* webView);
         ~InspectorClient();

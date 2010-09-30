@@ -383,6 +383,9 @@ if (isGtk()) {
     # Copy WebKitSupportLibrary to the correct location in WebKitLibraries so it can be found.
     # Will fail if WebKitSupportLibrary.zip is not in source root.
     (system("perl WebKitTools/Scripts/update-webkit-support-libs") == 0) or die;
+    
+    # Need to check if we're cairo... Just hardcoding for now.
+    (system("perl WebKitTools/Scripts/update-webkit-cairo-libs") == 0) or die;
 } elsif (isQt()) {
     @options = @ARGV;
     push @options, "--install-headers=" . $installHeaders if defined($installHeaders);

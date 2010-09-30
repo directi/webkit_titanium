@@ -1,4 +1,12 @@
 EXPORTS
+	?addScriptEvaluator@@YGXPAUIWebScriptEvaluator@@@Z
+	setNormalizeURLCallback
+	setURLToFileURLCallback
+	setCanPreprocessCallback
+	setPreprocessCallback
+	setProxyCallback
+	setCookieJarFilename
+
         DllGetClassObject   PRIVATE
         DllCanUnloadNow     PRIVATE
         DllRegisterServer   PRIVATE
