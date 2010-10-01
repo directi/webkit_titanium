@@ -30,6 +30,7 @@
 #include <wtf/Deque.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PassRefPtr.h>
+#include "ScriptEvaluator.h"
 
 namespace WebCore {
 
@@ -68,7 +69,7 @@ private:
 
     void executeParsingBlockingScript();
     void executePendingScriptAndDispatchEvent(PendingScript&);
-    void executeScript(const ScriptSourceCode&) const;
+    void executeScript(const String mimeType, const ScriptSourceCode&, ScriptEvaluator *) const;
     bool haveParsingBlockingScript() const;
     bool executeParsingBlockingScripts();
 

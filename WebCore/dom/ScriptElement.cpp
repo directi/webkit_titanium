@@ -51,13 +51,24 @@
 
 namespace WebCore {
 
-WTF::Vector<ScriptEvaluator*> ScriptElement::evaluators;
+WTF::Vector<ScriptEvaluator*> ScriptElement::m_evaluators;
 
 /*static*/
 void ScriptElement::addScriptEvaluator(ScriptEvaluator* evaluator)
 {
-    evaluators.append(evaluator);
+    m_evaluators.append(evaluator);
 }
+
+ScriptEvaluator* ScriptElement::findEvaluator(String mimeType) 
+{
+    for (size_t i = 0; i < m_evaluators.size(); i++) {
+		ScriptEvaluator* evaluator = m_evaluators.at(i);
+		if (evaluator && evaluator->matchesMimeType(mimeType))
+			return evaluator;
+	}
+	return 0;
+}
+
 
 void ScriptElement::insertedIntoDocument(ScriptElementData& data, const String& sourceUrl)
 {
@@ -200,26 +211,6 @@ void ScriptElementData::evaluateScript(const ScriptSourceCode& sourceCode)
     if (m_evaluated || sourceCode.isEmpty())
         return;
 
-    if (!shouldExecuteAsJavaScript()) {
-        Frame* frame = m_element->document()->frame();
-        if (!frame)
-            return;
-
-        for (size_t i = 0; i < ScriptElement::evaluators.size(); i++) {
-            ScriptEvaluator* evaluator = ScriptElement::evaluators.at(i);
-            if (!evaluator || !evaluator->matchesMimeType(m_scriptElement->typeAttributeValue()))
-                continue;
-
-            m_evaluated = true;
-            evaluator->evaluate(m_scriptElement->typeAttributeValue(), sourceCode,
-                frame->script()->windowShell(mainThreadNormalWorld())->window()->globalExec());
-            Document::updateStyleForAllDocuments();
-            return;
-        }
-
-        return;
-    }
-
     if (Frame* frame = m_element->document()->frame()) {
         if (!frame->script()->canExecuteScripts(AboutToExecuteScript))
             return;
@@ -240,7 +231,13 @@ void ScriptElementData::evaluateScript(const ScriptSourceCode& sourceCode)
         // Create a script from the script element node, using the script
         // block's source and the script block's type.
         // Note: This is where the script is compiled and actually executed.
-        frame->script()->evaluate(sourceCode);
+		ScriptEvaluator* evaluator = ScriptElement::findEvaluator(m_scriptElement->typeAttributeValue());
+		if(evaluator) {
+            evaluator->evaluate(m_scriptElement->typeAttributeValue(), sourceCode,
+                frame->script()->windowShell(mainThreadNormalWorld())->window()->globalExec());
+		} else {
+			frame->script()->evaluate(sourceCode);
+		}
 
         // Remove the "write-neutralised" flag from neutralised doc, if it was
         // set in the earlier step.
@@ -251,26 +248,6 @@ void ScriptElementData::evaluateScript(const ScriptSourceCode& sourceCode)
 
         Document::updateStyleForAllDocuments();
     }
-}
-
-ScriptEvaluator* ScriptElementData::findEvaluator() const
-{
-    String type = m_scriptElement->typeAttributeValue();
-    String language = m_scriptElement->languageAttributeValue();
-
-    for (size_t i = 0; i < ScriptElement::evaluators.size(); i++) {
-        ScriptEvaluator* evaluator = ScriptElement::evaluators.at(i);
-        if (evaluator) {
-            if (!type.isEmpty() && evaluator->matchesMimeType(type)) {
-                return evaluator;
-            }
-            else if (!language.isEmpty() && evaluator->matchesMimeType(language)) {
-                return evaluator;
-            }
-        }
-    }
-
-    return NULL;
 }
 
 void ScriptElementData::stopLoadRequest()

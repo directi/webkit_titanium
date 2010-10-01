@@ -98,7 +98,7 @@ public:
     ScriptValue executeScript(const String& script, bool forceUserGesture = false, ShouldAllowXSS shouldAllowXSS = DoNotAllowXSS);
     ScriptValue executeScriptInWorld(DOMWrapperWorld* world, const String& script, bool forceUserGesture = false, ShouldAllowXSS shouldAllowXSS = DoNotAllowXSS);
 
-	ScriptValue executeScript(const ScriptSourceCode& sourceCode, const String& mimeType, ScriptEvaluator* evaluator);
+	ScriptValue executeScript(const String mimeType, const ScriptSourceCode& sourceCode, ScriptEvaluator* evaluator);
 
     // Returns true if argument is a JavaScript URL.
     bool executeIfJavaScriptURL(const KURL&, bool userGesture = false, ShouldReplaceDocumentIfJavaScriptURL shouldReplaceDocumentIfJavaScriptURL = ReplaceDocumentIfJavaScriptURL);

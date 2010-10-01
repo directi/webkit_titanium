@@ -729,7 +729,7 @@ bool ResourceHandleManager::preprocess(ResourceHandle* handle)
     if (d->m_cancelled)
         return false;
 
-    client->didFinishLoading(handle);
+    client->didFinishLoading(handle, 0);
 
     return false;
 }

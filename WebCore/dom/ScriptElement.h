@@ -53,10 +53,10 @@ public:
 
     // A charset for loading the script (may be overridden by HTTP headers or a BOM).
     virtual String scriptCharset() const = 0;
-    static void addScriptEvaluator(ScriptEvaluator* evaluator);
-    static WTF::Vector<ScriptEvaluator*> evaluators;
-
     virtual bool shouldExecuteAsJavaScript() const = 0;
+
+	static ScriptEvaluator* findEvaluator(String mimeType);
+    static void addScriptEvaluator(ScriptEvaluator* evaluator);
 
 protected:
     // Helper functions used by our parent classes.
@@ -65,6 +65,9 @@ protected:
     static void childrenChanged(ScriptElementData&);
     static void finishParsingChildren(ScriptElementData&, const String& sourceUrl);
     static void handleSourceAttribute(ScriptElementData&, const String& sourceUrl);
+
+private:
+	static WTF::Vector<ScriptEvaluator*> ScriptElement::m_evaluators;
 };
 
 // HTML/SVGScriptElement hold this struct as member variable
@@ -76,7 +79,6 @@ public:
 
     bool ignoresLoadRequest() const;
     bool shouldExecuteAsJavaScript() const;
-    ScriptEvaluator* findEvaluator() const;
 
     String scriptContent() const;
     String scriptCharset() const;

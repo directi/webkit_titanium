@@ -16,6 +16,7 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
+			OutputDirectory="$(WebKitOutputDir)\bin"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefines.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug.vsprops;.\WebKit2WebProcessCommon.vsprops"
 			CharacterSet="1"
@@ -78,6 +79,7 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
+			OutputDirectory="$(WebKitOutputDir)\bin"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefines.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\release.vsprops;.\WebKit2WebProcessCommon.vsprops"
 			CharacterSet="1"
@@ -141,6 +143,7 @@
 		</Configuration>
 		<Configuration
 			Name="Debug_All|Win32"
+			OutputDirectory="$(WebKitOutputDir)\bin"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefines.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug_internal.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug_all.vsprops;.\WebKit2WebProcessCommon.vsprops"
 			CharacterSet="1"
@@ -203,6 +206,7 @@
 		</Configuration>
 		<Configuration
 			Name="Debug_Internal|Win32"
+			OutputDirectory="$(WebKitOutputDir)\bin"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefines.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug_internal.vsprops;.\WebKit2WebProcessCommon.vsprops"
 			CharacterSet="1"
@@ -265,7 +269,7 @@
 		</Configuration>
 		<Configuration
 			Name="Debug_CFLite|Win32"
-			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
+			OutputDirectory="$(WebKitOutputDir)\bin"
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefines.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug_wincairo.vsprops;.\WebKit2WebProcessCommon.vsprops"

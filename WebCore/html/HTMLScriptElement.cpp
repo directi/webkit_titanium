@@ -30,17 +30,10 @@
 #include "HTMLNames.h"
 #include "ScriptEventListener.h"
 #include "Text.h"
-#include "ScriptEvaluator.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
-
-ScriptEvaluator* HTMLScriptElement::findEvaluator() const
-{
-    return m_data.findEvaluator();
-}
-
 
 inline HTMLScriptElement::HTMLScriptElement(const QualifiedName& tagName, Document* doc, bool createdByParser)
     : HTMLElement(tagName, doc)

@@ -39,8 +39,6 @@
 #include "NotImplemented.h"
 #include "ScriptElement.h"
 #include "ScriptSourceCode.h"
-#include "ScriptEvaluator.h"
-#include "HTMLScriptElement.h"
 
 namespace WebCore {
 
@@ -140,31 +138,25 @@ void HTMLScriptRunner::executePendingScriptAndDispatchEvent(PendingScript& pendi
         if (errorOccurred)
             scriptElement->dispatchEvent(createScriptErrorEvent());
         else {
-            executeScript(sourceCode);
+			String mimeType = scriptElement->getAttribute(typeAttr);
+			ScriptEvaluator *scriptEvaluator = ScriptElement::findEvaluator(mimeType);
+            executeScript(mimeType, sourceCode, scriptEvaluator);
             scriptElement->dispatchEvent(createScriptLoadEvent());
         }
     }
     ASSERT(!m_scriptNestingLevel);
 }
 
-void HTMLScriptRunner::executeScript(const ScriptSourceCode& sourceCode) const
+void HTMLScriptRunner::executeScript(const String mimeType, const ScriptSourceCode& sourceCode, ScriptEvaluator *scriptEvaluator) const
 {
     ASSERT(m_document);
-    ScriptElement* scriptElement = toScriptElement(element);
-    ASSERT(scriptElement);
-	HTMLScriptElement* hse = static_cast<HTMLScriptElement*> (scriptElement);
-	ASSERT(hse);
-	ScriptEvaluator* m_scriptEvaluator = hse->findEvaluator();
-    String m_scriptMimeType = hse->type();
-    if (!(scriptElement->shouldExecuteAsJavaScript() || (m_scriptEvaluator != NULL)))
-        return;
     ASSERT(isExecutingScript());
     if (!m_document->frame())
         return;
-	if (!m_scriptEvaluator || m_scriptMimeType.length() == 0 || !m_scriptEvaluator->matchesMimeType(m_scriptMimeType)) {
+	if (!scriptEvaluator) {
 	    m_document->frame()->script()->executeScript(sourceCode);
 	} else {
-        m_document->frame()->script()->executeScript(sourceCode, m_scriptMimeType, m_scriptEvaluator);
+        m_document->frame()->script()->executeScript(mimeType, sourceCode, scriptEvaluator);
     }
 }
 
@@ -312,8 +304,12 @@ void HTMLScriptRunner::runScript(Element* script, int startingLineNumber)
 
         ScriptElement* scriptElement = toScriptElement(script);
         ASSERT(scriptElement);
-        if (!scriptElement->shouldExecuteAsJavaScript())
-            return;
+
+		String mimeType = script->getAttribute(typeAttr);
+		ScriptEvaluator* scriptEvaluator = ScriptElement::findEvaluator(mimeType);
+
+		if (!(scriptElement->shouldExecuteAsJavaScript() || (!scriptEvaluator)))
+			return;
         
         if (script->hasAttribute(srcAttr)) {
             if (script->hasAttribute(asyncAttr)) // Async takes precendence over defer.
@@ -330,7 +326,7 @@ void HTMLScriptRunner::runScript(Element* script, int startingLineNumber)
             // ASSERT(document()->haveStylesheetsLoaded());
             ASSERT(isExecutingScript());
             ScriptSourceCode sourceCode(script->textContent(), documentURLForScriptExecution(m_document), startingLineNumber);
-            executeScript(sourceCode);
+            executeScript(mimeType, sourceCode, scriptEvaluator);
         }
     }
 }
