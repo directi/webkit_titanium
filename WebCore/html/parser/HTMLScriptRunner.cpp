@@ -308,7 +308,7 @@ void HTMLScriptRunner::runScript(Element* script, int startingLineNumber)
 		String mimeType = script->getAttribute(typeAttr);
 		ScriptEvaluator* scriptEvaluator = ScriptElement::findEvaluator(mimeType);
 
-		if (!(scriptElement->shouldExecuteAsJavaScript() || (!scriptEvaluator)))
+		if (!(scriptElement->shouldExecuteAsJavaScript() || (scriptEvaluator)))
 			return;
         
         if (script->hasAttribute(srcAttr)) {
