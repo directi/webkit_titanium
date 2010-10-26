@@ -28,7 +28,6 @@
 #include "ArgumentDecoder.h"
 #include "ArgumentEncoder.h"
 #include <WebCore/ResourceResponse.h>
-#include <WebKitSystemInterface/WebKitSystemInterface.h>
 
 using namespace WebCore;
 
@@ -42,19 +41,6 @@ PlatformCertificateInfo::PlatformCertificateInfo()
 PlatformCertificateInfo::PlatformCertificateInfo(const ResourceResponse& response)
     : m_certificateContext(0)
 {
-    CFURLResponseRef cfResponse = response.cfURLResponse();
-    if (!cfResponse)
-        return;
-
-    CFDictionaryRef certificateInfo = wkGetSSLCertificateInfo(cfResponse);
-    if (!certificateInfo)
-        return;
-
-    void* data = wkGetSSLPeerCertificateData(certificateInfo);
-    if (!data)
-        return;
-
-    m_certificateContext = ::CertDuplicateCertificateContext(static_cast<PCCERT_CONTEXT>(data));
 }
 
 PlatformCertificateInfo::~PlatformCertificateInfo()

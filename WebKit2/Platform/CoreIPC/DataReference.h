@@ -30,7 +30,9 @@ namespace CoreIPC {
 
 class ArgumentDecoder;
 class ArgumentEncoder;
-    
+
+typedef unsigned char uint8_t;
+
 class DataReference {
 public:
     DataReference()
