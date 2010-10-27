@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 9.00
-# Visual Studio 2005
+# Visual C++ Express 2005
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "JavaScriptCore", "..\..\..\JavaScriptCore\JavaScriptCore.vcproj\JavaScriptCore\JavaScriptCore.vcproj", "{011D10F1-B656-4A1B-A0C3-3842F02122C5}"
 	ProjectSection(ProjectDependencies) = postProject
 		{AA8A5A85-592B-4357-BC60-E0E91E026AF6} = {AA8A5A85-592B-4357-BC60-E0E91E026AF6}
@@ -330,13 +330,11 @@ Global
 		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Debug_All|Win32.ActiveCfg = Debug_All|Win32
 		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Debug_All|Win32.Build.0 = Debug_All|Win32
 		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Debug_Cairo|Win32.ActiveCfg = Debug|Win32
-		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Debug_Cairo|Win32.Build.0 = Debug|Win32
 		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Debug_Internal|Win32.ActiveCfg = Debug_Internal|Win32
 		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Debug_Internal|Win32.Build.0 = Debug_Internal|Win32
 		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Debug|Win32.ActiveCfg = Debug|Win32
 		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Debug|Win32.Build.0 = Debug|Win32
 		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Release_Cairo|Win32.ActiveCfg = Release|Win32
-		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Release_Cairo|Win32.Build.0 = Release|Win32
 		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Release|Win32.ActiveCfg = Release|Win32
 		{59CC0547-70AC-499C-9B19-EC01C6F61137}.Release|Win32.Build.0 = Release|Win32
 		{DA31DA52-6675-48D4-89E0-333A7144397C}.Debug_All|Win32.ActiveCfg = all|Win32

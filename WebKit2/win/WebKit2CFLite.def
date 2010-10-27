@@ -125,3 +125,7 @@ EXPORTS
         ?wait@ThreadCondition@WTF@@QAEXAAVMutex@2@@Z
         ?waitForThreadCompletion@WTF@@YAHIPAPAX@Z
         ?createThread@WTF@@YAIP6APAXPAX@Z0@Z
+
+	; Added For Curl Proxies.
+	setProxyCallback
+	setCookieJarFileName
