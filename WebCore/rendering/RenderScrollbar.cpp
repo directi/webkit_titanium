@@ -58,8 +58,7 @@ RenderScrollbar::RenderScrollbar(ScrollbarClient* client, ScrollbarOrientation o
 
 RenderScrollbar::~RenderScrollbar()
 {
-	// Some memory leak will happen I'm sure, because I'm ignoring this - but bigger problems for now...
-    // ASSERT(m_parts.isEmpty());
+    ASSERT(m_parts.isEmpty());
 }
 
 RenderBox* RenderScrollbar::owningRenderer() const
