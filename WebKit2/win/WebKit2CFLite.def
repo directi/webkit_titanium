@@ -129,3 +129,4 @@ EXPORTS
 	; Added For Curl Proxies.
 	setProxyCallback
 	setCookieJarFileName
+	setTitaniumProtocolResolver

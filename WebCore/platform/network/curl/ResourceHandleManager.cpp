@@ -124,6 +124,7 @@ ResourceHandleManager::ResourceHandleManager()
     , m_certificatePath (certificatePath())
     , m_runningJobs(0)
 	, m_ProxyCallback(0)
+	, m_resolver(0)
 {
     curl_global_init(CURL_GLOBAL_ALL);
     m_curlMultiHandle = curl_multi_init();
@@ -326,6 +327,11 @@ size_t readCallback(void* ptr, size_t size, size_t nmemb, void* data)
 void ResourceHandleManager::setProxyCallback(ProxyForURLCallback cb) 
 {
 	m_ProxyCallback = cb;
+}
+
+void ResourceHandleManager::setTitaniumProtocolResolver(TitaniumProtocolResolver p)
+{
+	m_resolver = p;
 }
 
 void ResourceHandleManager::downloadTimerCallback(Timer<ResourceHandleManager>* timer)
@@ -697,6 +703,14 @@ void ResourceHandleManager::initializeHandle(ResourceHandle* job)
 
     ResourceHandleInternal* d = job->getInternal();
     String url = kurl.string();
+	if(m_resolver && (url.startsWith("app://") || url.startsWith("ti://"))) 
+	{
+		char *buff = new char[4096];
+		m_resolver(url.utf8().data(), buff, 4096);
+		url = String::fromUTF8(buff);
+		kurl = KURL(ParsedURLString, url);
+		delete [] buff;
+	}
 
     if (kurl.isLocalFile()) {
         String query = kurl.query();

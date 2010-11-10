@@ -11,8 +11,10 @@
 extern "C" {
 #endif
 	QUICKCURLSETTINGS_API typedef void(*ProxyForURLCallback)(const char*, char*, int);
+	QUICKCURLSETTINGS_API typedef void(*TitaniumProtocolResolver)(const char*, char*, int);
 	QUICKCURLSETTINGS_API void setProxyCallback(ProxyForURLCallback cb);
 	QUICKCURLSETTINGS_API void setCookieJarFileName(const char* filename);
+	QUICKCURLSETTINGS_API void setTitaniumProtocolResolver(TitaniumProtocolResolver p);
 #ifdef __cplusplus
 }
 #endif

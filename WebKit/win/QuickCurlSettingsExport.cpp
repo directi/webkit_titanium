@@ -16,3 +16,8 @@ QUICKCURLSETTINGS_API void setCookieJarFileName(const char* filename)
 {
 	WebCore::ResourceHandleManager::sharedInstance()->setCookieJarFileName(filename);
 }
+
+QUICKCURLSETTINGS_API void setTitaniumProtocolResolver(TitaniumProtocolResolver p)
+{
+	WebCore::ResourceHandleManager::sharedInstance()->setTitaniumProtocolResolver(p);
+}
