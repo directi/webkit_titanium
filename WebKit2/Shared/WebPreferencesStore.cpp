@@ -36,21 +36,36 @@ WebPreferencesStore::WebPreferencesStore()
     : javaScriptEnabled(true)
     , loadsImagesAutomatically(true)
     , pluginsEnabled(true)
+    , javaEnabled(true)
     , offlineWebApplicationCacheEnabled(false)
     , localStorageEnabled(true)
     , xssAuditorEnabled(true)
     , frameFlatteningEnabled(false)
+    , acceleratedCompositingEnabled(true)
+    , compositingBordersVisible(false)
+    , compositingRepaintCountersVisible(false)
+    , privateBrowsingEnabled(false)
+    , developerExtrasEnabled(false)
     , fontSmoothingLevel(FontSmoothingLevelMedium)
     , minimumFontSize(1)
     , minimumLogicalFontSize(9)
     , defaultFontSize(16)
     , defaultFixedFontSize(13)
+#if PLATFORM(WIN)
+    , standardFontFamily("Times New Roman")
+    , cursiveFontFamily("Comic Sans MS")
+    , fantasyFontFamily("Comic Sans MS")
+    , fixedFontFamily("Courier New")
+    , sansSerifFontFamily("Arial")
+    , serifFontFamily("Times New Roman")
+#else
     , standardFontFamily("Times")
     , cursiveFontFamily("Apple Chancery")
     , fantasyFontFamily("Papyrus")
     , fixedFontFamily("Courier")
     , sansSerifFontFamily("Helvetica")
     , serifFontFamily("Times")
+#endif
 {
 }
 
@@ -59,10 +74,13 @@ void WebPreferencesStore::encode(CoreIPC::ArgumentEncoder* encoder) const
     encoder->encode(javaScriptEnabled);
     encoder->encode(loadsImagesAutomatically);
     encoder->encode(pluginsEnabled);
+    encoder->encode(javaEnabled);
     encoder->encode(offlineWebApplicationCacheEnabled);
     encoder->encode(localStorageEnabled);
     encoder->encode(xssAuditorEnabled);
     encoder->encode(frameFlatteningEnabled);
+    encoder->encode(privateBrowsingEnabled);
+    encoder->encode(developerExtrasEnabled);
     encoder->encode(fontSmoothingLevel);
     encoder->encode(minimumFontSize);
     encoder->encode(minimumLogicalFontSize);
@@ -74,6 +92,9 @@ void WebPreferencesStore::encode(CoreIPC::ArgumentEncoder* encoder) const
     encoder->encode(fixedFontFamily);
     encoder->encode(sansSerifFontFamily);
     encoder->encode(serifFontFamily);
+    encoder->encode(acceleratedCompositingEnabled);
+    encoder->encode(compositingBordersVisible);
+    encoder->encode(compositingRepaintCountersVisible);
 }
 
 bool WebPreferencesStore::decode(CoreIPC::ArgumentDecoder* decoder, WebPreferencesStore& s)
@@ -84,6 +105,8 @@ bool WebPreferencesStore::decode(CoreIPC::ArgumentDecoder* decoder, WebPreferenc
         return false;
     if (!decoder->decode(s.pluginsEnabled))
         return false;
+    if (!decoder->decode(s.javaEnabled))
+        return false;
     if (!decoder->decode(s.offlineWebApplicationCacheEnabled))
         return false;
     if (!decoder->decode(s.localStorageEnabled))
@@ -91,6 +114,10 @@ bool WebPreferencesStore::decode(CoreIPC::ArgumentDecoder* decoder, WebPreferenc
     if (!decoder->decode(s.xssAuditorEnabled))
         return false;
     if (!decoder->decode(s.frameFlatteningEnabled))
+        return false;
+    if (!decoder->decode(s.privateBrowsingEnabled))
+        return false;
+    if (!decoder->decode(s.developerExtrasEnabled))
         return false;
     if (!decoder->decode(s.fontSmoothingLevel))
         return false;
@@ -113,6 +140,12 @@ bool WebPreferencesStore::decode(CoreIPC::ArgumentDecoder* decoder, WebPreferenc
     if (!decoder->decode(s.sansSerifFontFamily))
         return false;
     if (!decoder->decode(s.serifFontFamily))
+        return false;
+    if (!decoder->decode(s.acceleratedCompositingEnabled))
+        return false;
+    if (!decoder->decode(s.compositingBordersVisible))
+        return false;
+    if (!decoder->decode(s.compositingRepaintCountersVisible))
         return false;
 
     if (hasXSSAuditorEnabledTestRunnerOverride)

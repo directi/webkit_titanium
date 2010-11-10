@@ -38,9 +38,30 @@ function prepareMove()
 
 function doMove()
 {
-  var event = document.createEvent('KeyboardEvents');
-  event.initKeyboardEvent('keydown', true, true, document.defaultView, gExpectedResults[gIndex][0], 0, false, false, false, false, false);
-  document.dispatchEvent(event);
+  var direction;
+
+  switch (gExpectedResults[gIndex][0]) {
+  case "Up":
+    direction = "upArrow";
+    break;
+  case "Right":
+    direction = "rightArrow";
+    break;
+  case "Down":
+    direction = "downArrow";
+    break;
+  case "Left":
+    direction = "leftArrow";
+    break;
+  case "Space":
+    direction = " ";
+    break;
+  default:
+    debug("Action [" + gExpectedResults[gIndex][0] + "] not supported.");
+  }
+
+  if (window.layoutTestController && direction)
+    eventSender.keyDown(direction);
 
   setTimeout(verifyAndAdvance, 15);
 }

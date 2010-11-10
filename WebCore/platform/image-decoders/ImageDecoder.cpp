@@ -31,6 +31,7 @@
 #include "ICOImageDecoder.h"
 #include "JPEGImageDecoder.h"
 #include "PNGImageDecoder.h"
+#include "WEBPImageDecoder.h"
 #include "SharedBuffer.h"
 
 using namespace std;
@@ -74,6 +75,19 @@ ImageDecoder* ImageDecoder::create(const SharedBuffer& data, bool premultiplyAlp
     if (!memcmp(contents, "\xFF\xD8\xFF", 3))
         return new JPEGImageDecoder(premultiplyAlpha);
 
+#if USE(WEBP)
+    if (!memcmp(contents, "RIFF", 4)) {
+        static const unsigned webpExtraMarker = 6;
+        static const unsigned webpExtraMarkeroffset = 8;
+        char header[webpExtraMarker];
+        unsigned length = copyFromSharedBuffer(header, webpExtraMarker, data, webpExtraMarkeroffset);
+        if (length >= webpExtraMarker) {
+            if (!memcmp(header, "WEBPVP", webpExtraMarker))
+                return new WEBPImageDecoder(premultiplyAlpha);
+        }
+    }
+#endif
+
     // BMP
     if (strncmp(contents, "BM", 2) == 0)
         return new BMPImageDecoder(premultiplyAlpha);
@@ -103,7 +117,7 @@ RGBA32Buffer& RGBA32Buffer::operator=(const RGBA32Buffer& other)
     if (this == &other)
         return *this;
 
-    copyBitmapData(other);
+    copyReferenceToBitmapData(other);
     setRect(other.rect());
     setStatus(other.status());
     setDuration(other.duration());
@@ -114,7 +128,8 @@ RGBA32Buffer& RGBA32Buffer::operator=(const RGBA32Buffer& other)
 
 void RGBA32Buffer::clear()
 {
-    m_bytes.clear();
+    m_backingStore.clear();
+    m_bytes = 0;
     m_status = FrameEmpty;
     // NOTE: Do not reset other members here; clearFrameBufferCache() calls this
     // to free the bitmap data, but other functions like initFrameBuffer() and
@@ -124,8 +139,16 @@ void RGBA32Buffer::clear()
 
 void RGBA32Buffer::zeroFill()
 {
-    m_bytes.fill(0);
+    memset(m_bytes, 0, m_size.width() * m_size.height() * sizeof(PixelData));
     m_hasAlpha = true;
+}
+
+#if !PLATFORM(CG)
+
+void RGBA32Buffer::copyReferenceToBitmapData(const RGBA32Buffer& other)
+{
+    ASSERT(this != &other);
+    copyBitmapData(other);
 }
 
 bool RGBA32Buffer::copyBitmapData(const RGBA32Buffer& other)
@@ -133,7 +156,8 @@ bool RGBA32Buffer::copyBitmapData(const RGBA32Buffer& other)
     if (this == &other)
         return true;
 
-    m_bytes = other.m_bytes;
+    m_backingStore = other.m_backingStore;
+    m_bytes = m_backingStore.data();
     m_size = other.m_size;
     setHasAlpha(other.m_hasAlpha);
     return true;
@@ -143,7 +167,8 @@ bool RGBA32Buffer::setSize(int newWidth, int newHeight)
 {
     // NOTE: This has no way to check for allocation failure if the requested
     // size was too big...
-    m_bytes.resize(newWidth * newHeight);
+    m_backingStore.resize(newWidth * newHeight);
+    m_bytes = m_backingStore.data();
     m_size = IntSize(newWidth, newHeight);
 
     // Zero the image.
@@ -151,6 +176,8 @@ bool RGBA32Buffer::setSize(int newWidth, int newHeight)
 
     return true;
 }
+
+#endif
 
 bool RGBA32Buffer::hasAlpha() const
 {
@@ -160,6 +187,11 @@ bool RGBA32Buffer::hasAlpha() const
 void RGBA32Buffer::setHasAlpha(bool alpha)
 {
     m_hasAlpha = alpha;
+}
+
+void RGBA32Buffer::setColorProfile(const ColorProfile& colorProfile)
+{
+    m_colorProfile = colorProfile;
 }
 
 void RGBA32Buffer::setStatus(FrameStatus status)

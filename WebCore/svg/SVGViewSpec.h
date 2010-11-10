@@ -21,6 +21,8 @@
 #define SVGViewSpec_h
 
 #if ENABLE(SVG)
+#include "SVGAnimatedPropertyMacros.h"
+#include "SVGElement.h"
 #include "SVGFitToViewBox.h"
 #include "SVGZoomAndPan.h"
 
@@ -29,14 +31,13 @@
 namespace WebCore {
 
     class SVGElement;
-    class SVGSVGElement;
     class SVGTransformList;
 
     class SVGViewSpec : public SVGFitToViewBox,
                         public SVGZoomAndPan,
                         public Noncopyable {
     public:
-        SVGViewSpec(const SVGSVGElement*);
+        SVGViewSpec(SVGElement*);
 
         bool parseViewSpec(const String&);
 
@@ -51,14 +52,14 @@ namespace WebCore {
         String viewTargetString() const { return m_viewTargetString; }
         SVGElement* viewTarget() const;
 
-        SVGSVGElement* contextElement() const { return const_cast<SVGSVGElement*>(m_contextElement); }
+        SVGElement* contextElement() const { return const_cast<SVGElement*>(m_contextElement); }
 
     private:
-        const SVGSVGElement* m_contextElement;
+        SVGElement* m_contextElement;
 
         // SVGFitToViewBox
-        DECLARE_ANIMATED_PROPERTY(SVGViewSpec, SVGNames::viewBoxAttr, FloatRect, ViewBox, viewBox)
-        DECLARE_ANIMATED_PROPERTY(SVGViewSpec, SVGNames::preserveAspectRatioAttr, SVGPreserveAspectRatio, PreserveAspectRatio, preserveAspectRatio)
+        DECLARE_ANIMATED_PROPERTY_NEW(SVGViewSpec, SVGNames::viewBoxAttr, FloatRect, ViewBox, viewBox)
+        DECLARE_ANIMATED_PROPERTY_NEW(SVGViewSpec, SVGNames::preserveAspectRatioAttr, SVGPreserveAspectRatio, PreserveAspectRatio, preserveAspectRatio)
 
         mutable RefPtr<SVGTransformList> m_transform;
         String m_viewTargetString;

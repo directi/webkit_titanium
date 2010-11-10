@@ -25,7 +25,6 @@
 #include "HTMLFrameElementBase.h"
 
 #include "Attribute.h"
-#include "CSSHelper.h"
 #include "Document.h"
 #include "EventNames.h"
 #include "FocusController.h"
@@ -35,6 +34,7 @@
 #include "FrameView.h"
 #include "HTMLFrameSetElement.h"
 #include "HTMLNames.h"
+#include "HTMLParserIdioms.h"
 #include "KURL.h"
 #include "Page.h"
 #include "RenderEmbeddedObject.h"
@@ -92,8 +92,6 @@ bool HTMLFrameElementBase::isURLAllowed() const
 
 void HTMLFrameElementBase::openURL(bool lockHistory, bool lockBackForwardList)
 {
-    ASSERT(!m_frameName.isEmpty());
-
     if (!isURLAllowed())
         return;
 
@@ -112,7 +110,7 @@ void HTMLFrameElementBase::openURL(bool lockHistory, bool lockBackForwardList)
 void HTMLFrameElementBase::parseMappedAttribute(Attribute* attr)
 {
     if (attr->name() == srcAttr)
-        setLocation(deprecatedParseURL(attr->value()));
+        setLocation(stripLeadingAndTrailingHTMLSpaces(attr->value()));
     else if (isIdAttributeName(attr->name())) {
         // Important to call through to base for the id attribute so the hasID bit gets set.
         HTMLFrameOwnerElement::parseMappedAttribute(attr);
@@ -155,20 +153,12 @@ void HTMLFrameElementBase::setName()
     m_frameName = getAttribute(nameAttr);
     if (m_frameName.isNull())
         m_frameName = getIdAttribute();
-    
-    if (Frame* parentFrame = document()->frame())
-        m_frameName = parentFrame->tree()->uniqueChildName(m_frameName);
 }
 
 void HTMLFrameElementBase::setNameAndOpenURL()
 {
     setName();
     openURL();
-}
-
-void HTMLFrameElementBase::setNameAndOpenURLCallback(Node* n)
-{
-    static_cast<HTMLFrameElementBase*>(n)->setNameAndOpenURL();
 }
 
 void HTMLFrameElementBase::updateOnReparenting()

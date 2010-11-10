@@ -24,11 +24,16 @@
 #include "qwkpreferences_p.h"
 
 #include "ClientImpl.h"
+#include "qwkhistory.h"
+#include "qwkhistory_p.h"
+#include "FindIndicator.h"
 #include "LocalizedStrings.h"
 #include "NativeWebKeyboardEvent.h"
 #include "WebContext.h"
+#include "WebContextMenuProxyQt.h"
 #include "WebEventFactoryQt.h"
 #include "WebPlatformStrategies.h"
+#include "WebPopupMenuProxyQt.h"
 #include "WKStringQt.h"
 #include "WKURLQt.h"
 #include "ViewportArguments.h"
@@ -38,31 +43,40 @@
 #include <QStyle>
 #include <QTouchEvent>
 #include <QtDebug>
+#include <WebCore/Cursor.h>
+#include <WebCore/FloatRect.h>
 #include <WebKit2/WKFrame.h>
 #include <WebKit2/WKRetainPtr.h>
 
-
 using namespace WebKit;
 using namespace WebCore;
+
+static inline void initializePlatformStrategiesIfNeeded()
+{
+    static bool initialized = false;
+    if (initialized)
+        return;
+
+    WebPlatformStrategies::initialize();
+    initialized = true;
+}
 
 QWKPagePrivate::QWKPagePrivate(QWKPage* qq, WKPageNamespaceRef namespaceRef)
     : q(qq)
     , preferences(0)
     , createNewPageFn(0)
 {
-    // We want to use the LocalizationStrategy at the UI side as well.
-    // FIXME: this should be avoided.
-    WebPlatformStrategies::initialize();
-
+    initializePlatformStrategiesIfNeeded();
     memset(actions, 0, sizeof(actions));
-    page = toWK(namespaceRef)->createWebPage();
+    page = toImpl(namespaceRef)->createWebPage(); // Page gets a ref to namespace.
     page->setPageClient(this);
-    pageNamespaceRef = namespaceRef;
+    history = QWKHistoryPrivate::createHistory(page->backForwardList());
 }
 
 QWKPagePrivate::~QWKPagePrivate()
 {
     page->close();
+    delete history;
 }
 
 void QWKPagePrivate::init(const QSize& viewportSize, PassOwnPtr<DrawingAreaProxy> proxy)
@@ -78,16 +92,64 @@ void QWKPagePrivate::setCursor(const WebCore::Cursor& cursor)
 #endif
 }
 
+void QWKPagePrivate::setViewportArguments(const ViewportArguments& args)
+{
+    viewportArguments = args;
+    emit q->viewportChangeRequested();
+}
+
+void QWKPagePrivate::pageDidRequestScroll(const IntSize& delta)
+{
+    emit q->scrollRequested(delta.width(), delta.height());
+}
+
+void QWKPagePrivate::didChangeContentsSize(const IntSize& newSize)
+{
+    emit q->contentsSizeChanged(QSize(newSize));
+}
+
 void QWKPagePrivate::toolTipChanged(const String&, const String& newTooltip)
 {
     emit q->statusBarMessage(QString(newTooltip));
 }
 
-void QWKPagePrivate::registerEditCommand(PassRefPtr<WebEditCommandProxy>, UndoOrRedo)
+void QWKPagePrivate::registerEditCommand(PassRefPtr<WebEditCommandProxy>, WebPageProxy::UndoOrRedo)
 {
 }
 
 void QWKPagePrivate::clearAllEditCommands()
+{
+}
+
+FloatRect QWKPagePrivate::convertToDeviceSpace(const FloatRect& rect)
+{
+    return rect;
+}
+
+FloatRect QWKPagePrivate::convertToUserSpace(const FloatRect& rect)
+{
+    return rect;
+}
+
+void QWKPagePrivate::selectionChanged(bool, bool, bool, bool)
+{
+}
+
+void QWKPagePrivate::didNotHandleKeyEvent(const NativeWebKeyboardEvent&)
+{
+}
+
+PassRefPtr<WebPopupMenuProxy> QWKPagePrivate::createPopupMenuProxy()
+{
+    return WebPopupMenuProxyQt::create();
+}
+
+PassRefPtr<WebContextMenuProxy> QWKPagePrivate::createContextMenuProxy(WebPageProxy*)
+{
+    return WebContextMenuProxyQt::create();
+}
+
+void QWKPagePrivate::setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut)
 {
 }
 
@@ -249,12 +311,14 @@ QWKPage::QWKPage(WKPageNamespaceRef namespaceRef)
         qt_wk_didFirstLayoutForFrame,
         qt_wk_didFirstVisuallyNonEmptyLayoutForFrame,
         qt_wk_didRemoveFrameFromHierarchy,
+        0, /* didDisplayInsecureContentForFrame */
+        0, /* didRunInsecureContentForFrame */
         qt_wk_didStartProgress,
         qt_wk_didChangeProgress,
         qt_wk_didFinishProgress,
         qt_wk_didBecomeUnresponsive,
         qt_wk_didBecomeResponsive,
-        0,  /* processDidExit */
+        0,  /* processDidCrash */
         0   /* didChangeBackForwardList */
     };
     WKPageSetPageLoaderClient(pageRef(), &loadClient);
@@ -270,8 +334,20 @@ QWKPage::QWKPage(WKPageNamespaceRef namespaceRef)
         0,  /* runJavaScriptPrompt */
         0,  /* setStatusText */
         0,  /* mouseDidMoveOverElement */
-        0,  /* contentsSizeChanged */
-        0   /* didNotHandleKeyEvent */
+        0,  /* didNotHandleKeyEvent */
+        0,  /* toolbarsAreVisible */
+        0,  /* setToolbarsAreVisible */
+        0,  /* menuBarIsVisible */
+        0,  /* setMenuBarIsVisible */
+        0,  /* statusBarIsVisible */
+        0,  /* setStatusBarIsVisible */
+        0,  /* isResizable */
+        0,  /* setIsResizable */
+        0,  /* getWindowFrame */
+        0,  /* setWindowFrame */
+        0,  /* runBeforeUnloadConfirmPanel */
+        0,  /* didDraw */
+        0   /* pageDidScroll */
     };
     WKPageSetPageUIClient(pageRef(), &uiClient);
 }
@@ -281,7 +357,7 @@ QWKPage::~QWKPage()
     delete d;
 }
 
-QWKPage::ViewportConfiguration::ViewportConfiguration()
+QWKPage::ViewportAttributes::ViewportAttributes()
     : d(0)
     , m_initialScaleFactor(-1.0)
     , m_minimumScaleFactor(-1.0)
@@ -293,7 +369,7 @@ QWKPage::ViewportConfiguration::ViewportConfiguration()
 
 }
 
-QWKPage::ViewportConfiguration::ViewportConfiguration(const QWKPage::ViewportConfiguration& other)
+QWKPage::ViewportAttributes::ViewportAttributes(const QWKPage::ViewportAttributes& other)
     : d(other.d)
     , m_initialScaleFactor(other.m_initialScaleFactor)
     , m_minimumScaleFactor(other.m_minimumScaleFactor)
@@ -306,12 +382,12 @@ QWKPage::ViewportConfiguration::ViewportConfiguration(const QWKPage::ViewportCon
 
 }
 
-QWKPage::ViewportConfiguration::~ViewportConfiguration()
+QWKPage::ViewportAttributes::~ViewportAttributes()
 {
 
 }
 
-QWKPage::ViewportConfiguration& QWKPage::ViewportConfiguration::operator=(const QWKPage::ViewportConfiguration& other)
+QWKPage::ViewportAttributes& QWKPage::ViewportAttributes::operator=(const QWKPage::ViewportAttributes& other)
 {
     if (this != &other) {
         d = other.d;
@@ -327,28 +403,30 @@ QWKPage::ViewportConfiguration& QWKPage::ViewportConfiguration::operator=(const 
     return *this;
 }
 
-QWKPage::ViewportConfiguration QWKPage::viewportConfigurationForSize(QSize availableSize) const
+QWKPage::ViewportAttributes QWKPage::viewportAttributesForSize(const QSize& availableSize) const
 {
     static int desktopWidth = 980;
     static int deviceDPI = 160;
+
+    ViewportAttributes result;
+
+     if (availableSize.isEmpty())
+         return result; // Returns an invalid instance.
 
     // FIXME: Add a way to get these data via the platform plugin and fall back
     // to the size of the view.
     int deviceWidth = 480;
     int deviceHeight = 864;
 
-    ViewportArguments args;
-
-    WebCore::ViewportConfiguration conf = WebCore::findConfigurationForViewportData(args, desktopWidth, deviceWidth, deviceHeight, deviceDPI, availableSize);
-
-    ViewportConfiguration result;
+    WebCore::ViewportAttributes conf = WebCore::computeViewportAttributes(d->viewportArguments, desktopWidth, deviceWidth, deviceHeight, deviceDPI, availableSize);
 
     result.m_isValid = true;
-    result.m_size = conf.layoutViewport;
+    result.m_size = conf.layoutSize;
     result.m_initialScaleFactor = conf.initialScale;
     result.m_minimumScaleFactor = conf.minimumScale;
     result.m_maximumScaleFactor = conf.maximumScale;
     result.m_devicePixelRatio = conf.devicePixelRatio;
+    result.m_isUserScalable = conf.userScalable;
 
     return result;
 }
@@ -364,13 +442,13 @@ void QWKPage::timerEvent(QTimerEvent* ev)
 
 WKPageRef QWKPage::pageRef() const
 {
-    return toRef(d->page.get());
+    return toAPI(d->page.get());
 }
 
 QWKPreferences* QWKPage::preferences() const
 {
     if (!d->preferences) {
-        WKContextRef contextRef = WKPageNamespaceGetContext(d->pageNamespaceRef);
+        WKContextRef contextRef = WKPageNamespaceGetContext(toAPI(d->page->pageNamespace()));
         d->preferences = QWKPreferencesPrivate::createPreferences(contextRef);
     }
 
@@ -380,6 +458,12 @@ QWKPreferences* QWKPage::preferences() const
 void QWKPage::setCreateNewPageFunction(CreateNewPageFn function)
 {
     d->createNewPageFn = function;
+}
+
+void QWKPage::setCustomUserAgent(const QString& userAgent)
+{
+    WKRetainPtr<WKStringRef> wkUserAgent(WKStringCreateWithQString(userAgent));
+    WKPageSetCustomUserAgent(pageRef(), wkUserAgent.get());
 }
 
 void QWKPage::load(const QUrl& url)
@@ -410,6 +494,36 @@ void QWKPage::setViewportSize(const QSize& size)
 {
     if (d->page->drawingArea())
         d->page->drawingArea()->setSize(IntSize(size));
+}
+
+qreal QWKPage::textZoomFactor() const
+{
+    return WKPageGetTextZoomFactor(pageRef());
+}
+
+void QWKPage::setTextZoomFactor(qreal zoomFactor)
+{
+    WKPageSetTextZoomFactor(pageRef(), zoomFactor);
+}
+
+qreal QWKPage::pageZoomFactor() const
+{
+    return WKPageGetPageZoomFactor(pageRef());
+}
+
+void QWKPage::setPageZoomFactor(qreal zoomFactor)
+{
+    WKPageSetPageZoomFactor(pageRef(), zoomFactor);
+}
+
+void QWKPage::setPageAndTextZoomFactors(qreal pageZoomFactor, qreal textZoomFactor)
+{
+    WKPageSetPageAndTextZoomFactors(pageRef(), pageZoomFactor, textZoomFactor);
+}
+
+QWKHistory* QWKPage::history() const
+{
+    return d->history;
 }
 
 #ifndef QT_NO_ACTION

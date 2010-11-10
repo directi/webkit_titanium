@@ -405,7 +405,7 @@ void LayoutTestController::setGeolocationPermission(bool allow)
     setGeolocationPermissionCommon(allow);
 }
 
-void LayoutTestController::setMockSpeechInputResult(JSStringRef result)
+void LayoutTestController::setMockSpeechInputResult(JSStringRef result, JSStringRef language)
 {
     // FIXME: Implement for speech input layout tests.
     // See https://bugs.webkit.org/show_bug.cgi?id=39485.
@@ -1383,10 +1383,23 @@ void LayoutTestController::setEditingBehavior(const char* editingBehavior)
     string behaviorString(editingBehavior);
     if (behaviorString == "mac")
         preferences->setEditingBehavior(WebKitEditingMacBehavior);
-    if (behaviorString == "win")
+    else if (behaviorString == "win")
         preferences->setEditingBehavior(WebKitEditingWinBehavior);
+    else if (behaviorString == "unix")
+        preferences->setEditingBehavior(WebKitEditingUnixBehavior);
 }
 
 void LayoutTestController::abortModal()
 {
+}
+
+bool LayoutTestController::hasSpellingMarker(int from, int length)
+{
+    COMPtr<IWebFramePrivate> framePrivate(Query, frame);
+    if (!framePrivate)
+        return false;
+    BOOL ret = FALSE;
+    if (FAILED(framePrivate->hasSpellingMarker(from, length, &ret)))
+        return false;
+    return ret;
 }

@@ -120,6 +120,10 @@ CString TextEncoding::encode(const UChar* characters, size_t length, Unencodable
 #elif USE(GLIB_UNICODE)
     GOwnPtr<char> UTF8Source;
     UTF8Source.set(g_utf16_to_utf8(characters, length, 0, 0, 0));
+    if (!UTF8Source) {
+        // If conversion to UTF-8 failed, try with the string without normalization
+        return newTextCodec(*this)->encode(characters, length, handling);
+    }
 
     GOwnPtr<char> UTF8Normalized;
     UTF8Normalized.set(g_utf8_normalize(UTF8Source.get(), -1, G_NORMALIZE_NFC));
@@ -131,6 +135,10 @@ CString TextEncoding::encode(const UChar* characters, size_t length, Unencodable
     return newTextCodec(*this)->encode(UTF16Normalized.get(), UTF16Length, handling);
 #elif OS(WINCE)
     // normalization will be done by Windows CE API
+    OwnPtr<TextCodec> textCodec = newTextCodec(*this);
+    return textCodec.get() ? textCodec->encode(characters, length, handling) : CString();
+#elif USE(BREWMP_UNICODE)
+    // FIXME: not sure if Brew MP normalizes the input string automatically
     OwnPtr<TextCodec> textCodec = newTextCodec(*this);
     return textCodec.get() ? textCodec->encode(characters, length, handling) : CString();
 #endif

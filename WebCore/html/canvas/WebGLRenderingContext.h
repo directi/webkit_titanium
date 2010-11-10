@@ -176,6 +176,7 @@ public:
 
     void hint(unsigned long target, unsigned long mode);
     bool isBuffer(WebGLBuffer*);
+    bool isContextLost() const;
     bool isEnabled(unsigned long cap);
     bool isFramebuffer(WebGLFramebuffer*);
     bool isProgram(WebGLProgram*);
@@ -277,6 +278,9 @@ public:
 
     void viewport(long x, long y, unsigned long width, unsigned long height);
 
+    void loseContext();
+    void restoreContext();
+
     GraphicsContext3D* graphicsContext3D() const { return m_context.get(); }
 #if USE(ACCELERATED_COMPOSITING)
     virtual PlatformLayer* platformLayer() const { return m_context->platformLayer(); }
@@ -291,7 +295,8 @@ public:
   private:
     friend class WebGLObject;
 
-    WebGLRenderingContext(HTMLCanvasElement*, PassOwnPtr<GraphicsContext3D>);
+    WebGLRenderingContext(HTMLCanvasElement*, PassRefPtr<GraphicsContext3D>);
+    void initializeNewContext();
 
     void addObject(WebGLObject*);
     void detachAndRemoveAllObjects();
@@ -323,17 +328,16 @@ public:
 
     // Precise but slow index validation -- only done if conservative checks fail
     bool validateIndexArrayPrecise(unsigned long count, unsigned long type, long offset, long& numElementsRequired);
+    // If numElements <= 0, we only check if each enabled vertex attribute is bound to a buffer.
     bool validateRenderingState(long numElements);
 
     bool validateWebGLObject(WebGLObject* object);
 
     PassRefPtr<Image> videoFrameToImage(HTMLVideoElement* video);
 
-    OwnPtr<GraphicsContext3D> m_context;
+    RefPtr<GraphicsContext3D> m_context;
     bool m_needsUpdate;
     bool m_markedCanvasDirty;
-    // FIXME: I think this is broken -- it does not increment any
-    // reference counts, so may refer to destroyed objects.
     HashSet<RefPtr<WebGLObject> > m_canvasObjects;
 
     // List of bound VBO's. Used to maintain info about sizes for ARRAY_BUFFER and stored values for ELEMENT_ARRAY_BUFFER
@@ -416,10 +420,16 @@ public:
 
     int m_packAlignment;
     int m_unpackAlignment;
-    unsigned long m_implementationColorReadFormat;
-    unsigned long m_implementationColorReadType;
     bool m_unpackFlipY;
     bool m_unpackPremultiplyAlpha;
+    bool m_contextLost;
+
+    long m_stencilBits;
+    unsigned long m_stencilMask;
+    long m_stencilFuncRef; // Note that this is the user specified value, not the internal clamped value.
+    unsigned long m_stencilFuncMask;
+
+    bool m_isDepthStencilSupported;
 
     // Helpers for getParameter and others
     WebGLGetInfo getBooleanParameter(unsigned long pname);
@@ -480,6 +490,12 @@ public:
     // Helper function to validate mode for draw{Arrays/Elements}.
     bool validateDrawMode(unsigned long);
 
+    // Helper function to validate face.
+    bool validateFace(unsigned long);
+
+    // Helper function to validate stencil func.
+    bool validateStencilFunc(unsigned long);
+
     // Helper function for texParameterf and texParameteri.
     void texParameter(unsigned long target, unsigned long pname, float parami, int paramf, bool isFloat);
 
@@ -493,6 +509,9 @@ public:
 
     // Helper function to validate blend equation mode.
     bool validateBlendEquation(unsigned long);
+
+    // Helper function to validate blend func factors.
+    bool validateBlendFuncFactors(unsigned long src, unsigned long dst);
 
     // Helper function to validate a GL capability.
     bool validateCapability(unsigned long);

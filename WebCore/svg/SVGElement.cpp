@@ -42,6 +42,8 @@
 #include "SVGElementRareData.h"
 #include "SVGNames.h"
 #include "SVGSVGElement.h"
+#include "SVGStyledLocatableElement.h"
+#include "SVGTextElement.h"
 #include "SVGURIReference.h"
 #include "SVGUseElement.h"
 #include "ScriptEventListener.h"
@@ -116,7 +118,7 @@ void SVGElement::setXmlbase(const String& value, ExceptionCode&)
 
 SVGSVGElement* SVGElement::ownerSVGElement() const
 {
-    Node* n = isShadowNode() ? const_cast<SVGElement*>(this)->shadowParentNode() : parentNode();
+    ContainerNode* n = isShadowNode() ? const_cast<SVGElement*>(this)->shadowParentNode() : parentNode();
     while (n) {
         if (n->hasTagName(SVGNames::svgTag))
             return static_cast<SVGSVGElement*>(n);
@@ -131,7 +133,7 @@ SVGElement* SVGElement::viewportElement() const
 {
     // This function needs shadow tree support - as RenderSVGContainer uses this function
     // to determine the "overflow" property. <use> on <symbol> wouldn't work otherwhise.
-    Node* n = isShadowNode() ? const_cast<SVGElement*>(this)->shadowParentNode() : parentNode();
+    ContainerNode* n = isShadowNode() ? const_cast<SVGElement*>(this)->shadowParentNode() : parentNode();
     while (n) {
         if (n->hasTagName(SVGNames::svgTag) || n->hasTagName(SVGNames::imageTag) || n->hasTagName(SVGNames::symbolTag))
             return static_cast<SVGElement*>(n);
@@ -177,6 +179,19 @@ const HashSet<SVGElementInstance*>& SVGElement::instancesForElement() const
         return emptyInstances;
     }
     return rareSVGData()->elementInstances();
+}
+
+bool SVGElement::boundingBox(FloatRect& rect, SVGLocatable::StyleUpdateStrategy styleUpdateStrategy) const
+{
+    if (isStyledLocatable()) {
+        rect = static_cast<const SVGStyledLocatableElement*>(this)->getBBox(styleUpdateStrategy);
+        return true;
+    }
+    if (hasTagName(SVGNames::textTag)) {
+        rect = static_cast<const SVGTextElement*>(this)->getBBox(styleUpdateStrategy);
+        return true;
+    }
+    return false;
 }
 
 void SVGElement::setCursorElement(SVGCursorElement* cursorElement)

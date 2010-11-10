@@ -28,6 +28,7 @@
 #define WebChromeClient_h
 
 #include <WebCore/ChromeClient.h>
+#include <WebCore/ViewportArguments.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebKit {
@@ -59,12 +60,13 @@ private:
     virtual void takeFocus(WebCore::FocusDirection);
 
     virtual void focusedNodeChanged(WebCore::Node*);
+    virtual void focusedFrameChanged(WebCore::Frame*);
 
     // The Frame pointer provides the ChromeClient with context about which
     // Frame wants to create the new Page.  Also, the newly created window
     // should not be shown to the user until the ChromeClient of the newly
     // created Page has its show method called.
-    virtual WebCore::Page* createWindow(WebCore::Frame*, const WebCore::FrameLoadRequest&, const WebCore::WindowFeatures&);
+    virtual WebCore::Page* createWindow(WebCore::Frame*, const WebCore::FrameLoadRequest&, const WebCore::WindowFeatures&, const WebCore::NavigationAction&);
     virtual void show();
     
     virtual bool canRunModal();
@@ -105,6 +107,9 @@ private:
     virtual void invalidateContentsAndWindow(const WebCore::IntRect&, bool);
     virtual void invalidateContentsForSlowScroll(const WebCore::IntRect&, bool);
     virtual void scroll(const WebCore::IntSize& scrollDelta, const WebCore::IntRect& rectToScroll, const WebCore::IntRect& clipRect);
+#if ENABLE(TILED_BACKING_STORE)
+    virtual void delegatedScrollRequested(const WebCore::IntSize& scrollDelta);
+#endif
     virtual WebCore::IntPoint screenToWindow(const WebCore::IntPoint&) const;
     virtual WebCore::IntRect windowToScreen(const WebCore::IntRect&) const;
     virtual PlatformPageClient platformPageClient() const;
@@ -169,6 +174,10 @@ private:
     virtual PassRefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const;
     virtual PassRefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const;
 
+#if ENABLE(CONTEXT_MENUS)
+    virtual void showContextMenu();
+#endif
+
 #if USE(ACCELERATED_COMPOSITING)
     virtual void attachRootGraphicsLayer(WebCore::Frame*, WebCore::GraphicsLayer*);
     virtual void setNeedsOneShotDrawingSynchronization();
@@ -186,6 +195,8 @@ private:
 #if PLATFORM(WIN)
     virtual void setLastSetCursorToCurrentCursor();
 #endif
+
+    virtual void dispatchViewportDataDidChange(const WebCore::ViewportArguments&) const;
 
     String m_cachedToolTip;
     WebPage* m_page;

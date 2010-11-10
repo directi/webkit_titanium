@@ -30,11 +30,13 @@
 #include "ButtonInputType.h"
 #include "CheckboxInputType.h"
 #include "ColorInputType.h"
+#include "DateComponents.h"
 #include "DateInputType.h"
 #include "DateTimeInputType.h"
 #include "DateTimeLocalInputType.h"
 #include "EmailInputType.h"
 #include "FileInputType.h"
+#include "FormDataList.h"
 #include "HTMLInputElement.h"
 #include "HiddenInputType.h"
 #include "ImageInputType.h"
@@ -45,6 +47,7 @@
 #include "RadioInputType.h"
 #include "RangeInputType.h"
 #include "RegularExpression.h"
+#include "RenderObject.h"
 #include "ResetInputType.h"
 #include "SearchInputType.h"
 #include "SubmitInputType.h"
@@ -53,10 +56,14 @@
 #include "TimeInputType.h"
 #include "URLInputType.h"
 #include "WeekInputType.h"
+#include <limits>
+#include <wtf/Assertions.h>
 #include <wtf/HashMap.h>
 #include <wtf/text/StringHash.h>
 
 namespace WebCore {
+
+using namespace std;
 
 typedef HashMap<String, PassOwnPtr<InputType> (*)(HTMLInputElement*), CaseFoldingHash> InputTypeFactoryMap;
 static PassOwnPtr<InputTypeFactoryMap> createInputTypeFactoryMap()
@@ -117,10 +124,180 @@ bool InputType::isTextType() const
     return false;
 }
 
+bool InputType::saveFormControlState(String& result) const
+{
+    String currentValue = element()->value();
+    if (currentValue == element()->defaultValue())
+        return false;
+    result = currentValue;
+    return true;
+}
+
+void InputType::restoreFormControlState(const String& state) const
+{
+    element()->setValue(state);
+}
+
+bool InputType::isFormDataAppendable() const
+{
+    // There is no form data unless there's a name for non-image types.
+    return !element()->name().isEmpty();
+}
+
+bool InputType::appendFormData(FormDataList& encoding, bool) const
+{
+    // Always successful.
+    encoding.appendData(element()->name(), element()->value());
+    return true;
+}
+
+double InputType::valueAsDate() const
+{
+    return DateComponents::invalidMilliseconds();
+}
+
+void InputType::setValueAsDate(double, ExceptionCode& ec) const
+{
+    ec = INVALID_STATE_ERR;
+}
+
+double InputType::valueAsNumber() const
+{
+    return numeric_limits<double>::quiet_NaN();
+}
+
+void InputType::setValueAsNumber(double, ExceptionCode& ec) const
+{
+    ec = INVALID_STATE_ERR;
+}
+
+bool InputType::supportsValidation() const
+{
+    return true;
+}
+
+bool InputType::typeMismatchFor(const String&) const
+{
+    return false;
+}
+
+bool InputType::typeMismatch() const
+{
+    return false;
+}
+
+bool InputType::supportsRequired() const
+{
+    // Almost all validatable types support @required.
+    return supportsValidation();
+}
+
+bool InputType::valueMissing(const String&) const
+{
+    return false;
+}
+
 bool InputType::patternMismatch(const String&) const
 {
     return false;
 }
+
+bool InputType::rangeUnderflow(const String&) const
+{
+    return false;
+}
+
+bool InputType::rangeOverflow(const String&) const
+{
+    return false;
+}
+
+double InputType::minimum() const
+{
+    ASSERT_NOT_REACHED();
+    return 0;
+}
+
+double InputType::maximum() const
+{
+    ASSERT_NOT_REACHED();
+    return 0;
+}
+
+bool InputType::stepMismatch(const String&, double) const
+{
+    // Non-supported types should be rejected by HTMLInputElement::getAllowedValueStep().
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+double InputType::stepBase() const
+{
+    ASSERT_NOT_REACHED();
+    return 0;
+}
+
+double InputType::stepBaseWithDecimalPlaces(unsigned* decimalPlaces) const
+{
+    if (decimalPlaces)
+        *decimalPlaces = 0;
+    return stepBase();
+}
+
+double InputType::defaultStep() const
+{
+    return numeric_limits<double>::quiet_NaN();
+}
+
+double InputType::stepScaleFactor() const
+{
+    return numeric_limits<double>::quiet_NaN();
+}
+
+bool InputType::parsedStepValueShouldBeInteger() const
+{
+    return false;
+}
+
+bool InputType::scaledStepValeuShouldBeInteger() const
+{
+    return false;
+}
+
+double InputType::acceptableError(double) const
+{
+    return 0;
+}
+
+RenderObject* InputType::createRenderer(RenderArena*, RenderStyle* style) const
+{
+    return RenderObject::createObject(element(), style);
+}
+
+double InputType::parseToDouble(const String&, double defaultValue) const
+{
+    return defaultValue;
+}
+
+double InputType::parseToDoubleWithDecimalPlaces(const String& src, double defaultValue, unsigned *decimalPlaces) const
+{
+    if (decimalPlaces)
+        *decimalPlaces = 0;
+    return parseToDouble(src, defaultValue);
+}
+
+bool InputType::parseToDateComponents(const String&, DateComponents*) const
+{
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+String InputType::serialize(double) const
+{
+    ASSERT_NOT_REACHED();
+    return String();
+}
+
 
 namespace InputTypeNames {
 

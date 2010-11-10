@@ -34,13 +34,15 @@
 #if ENABLE(BLOB)
 
 #include "ExceptionCode.h"
-#include "ScriptString.h"
-#include <wtf/PassRefPtr.h>
+#include <wtf/Forward.h>
 #include <wtf/RefCounted.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
+class ArrayBuffer;
 class Blob;
+class FileReaderLoader;
 class ScriptExecutionContext;
 
 class FileReaderSync : public RefCounted<FileReaderSync> {
@@ -52,35 +54,19 @@ public:
 
     virtual ~FileReaderSync() { }
 
-    const ScriptString& readAsBinaryString(ScriptExecutionContext*, Blob*, ExceptionCode&);
-    const ScriptString& readAsText(ScriptExecutionContext* scriptExecutionContext, Blob* blob, ExceptionCode& ec)
+    PassRefPtr<ArrayBuffer> readAsArrayBuffer(ScriptExecutionContext*, Blob*, ExceptionCode&);
+    String readAsBinaryString(ScriptExecutionContext*, Blob*, ExceptionCode&);
+    String readAsText(ScriptExecutionContext* scriptExecutionContext, Blob* blob, ExceptionCode& ec)
     {
         return readAsText(scriptExecutionContext, blob, "", ec);
     }
-    const ScriptString& readAsText(ScriptExecutionContext*, Blob*, const String& encoding, ExceptionCode&);
-    const ScriptString& readAsDataURL(ScriptExecutionContext*, Blob*, ExceptionCode&);
+    String readAsText(ScriptExecutionContext*, Blob*, const String& encoding, ExceptionCode&);
+    String readAsDataURL(ScriptExecutionContext*, Blob*, ExceptionCode&);
 
 private:
-    enum ReadType {
-        ReadAsBinaryString,
-        ReadAsText,
-        ReadAsDataURL
-    };
-
     FileReaderSync();
-    
-    void read(ScriptExecutionContext*, Blob*, ReadType, ExceptionCode&);
-    void convertToText(const char* data, int size, ScriptString& result);
 
-    // Like XMLHttpRequest.m_responseText, we keep this as a ScriptString, not a WTF::String.
-    // That's because these strings can easily get huge (they are filled from the file) and
-    // because JS can easily observe many intermediate states, so it's very useful to be
-    // able to share the buffer with JavaScript versions of the whole or partial string.
-    // In contrast, this string doesn't interact much with the rest of the engine so it's not that
-    // big a cost that it isn't a String.
-    ScriptString m_result;
-
-    String m_encoding;
+    void startLoading(ScriptExecutionContext*, FileReaderLoader&, Blob*, ExceptionCode&);
 };
 
 } // namespace WebCore

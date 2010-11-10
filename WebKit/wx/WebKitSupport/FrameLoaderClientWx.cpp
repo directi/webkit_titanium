@@ -49,7 +49,6 @@
 #include "ResourceError.h"
 #include "ResourceResponse.h"
 #include "ScriptController.h"
-#include "ScriptString.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
@@ -767,7 +766,7 @@ void FrameLoaderClientWx::dispatchDidFailLoad(const ResourceError&)
     notImplemented();
 }
 
-Frame* FrameLoaderClientWx::dispatchCreatePage()
+Frame* FrameLoaderClientWx::dispatchCreatePage(const NavigationAction&)
 {
     notImplemented();
     return false;
@@ -861,6 +860,10 @@ PassRefPtr<Frame> FrameLoaderClientWx::createFrame(const KURL& url, const String
 }
 
 void FrameLoaderClientWx::didTransferChildFrameToNewDocument(Page*)
+{
+}
+
+void FrameLoaderClientWx::transferLoadingResourceFromPage(unsigned long, DocumentLoader*, const ResourceRequest&, Page*)
 {
 }
 
@@ -961,6 +964,10 @@ void FrameLoaderClientWx::transitionToCommittedForNewPage()
     
     if (m_frame)
         m_frame->createView(size, backgroundColor, transparent, IntSize(), false); 
+}
+
+void FrameLoaderClientWx::dispatchDidBecomeFrameset(bool)
+{
 }
 
 bool FrameLoaderClientWx::shouldUsePluginDocument(const String &mimeType) const

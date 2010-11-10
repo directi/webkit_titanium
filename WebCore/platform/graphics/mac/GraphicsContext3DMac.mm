@@ -36,6 +36,7 @@
 #include "ArrayBufferView.h"
 #include "CanvasRenderingContext.h"
 #include <CoreGraphics/CGBitmapContext.h>
+#include "Extensions3DOpenGL.h"
 #include "Float32Array.h"
 #include "GraphicsContext.h"
 #include "HTMLCanvasElement.h"
@@ -77,12 +78,12 @@ static void setPixelFormat(Vector<CGLPixelFormatAttribute>& attribs, int colorBi
     attribs.append(static_cast<CGLPixelFormatAttribute>(0));
 }
 
-PassOwnPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attributes attrs, HostWindow* hostWindow, GraphicsContext3D::RenderStyle renderStyle)
+PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attributes attrs, HostWindow* hostWindow, GraphicsContext3D::RenderStyle renderStyle)
 {
     // This implementation doesn't currently support rendering directly to the HostWindow.
     if (renderStyle == RenderDirectlyToHostWindow)
         return 0;
-    OwnPtr<GraphicsContext3D> context(new GraphicsContext3D(attrs, hostWindow, false));
+    RefPtr<GraphicsContext3D> context = adoptRef(new GraphicsContext3D(attrs, hostWindow, false));
     return context->m_contextObj ? context.release() : 0;
 }
 
@@ -210,6 +211,8 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attrs, HostWi
     m_compiler.setResources(ANGLEResources);
     
     ::glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+    ::glEnable(GL_POINT_SPRITE);
+
     ::glClearColor(0, 0, 0, 0);
 }
 

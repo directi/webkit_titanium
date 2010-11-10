@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2006, 2010 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2009 Google, Inc. All rights reserved.
  *
@@ -28,82 +28,48 @@
 #ifndef BackForwardList_h
 #define BackForwardList_h
 
+#include <wtf/Forward.h>
 #include <wtf/RefCounted.h>
-#include <wtf/PassRefPtr.h>
-#include <wtf/Vector.h>
 
 namespace WebCore {
 
 class HistoryItem;
 
-typedef Vector<RefPtr<HistoryItem> > HistoryItemVector;
-
-#if PLATFORM(CHROMIUM)
-// In the Chromium port, the back/forward list is managed externally.
-// See BackForwardListChromium.cpp
-class BackForwardListClient {
-public:
-    virtual ~BackForwardListClient() {}
-    virtual void addItem(PassRefPtr<HistoryItem>) = 0;
-    virtual void goToItem(HistoryItem*) = 0;
-    virtual HistoryItem* currentItem() = 0;
-    virtual HistoryItem* itemAtIndex(int) = 0;
-    virtual int backListCount() = 0;
-    virtual int forwardListCount() = 0;
-    virtual void close() = 0;
-};
-#endif
-
+// FIXME: Rename this class to BackForwardClient, and rename the
+// getter in Page accordingly.
 class BackForwardList : public RefCounted<BackForwardList> {
 public: 
     virtual ~BackForwardList()
     {
     }
 
-    virtual bool isBackForwardListImpl() const { return false; }
-
-#if PLATFORM(CHROMIUM)
-    // Must be called before any other methods. 
-    virtual void setClient(BackForwardListClient*) = 0;
-#endif
-
     virtual void addItem(PassRefPtr<HistoryItem>) = 0;
-    virtual void goBack() = 0;
-    virtual void goForward() = 0;
+
     virtual void goToItem(HistoryItem*) = 0;
         
-    virtual HistoryItem* backItem() = 0;
-    virtual HistoryItem* currentItem() = 0;
-    virtual HistoryItem* forwardItem() = 0;
     virtual HistoryItem* itemAtIndex(int) = 0;
-
-    virtual void backListWithLimit(int, HistoryItemVector&) = 0;
-    virtual void forwardListWithLimit(int, HistoryItemVector&) = 0;
-
-    virtual int capacity() = 0;
-    virtual void setCapacity(int) = 0;
-    virtual bool enabled() = 0;
-    virtual void setEnabled(bool) = 0;
     virtual int backListCount() = 0;
     virtual int forwardListCount() = 0;
-    virtual bool containsItem(HistoryItem*) = 0;
+
+    virtual bool isActive() = 0;
 
     virtual void close() = 0;
-    virtual bool closed() = 0;
-    
-    virtual void removeItem(HistoryItem*)  = 0;
-    virtual HistoryItemVector& entries()  = 0;
-    
+
 #if ENABLE(WML)
+    // FIXME: Rename this to just "clear" and change it so it's not
+    // WML-specific. This is the same operation as clearBackForwardList
+    // in the layout test controller; it would be reasonable to have it
+    // here even though HTML DOM interfaces don't require it.
     virtual void clearWMLPageHistory()  = 0;
 #endif
 
-protected:
-    BackForwardList()
-    {
-    }
+    // FIXME: Delete these once all callers are using BackForwardController
+    // instead of calling this directly.
+    HistoryItem* backItem() { return itemAtIndex(-1); }
+    HistoryItem* currentItem() { return itemAtIndex(0); }
+    HistoryItem* forwardItem() { return itemAtIndex(1); }
 };
-    
+
 } // namespace WebCore
 
 #endif // BackForwardList_h

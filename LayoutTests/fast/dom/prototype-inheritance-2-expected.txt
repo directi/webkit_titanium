@@ -81,6 +81,7 @@ PASS DOMTokenList from inner.document.forms.testForm.0.0.classList
 PASS DOMTokenListConstructor from inner.document.forms.testForm.0.classList.constructor
 PASS DOMTokenListPrototype from inner.document.forms.testForm.0.0.classList.__proto__
 PASS DOMWindow from inner
+PASS DOMWindowConstructor from inner.document.forms.testForm.0.ownerDocument.defaultView.constructor
 PASS DOMWindowPrototype from inner.document.forms.testForm.0.ownerDocument.defaultView.__proto__
 PASS DocumentPrototype from inner.document.forms.testForm.0.ownerDocument.__proto__.__proto__
 PASS ElementPrototype from inner.document.forms.testForm.0.__proto__.__proto__.__proto__
@@ -225,6 +226,7 @@ Never found CanvasGradient
 Never found CharacterData
 Never found Clipboard
 Never found DOMParser
+Never found DOMSettableTokenList
 Never found DOMStringList
 Never found Document
 Never found DocumentFragment
@@ -267,6 +269,7 @@ Never found HTMLOListElement
 Never found HTMLObjectElement
 Never found HTMLOptGroupElement
 Never found HTMLOptionElement
+Never found HTMLOutputElement
 Never found HTMLParagraphElement
 Never found HTMLParamElement
 Never found HTMLPreElement

@@ -30,10 +30,7 @@
 """Abstract base class of Port-specific entrypoints for the layout tests
 test infrastructure (the Port and Driver classes)."""
 
-from __future__ import with_statement
-
 import cgi
-import codecs
 import difflib
 import errno
 import os
@@ -42,11 +39,16 @@ import sys
 import time
 
 import apache_http_server
-import test_files
+import config as port_config
+import http_lock
 import http_server
+import test_files
 import websocket_server
 
+from webkitpy.common import system
+from webkitpy.common.system import filesystem
 from webkitpy.common.system import logutils
+from webkitpy.common.system import path
 from webkitpy.common.system.executive import Executive, ScriptError
 from webkitpy.common.system.user import User
 
@@ -54,44 +56,71 @@ from webkitpy.common.system.user import User
 _log = logutils.get_logger(__file__)
 
 
-# Python's Popen has a bug that causes any pipes opened to a
-# process that can't be executed to be leaked.  Since this
-# code is specifically designed to tolerate exec failures
-# to gracefully handle cases where wdiff is not installed,
-# the bug results in a massive file descriptor leak. As a
-# workaround, if an exec failure is ever experienced for
-# wdiff, assume it's not available.  This will leak one
-# file descriptor but that's better than leaking each time
-# wdiff would be run.
-#
-# http://mail.python.org/pipermail/python-list/
-#    2008-August/505753.html
-# http://bugs.python.org/issue3210
-_wdiff_available = True
-_pretty_patch_available = True
+class DummyOptions(object):
+    """Fake implementation of optparse.Values. Cloned from
+    webkitpy.tool.mocktool.MockOptions.
+
+    """
+
+    def __init__(self, **kwargs):
+        # The caller can set option values using keyword arguments. We don't
+        # set any values by default because we don't know how this
+        # object will be used. Generally speaking unit tests should
+        # subclass this or provider wrapper functions that set a common
+        # set of options.
+        for key, value in kwargs.items():
+            self.__dict__[key] = value
+
 
 # FIXME: This class should merge with webkitpy.webkit_port at some point.
 class Port(object):
-    """Abstract class for Port-specific hooks for the layout_test package.
-    """
+    """Abstract class for Port-specific hooks for the layout_test package."""
 
-    @staticmethod
-    def flag_from_configuration(configuration):
-        flags_by_configuration = {
-            "Debug": "--debug",
-            "Release": "--release",
-        }
-        return flags_by_configuration[configuration]
-
-    def __init__(self, **kwargs):
-        self._name = kwargs.get('port_name', None)
-        self._options = kwargs.get('options', None)
-        self._executive = kwargs.get('executive', Executive())
-        self._user = kwargs.get('user', User())
+    def __init__(self, port_name=None, options=None,
+                 executive=None,
+                 user=None,
+                 filesystem=None,
+                 config=None,
+                 **kwargs):
+        self._name = port_name
+        self._options = options
+        if self._options is None:
+            # FIXME: Ideally we'd have a package-wide way to get a
+            # well-formed options object that had all of the necessary
+            # options defined on it.
+            self._options = DummyOptions()
+        self._executive = executive or Executive()
+        self._user = user or User()
+        self._filesystem = filesystem or system.filesystem.FileSystem()
+        self._config = config or port_config.Config(self._executive,
+                                                    self._filesystem)
         self._helper = None
         self._http_server = None
         self._webkit_base_dir = None
         self._websocket_server = None
+        self._http_lock = None
+
+        # Python's Popen has a bug that causes any pipes opened to a
+        # process that can't be executed to be leaked.  Since this
+        # code is specifically designed to tolerate exec failures
+        # to gracefully handle cases where wdiff is not installed,
+        # the bug results in a massive file descriptor leak. As a
+        # workaround, if an exec failure is ever experienced for
+        # wdiff, assume it's not available.  This will leak one
+        # file descriptor but that's better than leaking each time
+        # wdiff would be run.
+        #
+        # http://mail.python.org/pipermail/python-list/
+        #    2008-August/505753.html
+        # http://bugs.python.org/issue3210
+        self._wdiff_available = True
+
+        self._pretty_patch_path = self.path_from_webkit_base("BugsSite",
+            "PrettyPatch", "prettify.rb")
+        self._pretty_patch_available = True
+        self.set_option_default('configuration', None)
+        if self._options.configuration is None:
+            self._options.configuration = self.default_configuration()
 
     def default_child_processes(self):
         """Return the number of DumpRenderTree instances to use for this
@@ -124,6 +153,27 @@ class Port(object):
     def check_image_diff(self, override_step=None, logging=True):
         """This routine is used to check whether image_diff binary exists."""
         raise NotImplementedError('Port.check_image_diff')
+
+    def check_pretty_patch(self):
+        """Checks whether we can use the PrettyPatch ruby script."""
+
+        # check if Ruby is installed
+        try:
+            result = self._executive.run_command(['ruby', '--version'])
+        except OSError, e:
+            if e.errno in [errno.ENOENT, errno.EACCES, errno.ECHILD]:
+                _log.error("Ruby is not installed; "
+                           "can't generate pretty patches.")
+                _log.error('')
+                return False
+
+        if not self.path_exists(self._pretty_patch_path):
+            _log.error('Unable to find %s .' % self._pretty_patch_path)
+            _log.error("Can't generate pretty patches.")
+            _log.error('')
+            return False
+
+        return True
 
     def compare_text(self, expected_text, actual_text):
         """Return whether or not the two strings are *not* equal. This
@@ -213,7 +263,8 @@ class Port(object):
 
         baselines = []
         for platform_dir in baseline_search_path:
-            if os.path.exists(os.path.join(platform_dir, baseline_filename)):
+            if self.path_exists(self._filesystem.join(platform_dir,
+                                                      baseline_filename)):
                 baselines.append((platform_dir, baseline_filename))
 
             if not all_baselines and baselines:
@@ -222,7 +273,8 @@ class Port(object):
         # If it wasn't found in a platform directory, return the expected
         # result in the test directory, even if no such file actually exists.
         platform_dir = self.layout_tests_dir()
-        if os.path.exists(os.path.join(platform_dir, baseline_filename)):
+        if self.path_exists(self._filesystem.join(platform_dir,
+                                                  baseline_filename)):
             baselines.append((platform_dir, baseline_filename))
 
         if baselines:
@@ -252,51 +304,47 @@ class Port(object):
         platform_dir, baseline_filename = self.expected_baselines(
             filename, suffix)[0]
         if platform_dir:
-            return os.path.join(platform_dir, baseline_filename)
-        return os.path.join(self.layout_tests_dir(), baseline_filename)
-
-    def _expected_file_contents(self, test, extension, encoding):
-        path = self.expected_filename(test, extension)
-        if not os.path.exists(path):
-            return None
-        with codecs.open(path, 'r', encoding) as file:
-            return file.read()
+            return self._filesystem.join(platform_dir, baseline_filename)
+        return self._filesystem.join(self.layout_tests_dir(), baseline_filename)
 
     def expected_checksum(self, test):
         """Returns the checksum of the image we expect the test to produce, or None if it is a text-only test."""
-        return self._expected_file_contents(test, '.checksum', 'ascii')
+        path = self.expected_filename(test, '.checksum')
+        if not self.path_exists(path):
+            return None
+        return self._filesystem.read_text_file(path)
 
     def expected_image(self, test):
         """Returns the image we expect the test to produce."""
-        return self._expected_file_contents(test, '.png', None)
+        path = self.expected_filename(test, '.png')
+        if not self.path_exists(path):
+            return None
+        return self._filesystem.read_binary_file(path)
 
     def expected_text(self, test):
         """Returns the text output we expect the test to produce."""
-        # NOTE: -expected.txt files are ALWAYS utf-8.  However,
-        # we do not decode the output from DRT, so we should not
-        # decode the -expected.txt values either to allow comparisons.
-        text = self._expected_file_contents(test, '.txt', None)
-        if not text:
+        # FIXME: DRT output is actually utf-8, but since we don't decode the
+        # output from DRT (instead treating it as a binary string), we read the
+        # baselines as a binary string, too.
+        path = self.expected_filename(test, '.txt')
+        if not self.path_exists(path):
             return ''
+        text = self._filesystem.read_binary_file(path)
         return text.strip("\r\n").replace("\r\n", "\n") + "\n"
 
     def filename_to_uri(self, filename):
-        """Convert a test file to a URI."""
+        """Convert a test file (which is an absolute path) to a URI."""
         LAYOUTTEST_HTTP_DIR = "http/tests/"
-        LAYOUTTEST_WEBSOCKET_DIR = "websocket/tests/"
+        LAYOUTTEST_WEBSOCKET_DIR = "http/tests/websocket/tests/"
 
         relative_path = self.relative_test_filename(filename)
         port = None
         use_ssl = False
 
-        if relative_path.startswith(LAYOUTTEST_HTTP_DIR):
-            # http/tests/ run off port 8000 and ssl/ off 8443
+        if (relative_path.startswith(LAYOUTTEST_WEBSOCKET_DIR)
+            or relative_path.startswith(LAYOUTTEST_HTTP_DIR)):
             relative_path = relative_path[len(LAYOUTTEST_HTTP_DIR):]
             port = 8000
-        elif relative_path.startswith(LAYOUTTEST_WEBSOCKET_DIR):
-            # websocket/tests/ run off port 8880 and 9323
-            # Note: the root is /, not websocket/tests/
-            port = 8880
 
         # Make http/tests/local run as local files. This is to mimic the
         # logic in run-webkit-tests.
@@ -311,9 +359,7 @@ class Port(object):
                 protocol = "http"
             return "%s://127.0.0.1:%u/%s" % (protocol, port, relative_path)
 
-        if sys.platform in ('cygwin', 'win32'):
-            return "file:///" + self.get_absolute_path(filename)
-        return "file://" + self.get_absolute_path(filename)
+        return path.abspath_to_uri(os.path.abspath(filename))
 
     def tests(self, paths):
         """Return the list of tests found (relative to layout_tests_dir()."""
@@ -324,20 +370,19 @@ class Port(object):
 
         Used by --clobber-old-results."""
         layout_tests_dir = self.layout_tests_dir()
-        return filter(lambda x: os.path.isdir(os.path.join(layout_tests_dir, x)),
-                      os.listdir(layout_tests_dir))
+        return filter(lambda x: self._filesystem.isdir(self._filesystem.join(layout_tests_dir, x)),
+                      self._filesystem.listdir(layout_tests_dir))
 
     def path_isdir(self, path):
-        """Returns whether the path refers to a directory of tests.
-
-        Used by test_expectations.py to apply rules to whole directories."""
-        return os.path.isdir(path)
+        """Return True if the path refers to a directory of tests."""
+        # Used by test_expectations.py to apply rules to whole directories.
+        return self._filesystem.isdir(path)
 
     def path_exists(self, path):
-        """Returns whether the path refers to an existing test or baseline."""
+        """Return True if the path refers to an existing test or baseline."""
         # Used by test_expectations.py to determine if an entry refers to a
-        # valid test and by printing.py to determine if baselines exist."""
-        return os.path.exists(path)
+        # valid test and by printing.py to determine if baselines exist.
+        return self._filesystem.exists(path)
 
     def update_baseline(self, path, data, encoding):
         """Updates the baseline for a test.
@@ -349,8 +394,12 @@ class Port(object):
             data: contents of the baseline.
             encoding: file encoding to use for the baseline.
         """
-        with codecs.open(path, "w", encoding=encoding) as file:
-            file.write(data)
+        # FIXME: remove the encoding parameter in favor of text/binary
+        # functions.
+        if encoding is None:
+            self._filesystem.write_binary_file(path, data)
+        else:
+            self._filesystem.write_text_file(path, data)
 
     def uri_to_test_name(self, uri):
         """Return the base layout test name for a given URI.
@@ -362,12 +411,8 @@ class Port(object):
         """
         test = uri
         if uri.startswith("file:///"):
-            if sys.platform == 'win32':
-                test = test.replace('file:///', '')
-                test = test.replace('/', '\\')
-            else:
-                test = test.replace('file://', '')
-            return self.relative_test_filename(test)
+            prefix = path.abspath_to_uri(self.layout_tests_dir()) + "/"
+            return test[len(prefix):]
 
         if uri.startswith("http://127.0.0.1:8880/"):
             # websocket tests
@@ -382,13 +427,6 @@ class Port(object):
 
         raise NotImplementedError('unknown url type: %s' % uri)
 
-    def get_absolute_path(self, filename):
-        """Return the absolute path in unix format for the given filename.
-
-        This routine exists so that platforms that don't use unix filenames
-        can convert accordingly."""
-        return os.path.abspath(filename)
-
     def layout_tests_dir(self):
         """Return the absolute path to the top of the LayoutTests directory."""
         return self.path_from_webkit_base('LayoutTests')
@@ -400,18 +438,16 @@ class Port(object):
         for test_or_category in self.skipped_layout_tests():
             if test_or_category == test_name:
                 return True
-            category = os.path.join(self.layout_tests_dir(), test_or_category)
-            if os.path.isdir(category) and test_name.startswith(test_or_category):
+            category = self._filesystem.join(self.layout_tests_dir(),
+                                             test_or_category)
+            if (self._filesystem.isdir(category) and
+                test_name.startswith(test_or_category)):
                 return True
         return False
 
     def maybe_make_directory(self, *path):
         """Creates the specified directory if it doesn't already exist."""
-        try:
-            os.makedirs(os.path.join(*path))
-        except OSError, e:
-            if e.errno != errno.EEXIST:
-                raise
+        self._filesystem.maybe_make_directory(*path)
 
     def name(self):
         """Return the name of the port (e.g., 'mac', 'chromium-win-xp').
@@ -420,19 +456,25 @@ class Port(object):
         may be different (e.g., 'win-xp' instead of 'chromium-win-xp'."""
         return self._name
 
-    # FIXME: This could be replaced by functions in webkitpy.common.checkout.scm.
+    def get_option(self, name, default_value=None):
+        # FIXME: Eventually we should not have to do a test for
+        # hasattr(), and we should be able to just do
+        # self.options.value. See additional FIXME in the constructor.
+        if hasattr(self._options, name):
+            return getattr(self._options, name)
+        return default_value
+
+    def set_option_default(self, name, default_value):
+        if not hasattr(self._options, name):
+            return setattr(self._options, name, default_value)
+
     def path_from_webkit_base(self, *comps):
         """Returns the full path to path made by joining the top of the
         WebKit source tree and the list of path components in |*comps|."""
-        if not self._webkit_base_dir:
-            abspath = os.path.abspath(__file__)
-            self._webkit_base_dir = abspath[0:abspath.find('WebKitTools')]
+        return self._config.path_from_webkit_base(*comps)
 
-        return os.path.join(self._webkit_base_dir, *comps)
-
-    # FIXME: Callers should eventually move to scm.script_path.
     def script_path(self, script_name):
-        return self.path_from_webkit_base("WebKitTools", "Scripts", script_name)
+        return self._config.script_path(script_name)
 
     def path_to_test_expectations_file(self):
         """Update the test expectations to the passed-in string.
@@ -445,7 +487,7 @@ class Port(object):
         """Relative unix-style path for a filename under the LayoutTests
         directory. Filenames outside the LayoutTests directory should raise
         an error."""
-        assert(filename.startswith(self.layout_tests_dir()))
+        #assert(filename.startswith(self.layout_tests_dir()))
         return filename[len(self.layout_tests_dir()) + 1:]
 
     def results_directory(self):
@@ -484,12 +526,12 @@ class Port(object):
         """Start a web server if it is available. Do nothing if
         it isn't. This routine is allowed to (and may) fail if a server
         is already running."""
-        if self._options.use_apache:
+        if self.get_option('use_apache'):
             self._http_server = apache_http_server.LayoutTestApacheHttpd(self,
-                self._options.results_directory)
+                self.get_option('results_directory'))
         else:
             self._http_server = http_server.Lighttpd(self,
-                self._options.results_directory)
+                self.get_option('results_directory'))
         self._http_server.start()
 
     def start_websocket_server(self):
@@ -497,8 +539,12 @@ class Port(object):
         it isn't. This routine is allowed to (and may) fail if a server
         is already running."""
         self._websocket_server = websocket_server.PyWebSocket(self,
-            self._options.results_directory)
+            self.get_option('results_directory'))
         self._websocket_server.start()
+
+    def acquire_http_lock(self):
+        self._http_lock = http_lock.HttpLock(None)
+        self._http_lock.wait_for_httpd_lock()
 
     def stop_helper(self):
         """Shut down the test helper if it is running. Do nothing if
@@ -517,6 +563,10 @@ class Port(object):
         it isn't, or it isn't available."""
         if self._websocket_server:
             self._websocket_server.stop()
+
+    def release_http_lock(self):
+        if self._http_lock:
+            self._http_lock.cleanup_http_lock()
 
     def test_expectations(self):
         """Returns the test expectations for this port.
@@ -628,8 +678,7 @@ class Port(object):
         """Returns a string of HTML indicating the word-level diff of the
         contents of the two filenames. Returns an empty string if word-level
         diffing isn't available."""
-        global _wdiff_available  # See explaination at top of file.
-        if not _wdiff_available:
+        if not self._wdiff_available:
             return ""
         try:
             # It's possible to raise a ScriptError we pass wdiff invalid paths.
@@ -637,67 +686,37 @@ class Port(object):
         except OSError, e:
             if e.errno in [errno.ENOENT, errno.EACCES, errno.ECHILD]:
                 # Silently ignore cases where wdiff is missing.
-                _wdiff_available = False
+                self._wdiff_available = False
                 return ""
             raise
 
-    _pretty_patch_error_html = "Failed to run PrettyPatch, see error console."
+    # This is a class variable so we can test error output easily.
+    _pretty_patch_error_html = "Failed to run PrettyPatch, see error log."
 
     def pretty_patch_text(self, diff_path):
-        # FIXME: Much of this function could move to prettypatch.rb
-        global _pretty_patch_available
-        if not _pretty_patch_available:
+        if not self._pretty_patch_available:
             return self._pretty_patch_error_html
-        pretty_patch_path = self.path_from_webkit_base("BugsSite", "PrettyPatch")
-        prettify_path = os.path.join(pretty_patch_path, "prettify.rb")
-        command = ["ruby", "-I", pretty_patch_path, prettify_path, diff_path]
+        command = ("ruby", "-I", os.path.dirname(self._pretty_patch_path),
+                   self._pretty_patch_path, diff_path)
         try:
             # Diffs are treated as binary (we pass decode_output=False) as they
             # may contain multiple files of conflicting encodings.
             return self._executive.run_command(command, decode_output=False)
         except OSError, e:
             # If the system is missing ruby log the error and stop trying.
-            _pretty_patch_available = False
+            self._pretty_patch_available = False
             _log.error("Failed to run PrettyPatch (%s): %s" % (command, e))
             return self._pretty_patch_error_html
         except ScriptError, e:
-            # If ruby failed to run for some reason, log the command output and stop trying.
-            _pretty_patch_available = False
-            _log.error("Failed to run PrettyPatch (%s):\n%s" % (command, e.message_with_output()))
+            # If ruby failed to run for some reason, log the command
+            # output and stop trying.
+            self._pretty_patch_available = False
+            _log.error("Failed to run PrettyPatch (%s):\n%s" % (command,
+                       e.message_with_output()))
             return self._pretty_patch_error_html
 
-    def _webkit_build_directory(self, args):
-        args = ["perl", self.script_path("webkit-build-directory")] + args
-        return self._executive.run_command(args).rstrip()
-
-    def _configuration_file_path(self):
-        build_root = self._webkit_build_directory(["--top-level"])
-        return os.path.join(build_root, "Configuration")
-
-    # Easy override for unit tests
-    def _open_configuration_file(self):
-        configuration_path = self._configuration_file_path()
-        return codecs.open(configuration_path, "r", "utf-8")
-
-    def _read_configuration(self):
-        try:
-            with self._open_configuration_file() as file:
-                return file.readline().rstrip()
-        except:
-            return None
-
-    # FIXME: This list may be incomplete as Apple has some sekret configs.
-    _RECOGNIZED_CONFIGURATIONS = ("Debug", "Release")
-
     def default_configuration(self):
-        # FIXME: Unify this with webkitdir.pm configuration reading code.
-        configuration = self._read_configuration()
-        if not configuration:
-            configuration = "Release"
-        if configuration not in self._RECOGNIZED_CONFIGURATIONS:
-            _log.warn("Configuration \"%s\" found in %s is not a recognized value.\n" % (configuration, self._configuration_file_path()))
-            _log.warn("Scripts may fail.  See 'set-webkit-configuration --help'.")
-        return configuration
+        return self._config.default_configuration()
 
     #
     # PROTECTED ROUTINES
@@ -705,6 +724,8 @@ class Port(object):
     # The routines below should only be called by routines in this class
     # or any of its subclasses.
     #
+    def _webkit_build_directory(self, args):
+        return self._config.build_directory(args[0])
 
     def _path_to_apache(self):
         """Returns the full path to the apache binary.
@@ -776,8 +797,8 @@ class Port(object):
     def _webkit_baseline_path(self, platform):
         """Return the  full path to the top of the baseline tree for a
         given platform."""
-        return os.path.join(self.layout_tests_dir(), 'platform',
-                            platform)
+        return self._filesystem.join(self.layout_tests_dir(), 'platform',
+                                     platform)
 
 
 class Driver:

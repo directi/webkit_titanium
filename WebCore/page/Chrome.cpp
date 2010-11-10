@@ -87,6 +87,13 @@ void Chrome::scroll(const IntSize& scrollDelta, const IntRect& rectToScroll, con
     m_client->scroll(scrollDelta, rectToScroll, clipRect);
 }
 
+#if ENABLE(TILED_BACKING_STORE)
+void Chrome::delegatedScrollRequested(const IntSize& scrollDelta)
+{
+    m_client->delegatedScrollRequested(scrollDelta);
+}
+#endif
+
 IntPoint Chrome::screenToWindow(const IntPoint& point) const
 {
     return m_client->screenToWindow(point);
@@ -163,9 +170,14 @@ void Chrome::focusedNodeChanged(Node* node) const
     m_client->focusedNodeChanged(node);
 }
 
-Page* Chrome::createWindow(Frame* frame, const FrameLoadRequest& request, const WindowFeatures& features) const
+void Chrome::focusedFrameChanged(Frame* frame) const
 {
-    Page* newPage = m_client->createWindow(frame, request, features);
+    m_client->focusedFrameChanged(frame);
+}
+
+Page* Chrome::createWindow(Frame* frame, const FrameLoadRequest& request, const WindowFeatures& features, const NavigationAction& action) const
+{
+    Page* newPage = m_client->createWindow(frame, request, features, action);
 
 #if ENABLE(DOM_STORAGE)
     if (newPage) {
@@ -426,6 +438,11 @@ void Chrome::chooseIconForFiles(const Vector<String>& filenames, FileChooser* fi
     m_client->chooseIconForFiles(filenames, fileChooser);
 }
 
+void Chrome::dispatchViewportDataDidChange(const ViewportArguments& arguments) const
+{
+    m_client->dispatchViewportDataDidChange(arguments);
+}
+
 void Chrome::setCursor(const Cursor& cursor)
 {
     m_client->setCursor(cursor);
@@ -496,5 +513,12 @@ PassRefPtr<SearchPopupMenu> Chrome::createSearchPopupMenu(PopupMenuClient* clien
 {
     return m_client->createSearchPopupMenu(client);
 }
+
+#if ENABLE(CONTEXT_MENUS)
+void Chrome::showContextMenu()
+{
+    m_client->showContextMenu();
+}
+#endif
 
 } // namespace WebCore

@@ -31,6 +31,7 @@
 #include "ProcessModel.h"
 #include "VisitedLinkProvider.h"
 #include "WebContextInjectedBundleClient.h"
+#include "WebDownloadClient.h"
 #include "WebHistoryClient.h"
 #include "WebProcessProxy.h"
 #include <WebCore/LinkHash.h>
@@ -45,9 +46,11 @@ struct WKContextStatistics;
 
 namespace WebKit {
 
+class DownloadProxy;
 class WebPageNamespace;
 class WebPageProxy;
 class WebPreferences;
+struct WebProcessCreationParameters;
 
 class WebContext : public APIObject {
 public:
@@ -57,20 +60,21 @@ public:
     static WebContext* sharedThreadContext();
 
     static PassRefPtr<WebContext> create(const String& injectedBundlePath);
-
-    ~WebContext();
+    virtual ~WebContext();
 
     void initializeInjectedBundleClient(const WKContextInjectedBundleClient*);
     void initializeHistoryClient(const WKContextHistoryClient*);
+    void initializeDownloadClient(const WKContextDownloadClient*);
 
     ProcessModel processModel() const { return m_processModel; }
     WebProcessProxy* process() const { return m_process.get(); }
 
     void processDidFinishLaunching(WebProcessProxy*);
+    void processDidClose(WebProcessProxy*);
 
     WebPageProxy* createWebPage(WebPageNamespace*);
 
-    void reviveIfNecessary();
+    void relaunchProcessIfNecessary();
 
     WebPageNamespace* createPageNamespace();
     void pageNamespaceWasDestroyed(WebPageNamespace*);
@@ -81,17 +85,15 @@ public:
 
     const String& injectedBundlePath() const { return m_injectedBundlePath; }
 
+    void setInjectedBundleInitializationUserData(PassRefPtr<APIObject> userData) { m_injectedBundleInitializationUserData = userData; }
+    APIObject* injectedBundleInitializationUserData() const { return m_injectedBundleInitializationUserData.get(); }
+
     void postMessageToInjectedBundle(const String&, APIObject*);
 
     // InjectedBundle client
     void didReceiveMessageFromInjectedBundle(const String&, APIObject*);
     void didReceiveSynchronousMessageFromInjectedBundle(const String&, APIObject*, RefPtr<APIObject>& returnData);
 
-    // History client
-    void didNavigateWithNavigationData(WebFrameProxy*, const WebNavigationDataStore&); 
-    void didPerformClientRedirect(WebFrameProxy*, const String& sourceURLString, const String& destinationURLString);
-    void didPerformServerRedirect(WebFrameProxy*, const String& sourceURLString, const String& destinationURLString);
-    void didUpdateHistoryTitle(WebFrameProxy*, const String& title, const String& url);
     void populateVisitedLinks();
     
     void getStatistics(WKContextStatistics* statistics);
@@ -101,16 +103,25 @@ public:
     String applicationCacheDirectory();
     
     void registerURLSchemeAsEmptyDocument(const String&);
-    
+    void registerURLSchemeAsSecure(const String&);
+    void setDomainRelaxationForbiddenForURLScheme(const String&);
+
     void addVisitedLink(const String&);
-    void addVisitedLink(WebCore::LinkHash);
+    void addVisitedLinkHash(WebCore::LinkHash);
 
     void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
+    CoreIPC::SyncReplyMode didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
+
+    void setCacheModel(CacheModel);
+    CacheModel cacheModel() const { return m_cacheModel; }
 
 #if PLATFORM(WIN)
     void setShouldPaintNativeControls(bool);
 #endif
+
+    // Downloads.
+    uint64_t createDownloadProxy();
+    WebDownloadClient& downloadClient() { return m_downloadClient; }
 
 private:
     WebContext(ProcessModel, const String& injectedBundlePath);
@@ -119,7 +130,24 @@ private:
 
     void ensureWebProcess();
     bool hasValidProcess() const { return m_process && m_process->isValid(); }
-    void platformSetUpWebProcess();
+    void platformInitializeWebProcess(WebProcessCreationParameters&);
+
+    // History client
+    void didNavigateWithNavigationData(uint64_t pageID, const WebNavigationDataStore& store, uint64_t frameID);
+    void didPerformClientRedirect(uint64_t pageID, const String& sourceURLString, const String& destinationURLString, uint64_t frameID);
+    void didPerformServerRedirect(uint64_t pageID, const String& sourceURLString, const String& destinationURLString, uint64_t frameID);
+    void didUpdateHistoryTitle(uint64_t pageID, const String& title, const String& url, uint64_t frameID);
+
+    // Plugins
+    void getPlugins(bool refresh, Vector<WebCore::PluginInfo>& plugins);
+    void getPluginPath(const String& mimeType, const String& urlString, String& pluginPath);
+
+    // Implemented in generated WebContextMessageReceiver.cpp
+    void didReceiveWebContextMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    CoreIPC::SyncReplyMode didReceiveSyncWebContextMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
+
+    static void languageChanged(void* context);
+    void languageChanged();
 
     ProcessModel m_processModel;
     
@@ -129,6 +157,7 @@ private:
     HashSet<WebPageNamespace*> m_pageNamespaces;
     RefPtr<WebPreferences> m_preferences;
 
+    RefPtr<APIObject> m_injectedBundleInitializationUserData;
     String m_injectedBundlePath;
     WebContextInjectedBundleClient m_injectedBundleClient;
 
@@ -138,7 +167,15 @@ private:
     VisitedLinkProvider m_visitedLinkProvider;
         
     HashSet<String> m_schemesToRegisterAsEmptyDocument;
+    HashSet<String> m_schemesToRegisterAsSecure;
+    HashSet<String> m_schemesToSetDomainRelaxationForbiddenFor;
+
     Vector<pair<String, RefPtr<APIObject> > > m_pendingMessagesToPostToInjectedBundle;
+
+    CacheModel m_cacheModel;
+
+    WebDownloadClient m_downloadClient;
+    HashMap<uint64_t, RefPtr<DownloadProxy> > m_downloads;
 
 #if PLATFORM(WIN)
     bool m_shouldPaintNativeControls;

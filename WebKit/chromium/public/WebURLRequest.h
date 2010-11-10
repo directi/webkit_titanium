@@ -58,9 +58,7 @@ public:
 
     enum TargetType {
         TargetIsMainFrame = 0,
-        TargetIsSubFrame = 1,   // Temporary for backward compatibility.
         TargetIsSubframe = 1,
-        TargetIsSubResource = 2,  // Temporary for backward comptibility.
         TargetIsSubresource = 2,
         TargetIsStyleSheet = 3,
         TargetIsScript = 4,
@@ -134,8 +132,17 @@ public:
     WEBKIT_API bool reportLoadTiming() const;
     WEBKIT_API void setReportLoadTiming(bool);
 
+    // Controls whether actual headers sent and received for request are
+    // collected and reported.
+    WEBKIT_API bool reportRawHeaders() const;
+    WEBKIT_API void setReportRawHeaders(bool);
+
     WEBKIT_API TargetType targetType() const;
     WEBKIT_API void setTargetType(TargetType);
+
+    // True if the request was user initiated.
+    WEBKIT_API bool hasUserGesture() const;
+    WEBKIT_API void setHasUserGesture(bool);
 
     // A consumer controlled value intended to be used to identify the
     // requestor.

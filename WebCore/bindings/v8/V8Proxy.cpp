@@ -39,7 +39,7 @@
 #include "FrameLoaderClient.h"
 #include "IDBFactoryBackendInterface.h"
 #include "IDBPendingTransactionMonitor.h"
-#include "InspectorTimelineAgent.h"
+#include "InspectorInstrumentation.h"
 #include "Page.h"
 #include "PageGroup.h"
 #include "PlatformBridge.h"
@@ -55,6 +55,7 @@
 #include "V8DOMMap.h"
 #include "V8DOMWindow.h"
 #include "V8EventException.h"
+#include "V8FileException.h"
 #include "V8HiddenPropertyName.h"
 #include "V8IsolatedContext.h"
 #include "V8RangeException.h"
@@ -77,7 +78,7 @@
 #include <wtf/StdLibExtras.h>
 #include <wtf/StringExtras.h>
 #include <wtf/UnusedParam.h>
-#include <wtf/text/CString.h>
+#include <wtf/text/StringConcatenate.h>
 
 namespace WebCore {
 
@@ -191,11 +192,8 @@ void V8Proxy::reportUnsafeAccessTo(Frame* target, DelayReporting delay)
 
     // FIXME: This error message should contain more specifics of why the same
     // origin check has failed.
-    String str = String::format("Unsafe JavaScript attempt to access frame "
-                                "with URL %s from frame with URL %s. "
-                                "Domains, protocols and ports must match.\n",
-                                targetDocument->url().string().utf8().data(),
-                                sourceDocument->url().string().utf8().data());
+    String str = makeString("Unsafe JavaScript attempt to access frame with URL ", targetDocument->url().string(),
+                            " from frame with URL ", sourceDocument->url().string(), ". Domains, protocols and ports must match.\n");
 
     // Build a console message with fake source ID and line number.
     const String kSourceID = "";
@@ -376,10 +374,7 @@ v8::Local<v8::Value> V8Proxy::evaluate(const ScriptSourceCode& source, Node* nod
 
     V8GCController::checkMemoryUsage();
 
-#if ENABLE(INSPECTOR)
-    if (InspectorTimelineAgent* timelineAgent = m_frame->page() ? m_frame->page()->inspectorTimelineAgent() : 0)
-        timelineAgent->willEvaluateScript(source.url().isNull() ? String() : source.url().string(), source.startLine());
-#endif
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willEvaluateScript(m_frame, source.url().isNull() ? String() : source.url().string(), source.startLine());
 
     v8::Local<v8::Value> result;
     {
@@ -414,10 +409,7 @@ v8::Local<v8::Value> V8Proxy::evaluate(const ScriptSourceCode& source, Node* nod
     PlatformBridge::traceEventEnd("v8.run", node, "");
 #endif
 
-#if ENABLE(INSPECTOR)
-    if (InspectorTimelineAgent* timelineAgent = m_frame->page() ? m_frame->page()->inspectorTimelineAgent() : 0)
-        timelineAgent->didEvaluateScript();
-#endif
+    InspectorInstrumentation::didEvaluateScript(cookie);
 
     return result;
 }
@@ -505,33 +497,23 @@ v8::Local<v8::Value> V8Proxy::callFunction(v8::Handle<v8::Function> function, v8
         // execution finishs before firing the timer.
         m_frame->keepAlive();
 
-#if ENABLE(INSPECTOR)
-        Page* inspectedPage = InspectorTimelineAgent::instanceCount() ? m_frame->page(): 0;
-        if (inspectedPage) {
-            if (InspectorTimelineAgent* timelineAgent = inspectedPage->inspectorTimelineAgent()) {
-                v8::ScriptOrigin origin = function->GetScriptOrigin();
-                String resourceName("undefined");
-                int lineNumber = 1;
-                if (!origin.ResourceName().IsEmpty()) {
-                    resourceName = toWebCoreString(origin.ResourceName());
-                    lineNumber = function->GetScriptLineNumber() + 1;
-                }
-                timelineAgent->willCallFunction(resourceName, lineNumber);
-            } else
-                inspectedPage = 0;
+        InspectorInstrumentationCookie cookie;
+        if (InspectorInstrumentation::hasFrontends()) {
+            v8::ScriptOrigin origin = function->GetScriptOrigin();
+            String resourceName("undefined");
+            int lineNumber = 1;
+            if (!origin.ResourceName().IsEmpty()) {
+                resourceName = toWebCoreString(origin.ResourceName());
+                lineNumber = function->GetScriptLineNumber() + 1;
+            }
+            cookie = InspectorInstrumentation::willCallFunction(m_frame, resourceName, lineNumber);
         }
-#endif // !ENABLE(INSPECTOR)
 
         m_recursion++;
         result = function->Call(receiver, argc, args);
         m_recursion--;
 
-#if ENABLE(INSPECTOR)
-        if (inspectedPage)
-            if (InspectorTimelineAgent* timelineAgent = inspectedPage->inspectorTimelineAgent())
-                timelineAgent->didCallFunction();
-#endif // !ENABLE(INSPECTOR)
-
+        InspectorInstrumentation::didCallFunction(cookie);
     }
 
     // Release the storage mutex if applicable.
@@ -720,6 +702,11 @@ void V8Proxy::setDOMException(int exceptionCode)
 #if ENABLE(DATABASE)
     case SQLExceptionType:
         exception = toV8(SQLException::create(description));
+        break;
+#endif
+#if ENABLE(BLOB) || ENABLE(FILE_SYSTEM)
+    case FileExceptionType:
+        exception = toV8(FileException::create(description));
         break;
 #endif
     default:

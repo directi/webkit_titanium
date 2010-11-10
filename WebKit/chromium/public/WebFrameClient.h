@@ -240,6 +240,10 @@ public:
     virtual void assignIdentifierToRequest(
         WebFrame*, unsigned identifier, const WebURLRequest&) { }
 
+     // Remove the association between an identifier assigned to a request if
+     // the client keeps such an association.
+     virtual void removeIdentifierForRequest(unsigned identifier) { }
+
     // A request is about to be sent out, and the client may modify it.  Request
     // is writable, and changes to the URL, for example, will change the request
     // made.  If this request is the result of a redirect, then redirectResponse
@@ -349,10 +353,14 @@ public:
     // WebFileSystemCallbacks::didOpenFileSystem() must be called with
     // a name and root path for the requested FileSystem when the operation
     // is completed successfully. WebFileSystemCallbacks::didFail() must be
-    // called otherwise.
+    // called otherwise. The create bool is for indicating whether or not to
+    // create root path for file systems if it do not exist.
     virtual void openFileSystem(
         WebFrame*, WebFileSystem::Type, long long size,
-        WebFileSystemCallbacks*) { }
+        bool create, WebFileSystemCallbacks*) { }
+
+    // FIXME: This method should be deleted once chromium implements the new method above.
+    virtual void openFileSystem(WebFrame* frame, WebFileSystem::Type type, long long size, WebFileSystemCallbacks* callbacks) { return openFileSystem(frame, type, size, true, callbacks); }
 
 protected:
     ~WebFrameClient() { }

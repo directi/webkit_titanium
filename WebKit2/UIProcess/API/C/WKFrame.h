@@ -50,9 +50,17 @@ WK_EXPORT WKFrameLoadState WKFrameGetFrameLoadState(WKFrameRef frame);
 WK_EXPORT WKURLRef WKFrameCopyProvisionalURL(WKFrameRef frame);
 WK_EXPORT WKURLRef WKFrameCopyURL(WKFrameRef frame);
 
+WK_EXPORT WKURLRef WKFrameCopyUnreachableURL(WKFrameRef frame);
+
+WK_EXPORT WKStringRef WKFrameCopyMIMEType(WKFrameRef frame);
+
 WK_EXPORT WKPageRef WKFrameGetPage(WKFrameRef frame);
 
 WK_EXPORT WKCertificateInfoRef WKFrameGetCertificateInfo(WKFrameRef frame);
+
+WK_EXPORT bool WKFrameCanProvideSource(WKFrameRef frame);
+
+WK_EXPORT bool WKFrameIsFrameSet(WKFrameRef frame);
 
 #ifdef __cplusplus
 }

@@ -51,6 +51,7 @@
 #include "PlatformString.h"
 #include "PluginData.h"
 #include "PluginDataChromium.h"
+#include "ProgressTracker.h"
 #include "Settings.h"
 #include "StringExtras.h"
 #include "WebDataSourceImpl.h"
@@ -288,7 +289,7 @@ void FrameLoaderClientImpl::assignIdentifierToInitialRequest(
 // this includes images and xmlhttp requests.  It is important to note that a
 // subresource is NOT limited to stuff loaded through the frame's subresource
 // loader. Synchronous xmlhttp requests for example, do not go through the
-// subresource loader, but we still label them as TargetIsSubResource.
+// subresource loader, but we still label them as TargetIsSubresource.
 //
 // The important edge cases to consider when modifying this function are
 // how synchronous resource loads are treated during load/unload threshold.
@@ -812,11 +813,11 @@ void FrameLoaderClientImpl::dispatchDidFirstVisuallyNonEmptyLayout()
         m_webFrame->client()->didFirstVisuallyNonEmptyLayout(m_webFrame);
 }
 
-Frame* FrameLoaderClientImpl::dispatchCreatePage()
+Frame* FrameLoaderClientImpl::dispatchCreatePage(const NavigationAction& action)
 {
     struct WindowFeatures features;
     Page* newPage = m_webFrame->frame()->page()->chrome()->createWindow(
-        m_webFrame->frame(), FrameLoadRequest(), features);
+        m_webFrame->frame(), FrameLoadRequest(), features, action);
 
     // Make sure that we have a valid disposition.  This should have been set in
     // the preceeding call to dispatchDecidePolicyForNewWindowAction.
@@ -1010,7 +1011,12 @@ void FrameLoaderClientImpl::postProgressStartedNotification()
 
 void FrameLoaderClientImpl::postProgressEstimateChangedNotification()
 {
-    // FIXME
+    WebViewImpl* webview = m_webFrame->viewImpl();
+    if (webview && webview->client()) {
+        webview->client()->didChangeLoadProgress(
+            m_webFrame, m_webFrame->frame()->page()->progress()->estimatedProgress());
+    }
+
 }
 
 void FrameLoaderClientImpl::postProgressFinishedNotification()
@@ -1072,7 +1078,11 @@ void FrameLoaderClientImpl::committedLoad(DocumentLoader* loader, const char* da
             m_pluginWidget->didReceiveResponse(
                 m_webFrame->frame()->loader()->activeDocumentLoader()->response());
         }
-        m_pluginWidget->didReceiveData(data, length);
+
+        // It's possible that the above call removed the pointer to the plugin, so
+        // check before calling it.
+        if (m_pluginWidget.get())
+            m_pluginWidget->didReceiveData(data, length);
     }
 }
 
@@ -1338,6 +1348,10 @@ void FrameLoaderClientImpl::transitionToCommittedForNewPage()
     makeDocumentView();
 }
 
+void FrameLoaderClientImpl::dispatchDidBecomeFrameset(bool)
+{
+}
+
 bool FrameLoaderClientImpl::canCachePage() const
 {
     // Since we manage the cache, always report this page as non-cacheable to
@@ -1381,6 +1395,15 @@ void FrameLoaderClientImpl::didTransferChildFrameToNewDocument(Page*)
     m_webFrame->setClient(newParent->client());
 }
 
+void FrameLoaderClientImpl::transferLoadingResourceFromPage(unsigned long identifier, DocumentLoader* loader, const ResourceRequest& request, Page* oldPage)
+{
+    assignIdentifierToInitialRequest(identifier, loader, request);
+
+    WebFrameImpl* oldWebFrame = WebFrameImpl::fromFrame(oldPage->mainFrame());
+    if (oldWebFrame && oldWebFrame->client())
+        oldWebFrame->client()->removeIdentifierForRequest(identifier);
+}
+
 PassRefPtr<Widget> FrameLoaderClientImpl::createPlugin(
     const IntSize& size, // FIXME: how do we use this?
     HTMLPlugInElement* element,
@@ -1411,14 +1434,6 @@ PassRefPtr<Widget> FrameLoaderClientImpl::createPlugin(
     if (!webPlugin->initialize(container.get()))
         return 0;
 
-    bool zoomTextOnly = m_webFrame->viewImpl()->zoomTextOnly();
-    float zoomFactor = zoomTextOnly ? m_webFrame->frame()->textZoomFactor() : m_webFrame->frame()->pageZoomFactor();
-    if (zoomFactor != 1) {
-        // There's a saved zoom level, so tell the plugin about it since
-        // WebViewImpl::setZoomLevel was called before the plugin was created.
-        webPlugin->setZoomFactor(zoomFactor, zoomTextOnly);
-    }
-
     // The element might have been removed during plugin initialization!
     if (!element->renderer())
         return 0;
@@ -1430,7 +1445,8 @@ PassRefPtr<Widget> FrameLoaderClientImpl::createPlugin(
 // (e.g., acrobat reader).
 void FrameLoaderClientImpl::redirectDataToPlugin(Widget* pluginWidget)
 {
-    m_pluginWidget = static_cast<WebPluginContainerImpl*>(pluginWidget);
+    if (pluginWidget->isPluginContainer())
+        m_pluginWidget = static_cast<WebPluginContainerImpl*>(pluginWidget);
     ASSERT(m_pluginWidget.get());
 }
 

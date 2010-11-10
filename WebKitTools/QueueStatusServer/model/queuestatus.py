@@ -27,8 +27,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from google.appengine.ext import db
+from model.queuepropertymixin import QueuePropertyMixin
 
-class QueueStatus(db.Model):
+
+class QueueStatus(db.Model, QueuePropertyMixin):
     author = db.UserProperty()
     queue_name = db.StringProperty()
     bot_id = db.StringProperty()
@@ -37,3 +39,6 @@ class QueueStatus(db.Model):
     message = db.StringProperty(multiline=True)
     date = db.DateTimeProperty(auto_now_add=True)
     results_file = db.BlobProperty()
+
+    def is_retry_request(self):
+        return self.message == "Retry"  # From AbstractQueue._retry_status

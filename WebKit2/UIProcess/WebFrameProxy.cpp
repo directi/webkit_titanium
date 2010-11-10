@@ -29,6 +29,7 @@
 #include "WebFormSubmissionListenerProxy.h"
 #include "WebFramePolicyListenerProxy.h"
 #include "WebPageProxy.h"
+#include <WebCore/DOMImplementation.h>
 #include <wtf/text/WTFString.h>
 
 using namespace WebCore;
@@ -38,6 +39,7 @@ namespace WebKit {
 WebFrameProxy::WebFrameProxy(WebPageProxy* page, uint64_t frameID)
     : m_page(page)
     , m_loadState(LoadStateFinished)
+    , m_isFrameSet(false)
     , m_frameID(frameID)
 {
 }
@@ -68,6 +70,14 @@ void WebFrameProxy::setCertificateInfo(PassRefPtr<WebCertificateInfo> certificat
     m_certificateInfo = certificateInfo;
 }
 
+bool WebFrameProxy::canProvideSource() const
+{
+    // FIXME: This check should be moved to somewhere in WebCore. 
+    if (m_MIMEType == "text/html" || m_MIMEType == "image/svg+xml" || DOMImplementation::isXMLMIMEType(m_MIMEType))
+        return true;
+    return false;
+}
+
 void WebFrameProxy::didStartProvisionalLoad(const String& url)
 {
     // FIXME: Add assertions.
@@ -78,6 +88,12 @@ void WebFrameProxy::didStartProvisionalLoad(const String& url)
 void WebFrameProxy::didReceiveServerRedirectForProvisionalLoad(const String& url)
 {
     m_provisionalURL = url;
+}
+
+void WebFrameProxy::didFailProvisionalLoad()
+{
+    m_loadState = LoadStateFinished;
+    m_provisionalURL = String();
 }
 
 void WebFrameProxy::didCommitLoad()
@@ -91,6 +107,11 @@ void WebFrameProxy::didCommitLoad()
 void WebFrameProxy::didFinishLoad()
 {
     // FIXME: Add assertions
+    m_loadState = LoadStateFinished;
+}
+
+void WebFrameProxy::didFailLoad()
+{
     m_loadState = LoadStateFinished;
 }
 

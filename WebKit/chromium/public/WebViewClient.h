@@ -48,6 +48,8 @@ class WebAccessibilityObject;
 class WebDeviceOrientationClient;
 class WebDragData;
 class WebElement;
+class WebExternalPopupMenu;
+class WebExternalPopupMenuClient;
 class WebFileChooserCompletion;
 class WebFrame;
 class WebGeolocationService;
@@ -87,6 +89,8 @@ public:
     // responsible for rendering the contents of the popup menu.
     virtual WebWidget* createPopupMenu(WebPopupType) { return 0; }
     virtual WebWidget* createPopupMenu(const WebPopupMenuInfo&) { return 0; }
+    virtual WebExternalPopupMenu* createExternalPopupMenu(
+        const WebPopupMenuInfo&, WebExternalPopupMenuClient*) { return 0; }
 
     // Create a session storage namespace object associated with this WebView.
     virtual WebStorageNamespace* createSessionStorageNamespace(unsigned quota) { return 0; }
@@ -113,6 +117,10 @@ public:
     virtual void didStartLoading() { }
     virtual void didStopLoading() { }
 
+    // Notification that some progress was made loading the current page.
+    // loadProgress is a value between 0 (nothing loaded) and 1.0 (frame fully
+    // loaded).
+    virtual void didChangeLoadProgress(WebFrame*, double loadProgress) { }
 
     // Editing -------------------------------------------------------------
 
@@ -272,10 +280,6 @@ public:
 
     // Accessibility -------------------------------------------------------
 
-    // Notifies embedder that the focus has changed to the given
-    // accessibility object.
-    virtual void focusAccessibilityObject(const WebAccessibilityObject&) { }
-
     // Notifies embedder about an accessibility notification.
     virtual void postAccessibilityNotification(const WebAccessibilityObject&, WebAccessibilityNotification) { }
 
@@ -347,6 +351,17 @@ public:
 
     // Access the embedder API for device orientation services.
     virtual WebDeviceOrientationClient* deviceOrientationClient() { return 0; }
+
+
+    // Zoom ----------------------------------------------------------------
+
+    // Informs the browser that the zoom levels for this frame have changed from
+    // the default values.
+    virtual void zoomLimitsChanged(double minimumLevel, double maximumLevel) { }
+
+    // Informs the browser that the zoom level has changed as a result of an
+    // action that wasn't initiated by the client.
+    virtual void zoomLevelChanged() { }
 
 protected:
     ~WebViewClient() { }

@@ -120,8 +120,8 @@ GraphicsContext::GraphicsContext(PlatformGraphicsContext* context)
     setPaintingDisabled(!context);
     if (context) {
         // Make sure the context starts in sync with our state.
-        setPlatformFillColor(fillColor(), DeviceColorSpace);
-        setPlatformStrokeColor(strokeColor(), DeviceColorSpace);
+        setPlatformFillColor(fillColor(), ColorSpaceDeviceRGB);
+        setPlatformStrokeColor(strokeColor(), ColorSpaceDeviceRGB);
     }
 #if USE(WXGC)
     m_data->context = (wxGCDC*)context;
@@ -333,11 +333,6 @@ void GraphicsContext::clipOut(const Path&)
 }
 
 void GraphicsContext::clipOut(const IntRect&)
-{
-    notImplemented();
-}
-
-void GraphicsContext::clipOutEllipseInRect(const IntRect&)
 {
     notImplemented();
 }

@@ -88,12 +88,19 @@ JSValue DebuggerCallFrame::evaluate(const UString& script, JSValue& exception) c
     if (!m_callFrame->codeBlock())
         return JSValue();
 
-    RefPtr<EvalExecutable> eval = EvalExecutable::create(m_callFrame, makeSource(script));
+    RefPtr<EvalExecutable> eval = EvalExecutable::create(m_callFrame, makeSource(script), m_callFrame->codeBlock()->isStrictMode());
     JSObject* error = eval->compile(m_callFrame, m_callFrame->scopeChain());
     if (error)
         return error;
 
-    return m_callFrame->scopeChain()->globalData->interpreter->execute(eval.get(), m_callFrame, thisObject(), m_callFrame->scopeChain(), &exception);
+    JSGlobalData& globalData = m_callFrame->globalData();
+    JSValue result = globalData.interpreter->execute(eval.get(), m_callFrame, thisObject(), m_callFrame->scopeChain());
+    if (globalData.exception) {
+        exception = globalData.exception;
+        globalData.exception = JSValue();
+    }
+    ASSERT(result);
+    return result;
 }
 
 } // namespace JSC

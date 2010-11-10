@@ -24,6 +24,7 @@
  */
 
 #include "WKBundleNodeHandle.h"
+#include "WKBundleNodeHandlePrivate.h"
 
 #include "InjectedBundleNodeHandle.h"
 #include "WKAPICast.h"
@@ -33,5 +34,37 @@ using namespace WebKit;
 
 WKTypeID WKBundleNodeHandleGetTypeID()
 {
-    return toRef(InjectedBundleNodeHandle::APIType);
+    return toAPI(InjectedBundleNodeHandle::APIType);
+}
+
+WKBundleNodeHandleRef WKBundleNodeHandleCreate(JSContextRef contextRef, JSObjectRef objectRef)
+{
+    RefPtr<InjectedBundleNodeHandle> nodeHandle = InjectedBundleNodeHandle::getOrCreate(contextRef, objectRef);
+    return toAPI(nodeHandle.release().releaseRef());
+}
+
+WKRect WKBundleNodeHandleGetElementBounds(WKBundleNodeHandleRef nodeHandleRef)
+{
+    return toAPI(toImpl(nodeHandleRef)->elementBounds());
+}
+
+void WKBundleNodeHandleSetHTMLInputElementValueForUser(WKBundleNodeHandleRef htmlInputElementHandleRef, WKStringRef valueRef)
+{
+    toImpl(htmlInputElementHandleRef)->setHTMLInputElementValueForUser(toWTFString(valueRef));
+}
+
+bool WKBundleNodeHandleGetHTMLInputElementAutofilled(WKBundleNodeHandleRef htmlInputElementHandleRef)
+{
+    return toImpl(htmlInputElementHandleRef)->isHTMLInputElementAutofilled();
+}
+
+void WKBundleNodeHandleSetHTMLInputElementAutofilled(WKBundleNodeHandleRef htmlInputElementHandleRef, bool filled)
+{
+    toImpl(htmlInputElementHandleRef)->setHTMLInputElementAutofilled(filled);
+}
+
+WKBundleNodeHandleRef WKBundleNodeHandleCopyHTMLTableCellElementCellAbove(WKBundleNodeHandleRef htmlTableCellElementHandleRef)
+{
+    RefPtr<InjectedBundleNodeHandle> nodeHandle = toImpl(htmlTableCellElementHandleRef)->copyHTMLTableCellElementCellAbove();
+    return toAPI(nodeHandle.release().releaseRef());
 }

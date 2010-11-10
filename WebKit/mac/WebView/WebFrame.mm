@@ -44,7 +44,6 @@
 #import "WebFrameViewInternal.h"
 #import "WebHTMLView.h"
 #import "WebHTMLViewInternal.h"
-#import "WebIconFetcherInternal.h"
 #import "WebKitStatisticsPrivate.h"
 #import "WebKitVersionChecks.h"
 #import "WebNSObjectExtras.h"
@@ -204,6 +203,8 @@ WebCore::EditingBehaviorType core(WebKitEditingBehavior behavior)
             return WebCore::EditingMacBehavior;
         case WebKitEditingWinBehavior:
             return WebCore::EditingWindowsBehavior;
+        case WebKitEditingUnixBehavior:
+            return WebCore::EditingUnixBehavior;
     }
     ASSERT_NOT_REACHED();
     return WebCore::EditingMacBehavior;
@@ -530,6 +531,26 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     return [[[NSString alloc] initWithCharactersNoCopy:buf length:length freeWhenDone:YES] autorelease];
 }
 
+- (BOOL)_shouldFlattenCompositingLayers:(CGContextRef)context
+{
+    // -currentContextDrawingToScreen returns YES for bitmap contexts.
+    BOOL isPrinting = ![NSGraphicsContext currentContextDrawingToScreen];
+    if (isPrinting)
+        return YES;
+
+    if (!WKCGContextIsBitmapContext(context))
+        return NO;
+
+    // If we're drawing into a bitmap, we might be snapshotting, or drawing into a layer-backed view.
+    if ([getWebView(self) _usesDocumentViews]) {
+        id documentView = [_private->webFrameView documentView];
+        if ([documentView isKindOfClass:[WebHTMLView class]] && [(WebHTMLView *)documentView _web_isDrawingIntoLayer])
+            return NO;
+    }
+
+    return [getWebView(self) _includesFlattenedCompositingLayersWhenDrawingToBitmap];
+}
+
 - (void)_drawRect:(NSRect)rect contentsOnly:(BOOL)contentsOnly
 {
     ASSERT([[NSGraphicsContext currentContext] isFlipped]);
@@ -546,7 +567,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
         if (parentView)
             shouldFlatten = parentView->paintBehavior() & PaintBehaviorFlattenCompositingLayers;
     } else
-        shouldFlatten = WKCGContextIsBitmapContext(ctx) && [getWebView(self) _includesFlattenedCompositingLayersWhenDrawingToBitmap];
+        shouldFlatten = [self _shouldFlattenCompositingLayers:ctx];
 
     PaintBehavior oldBehavior = PaintBehaviorNormal;
     if (shouldFlatten) {
@@ -1008,14 +1029,6 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     return _private->coreFrame->domWindow()->pendingUnloadEventListeners();
 }
 
-- (WebIconFetcher *)fetchApplicationIcon:(id)target
-                                selector:(SEL)selector
-{
-    return [WebIconFetcher _fetchApplicationIconForFrame:self
-                                                  target:target
-                                                selector:selector];
-}
-
 - (void)_setIsDisconnected:(bool)isDisconnected
 {
     _private->coreFrame->setIsDisconnected(isDisconnected);
@@ -1123,12 +1136,8 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     Frame* frame = core(self);
     if (!frame)
         return;
-
-    AnimationController* controller = frame->animation();
-    if (!controller)
-        return;
-
-    controller->suspendAnimations(frame->document());
+        
+    frame->animation()->suspendAnimations();
 }
 
 - (void) _resumeAnimations
@@ -1137,11 +1146,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     if (!frame)
         return;
 
-    AnimationController* controller = frame->animation();
-    if (!controller)
-        return;
-
-    controller->resumeAnimations(frame->document());
+    frame->animation()->resumeAnimations();
 }
 
 - (void)_replaceSelectionWithFragment:(DOMDocumentFragment *)fragment selectReplacement:(BOOL)selectReplacement smartReplace:(BOOL)smartReplace matchStyle:(BOOL)matchStyle
@@ -1395,7 +1400,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     Frame* coreFrame = _private->coreFrame;
     if (!coreFrame)
         return nil;
-    return coreFrame->tree()->name();
+    return coreFrame->tree()->uniqueName();
 }
 
 - (WebFrameView *)frameView

@@ -22,8 +22,8 @@
 #define SVGFEMergeNodeElement_h
 
 #if ENABLE(SVG) && ENABLE(FILTERS)
+#include "SVGAnimatedPropertyMacros.h"
 #include "SVGElement.h"
-#include "SVGNames.h"
 
 namespace WebCore {
 
@@ -35,9 +35,10 @@ namespace WebCore {
         SVGFEMergeNodeElement(const QualifiedName&, Document*);
 
         virtual void parseMappedAttribute(Attribute*);
+        virtual void svgAttributeChanged(const QualifiedName&);
         virtual void synchronizeProperty(const QualifiedName&);
 
-        DECLARE_ANIMATED_PROPERTY(SVGFEMergeNodeElement, SVGNames::inAttr, String, In1, in1)
+        DECLARE_ANIMATED_STATIC_PROPERTY_NEW(SVGFEMergeNodeElement, SVGNames::inAttr, String, In1, in1)
     };
 
 } // namespace WebCore

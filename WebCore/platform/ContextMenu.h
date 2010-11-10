@@ -91,6 +91,9 @@ namespace WebCore {
 #endif
     };
 
+Vector<ContextMenuItem> contextMenuItemVector(PlatformMenuDescription);
+PlatformMenuDescription platformMenuDescription(Vector<ContextMenuItem>&);
+
 }
 
 #endif // ContextMenu_h

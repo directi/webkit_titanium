@@ -23,6 +23,7 @@
 
 #include "FrameLoaderTypes.h"
 #include "PlatformString.h"
+#include "ViewportArguments.h"
 #include <wtf/Forward.h>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
@@ -38,7 +39,6 @@ namespace JSC {
 namespace WebCore {
 
     class BackForwardController;
-    class BackForwardControllerClient;
     class BackForwardList;
     class Chrome;
     class ChromeClient;
@@ -60,7 +60,6 @@ namespace WebCore {
     class HistoryItem;
     class InspectorClient;
     class InspectorController;
-    class InspectorTimelineAgent;
     class MediaCanStartListener;
     class Node;
     class PageGroup;
@@ -72,6 +71,7 @@ namespace WebCore {
     class VisibleSelection;
     class SelectionController;
     class Settings;
+    class SharedGraphicsContext3D;
     class SpeechInput;
     class SpeechInputClient;
 
@@ -94,20 +94,9 @@ namespace WebCore {
         static void scheduleForcedStyleRecalcForAllPages();
 
         // It is up to the platform to ensure that non-null clients are provided where required.
-        struct PageClients {
-            PageClients()
-                : chromeClient(0)
-                , contextMenuClient(0)
-                , editorClient(0)
-                , dragClient(0)
-                , inspectorClient(0)
-                , pluginHalterClient(0)
-                , geolocationControllerClient(0)
-                , deviceMotionClient(0)
-                , deviceOrientationClient(0)
-                , backForwardControllerClient(0)
-                , speechInputClient(0)
-            { }
+        struct PageClients : Noncopyable {
+            PageClients();
+            ~PageClients();
 
             ChromeClient* chromeClient;
             ContextMenuClient* contextMenuClient;
@@ -118,7 +107,7 @@ namespace WebCore {
             GeolocationControllerClient* geolocationControllerClient;
             DeviceMotionClient* deviceMotionClient;
             DeviceOrientationClient* deviceOrientationClient;
-            BackForwardControllerClient* backForwardControllerClient;
+            RefPtr<BackForwardList> backForwardClient;
             SpeechInputClient* speechInputClient;
         };
 
@@ -126,6 +115,9 @@ namespace WebCore {
         ~Page();
 
         RenderTheme* theme() const { return m_theme.get(); };
+
+        ViewportArguments viewportArguments() const { return m_viewportArguments; }
+        void updateViewportArguments();
 
         static void refreshPlugins(bool reload);
         PluginData* pluginData() const;
@@ -141,18 +133,15 @@ namespace WebCore {
         bool openedByDOM() const;
         void setOpenedByDOM();
 
+        // DEPRECATED. Use backForward() instead of the following 6 functions.
         BackForwardList* backForwardList() const;
-
-        // FIXME: The following three methods don't fall under the responsibilities of the Page object
-        // They seem to fit a hypothetical Page-controller object that would be akin to the 
-        // Frame-FrameLoader relationship.  They have to live here now, but should move somewhere that
-        // makes more sense when that class exists.
         bool goBack();
         bool goForward();
         bool canGoBackOrForward(int distance) const;
         void goBackOrForward(int distance);
-        void goToItem(HistoryItem*, FrameLoadType);
         int getHistoryLength();
+
+        void goToItem(HistoryItem*, FrameLoadType);
 
         HistoryItem* globalHistoryItem() const { return m_globalHistoryItem.get(); }
         void setGlobalHistoryItem(HistoryItem*);
@@ -191,7 +180,7 @@ namespace WebCore {
 #endif
         Settings* settings() const { return m_settings.get(); }
         ProgressTracker* progress() const { return m_progress.get(); }
-
+        BackForwardController* backForward() const { return m_backForwardController.get(); }
 
         enum ViewMode {
             ViewModeInvalid,
@@ -259,6 +248,8 @@ namespace WebCore {
         static void allVisitedStateChanged(PageGroup*);
         static void visitedStateChanged(PageGroup*, LinkHash visitedHash);
 
+        SharedGraphicsContext3D* sharedGraphicsContext3D();
+
 #if ENABLE(DOM_STORAGE)
         StorageNamespace* sessionStorage(bool optionalCreate = true);
         void setSessionStorage(PassRefPtr<StorageNamespace>);
@@ -282,10 +273,6 @@ namespace WebCore {
         void setJavaScriptURLsAreAllowed(bool);
         bool javaScriptURLsAreAllowed() const;
 
-#if ENABLE(INSPECTOR)
-        InspectorTimelineAgent* inspectorTimelineAgent() const;
-#endif
-
         // Don't allow more than a certain number of frames in a page.
         // This seems like a reasonable upper bound, and otherwise mutually
         // recursive frameset pages can quickly bring the program to its knees
@@ -304,6 +291,11 @@ namespace WebCore {
 
         OwnPtr<Chrome> m_chrome;
         OwnPtr<SelectionController> m_dragCaretController;
+
+#if ENABLE(ACCELERATED_2D_CANVAS)
+        RefPtr<SharedGraphicsContext3D> m_sharedGraphicsContext3D;
+#endif
+        
 #if ENABLE(DRAG_SUPPORT)
         OwnPtr<DragController> m_dragController;
 #endif
@@ -383,6 +375,8 @@ namespace WebCore {
 #endif
 
         ViewMode m_viewMode;
+
+        ViewportArguments m_viewportArguments;
     };
 
 } // namespace WebCore

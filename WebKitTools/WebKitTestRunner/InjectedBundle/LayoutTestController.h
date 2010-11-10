@@ -28,9 +28,18 @@
 
 #include "JSWrappable.h"
 #include <JavaScriptCore/JSRetainPtr.h>
-#include <wtf/PassRefPtr.h>
-#include <wtf/RetainPtr.h>
 #include <string>
+#include <wtf/PassRefPtr.h>
+
+#if PLATFORM(MAC)
+#include <wtf/RetainPtr.h>
+typedef RetainPtr<CFRunLoopTimerRef> PlatformTimerRef;
+#elif PLATFORM(WIN)
+typedef UINT_PTR PlatformTimerRef;
+#elif PLATFORM(QT)
+#include <QTimer>
+typedef QTimer PlatformTimerRef;
+#endif
 
 namespace WTR {
 
@@ -51,6 +60,7 @@ public:
     void notifyDone();
 
     // Other dumping.
+    void dumpBackForwardList() { m_shouldDumpBackForwardListsForAllWindows = true; }
     void dumpChildFrameScrollPositions() { m_shouldDumpAllFrameScrollPositions = true; }
     void dumpEditingCallbacks() { m_dumpEditingCallbacks = true; }
     void dumpSelectionRect() { } // Will need to do something when we support pixel tests.
@@ -63,14 +73,15 @@ public:
     void setCanOpenWindows(bool);
     void setCloseRemainingWindowsWhenComplete(bool value) { m_shouldCloseExtraWindows = value; }
     void setXSSAuditorEnabled(bool);
-    unsigned windowCount();
 
     // Special DOM functions.
     JSValueRef computedStyleIncludingVisitedInfo(JSValueRef element);
     JSRetainPtr<JSStringRef> counterValueForElementById(JSStringRef elementId);
-    JSRetainPtr<JSStringRef> markerTextForListItem(JSValueRef element);
+    void clearBackForwardList();
     void execCommand(JSStringRef name, JSStringRef argument);
     bool isCommandEnabled(JSStringRef name);
+    JSRetainPtr<JSStringRef> markerTextForListItem(JSValueRef element);
+    unsigned windowCount();
 
     // Repaint testing.
     void testRepaint() { m_testRepaint = true; }
@@ -80,7 +91,12 @@ public:
     // Animation testing.
     unsigned numberOfActiveAnimations() const;
     bool pauseAnimationAtTimeOnElementWithId(JSStringRef animationName, double time, JSStringRef elementId);
-
+    void suspendAnimations();
+    void resumeAnimations();
+    
+    // Compositing testing.
+    JSRetainPtr<JSStringRef> layerTreeAsText() const;
+    
     // UserContent testing.
     void addUserScript(JSStringRef source, bool runAtStart, bool allFrames);
     void addUserStyleSheet(JSStringRef source, bool allFrames);
@@ -89,9 +105,9 @@ public:
     WhatToDump whatToDump() const { return m_whatToDump; }
 
     bool shouldDumpAllFrameScrollPositions() const { return m_shouldDumpAllFrameScrollPositions; }
+    bool shouldDumpBackForwardListsForAllWindows() const { return m_shouldDumpBackForwardListsForAllWindows; }
     bool shouldDumpEditingCallbacks() const { return m_dumpEditingCallbacks; }
     bool shouldDumpMainFrameScrollPosition() const { return m_whatToDump == RenderTree; }
-
     bool shouldDumpStatusCallbacks() const { return m_dumpStatusCallbacks; }
     bool shouldDumpTitleChanges() const { return m_dumpTitleChanges; }
 
@@ -113,6 +129,7 @@ private:
 
     WhatToDump m_whatToDump;
     bool m_shouldDumpAllFrameScrollPositions;
+    bool m_shouldDumpBackForwardListsForAllWindows;
 
     bool m_shouldAllowEditing;
     bool m_shouldCloseExtraWindows;
@@ -124,11 +141,7 @@ private:
     bool m_testRepaint;
     bool m_testRepaintSweepHorizontally;
 
-#if PLATFORM(MAC)
-    RetainPtr<CFRunLoopTimerRef> m_waitToDumpWatchdogTimer;
-#elif PLATFORM(WIN)
-    UINT_PTR m_waitToDumpWatchdogTimer;
-#endif
+    PlatformTimerRef m_waitToDumpWatchdogTimer;
 };
 
 } // namespace WTR

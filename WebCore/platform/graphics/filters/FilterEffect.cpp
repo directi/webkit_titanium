@@ -39,35 +39,29 @@ FilterEffect::~FilterEffect()
 {
 }
 
-FloatRect FilterEffect::determineFilterPrimitiveSubregion(Filter* filter)
+void FilterEffect::determineAbsolutePaintRect(Filter*)
 {
-    FloatRect uniteRect;
+    m_absolutePaintRect = IntRect();
     unsigned size = m_inputEffects.size();
-
-    // FETurbulence, FEImage and FEFlood don't have input effects, take the filter region as unite rect.
-    if (!size)
-        uniteRect = filter->filterRegion();
-    else {
-        for (unsigned i = 0; i < size; ++i)
-            uniteRect.unite(m_inputEffects.at(i)->determineFilterPrimitiveSubregion(filter));
-    }
-
-    filter->determineFilterPrimitiveSubregion(this, uniteRect);
-    return m_filterPrimitiveSubregion;
+    for (unsigned i = 0; i < size; ++i)
+        m_absolutePaintRect.unite(m_inputEffects.at(i)->absolutePaintRect());
+    
+    // SVG specification wants us to clip to primitive subregion.
+    m_absolutePaintRect.intersect(m_maxEffectRect);
 }
 
-IntRect FilterEffect::requestedRegionOfInputImageData(const FloatRect& effectRect) const
+IntRect FilterEffect::requestedRegionOfInputImageData(const IntRect& effectRect) const
 {
     ASSERT(m_effectBuffer);
-    FloatPoint location = m_repaintRectInLocalCoordinates.location();
+    IntPoint location = m_absolutePaintRect.location();
     location.move(-effectRect.x(), -effectRect.y());
-    return IntRect(roundedIntPoint(location), m_effectBuffer->size());
+    return IntRect(location, m_effectBuffer->size());
 }
 
-FloatRect FilterEffect::drawingRegionOfInputImage(const FloatRect& srcRect) const
+IntRect FilterEffect::drawingRegionOfInputImage(const IntRect& srcRect) const
 {
-    return FloatRect(FloatPoint(srcRect.x() - m_repaintRectInLocalCoordinates.x(),
-                                srcRect.y() - m_repaintRectInLocalCoordinates.y()), srcRect.size());
+    return IntRect(IntPoint(srcRect.x() - m_absolutePaintRect.x(),
+                            srcRect.y() - m_absolutePaintRect.y()), srcRect.size());
 }
 
 FilterEffect* FilterEffect::inputEffect(unsigned number) const
@@ -76,10 +70,12 @@ FilterEffect* FilterEffect::inputEffect(unsigned number) const
     return m_inputEffects.at(number).get();
 }
 
-GraphicsContext* FilterEffect::effectContext()
+GraphicsContext* FilterEffect::effectContext(Filter* filter)
 {
-    IntRect bufferRect = enclosingIntRect(m_repaintRectInLocalCoordinates);
-    m_effectBuffer = ImageBuffer::create(bufferRect.size(), LinearRGB);
+    determineAbsolutePaintRect(filter);
+    if (m_absolutePaintRect.isEmpty())
+        return 0;
+    m_effectBuffer = ImageBuffer::create(m_absolutePaintRect.size(), ColorSpaceLinearRGB);
     if (!m_effectBuffer)
         return 0;
     return m_effectBuffer->context();

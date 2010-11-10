@@ -81,13 +81,10 @@ public:
     virtual void prepareTexture();
 
     virtual void synthesizeGLError(unsigned long error);
-    virtual bool supportsBGRA();
-    virtual bool supportsMapSubCHROMIUM();
     virtual void* mapBufferSubDataCHROMIUM(unsigned target, int offset, int size, unsigned access);
     virtual void unmapBufferSubDataCHROMIUM(const void*);
     virtual void* mapTexSubImage2DCHROMIUM(unsigned target, int level, int xoffset, int yoffset, int width, int height, unsigned format, unsigned type, unsigned access);
     virtual void unmapTexSubImage2DCHROMIUM(const void*);
-    virtual bool supportsCopyTextureToParentTextureCHROMIUM();
     virtual void copyTextureToParentTextureCHROMIUM(unsigned texture, unsigned parentTexture);
 
     virtual void activeTexture(unsigned long texture);
@@ -273,6 +270,9 @@ public:
 private:
     WebGraphicsContext3D::Attributes m_attributes;
     bool m_initialized;
+    bool m_renderDirectlyToWebView;
+    bool m_isGLES2;
+
     unsigned int m_texture;
     unsigned int m_fbo;
     unsigned int m_depthStencilBuffer;
@@ -286,6 +286,12 @@ private:
     // For tracking which FBO is bound
     unsigned int m_boundFBO;
 
+    // For tracking which texture is bound
+    unsigned int m_boundTexture;
+    
+    // FBO used for copying child texture to parent texture.
+    unsigned m_copyTextureToParentTextureFBO;
+
 #ifdef FLIP_FRAMEBUFFER_VERTICALLY
     unsigned char* m_scanline;
     void flipVertically(unsigned char* framebuffer,
@@ -297,6 +303,9 @@ private:
     // particular stencil and antialias, and determine which could or could
     // not be honored based on the capabilities of the OpenGL implementation.
     void validateAttributes();
+
+    // Resolve the given rectangle of the multisampled framebuffer if necessary.
+    void resolveMultisampledFramebuffer(unsigned x, unsigned y, unsigned width, unsigned height);
 
     // Note: we aren't currently using this information, but we will
     // need to in order to verify that all enabled vertex arrays have
@@ -327,8 +336,8 @@ private:
 
     // ANGLE related.
     struct ShaderSourceEntry {
-        ShaderSourceEntry()
-                : type(0)
+        ShaderSourceEntry(unsigned long shaderType)
+                : type(shaderType)
                 , source(0)
                 , log(0)
                 , translatedSource(0)
@@ -357,7 +366,7 @@ private:
     void angleDestroyCompilers();
     bool angleValidateShaderSource(ShaderSourceEntry& entry);
 
-    typedef HashMap<WebGLId, ShaderSourceEntry> ShaderSourceMap;
+    typedef HashMap<WebGLId, ShaderSourceEntry*> ShaderSourceMap;
     ShaderSourceMap m_shaderSourceMap;
 
     ShHandle m_fragmentCompiler;

@@ -35,6 +35,7 @@ class RenderTextFragment : public RenderText {
 public:
     RenderTextFragment(Node*, StringImpl*, int startOffset, int length);
     RenderTextFragment(Node*, StringImpl*);
+    virtual ~RenderTextFragment();
 
     virtual bool isTextFragment() const { return true; }
 
@@ -49,9 +50,13 @@ public:
     StringImpl* contentString() const { return m_contentString.get(); }
     virtual PassRefPtr<StringImpl> originalText() const;
 
+protected:
+    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
+
 private:
     virtual void setTextInternal(PassRefPtr<StringImpl>);
     virtual UChar previousCharacter() const;
+    RenderBlock* blockForAccompanyingFirstLetter() const;
 
     unsigned m_start;
     unsigned m_end;

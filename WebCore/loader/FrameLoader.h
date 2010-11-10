@@ -36,9 +36,9 @@
 #include "FrameLoaderStateMachine.h"
 #include "FrameLoaderTypes.h"
 #include "HistoryController.h"
+#include "NavigationScheduler.h"
 #include "PolicyCallback.h"
 #include "PolicyChecker.h"
-#include "RedirectScheduler.h"
 #include "ResourceLoadNotifier.h"
 #include "ResourceRequest.h"
 #include "SubframeLoader.h"
@@ -68,12 +68,12 @@ class HTMLFormElement;
 class IconLoader;
 class NavigationAction;
 class NetworkingContext;
+class Page;
 class ProtectionSpace;
 class ResourceError;
 class ResourceLoader;
 class ResourceResponse;
 class ScriptSourceCode;
-class ScriptString;
 class ScriptValue;
 class SecurityOrigin;
 class SerializedScriptValue;
@@ -133,6 +133,8 @@ public:
     bool isLoadingMainResource() const { return m_isLoadingMainResource; }
     bool isLoading() const;
     bool frameHasLoaded() const;
+    void transferLoadingResourcesFromPage(Page*);
+    void dispatchTransferLoadingResourceFromPage(unsigned long, DocumentLoader*, const ResourceRequest&, Page*);
 
     int numPendingOrLoadingRequests(bool recurse) const;
     String referrer() const;
@@ -212,8 +214,8 @@ public:
 
     void setDefersLoading(bool);
 
-    void changeLocation(const KURL&, const String& referrer, bool lockHistory = true, bool lockBackForwardList = true, bool userGesture = false, bool refresh = false);
-    void urlSelected(const KURL&, const String& target, PassRefPtr<Event>, bool lockHistory, bool lockBackForwardList, bool userGesture, ReferrerPolicy);
+    void changeLocation(const KURL&, const String& referrer, bool lockHistory = true, bool lockBackForwardList = true, bool refresh = false);
+    void urlSelected(const KURL&, const String& target, PassRefPtr<Event>, bool lockHistory, bool lockBackForwardList, ReferrerPolicy);
 
     void submitForm(PassRefPtr<FormSubmission>);
 
@@ -365,11 +367,11 @@ private:
     void setLoadType(FrameLoadType);
 
     static void callContinueLoadAfterNavigationPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, bool shouldContinue);
-    static void callContinueLoadAfterNewWindowPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, bool shouldContinue);
+    static void callContinueLoadAfterNewWindowPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, const NavigationAction&, bool shouldContinue);
     static void callContinueFragmentScrollAfterNavigationPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, bool shouldContinue);
 
     void continueLoadAfterNavigationPolicy(const ResourceRequest&, PassRefPtr<FormState>, bool shouldContinue);
-    void continueLoadAfterNewWindowPolicy(const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, bool shouldContinue);
+    void continueLoadAfterNewWindowPolicy(const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, const NavigationAction&, bool shouldContinue);
     void continueFragmentScrollAfterNavigationPolicy(const ResourceRequest&, bool shouldContinue);
 
     bool shouldScrollToAnchor(bool isFormSubmission, FrameLoadType, const KURL&);
@@ -391,7 +393,7 @@ private:
 
     void dispatchDidCommitLoad();
 
-    void urlSelected(const ResourceRequest&, const String& target, PassRefPtr<Event>, bool lockHistory, bool lockBackForwardList, bool userGesture, ReferrerPolicy, ShouldReplaceDocumentIfJavaScriptURL);
+    void urlSelected(const ResourceRequest&, const String& target, PassRefPtr<Event>, bool lockHistory, bool lockBackForwardList, ReferrerPolicy, ShouldReplaceDocumentIfJavaScriptURL);
 
     void loadWithDocumentLoader(DocumentLoader*, FrameLoadType, PassRefPtr<FormState>); // Calls continueLoadAfterNavigationPolicy
     void load(DocumentLoader*);                                                         // Calls loadWithDocumentLoader   

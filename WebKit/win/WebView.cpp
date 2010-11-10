@@ -67,13 +67,12 @@
 #include <WebCore/AXObjectCache.h>
 #include <WebCore/ApplicationCacheStorage.h>
 #include <WebCore/BString.h>
-#include <WebCore/BackForwardList.h>
+#include <WebCore/BackForwardListImpl.h>
 #include <WebCore/BitmapInfo.h>
-#include <WebCore/Cache.h>
+#include <WebCore/MemoryCache.h>
 #include <WebCore/Chrome.h>
 #include <WebCore/ContextMenu.h>
 #include <WebCore/ContextMenuController.h>
-#include <WebCore/CookieStorageWin.h>
 #include <WebCore/Cursor.h>
 #include <WebCore/Document.h>
 #include <WebCore/DragController.h>
@@ -148,6 +147,7 @@
 #if USE(CFNETWORK)
 #include <CFNetwork/CFURLCachePriv.h>
 #include <CFNetwork/CFURLProtocolPriv.h>
+#include <WebCore/CookieStorageCFNet.h>
 #include <WebKitSystemInterface/WebKitSystemInterface.h> 
 #endif
 
@@ -159,6 +159,7 @@
 #include <windowsx.h>
 #include <wtf/HashSet.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/StringConcatenate.h>
 
 // Soft link functions for gestures and panning feedback
 SOFT_LINK_LIBRARY(USER32);
@@ -1200,7 +1201,9 @@ bool WebView::canHandleRequest(const WebCore::ResourceRequest& request)
 
 String WebView::standardUserAgentWithApplicationName(const String& applicationName)
 {
-    return String::format("Mozilla/5.0 (Windows; U; %s; %s) AppleWebKit/%s (KHTML, like Gecko)%s%s", osVersion().latin1().data(), defaultLanguage().latin1().data(), webKitVersion().latin1().data(), (applicationName.length() ? " " : ""), applicationName.latin1().data());
+    if (applicationName.isEmpty())
+        return makeString("Mozilla/5.0 (Windows; U; ", osVersion(), "; ", defaultLanguage(), ") AppleWebKit/", webKitVersion(), " (KHTML, like Gecko)");
+    return makeString("Mozilla/5.0 (Windows; U; ", osVersion(), "; ", defaultLanguage(), ") AppleWebKit/", webKitVersion(), " (KHTML, like Gecko) ", applicationName);
 }
 
 Page* WebView::page()
@@ -1631,9 +1634,9 @@ bool WebView::mouseWheel(WPARAM wParam, LPARAM lParam, bool isMouseHWheel)
         TCHAR className[256];
 
         // Make sure truncation won't affect the comparison.
-        ASSERT(ARRAYSIZE(className) > _tcslen(PopupMenuWin::popupClassName()));
+        ASSERT(WTF_ARRAY_LENGTH(className) > _tcslen(PopupMenuWin::popupClassName()));
 
-        if (GetClassName(focusedWindow, className, ARRAYSIZE(className)) && !_tcscmp(className, PopupMenuWin::popupClassName())) {
+        if (GetClassName(focusedWindow, className, WTF_ARRAY_LENGTH(className)) && !_tcscmp(className, PopupMenuWin::popupClassName())) {
             // We don't let the WebView scroll here for two reasons - 1) To match Firefox behavior, 2) If we do scroll, we lose the
             // focus ring around the select menu.
             SetFocus(m_viewWindow);
@@ -1830,10 +1833,10 @@ const char* WebView::interpretKeyEvent(const KeyboardEvent* evt)
         keyDownCommandsMap = new HashMap<int, const char*>;
         keyPressCommandsMap = new HashMap<int, const char*>;
 
-        for (unsigned i = 0; i < _countof(keyDownEntries); i++)
+        for (size_t i = 0; i < WTF_ARRAY_LENGTH(keyDownEntries); ++i)
             keyDownCommandsMap->set(keyDownEntries[i].modifiers << 16 | keyDownEntries[i].virtualKey, keyDownEntries[i].name);
 
-        for (unsigned i = 0; i < _countof(keyPressEntries); i++)
+        for (size_t i = 0; i < WTF_ARRAY_LENGTH(keyPressEntries); ++i)
             keyPressCommandsMap->set(keyPressEntries[i].modifiers << 16 | keyPressEntries[i].charCode, keyPressEntries[i].name);
     }
 
@@ -2310,11 +2313,10 @@ static String osVersion()
                 osVersion = "Windows 98; Win 9x 4.90";
         }
     } else if (versionInfo.dwPlatformId == VER_PLATFORM_WIN32_NT)
-        osVersion = String::format("Windows NT %d.%d", versionInfo.dwMajorVersion, versionInfo.dwMinorVersion);
+        osVersion = makeString("Windows NT ", String::number(versionInfo.dwMajorVersion), '.', String::number(versionInfo.dwMinorVersion));
 
     if (!osVersion.length())
-        osVersion = String::format("Windows %d.%d", versionInfo.dwMajorVersion, versionInfo.dwMinorVersion);
-
+        osVersion = makeString("Windows ", String::number(versionInfo.dwMajorVersion), '.', String::number(versionInfo.dwMinorVersion));
     return osVersion;
 }
 
@@ -2329,7 +2331,7 @@ static String webKitVersion()
     } *lpTranslate;
 
     TCHAR path[MAX_PATH];
-    GetModuleFileName(gInstance, path, ARRAYSIZE(path));
+    GetModuleFileName(gInstance, path, WTF_ARRAY_LENGTH(path));
     DWORD handle;
     DWORD versionSize = GetFileVersionInfoSize(path, &handle);
     if (!versionSize)
@@ -2343,12 +2345,12 @@ static String webKitVersion()
     if (!VerQueryValue(data, TEXT("\\VarFileInfo\\Translation"), (LPVOID*)&lpTranslate, &cbTranslate))
         goto exit;
     TCHAR key[256];
-    _stprintf_s(key, ARRAYSIZE(key), TEXT("\\StringFileInfo\\%04x%04x\\ProductVersion"), lpTranslate[0].wLanguage, lpTranslate[0].wCodePage);
+    _stprintf_s(key, WTF_ARRAY_LENGTH(key), TEXT("\\StringFileInfo\\%04x%04x\\ProductVersion"), lpTranslate[0].wLanguage, lpTranslate[0].wCodePage);
     LPCTSTR productVersion;
     UINT productVersionLength;
     if (!VerQueryValue(data, (LPTSTR)(LPCTSTR)key, (void**)&productVersion, &productVersionLength))
         goto exit;
-    versionStr = String(productVersion, productVersionLength);
+    versionStr = String(productVersion, productVersionLength - 1);
 
 exit:
     if (data)
@@ -2868,13 +2870,14 @@ HRESULT STDMETHODCALLTYPE WebView::focusedFrame(
 
     return webFrame->QueryInterface(IID_IWebFrame, (void**) frame);
 }
+
 HRESULT STDMETHODCALLTYPE WebView::backForwardList( 
     /* [out][retval] */ IWebBackForwardList** list)
 {
     if (!m_useBackForwardList)
         return E_FAIL;
  
-    *list = WebBackForwardList::createInstance(m_page->backForwardList());
+    *list = WebBackForwardList::createInstance(static_cast<WebCore::BackForwardListImpl*>(m_page->backForwardList()));
 
     return S_OK;
 }

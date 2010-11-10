@@ -71,6 +71,8 @@ PASS inner.DOMImplementation.isInner is true
 PASS inner.DOMImplementation.constructor.isInner is true
 PASS inner.DOMParser.isInner is true
 PASS inner.DOMParser.constructor.isInner is true
+PASS inner.DOMSettableTokenList.isInner is true
+PASS inner.DOMSettableTokenList.constructor.isInner is true
 PASS inner.DOMStringList.isInner is true
 PASS inner.DOMStringList.constructor.isInner is true
 PASS inner.DOMStringMap.isInner is true
@@ -201,6 +203,8 @@ PASS inner.HTMLOptGroupElement.isInner is true
 PASS inner.HTMLOptGroupElement.constructor.isInner is true
 PASS inner.HTMLOptionElement.isInner is true
 PASS inner.HTMLOptionElement.constructor.isInner is true
+PASS inner.HTMLOutputElement.isInner is true
+PASS inner.HTMLOutputElement.constructor.isInner is true
 PASS inner.HTMLParagraphElement.isInner is true
 PASS inner.HTMLParagraphElement.constructor.isInner is true
 PASS inner.HTMLParamElement.isInner is true

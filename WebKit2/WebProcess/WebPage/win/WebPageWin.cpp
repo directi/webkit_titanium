@@ -157,10 +157,10 @@ const char* WebPage::interpretKeyEvent(const KeyboardEvent* evt)
         keyDownCommandsMap = new HashMap<int, const char*>;
         keyPressCommandsMap = new HashMap<int, const char*>;
 
-        for (unsigned i = 0; i < _countof(keyDownEntries); i++)
+        for (size_t i = 0; i < WTF_ARRAY_LENGTH(keyDownEntries); ++i)
             keyDownCommandsMap->set(keyDownEntries[i].modifiers << 16 | keyDownEntries[i].virtualKey, keyDownEntries[i].name);
 
-        for (unsigned i = 0; i < _countof(keyPressEntries); i++)
+        for (size_t i = 0; i < WTF_ARRAY_LENGTH(keyPressEntries); ++i)
             keyPressCommandsMap->set(keyPressEntries[i].modifiers << 16 | keyPressEntries[i].charCode, keyPressEntries[i].name);
     }
 
@@ -197,12 +197,6 @@ bool WebPage::performDefaultBehaviorForKeyEvent(const WebKeyboardEvent& keyboard
             m_page->goForward();
         else
             m_page->goBack();
-        break;
-    case VK_SPACE:
-        if (keyboardEvent.shiftKey())
-            scroll(m_page.get(), ScrollUp, ScrollByPage);
-        else
-            scroll(m_page.get(), ScrollDown, ScrollByPage);
         break;
     case VK_LEFT:
         scroll(m_page.get(), ScrollLeft, ScrollByLine);

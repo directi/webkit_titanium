@@ -30,10 +30,13 @@
 
 #include "config.h"
 
+#if ENABLE(ACCELERATED_2D_CANVAS)
+
 #include "SharedGraphicsContext3D.h"
 
 #include "AffineTransform.h"
 #include "Color.h"
+#include "Extensions3D.h"
 #include "FloatRect.h"
 #include "GraphicsContext3D.h"
 #include "GraphicsTypes.h"
@@ -47,16 +50,27 @@
 namespace WebCore {
 
 // static
-PassRefPtr<SharedGraphicsContext3D> SharedGraphicsContext3D::create(PassOwnPtr<GraphicsContext3D> context)
+PassRefPtr<SharedGraphicsContext3D> SharedGraphicsContext3D::create(HostWindow* hostWindow)
 {
-    return adoptRef(new SharedGraphicsContext3D(context));
+    GraphicsContext3D::Attributes attr;
+    attr.canRecoverFromContextLoss = false; // Canvas contexts can not handle lost contexts.
+    RefPtr<GraphicsContext3D> context = GraphicsContext3D::create(attr, hostWindow);
+    if (!context)
+        return 0;
+    OwnPtr<SolidFillShader> solidFillShader = SolidFillShader::create(context.get());
+    if (!solidFillShader)
+        return 0;
+    OwnPtr<TexShader> texShader = TexShader::create(context.get());
+    if (!texShader)
+        return 0;
+    return adoptRef(new SharedGraphicsContext3D(context.release(), solidFillShader.release(), texShader.release()));
 }
 
-SharedGraphicsContext3D::SharedGraphicsContext3D(PassOwnPtr<GraphicsContext3D> context)
+SharedGraphicsContext3D::SharedGraphicsContext3D(PassRefPtr<GraphicsContext3D> context, PassOwnPtr<SolidFillShader> solidFillShader, PassOwnPtr<TexShader> texShader)
     : m_context(context)
     , m_quadVertices(0)
-    , m_solidFillShader(SolidFillShader::create(m_context.get()))
-    , m_texShader(TexShader::create(m_context.get()))
+    , m_solidFillShader(solidFillShader)
+    , m_texShader(texShader)
 {
     allContexts()->add(this);
 }
@@ -166,18 +180,8 @@ void SharedGraphicsContext3D::readPixels(long x, long y, unsigned long width, un
 
 bool SharedGraphicsContext3D::supportsBGRA()
 {
-    return m_context->supportsBGRA();
-}
-
-bool SharedGraphicsContext3D::supportsCopyTextureToParentTextureCHROMIUM()
-
-{
-    return m_context->supportsCopyTextureToParentTextureCHROMIUM();
-}
-
-void SharedGraphicsContext3D::copyTextureToParentTextureCHROMIUM(unsigned texture, unsigned parentTexture)
-{
-    return m_context->copyTextureToParentTextureCHROMIUM(texture, parentTexture);
+    return m_context->getExtensions()->supports("GL_EXT_texture_format_BGRA8888")
+        && m_context->getExtensions()->supports("GL_EXT_read_format_bgra");
 }
 
 Texture* SharedGraphicsContext3D::createTexture(NativeImagePtr ptr, Texture::Format format, int width, int height)
@@ -215,8 +219,8 @@ void SharedGraphicsContext3D::removeTexturesFor(NativeImagePtr ptr)
 // static
 HashSet<SharedGraphicsContext3D*>* SharedGraphicsContext3D::allContexts()
 {
-    static OwnPtr<HashSet<SharedGraphicsContext3D*> > set(new HashSet<SharedGraphicsContext3D*>);
-    return set.get();
+    DEFINE_STATIC_LOCAL(HashSet<SharedGraphicsContext3D*>, allContextsSet, ());
+    return &allContextsSet;
 }
 
 
@@ -334,3 +338,5 @@ bool SharedGraphicsContext3D::paintsIntoCanvasBuffer() const
 }
 
 } // namespace WebCore
+
+#endif

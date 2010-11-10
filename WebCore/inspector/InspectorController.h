@@ -32,10 +32,8 @@
 #include "CharacterData.h"
 #include "Console.h"
 #include "Cookie.h"
-#include "Element.h"
 #include "Page.h"
 #include "PlatformString.h"
-#include "ScriptState.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/ListHashSet.h>
@@ -51,7 +49,6 @@ class ConsoleMessage;
 class Database;
 class Document;
 class DocumentLoader;
-class Element;
 class FloatRect;
 class GraphicsContext;
 class HitTestResult;
@@ -70,7 +67,8 @@ class InspectorFrontend;
 class InspectorFrontendClient;
 class InspectorObject;
 class InspectorProfilerAgent;
-class InspectorResource;
+class InspectorResourceAgent;
+class InspectorState;
 class InspectorStorageAgent;
 class InspectorTimelineAgent;
 class InspectorValue;
@@ -82,15 +80,19 @@ class Page;
 class ResourceRequest;
 class ResourceResponse;
 class ResourceError;
+class ScriptArguments;
 class ScriptCallStack;
 class ScriptProfile;
-class ScriptString;
 class SharedBuffer;
 class Storage;
 class StorageArea;
 
 #if ENABLE(OFFLINE_WEB_APPLICATIONS)
 class InspectorApplicationCacheAgent;
+#endif
+
+#if ENABLE(FILE_SYSTEM)
+class InspectorFileSystemAgent;
 #endif
 
 #if ENABLE(WEB_SOCKETS)
@@ -100,8 +102,6 @@ class WebSocketHandshakeResponse;
 
 class InspectorController : public Noncopyable {
 public:
-    typedef HashMap<unsigned long, RefPtr<InspectorResource> > ResourcesMap;
-    typedef HashMap<RefPtr<Frame>, ResourcesMap*> FrameResourcesMap;
     typedef HashMap<int, RefPtr<InspectorDatabaseResource> > DatabaseResourcesMap;
     typedef HashMap<int, RefPtr<InspectorDOMStorageResource> > DOMStorageResourcesMap;
 
@@ -125,13 +125,7 @@ public:
     Page* inspectedPage() const { return m_inspectedPage; }
     void reloadPage();
 
-    String setting(const String& key) const;
-    void setSetting(const String& key, const String& value);
-    void saveApplicationSettings(const String& settings);
-    void saveSessionSettings(const String&);
-    void getSettings(RefPtr<InspectorObject>*);
-
-    void restoreInspectorStateFromCookie(const String& inspectorState);
+    void restoreInspectorStateFromCookie(const String& inspectorCookie);
 
     void inspect(Node*);
     void highlight(Node*);
@@ -139,23 +133,24 @@ public:
     void highlightDOMNode(long nodeId);
     void hideDOMNodeHighlight() { hideHighlight(); }
 
+    void highlightFrame(unsigned long frameId);
+    void hideFrameHighlight() { hideHighlight(); }
+
     void show();
     void showPanel(const String&);
     void close();
 
-    // We are in transition from JS transport via webInspector to native
-    // transport via InspectorClient. After migration, webInspector parameter should
-    // be removed.
     void connectFrontend();
     void reuseFrontend();
     void disconnectFrontend();
 
-    void addMessageToConsole(MessageSource, MessageType, MessageLevel, ScriptCallStack*, const String& message);
-    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String& sourceID);
+    void setConsoleMessagesEnabled(bool enabled, bool* newState);
+    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, PassOwnPtr<ScriptArguments> arguments, PassOwnPtr<ScriptCallStack>);
+    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String&);
     void clearConsoleMessages();
     const Vector<OwnPtr<ConsoleMessage> >& consoleMessages() const { return m_consoleMessages; }
 
-    bool searchingForNodeInPage() const { return m_searchingForNode; }
+    bool searchingForNodeInPage() const;
     void mouseDidMoveOverElement(const HitTestResult&, unsigned modifierFlags);
     void handleMousePress();
 
@@ -171,16 +166,12 @@ public:
     void identifierForInitialRequest(unsigned long identifier, DocumentLoader*, const ResourceRequest&);
     void willSendRequest(unsigned long identifier, ResourceRequest&, const ResourceResponse& redirectResponse);
     void markResourceAsCached(unsigned long identifier);
-    void didReceiveResponse(unsigned long identifier, const ResourceResponse&);
+    void didReceiveResponse(unsigned long identifier, DocumentLoader*, const ResourceResponse&);
     void didReceiveContentLength(unsigned long identifier, int lengthReceived);
     void didFinishLoading(unsigned long identifier, double finishTime);
     void didFailLoading(unsigned long identifier, const ResourceError&);
-    void resourceRetrievedByXMLHttpRequest(unsigned long identifier, const ScriptString& sourceString, const String& url, const String& sendURL, unsigned sendLineNumber);
+    void resourceRetrievedByXMLHttpRequest(unsigned long identifier, const String& sourceString, const String& url, const String& sendURL, unsigned sendLineNumber);
     void scriptImported(unsigned long identifier, const String& sourceString);
-
-    void setResourceTrackingEnabled(bool enabled);
-    void setResourceTrackingEnabled(bool enabled, bool always, bool* newState);
-    bool resourceTrackingEnabled() const { return m_resourceTrackingEnabled; }
 
     void ensureSettingsLoaded();
 
@@ -195,17 +186,12 @@ public:
     InspectorApplicationCacheAgent* applicationCacheAgent() { return m_applicationCacheAgent.get(); }
 #endif
 
+#if ENABLE(FILE_SYSTEM)
+    InspectorFileSystemAgent* fileSystemAgent() { return m_fileSystemAgent.get(); }
+#endif 
+
     void mainResourceFiredLoadEvent(DocumentLoader*, const KURL&);
     void mainResourceFiredDOMContentEvent(DocumentLoader*, const KURL&);
-
-    static void willInsertDOMNode(Node* node, Node* parent);
-    static void didInsertDOMNode(Node*);
-    static void willRemoveDOMNode(Node*);
-    static void willModifyDOMAttr(Element*);
-    static void didModifyDOMAttr(Element*);
-    static void characterDataModified(CharacterData*);
-
-    static void instrumentWillSendXMLHttpRequest(ScriptExecutionContext*, const KURL&);
 
 #if ENABLE(WORKERS)
     enum WorkerAction { WorkerCreated, WorkerDestroyed };
@@ -232,9 +218,6 @@ public:
     void didCloseWebSocket(unsigned long identifier);
 #endif
 
-    const ResourcesMap& resources() const { return m_resources; }
-    InspectorResource* resourceForURL(const String& url);
-    bool resourceContentForURL(const KURL& url, Document* loaderDocument, String* result);
     bool hasFrontend() const { return m_frontend; }
 
     void drawNodeHighlight(GraphicsContext&) const;
@@ -246,7 +229,7 @@ public:
     void startTiming(const String& title);
     bool stopTiming(const String& title, double& elapsed);
 
-    void startGroup(MessageSource source, ScriptCallStack* callFrame, bool collapsed = false);
+    void startGroup(PassOwnPtr<ScriptArguments>, PassOwnPtr<ScriptCallStack> callFrame, bool collapsed = false);
     void endGroup(MessageSource source, unsigned lineNumber, const String& sourceURL);
 
     void markTimeline(const String& message);
@@ -257,7 +240,9 @@ public:
     void addStartProfilingMessageToConsole(const String& title, unsigned lineNumber, const String& sourceURL);
     bool isRecordingUserInitiatedProfile() const;
     String getCurrentUserInitiatedProfileName(bool incrementProfileNumber = false);
+    void startProfiling() { startUserInitiatedProfiling(); }
     void startUserInitiatedProfiling();
+    void stopProfiling() { stopUserInitiatedProfiling(); }
     void stopUserInitiatedProfiling();
     void enableProfiler(bool always = false, bool skipRecompile = false);
     void disableProfiler(bool always = false);
@@ -270,9 +255,8 @@ public:
     InspectorDebuggerAgent* debuggerAgent() const { return m_debuggerAgent.get(); }
     void resume();
 
-    void setNativeBreakpoint(PassRefPtr<InspectorObject> breakpoint, unsigned int* breakpointId);
-    void removeNativeBreakpoint(unsigned int breakpointId);
-
+    void setNativeBreakpoint(PassRefPtr<InspectorObject> breakpoint, String* breakpointId);
+    void removeNativeBreakpoint(const String& breakpointId);
 #endif
 
     void evaluateForTestInFrontend(long testCallId, const String& script);
@@ -283,19 +267,30 @@ public:
     void removeAllScriptsToEvaluateOnLoad();
     void setInspectorExtensionAPI(const String& source);
 
-    static const String& inspectorStartsAttachedSettingName();
+    bool inspectorStartsAttached();
+    void setInspectorStartsAttached(bool);
+    void setInspectorAttachedHeight(long height);
+    int inspectorAttachedHeight() const;
+
+    static const unsigned defaultAttachedHeight;
 
 private:
-    void updateInspectorStateCookie();
     void getInspectorState(RefPtr<InspectorObject>* state);
+    void setConsoleMessagesEnabled(bool enabled);
 
     friend class InspectorBackend;
     friend class InspectorBackendDispatcher;
+    friend class InspectorInstrumentation;
     friend class InjectedScriptHost;
 
+    enum ProfilerRestoreAction {
+        ProfilerRestoreNoAction = 0,
+        ProfilerRestoreResetAgent = 1
+    };
+    
     void populateScriptObjects();
     void restoreDebugger();
-    void restoreProfiler();
+    void restoreProfiler(ProfilerRestoreAction action);
     void unbindAllResources();
     void setSearchingForNode(bool enabled);
 
@@ -303,14 +298,16 @@ private:
     void setSearchingForNode(bool enabled, bool* newState);
 
     void setMonitoringXHREnabled(bool enabled, bool* newState);
-    void storeLastActivePanel(const String& panelName);
     InspectorDOMAgent* domAgent() { return m_domAgent.get(); }
     void releaseFrontendLifetimeAgents();
 
 #if ENABLE(JAVASCRIPT_DEBUGGER)
-
     void toggleRecordButton(bool);
     void enableDebuggerFromFrontend(bool always);
+
+    String findEventListenerBreakpoint(const String& eventName);
+    String findXHRBreakpoint(const String& url);
+    void clearNativeBreakpoints();
 #endif
 #if ENABLE(DATABASE)
     void selectDatabase(Database* database);
@@ -325,33 +322,11 @@ private:
 
     void focusNode();
 
-    void addConsoleMessage(ScriptState*, PassOwnPtr<ConsoleMessage>);
-
-    void addResource(InspectorResource*);
-    void removeResource(InspectorResource*);
-    InspectorResource* getTrackedResource(unsigned long identifier);
-    void getResourceContent(unsigned long identifier, String* content);
-
-    void pruneResources(ResourcesMap*, DocumentLoader* loaderToKeep = 0);
-    void removeAllResources(ResourcesMap* map) { pruneResources(map); }
+    void addConsoleMessage(PassOwnPtr<ConsoleMessage>);
 
     bool isMainResourceLoader(DocumentLoader* loader, const KURL& requestUrl);
 
     void didEvaluateForTestInFrontend(long callId, const String& jsonResult);
-
-    static InspectorController* inspectorControllerForScriptExecutionContext(ScriptExecutionContext* context);
-    static InspectorController* inspectorControllerForNode(Node*);
-    static InspectorController* inspectorControllerForDocument(Document* document);
-
-    void willInsertDOMNodeImpl(Node* node, Node* parent);
-    void didInsertDOMNodeImpl(Node*);
-    void willRemoveDOMNodeImpl(Node*);
-    void didRemoveDOMNodeImpl(Node*);
-    void willModifyDOMAttrImpl(Element*);
-    void didModifyDOMAttrImpl(Element*);
-    void characterDataModifiedImpl(CharacterData*);
-
-    void instrumentWillSendXMLHttpRequestImpl(const KURL&);
 
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     friend class InspectorDebuggerAgent;
@@ -359,8 +334,6 @@ private:
     PassRefPtr<InspectorValue> loadBreakpoints();
     void saveBreakpoints(PassRefPtr<InspectorObject> breakpoints);
 #endif
-
-    static unsigned s_inspectorControllerCount;
 
     Page* m_inspectedPage;
     InspectorClient* m_client;
@@ -371,16 +344,19 @@ private:
     RefPtr<InspectorStorageAgent> m_storageAgent;
     OwnPtr<InspectorCSSStore> m_cssStore;
     OwnPtr<InspectorTimelineAgent> m_timelineAgent;
+    OwnPtr<InspectorState> m_state;
 
 #if ENABLE(OFFLINE_WEB_APPLICATIONS)
     OwnPtr<InspectorApplicationCacheAgent> m_applicationCacheAgent;
 #endif
+    
+#if ENABLE(FILE_SYSTEM)
+    RefPtr<InspectorFileSystemAgent> m_fileSystemAgent;
+#endif 
 
     RefPtr<Node> m_nodeToFocus;
-    RefPtr<InspectorResource> m_mainResource;
-    ResourcesMap m_resources;
-    HashSet<String> m_knownResources;
-    FrameResourcesMap m_frameResources;
+    RefPtr<InspectorResourceAgent> m_resourceAgent;
+    unsigned long m_mainResourceIdentifier;
     Vector<OwnPtr<ConsoleMessage> > m_consoleMessages;
     unsigned m_expiredConsoleMessageCount;
     HashMap<String, double> m_times;
@@ -393,14 +369,8 @@ private:
 #endif
     String m_showAfterVisible;
     RefPtr<Node> m_highlightedNode;
-#if ENABLE(INSPECTOR)
-    RefPtr<InspectorValue> m_sessionSettings;
-#endif
     unsigned m_groupLevel;
-    bool m_searchingForNode;
-    bool m_monitoringXHR;
     ConsoleMessage* m_previousMessage;
-    bool m_resourceTrackingEnabled;
     bool m_settingsLoaded;
     RefPtr<InspectorBackend> m_inspectorBackend;
     OwnPtr<InspectorBackendDispatcher> m_inspectorBackendDispatcher;
@@ -416,7 +386,10 @@ private:
     bool m_attachDebuggerWhenShown;
     OwnPtr<InspectorDebuggerAgent> m_debuggerAgent;
 
-    HashMap<unsigned int, String> m_XHRBreakpoints;
+    HashMap<String, String> m_nativeBreakpoints;
+    HashSet<String> m_eventListenerBreakpoints;
+    HashMap<String, String> m_XHRBreakpoints;
+
     unsigned int m_lastBreakpointId;
 
     OwnPtr<InspectorProfilerAgent> m_profilerAgent;
@@ -427,92 +400,6 @@ private:
     WorkersMap m_workers;
 #endif
 };
-
-inline void InspectorController::willInsertDOMNode(Node* node, Node* parent)
-{
-#if ENABLE(INSPECTOR)
-    if (InspectorController* inspectorController = inspectorControllerForNode(parent))
-        inspectorController->willInsertDOMNodeImpl(node, parent);
-#endif
-}
-
-inline void InspectorController::didInsertDOMNode(Node* node)
-{
-#if ENABLE(INSPECTOR)
-    if (InspectorController* inspectorController = inspectorControllerForNode(node))
-        inspectorController->didInsertDOMNodeImpl(node);
-#endif
-}
-
-inline void InspectorController::willRemoveDOMNode(Node* node)
-{
-#if ENABLE(INSPECTOR)
-    if (InspectorController* inspectorController = inspectorControllerForNode(node)) {
-        inspectorController->willRemoveDOMNodeImpl(node);
-        inspectorController->didRemoveDOMNodeImpl(node);
-    }
-#endif
-}
-
-inline void InspectorController::willModifyDOMAttr(Element* element)
-{
-#if ENABLE(INSPECTOR)
-    if (InspectorController* inspectorController = inspectorControllerForNode(element))
-        inspectorController->willModifyDOMAttrImpl(element);
-#endif
-}
-
-inline void InspectorController::didModifyDOMAttr(Element* element)
-{
-#if ENABLE(INSPECTOR)
-    if (InspectorController* inspectorController = inspectorControllerForNode(element))
-        inspectorController->didModifyDOMAttrImpl(element);
-#endif
-}
-
-inline void InspectorController::characterDataModified(CharacterData* characterData)
-{
-#if ENABLE(INSPECTOR)
-    if (InspectorController* inspectorController = inspectorControllerForNode(characterData))
-        inspectorController->characterDataModifiedImpl(characterData);
-#endif
-}
-
-inline void InspectorController::instrumentWillSendXMLHttpRequest(ScriptExecutionContext* context, const KURL& url)
-{
-#if ENABLE(INSPECTOR)
-    if (InspectorController* inspectorController = inspectorControllerForScriptExecutionContext(context))
-        inspectorController->instrumentWillSendXMLHttpRequestImpl(url);
-#endif
-}
-
-inline InspectorController* InspectorController::inspectorControllerForScriptExecutionContext(ScriptExecutionContext* context)
-{
-    if (!s_inspectorControllerCount || !context || !context->isDocument())
-        return 0;
-    return inspectorControllerForDocument(static_cast<Document*>(context));
-}
-
-inline InspectorController* InspectorController::inspectorControllerForNode(Node* node)
-{
-    if (!s_inspectorControllerCount)
-        return 0;
-    return inspectorControllerForDocument(node->document());
-}
-
-inline InspectorController* InspectorController::inspectorControllerForDocument(Document* document)
-{
-    ASSERT(document);
-    Page* page = document->page();
-    if (!page)
-        return 0;
-    InspectorController* inspectorController = page->inspectorController();
-    if (!inspectorController)
-        return 0;
-    if (!inspectorController->hasFrontend())
-        return 0;
-    return inspectorController;
-}
 
 } // namespace WebCore
 

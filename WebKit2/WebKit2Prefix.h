@@ -29,6 +29,22 @@
 #include <wtf/FastMalloc.h>
 #endif
 
+#ifdef __cplusplus
+#define EXTERN_C_BEGIN extern "C" {
+#define EXTERN_C_END }
+#else
+#define EXTERN_C_BEGIN
+#define EXTERN_C_END
+#endif
+
+// For defining getters to a static value, where the getters have internal linkage
+#define DEFINE_STATIC_GETTER(type, name, arguments) \
+static const type& name() \
+{ \
+    DEFINE_STATIC_LOCAL(type, name##Value, arguments); \
+    return name##Value; \
+}
+
 #if defined(BUILDING_QT__)
 
 #define WTF_USE_JSC 1
@@ -43,8 +59,7 @@
 #define ENABLE_WEB_PROCESS_SANDBOX 1
 #endif
 
-// FIXME: Enable once this works well enough.
-#define ENABLE_PLUGIN_PROCESS 0
+#define ENABLE_PLUGIN_PROCESS 1
 
 #import <CoreGraphics/CoreGraphics.h>
 
@@ -60,6 +75,8 @@
 #define JS_EXPORTDATA
 #define JS_EXPORTCLASS
 #define WEBKIT_EXPORTDATA
+
+#include <WebCore/EmptyProtocolDefinitions.h>
 
 #elif defined(WIN32) || defined(_WIN32)
 
@@ -92,3 +109,4 @@
 #endif
 
 #endif /* defined(WIN32) || defined(_WIN32) */
+

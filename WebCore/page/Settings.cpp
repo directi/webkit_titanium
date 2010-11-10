@@ -26,8 +26,9 @@
 #include "config.h"
 #include "Settings.h"
 
-#include "BackForwardList.h"
+#include "BackForwardController.h"
 #include "CachedResourceLoader.h"
+#include "CookieStorage.h"
 #include "DOMTimer.h"
 #include "Database.h"
 #include "Frame.h"
@@ -63,6 +64,27 @@ bool Settings::gShouldPaintNativeControls = true;
 bool Settings::gShouldUseHighResolutionTimers = true;
 #endif
 
+// NOTEs
+//  1) EditingMacBehavior comprises Tiger, Leopard, SnowLeopard and iOS builds, as well QtWebKit and Chromium when built on Mac;
+//  2) EditingWindowsBehavior comprises Win32 and WinCE builds, as well as QtWebKit and Chromium when built on Windows;
+//  3) EditingUnixBehavior comprises all unix-based systems, but Darwin/MacOS (and then abusing the terminology);
+// 99) MacEditingBehavior is used a fallback.
+static EditingBehaviorType editingBehaviorTypeForPlatform()
+{
+    return
+#if OS(DARWIN)
+    EditingMacBehavior
+#elif OS(WINDOWS)
+    EditingWindowsBehavior
+#elif OS(UNIX)
+    EditingUnixBehavior
+#else
+    // Fallback
+    EditingMacBehavior
+#endif
+    ;
+}
+
 Settings::Settings(Page* page)
     : m_page(page)
     , m_editableLinkBehavior(EditableLinkDefaultBehavior)
@@ -92,6 +114,7 @@ Settings::Settings(Page* page)
     , m_javaScriptCanOpenWindowsAutomatically(false)
     , m_javaScriptCanAccessClipboard(false)
     , m_shouldPrintBackgrounds(false)
+    , m_shouldDelegateScrolling(false)
     , m_textAreasAreResizable(false)
 #if ENABLE(DASHBOARD_SUPPORT)
     , m_usesDashboardBackwardCompatibilityMode(false)
@@ -119,14 +142,7 @@ Settings::Settings(Page* page)
     , m_enforceCSSMIMETypeInNoQuirksMode(true)
     , m_usesEncodingDetector(false)
     , m_allowScriptsToCloseWindows(false)
-    , m_editingBehaviorType(
-#if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
-        // (PLATFORM(MAC) is always false in Chromium, hence the extra condition.)
-        EditingMacBehavior
-#else
-        EditingWindowsBehavior
-#endif
-        )
+    , m_editingBehaviorType(editingBehaviorTypeForPlatform())
     // FIXME: This should really be disabled by default as it makes platforms that don't support the feature download files
     // they can't use by. Leaving enabled for now to not change existing behavior.
     , m_downloadableBinaryFontsEnabled(true)
@@ -148,6 +164,7 @@ Settings::Settings(Page* page)
     , m_interactiveFormValidation(false)
     , m_usePreHTML5ParserQuirks(false)
     , m_hyperlinkAuditingEnabled(false)
+    , m_crossOriginCheckInGetMatchedCSSRulesDisabled(false)
 {
     // A Frame may not have been created yet, so we initialize the AtomicString 
     // hash before trying to use it.
@@ -312,6 +329,9 @@ void Settings::setPrivateBrowsingEnabled(bool privateBrowsingEnabled)
     if (m_privateBrowsingEnabled == privateBrowsingEnabled)
         return;
 
+    // FIXME: We can only enable cookie private browsing mode globally, so it's misleading to have it as a per-page setting.
+    setCookieStoragePrivateBrowsingEnabled(privateBrowsingEnabled);
+
     m_privateBrowsingEnabled = privateBrowsingEnabled;
     m_page->privateBrowsingStateChanged();
 }
@@ -344,6 +364,11 @@ void Settings::setUserStyleSheetLocation(const KURL& userStyleSheetLocation)
 void Settings::setShouldPrintBackgrounds(bool shouldPrintBackgrounds)
 {
     m_shouldPrintBackgrounds = shouldPrintBackgrounds;
+}
+
+void Settings::setShouldDelegateScrolling(bool shouldDelegateScrolling)
+{
+    m_shouldDelegateScrolling = shouldDelegateScrolling;
 }
 
 void Settings::setTextAreasAreResizable(bool textAreasAreResizable)
@@ -419,9 +444,10 @@ void Settings::setUsesPageCache(bool usesPageCache)
         
     m_usesPageCache = usesPageCache;
     if (!m_usesPageCache) {
-        HistoryItemVector& historyItems = m_page->backForwardList()->entries();
-        for (unsigned i = 0; i < historyItems.size(); i++)
-            pageCache()->remove(historyItems[i].get());
+        int first = -m_page->backForward()->backCount();
+        int last = m_page->backForward()->forwardCount();
+        for (int i = first; i <= last; i++)
+            pageCache()->remove(m_page->backForward()->itemAtIndex(i));
         pageCache()->releaseAutoreleasedPagesNow();
     }
 }

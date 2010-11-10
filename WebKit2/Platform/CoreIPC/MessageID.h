@@ -35,17 +35,22 @@ enum MessageClass {
     MessageClassCoreIPC,
 
     // Messages sent by the UI process to the web process.
-    MessageClassWebProcess,
-    MessageClassInjectedBundle,
-    MessageClassWebPage,
     MessageClassDrawingArea,
+    MessageClassInjectedBundle,
+    MessageClassWebInspector,
+    MessageClassWebPage,
+    MessageClassWebProcess,
 
     // Messages sent by the web process to the UI process.
-    MessageClassWebContext,
-    MessageClassWebProcessProxy,
-    MessageClassWebPageProxy,
     MessageClassDrawingAreaProxy,
-    
+    MessageClassDownloadProxy,
+    MessageClassWebContext,
+    MessageClassWebContextLegacy,
+    MessageClassWebInspectorProxy,
+    MessageClassWebPageProxy,
+    MessageClassWebProcessProxy,
+    MessageClassWebProcessProxyLegacy,
+
     // Messages sent by the UI process to the plug-in process.
     MessageClassPluginProcess,
 
@@ -58,6 +63,9 @@ enum MessageClass {
 
     // Messages sent by the plug-in process to the web process.
     MessageClassPluginProxy,
+
+    // NPObject messages sent by both the plug-in process and the web process.
+    MessageClassNPObjectMessageReceiver,
 };
 
 template<typename> struct MessageKindTraits { };

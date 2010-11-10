@@ -66,11 +66,14 @@
 #if ENABLE(FILE_SYSTEM)
 #include "AsyncFileSystem.h"
 #include "DOMFileSystem.h"
+#include "DOMFileSystemSync.h"
 #include "ErrorCallback.h"
 #include "FileError.h"
+#include "FileException.h"
 #include "FileSystemCallback.h"
 #include "FileSystemCallbacks.h"
 #include "LocalFileSystem.h"
+#include "SyncCallbackHelper.h"
 #endif
 
 namespace WebCore {
@@ -338,12 +341,12 @@ EventTargetData* WorkerContext::ensureEventTargetData()
 }
 
 #if ENABLE(BLOB)
-String WorkerContext::createBlobURL(Blob* blob)
+String WorkerContext::createObjectURL(Blob* blob)
 {
     return scriptExecutionContext()->createPublicBlobURL(blob).string();
 }
 
-void WorkerContext::revokeBlobURL(const String& blobURLString)
+void WorkerContext::revokeObjectURL(const String& blobURLString)
 {
     scriptExecutionContext()->revokePublicBlobURL(KURL(ParsedURLString, blobURLString));
 }
@@ -353,17 +356,36 @@ void WorkerContext::revokeBlobURL(const String& blobURLString)
 void WorkerContext::requestFileSystem(int type, long long size, PassRefPtr<FileSystemCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback)
 {
     if (!AsyncFileSystem::isAvailable() || !securityOrigin()->canAccessFileSystem()) {
-        DOMFileSystem::scheduleCallback(this, errorCallback, FileError::create(SECURITY_ERR));
+        DOMFileSystem::scheduleCallback(this, errorCallback, FileError::create(FileError::SECURITY_ERR));
         return;
     }
 
     AsyncFileSystem::Type fileSystemType = static_cast<AsyncFileSystem::Type>(type);
     if (fileSystemType != AsyncFileSystem::Temporary && fileSystemType != AsyncFileSystem::Persistent) {
-        DOMFileSystem::scheduleCallback(this, errorCallback, FileError::create(INVALID_MODIFICATION_ERR));
+        DOMFileSystem::scheduleCallback(this, errorCallback, FileError::create(FileError::INVALID_MODIFICATION_ERR));
         return;
     }
 
-    LocalFileSystem::localFileSystem().requestFileSystem(this, fileSystemType, size, FileSystemCallbacks::create(successCallback, errorCallback, this));
+    LocalFileSystem::localFileSystem().requestFileSystem(this, fileSystemType, size, FileSystemCallbacks::create(successCallback, errorCallback, this), false);
+}
+
+PassRefPtr<DOMFileSystemSync> WorkerContext::requestFileSystemSync(int type, long long size, ExceptionCode& ec)
+{
+    ec = 0;
+    if (!AsyncFileSystem::isAvailable() || !securityOrigin()->canAccessFileSystem()) {
+        ec = FileException::SECURITY_ERR;
+        return 0;
+    }
+
+    AsyncFileSystem::Type fileSystemType = static_cast<AsyncFileSystem::Type>(type);
+    if (fileSystemType != AsyncFileSystem::Temporary && fileSystemType != AsyncFileSystem::Persistent) {
+        ec = FileException::INVALID_MODIFICATION_ERR;
+        return 0;
+    }
+
+    FileSystemSyncCallbackHelper helper;
+    LocalFileSystem::localFileSystem().requestFileSystem(this, fileSystemType, size, FileSystemCallbacks::create(helper.successCallback(), helper.errorCallback(), this), true);
+    return helper.getResult(ec);
 }
 
 COMPILE_ASSERT(static_cast<int>(WorkerContext::TEMPORARY) == static_cast<int>(AsyncFileSystem::Temporary), enum_mismatch);

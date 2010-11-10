@@ -1,3 +1,122 @@
+2010-11-08  Leandro Pereira  <leandro@profusion.mobi>
+
+        [EFL] Unreviewed. Build fix after r71496.
+
+        * CMakeLists.txt: Add WebCore/loader/cache directory to WebKit's
+        include directories list.
+
+2010-11-04  Mike Thole  <mthole@apple.com>
+
+        Reviewed by Dan Bernstein.
+
+        Title for images should use localized numerals
+        https://bugs.webkit.org/show_bug.cgi?id=49017
+
+        * English.lproj/Localizable.strings: Updated.
+
+2010-10-28  Mark Rowe  <mrowe@apple.com>
+
+        Stop allowing deprecated methods to be used in NetscapePluginHostProxy.mm now
+        that deprecated methods are no longer used.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2010-10-26  Dan Bernstein  <mitz@apple.com>
+
+        Build fix.
+
+        * WebKit.xcodeproj/project.pbxproj: Allow deprecated methods to be used in NetscapePluginHostProxy.mm.
+
+2010-10-23  David Kilzer  <ddkilzer@apple.com>
+
+        <http://webkit.org/b/48186> Remove unneeded WebHTMLRepresentationInternal.h header
+
+        Reviewed by Sam Weinig.
+
+        The only method defined in WebHTMLRepresentationInternal.h is
+        also defined in WebHTMLRepresentation.h, so use that instead.
+
+        * WebKit.xcodeproj/project.pbxproj: Removed references to
+        WebHTMLRepresentationInternal.h.
+
+2010-10-21  David Kilzer  <ddkilzer@apple.com>
+
+        <http://webkit.org/b/48047> Fix warnings found by check-Xcode-source-file-types
+
+        Reviewed by Adam Roben.
+
+        Fixes the following warning:
+
+            WARNING: Incorrect file type 'sourcecode.cpp.objcpp' for file 'WebStringTruncator.h'.
+            1 issues found for WebKit/WebKit.xcodeproj/project.pbxproj.
+
+        * WebKit.xcodeproj/project.pbxproj: Removed explicit file type
+        for WebStringTruncator.h to make it match other header files.
+
+2010-10-20  Nikolas Zimmermann  <nzimmermann@rim.com>
+
+        Not reviewed.
+
+        Fix efl build, add missing svg/properties include directory.
+
+        * CMakeLists.txt:
+
+2010-10-18  Alexey Proskuryakov  <ap@apple.com>
+
+        Reviewed by David Kilzer.
+
+        https://bugs.webkit.org/show_bug.cgi?id=47864
+        Convert WebNSUserDefaultsExtras.m to .mm
+
+        * WebKit.xcodeproj/project.pbxproj: Renamed WebNSUserDefaultsExtras.m.
+
+2010-10-12  Eric Seidel  <eric@webkit.org>
+
+        Reviewed by Darin Adler.
+
+        REGRESSION (new parser): Leopard/Tiger Mail <head>/<body> quirk is gone
+        https://bugs.webkit.org/show_bug.cgi?id=45693
+
+        * WebKit.xcodeproj/project.pbxproj:
+         - Add the MailQuirksUserScript.js to the project.
+
+2010-10-11  Anders Carlsson  <andersca@apple.com>
+
+        Reviewed by Darin Adler.
+
+        Remove WebIconFetcher from WebKit and IconFetcher from WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=47523
+
+        Remove all traces of the WebKit WebIconFetcher class. It's SPI that nobody uses.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2010-10-07  Jessie Berlin  <jberlin@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        Add Private API for creating a WebKit1 WebSerializedJSValue from the internal
+        representation of a WebKit2 WebSerializedScriptValue.
+        https://bugs.webkit.org/show_bug.cgi?id=47390
+
+        * WebKit.xcodeproj/project.pbxproj:
+        Add WebSerializedJSValuePrivate.h.
+
+2010-10-05  John Abd-El-Malek  <jam@chromium.org>
+
+        Reviewed by Darin Fisher.
+
+        [chromium] Get the link from a plugin when creating a context menu
+        https://bugs.webkit.org/show_bug.cgi?id=47130
+
+        * chromium/public/WebPlugin.h:
+        (WebKit::WebPlugin::linkAtPosition):
+        * chromium/public/WebView.h:
+        * chromium/src/ChromeClientImpl.cpp:
+        (WebKit::ChromeClientImpl::mouseDidMoveOverElement):
+        * chromium/src/ContextMenuClientImpl.cpp:
+        (WebKit::ContextMenuClientImpl::getCustomMenuFromDefaultItems):
+
 2010-09-22  Lucas De Marchi  <lucas.demarchi@profusion.mobi>
 
         Unreviewed, EFL build fix.

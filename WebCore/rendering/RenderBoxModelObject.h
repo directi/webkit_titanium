@@ -33,6 +33,10 @@ const int PositionTop = -0x7fffffff;
 const int PositionBottom = 0x7fffffff;
 const int PositionUndefined = 0x80000000;
 
+// Modes for some of the line-related functions.
+enum LinePositionMode { PositionOnContainingLine, PositionOfInteriorLineBoxes };
+enum LineDirectionMode { HorizontalLine, VerticalLine };
+
 // This class is the base for all objects that adhere to the CSS box model as described
 // at http://www.w3.org/TR/CSS21/box.html
 
@@ -98,20 +102,24 @@ public:
     virtual int marginStart() const = 0;
     virtual int marginEnd() const = 0;
 
-    bool hasHorizontalBordersPaddingOrMargin() const { return hasHorizontalBordersOrPadding() || marginLeft() != 0 || marginRight() != 0; }
-    bool hasHorizontalBordersOrPadding() const { return borderLeft() != 0 || borderRight() != 0 || paddingLeft() != 0 || paddingRight() != 0; }
+    bool hasInlineDirectionBordersPaddingOrMargin() const { return hasInlineDirectionBordersOrPadding() || marginStart()|| marginEnd(); }
+    bool hasInlineDirectionBordersOrPadding() const { return borderStart() || borderEnd() || paddingStart()|| paddingEnd(); }
 
     virtual int containingBlockLogicalWidthForContent() const;
 
     virtual void childBecameNonInline(RenderObject* /*child*/) { }
 
-    void paintBorder(GraphicsContext*, int tx, int ty, int w, int h, const RenderStyle*, bool begin = true, bool end = true);
+    void paintBorder(GraphicsContext*, int tx, int ty, int w, int h, const RenderStyle*, bool includeLogicalLeftEdge = true, bool includeLogicalRightEdge = true);
     bool paintNinePieceImage(GraphicsContext*, int tx, int ty, int w, int h, const RenderStyle*, const NinePieceImage&, CompositeOperator = CompositeSourceOver);
-    void paintBoxShadow(GraphicsContext*, int tx, int ty, int w, int h, const RenderStyle*, ShadowStyle, bool begin = true, bool end = true);
+    void paintBoxShadow(GraphicsContext*, int tx, int ty, int w, int h, const RenderStyle*, ShadowStyle, bool includeLogicalLeftEdge = true, bool includeLogicalRightEdge = true);
     void paintFillLayerExtended(const PaintInfo&, const Color&, const FillLayer*, int tx, int ty, int width, int height, InlineFlowBox* = 0, CompositeOperator = CompositeSourceOver, RenderObject* backgroundObject = 0);
 
     // The difference between this inline's baseline position and the line's baseline position.
     int verticalPosition(bool firstLine) const;
+    
+    // Overridden by subclasses to determine line height and baseline position.
+    virtual int lineHeight(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const = 0;
+    virtual int baselinePosition(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const = 0;
 
     // Called by RenderObject::destroy() (and RenderWidget::destroy()) and is the only way layers should ever be destroyed
     void destroyLayer();
@@ -129,7 +137,9 @@ private:
 
     IntSize calculateFillTileSize(const FillLayer*, IntSize scaledSize) const;
 
-    void clipBorderSidePolygon(GraphicsContext*, const IntRect&, const IntSize& topLeft, const IntSize& topRight, const IntSize& bottomLeft, const IntSize& bottomRight, const BoxSide side, bool firstEdgeMatches, bool secondEdgeMatches, const RenderStyle* style);
+    void clipBorderSidePolygon(GraphicsContext*, const IntRect&, const IntSize& topLeft, const IntSize& topRight, const IntSize& bottomLeft,
+                               const IntSize& bottomRight, const BoxSide side, bool firstEdgeMatches, bool secondEdgeMatches, const RenderStyle* style,
+                               bool includeLogicalLeftEdge, bool includeLogicalRightEdge);
 
     friend class RenderView;
 

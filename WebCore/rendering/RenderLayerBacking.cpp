@@ -43,9 +43,10 @@
 #include "HTMLIFrameElement.h"
 #include "HTMLMediaElement.h"
 #include "HTMLNames.h"
-#include "InspectorTimelineAgent.h"
+#include "InspectorInstrumentation.h"
 #include "KeyframeList.h"
 #include "PluginViewBase.h"
+#include "RenderApplet.h"
 #include "RenderBox.h"
 #include "RenderIFrame.h"
 #include "RenderImage.h"
@@ -224,6 +225,7 @@ void RenderLayerBacking::updateAfterLayout(UpdateDepth updateDepth, bool isUpdat
 bool RenderLayerBacking::updateGraphicsLayerConfiguration()
 {
     RenderLayerCompositor* compositor = this->compositor();
+    RenderObject* renderer = this->renderer();
 
     bool layerConfigChanged = false;
     if (updateForegroundLayer(compositor->needsContentsCompositingLayer(m_owningLayer)))
@@ -232,7 +234,7 @@ bool RenderLayerBacking::updateGraphicsLayerConfiguration()
     if (updateClippingLayers(compositor->clippedByAncestor(m_owningLayer), compositor->clipsCompositingDescendants(m_owningLayer)))
         layerConfigChanged = true;
 
-    if (updateMaskLayer(m_owningLayer->renderer()->hasMask()))
+    if (updateMaskLayer(renderer->hasMask()))
         m_graphicsLayer->setMaskLayer(m_maskLayer.get());
 
     if (m_owningLayer->hasReflection()) {
@@ -246,27 +248,28 @@ bool RenderLayerBacking::updateGraphicsLayerConfiguration()
     if (isDirectlyCompositedImage())
         updateImageContents();
 
-    if (renderer()->isEmbeddedObject() && toRenderEmbeddedObject(renderer())->allowsAcceleratedCompositing()) {
-        PluginViewBase* pluginViewBase = static_cast<PluginViewBase*>(toRenderEmbeddedObject(renderer())->widget());
+    if ((renderer->isEmbeddedObject() && toRenderEmbeddedObject(renderer)->allowsAcceleratedCompositing())
+        || (renderer->isApplet() && toRenderApplet(renderer)->allowsAcceleratedCompositing())) {
+        PluginViewBase* pluginViewBase = static_cast<PluginViewBase*>(toRenderWidget(renderer)->widget());
         m_graphicsLayer->setContentsToMedia(pluginViewBase->platformLayer());
     }
 #if ENABLE(VIDEO)
-    else if (renderer()->isVideo()) {
-        HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(renderer()->node());
+    else if (renderer->isVideo()) {
+        HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(renderer->node());
         m_graphicsLayer->setContentsToMedia(mediaElement->platformLayer());
     }
 #endif
 #if ENABLE(3D_CANVAS) || ENABLE(ACCELERATED_2D_CANVAS)
-    else if (isAcceleratedCanvas(renderer())) {
-        HTMLCanvasElement* canvas = static_cast<HTMLCanvasElement*>(renderer()->node());
+    else if (isAcceleratedCanvas(renderer)) {
+        HTMLCanvasElement* canvas = static_cast<HTMLCanvasElement*>(renderer->node());
         if (CanvasRenderingContext* context = canvas->renderingContext())
             m_graphicsLayer->setContentsToCanvas(context->platformLayer());
         layerConfigChanged = true;
     }
 #endif
 
-    if (renderer()->isRenderIFrame())
-        layerConfigChanged = RenderLayerCompositor::parentIFrameContentLayers(toRenderIFrame(renderer()));
+    if (renderer->isRenderIFrame())
+        layerConfigChanged = RenderLayerCompositor::parentIFrameContentLayers(toRenderIFrame(renderer));
 
     return layerConfigChanged;
 }
@@ -1059,26 +1062,10 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
     ASSERT(!m_owningLayer->m_usedTransparency);
 }
 
-#if ENABLE(INSPECTOR)
-static InspectorTimelineAgent* inspectorTimelineAgent(RenderObject* renderer)
-{
-    Frame* frame = renderer->frame();
-    if (!frame)
-        return 0;
-    Page* page = frame->page();
-    if (!page)
-        return 0;
-    return page->inspectorTimelineAgent();
-}
-#endif
-
 // Up-call from compositing layer drawing callback.
 void RenderLayerBacking::paintContents(const GraphicsLayer*, GraphicsContext& context, GraphicsLayerPaintingPhase paintingPhase, const IntRect& clip)
 {
-#if ENABLE(INSPECTOR)
-    if (InspectorTimelineAgent* timelineAgent = inspectorTimelineAgent(m_owningLayer->renderer()))
-        timelineAgent->willPaint(clip);
-#endif
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willPaint(m_owningLayer->renderer()->frame(), clip);
 
     // We have to use the same root as for hit testing, because both methods
     // can compute and cache clipRects.
@@ -1098,10 +1085,7 @@ void RenderLayerBacking::paintContents(const GraphicsLayer*, GraphicsContext& co
 
     paintIntoLayer(m_owningLayer, &context, dirtyRect, PaintBehaviorNormal, paintingPhase, renderer());
 
-#if ENABLE(INSPECTOR)
-    if (InspectorTimelineAgent* timelineAgent = inspectorTimelineAgent(m_owningLayer->renderer()))
-        timelineAgent->didPaint();
-#endif
+    InspectorInstrumentation::didPaint(cookie);
 }
 
 bool RenderLayerBacking::showDebugBorders() const
@@ -1117,7 +1101,7 @@ bool RenderLayerBacking::showRepaintCounter() const
 bool RenderLayerBacking::startAnimation(double timeOffset, const Animation* anim, const KeyframeList& keyframes)
 {
     bool hasOpacity = keyframes.containsProperty(CSSPropertyOpacity);
-    bool hasTransform = keyframes.containsProperty(CSSPropertyWebkitTransform);
+    bool hasTransform = renderer()->isBox() && keyframes.containsProperty(CSSPropertyWebkitTransform);
     
     if (!hasOpacity && !hasTransform)
         return false;
@@ -1134,13 +1118,14 @@ bool RenderLayerBacking::startAnimation(double timeOffset, const Animation* anim
         if (!keyframeStyle)
             continue;
             
-        // get timing function
+        // Get timing function.
         RefPtr<TimingFunction> tf = keyframeStyle->hasAnimations() ? (*keyframeStyle->animations()).animation(0)->timingFunction() : 0;
         
-        if (currentKeyframe.containsProperty(CSSPropertyWebkitTransform))
+        bool isFirstOrLastKeyframe = key == 0 || key == 1;
+        if ((hasTransform && isFirstOrLastKeyframe) || currentKeyframe.containsProperty(CSSPropertyWebkitTransform))
             transformVector.insert(new TransformAnimationValue(key, &(keyframeStyle->transform()), tf));
         
-        if (currentKeyframe.containsProperty(CSSPropertyOpacity))
+        if ((hasOpacity && isFirstOrLastKeyframe) || currentKeyframe.containsProperty(CSSPropertyOpacity))
             opacityVector.insert(new FloatAnimationValue(key, keyframeStyle->opacity(), tf));
     }
 

@@ -138,7 +138,7 @@ extern int pluginDatabaseClientCount;
 
     BOOL shouldUpdateWhileOffscreen;
     
-    // When this flag is set, we will not make any subviews underneath this WebView.  This means no WebFrameViews and no WebHTMLViews.
+    // When this flag is unset, we will not make any subviews underneath this WebView.  This means no WebFrameViews and no WebHTMLViews.
     BOOL usesDocumentViews;
 
     BOOL includesFlattenedCompositingLayersWhenDrawingToBitmap;
@@ -172,7 +172,7 @@ extern int pluginDatabaseClientCount;
     WebVideoFullscreenController *fullscreenController;
 #endif
 
-#if ENABLE(VIDEO) && USE(GSTREAMER)
+#if ENABLE(GLIB_SUPPORT)
     CFRunLoopObserverRef glibRunLoopObserver;
 #endif
     id<WebGeolocationProvider> _geolocationProvider;

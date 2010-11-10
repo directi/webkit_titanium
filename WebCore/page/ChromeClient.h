@@ -56,11 +56,12 @@ namespace WebCore {
     class HTMLParserQuirks;
     class HitTestResult;
     class IntRect;
+    class NavigationAction;
     class Node;
     class Page;
+    class PopupMenuClient;
     class SecurityOrigin;
     class SharedGraphicsContext3D;
-    class PopupMenuClient;
     class Widget;
 
     struct FrameLoadRequest;
@@ -93,12 +94,13 @@ namespace WebCore {
         virtual void takeFocus(FocusDirection) = 0;
 
         virtual void focusedNodeChanged(Node*) = 0;
+        virtual void focusedFrameChanged(Frame*) = 0;
 
         // The Frame pointer provides the ChromeClient with context about which
         // Frame wants to create the new Page.  Also, the newly created window
         // should not be shown to the user until the ChromeClient of the newly
         // created Page has its show method called.
-        virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&) = 0;
+        virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, const NavigationAction&) = 0;
         virtual void show() = 0;
 
         virtual bool canRunModal() = 0;
@@ -139,12 +141,17 @@ namespace WebCore {
         virtual void invalidateContentsAndWindow(const IntRect&, bool) = 0;
         virtual void invalidateContentsForSlowScroll(const IntRect&, bool) = 0;
         virtual void scroll(const IntSize&, const IntRect&, const IntRect&) = 0;
+#if ENABLE(TILED_BACKING_STORE)
+        virtual void delegatedScrollRequested(const IntSize&) = 0;
+#endif
         virtual IntPoint screenToWindow(const IntPoint&) const = 0;
         virtual IntRect windowToScreen(const IntRect&) const = 0;
         virtual PlatformPageClient platformPageClient() const = 0;
         virtual void scrollbarsModeDidChange() const = 0;
         virtual void setCursor(const Cursor&) = 0;
         // End methods used by HostWindow.
+
+        virtual void dispatchViewportDataDidChange(const ViewportArguments&) const { }
 
         virtual void contentsSizeChanged(Frame*, const IntSize&) const = 0;
         virtual void scrollRectIntoView(const IntRect&, const ScrollView*) const = 0; // Currently only Mac has a non empty implementation.
@@ -154,8 +161,6 @@ namespace WebCore {
         virtual void mouseDidMoveOverElement(const HitTestResult&, unsigned modifierFlags) = 0;
 
         virtual void setToolTip(const String&, TextDirection) = 0;
-
-        virtual void didReceiveViewportArguments(Frame*, const ViewportArguments&) const { }
 
         virtual void print(Frame*) = 0;
 
@@ -233,8 +238,6 @@ namespace WebCore {
         virtual bool allowsAcceleratedCompositing() const { return true; }
 #endif
 
-        virtual SharedGraphicsContext3D* getSharedGraphicsContext3D() { return 0; }
-
         virtual bool supportsFullscreenForNode(const Node*) { return false; }
         virtual void enterFullscreenForNode(Node*) { }
         virtual void exitFullscreenForNode(Node*) { }
@@ -269,6 +272,10 @@ namespace WebCore {
         virtual bool selectItemWritingDirectionIsNatural() = 0;
         virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const = 0;
         virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const = 0;
+
+#if ENABLE(CONTEXT_MENUS)
+        virtual void showContextMenu() = 0;
+#endif
 
         virtual void postAccessibilityNotification(AccessibilityObject*, AXObjectCache::AXNotification) { }
 

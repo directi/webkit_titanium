@@ -33,7 +33,9 @@
 #include "markup.h"
 #include <shlwapi.h>
 #include <wininet.h> // for INTERNET_MAX_URL_LENGTH
+#include <wtf/StringExtras.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/StringConcatenate.h>
 
 #if PLATFORM(CF)
 #include <CoreFoundation/CoreFoundation.h>
@@ -84,13 +86,13 @@ static bool getWebLocData(IDataObject* dataObject, String& url, String* title)
     if (!hdrop)
         return false;
 
-    if (!DragQueryFileW(hdrop, 0, filename, ARRAYSIZE(filename)))
+    if (!DragQueryFileW(hdrop, 0, filename, WTF_ARRAY_LENGTH(filename)))
         goto exit;
 
     if (_wcsicmp(PathFindExtensionW(filename), L".url"))
         goto exit;    
     
-    if (!GetPrivateProfileStringW(L"InternetShortcut", L"url", 0, urlBuffer, ARRAYSIZE(urlBuffer), filename))
+    if (!GetPrivateProfileStringW(L"InternetShortcut", L"url", 0, urlBuffer, WTF_ARRAY_LENGTH(urlBuffer), filename))
         goto exit;
     
     if (title) {
@@ -239,7 +241,11 @@ void markupToCFHTML(const String& markup, const String& srcURL, Vector<char>& re
     unsigned endFragmentOffset = startFragmentOffset + markupUTF8.length();
     unsigned endHTMLOffset = endFragmentOffset + strlen(endMarkup);
 
-    append(result, String::format(header, startHTMLOffset, endHTMLOffset, startFragmentOffset, endFragmentOffset).utf8());
+    unsigned headerBufferLength = startHTMLOffset + 1; // + 1 for '\0' terminator.
+    char* headerBuffer = (char*)malloc(headerBufferLength);
+    snprintf(headerBuffer, headerBufferLength, header, startHTMLOffset, endHTMLOffset, startFragmentOffset, endFragmentOffset);
+    append(result, CString(headerBuffer));
+    free(headerBuffer);
     if (sourceURLUTF8.length()) {
         append(result, sourceURLPrefix);
         append(result, sourceURLUTF8);

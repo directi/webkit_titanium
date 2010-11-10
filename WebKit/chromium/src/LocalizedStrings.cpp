@@ -33,13 +33,14 @@
 
 #include "IntSize.h"
 #include "NotImplemented.h"
-#include "PlatformString.h"
-#include "StringBuilder.h"
 
 #include "WebKit.h"
 #include "WebKitClient.h"
 #include "WebLocalizedString.h"
 #include "WebString.h"
+
+#include <wtf/text/StringBuilder.h>
+#include <wtf/text/WTFString.h>
 
 using WebKit::WebLocalizedString;
 
@@ -213,14 +214,13 @@ String keygenMenuMediumGradeKeySize()
 // Used in ImageDocument.cpp as the title for pages when that page is an image.
 String imageTitle(const String& filename, const IntSize& size)
 {
-    // Note that we cannot use String::format because it works for ASCII only.
     StringBuilder result;
     result.append(filename);
     result.append(" (");
     result.append(String::number(size.width()));
     result.append(static_cast<UChar>(0xD7));  // U+00D7 (multiplication sign)
     result.append(String::number(size.height()));
-    result.append(")");
+    result.append(')');
     return result.toString();
 }
 
@@ -296,44 +296,37 @@ String localizedMediaTimeDescription(float /*time*/)
 
 String validationMessageValueMissingText()
 {
-    notImplemented();
-    return String();
+    return query(WebLocalizedString::ValidationValueMissing);
 }
 
 String validationMessageTypeMismatchText()
 {
-    notImplemented();
-    return String();
+    return query(WebLocalizedString::ValidationTypeMismatch);
 }
 
 String validationMessagePatternMismatchText()
 {
-    notImplemented();
-    return String();
+    return query(WebLocalizedString::ValidationPatternMismatch);
 }
 
 String validationMessageTooLongText()
 {
-    notImplemented();
-    return String();
+    return query(WebLocalizedString::ValidationTooLong);
 }
 
 String validationMessageRangeUnderflowText()
 {
-    notImplemented();
-    return String();
+    return query(WebLocalizedString::ValidationRangeUnderflow);
 }
 
 String validationMessageRangeOverflowText()
 {
-    notImplemented();
-    return String();
+    return query(WebLocalizedString::ValidationRangeOverflow);
 }
 
 String validationMessageStepMismatchText()
 {
-    notImplemented();
-    return String();
+    return query(WebLocalizedString::ValidationStepMismatch);
 }
 
 } // namespace WebCore

@@ -23,22 +23,29 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#import "NativeWebKeyboardEvent.h"
 #import "PageClientImpl.h"
 
+#import "FindIndicator.h"
 #import "WKAPICast.h"
 #import "WKStringCF.h"
 #import "WKViewInternal.h"
+#import "WebContextMenuProxyMac.h"
 #import "WebEditCommandProxy.h"
+#import "WebPopupMenuProxyMac.h"
 #import <WebCore/Cursor.h>
+#import <WebCore/FloatRect.h>
 #import <WebCore/FoundationExtras.h>
+#import <WebCore/KeyboardEvent.h>
 #import <wtf/PassOwnPtr.h>
+#import <wtf/text/CString.h>
 #import <wtf/text/WTFString.h>
 
 using namespace WebCore;
 
 @interface WebEditCommandObjC : NSObject
 {
-    RefPtr<WebKit::WebEditCommandProxy> m_command;   
+    RefPtr<WebKit::WebEditCommandProxy> m_command;
 }
 
 - (id)initWithWebEditCommandProxy:(PassRefPtr<WebKit::WebEditCommandProxy>)command;
@@ -88,12 +95,11 @@ using namespace WebCore;
 
 @end
 
-
 namespace WebKit {
 
 NSString* nsStringFromWebCoreString(const String& string)
 {
-    return string.impl() ? HardAutorelease(WKStringCopyCFString(0, toRef(string.impl()))) : @"";
+    return string.impl() ? HardAutorelease(WKStringCopyCFString(0, toAPI(string.impl()))) : @"";
 }
 
 PassOwnPtr<PageClientImpl> PageClientImpl::create(WKView* wkView)
@@ -111,14 +117,14 @@ PageClientImpl::~PageClientImpl()
 {
 }
 
-void PageClientImpl::processDidExit()
+void PageClientImpl::processDidCrash()
 {
-    [m_wkView _processDidExit];
+    [m_wkView _processDidCrash];
 }
 
-void PageClientImpl::processDidRevive()
+void PageClientImpl::didRelaunchProcess()
 {
-    [m_wkView _processDidRevive];
+    [m_wkView _didRelaunchProcess];
 }
 
 void PageClientImpl::takeFocus(bool direction)
@@ -134,6 +140,16 @@ void PageClientImpl::toolTipChanged(const String& oldToolTip, const String& newT
 void PageClientImpl::setCursor(const WebCore::Cursor& cursor)
 {
     [m_wkView _setCursor:cursor.platformCursor()];
+}
+
+void PageClientImpl::setViewportArguments(const WebCore::ViewportArguments&)
+{
+
+}
+
+void PageClientImpl::selectionChanged(bool isNone, bool isContentEditable, bool isPasswordField, bool hasComposition)
+{
+    [m_wkView _selectionChanged:isNone isEditable:isContentEditable isPassword:isPasswordField hasMarkedText:hasComposition];
 }
 
 static NSString* nameForEditAction(EditAction editAction)
@@ -183,7 +199,7 @@ static NSString* nameForEditAction(EditAction editAction)
     return nil;
 }
 
-void PageClientImpl::registerEditCommand(PassRefPtr<WebEditCommandProxy> prpCommand, UndoOrRedo undoOrRedo)
+void PageClientImpl::registerEditCommand(PassRefPtr<WebEditCommandProxy> prpCommand, WebPageProxy::UndoOrRedo undoOrRedo)
 {
     RefPtr<WebEditCommandProxy> command = prpCommand;
 
@@ -191,7 +207,7 @@ void PageClientImpl::registerEditCommand(PassRefPtr<WebEditCommandProxy> prpComm
     NSString *actionName = nameForEditAction(command->editAction());
 
     NSUndoManager *undoManager = [m_wkView undoManager];
-    [undoManager registerUndoWithTarget:m_undoTarget.get() selector:((undoOrRedo == Undo) ? @selector(undoEditing:) : @selector(redoEditing:)) object:commandObjC.get()];
+    [undoManager registerUndoWithTarget:m_undoTarget.get() selector:((undoOrRedo == WebPageProxy::Undo) ? @selector(undoEditing:) : @selector(redoEditing:)) object:commandObjC.get()];
     if (actionName)
         [undoManager setActionName:actionName];
 }
@@ -204,6 +220,45 @@ void PageClientImpl::clearAllEditCommands()
 void PageClientImpl::setEditCommandState(const String& commandName, bool isEnabled, int newState)
 {
     [m_wkView _setUserInterfaceItemState:nsStringFromWebCoreString(commandName) enabled:isEnabled state:newState];
+}
+
+void PageClientImpl::interceptKeyEvent(const NativeWebKeyboardEvent& event, Vector<WebCore::KeypressCommand>& commandsList)
+{
+    commandsList = [m_wkView _interceptKeyEvent:event.nativeEvent()];
+}
+
+FloatRect PageClientImpl::convertToDeviceSpace(const FloatRect& rect)
+{
+    return [m_wkView _convertToDeviceSpace:rect];
+}
+
+FloatRect PageClientImpl::convertToUserSpace(const FloatRect& rect)
+{
+    return [m_wkView _convertToUserSpace:rect];
+}
+
+void PageClientImpl::didNotHandleKeyEvent(const NativeWebKeyboardEvent& event)
+{
+    NSEvent* nativeEvent = event.nativeEvent();
+    if ([nativeEvent type] == NSKeyDown) {
+        [m_wkView _setEventBeingResent:nativeEvent];
+        [[NSApplication sharedApplication] sendEvent:nativeEvent];
+    }
+}
+
+PassRefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy()
+{
+    return WebPopupMenuProxyMac::create(m_wkView);
+}
+
+PassRefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy* page)
+{
+    return WebContextMenuProxyMac::create(m_wkView, page);
+}
+
+void PageClientImpl::setFindIndicator(PassRefPtr<FindIndicator> findIndicator, bool fadeOut)
+{
+    [m_wkView _setFindIndicator:findIndicator fadeOut:fadeOut];
 }
 
 #if USE(ACCELERATED_COMPOSITING)

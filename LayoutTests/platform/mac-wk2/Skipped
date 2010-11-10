@@ -37,48 +37,10 @@ platform/mac/accessibility
 # <https://bugs.webkit.org/show_bug.cgi?id=42139>
 fast/loader/null-request-after-willSendRequest.html
 
-# Support layoutTestController.layerTreeAsText in WebKitTestRunner
-# <https://bugs.webkit.org/show_bug.cgi?id=42145>
-compositing/layer-creation/scroll-partial-update.html
-compositing/animation/animation-compositing.html
-compositing/geometry/clip.html
-compositing/geometry/limit-layer-bounds-clipping-ancestor.html
-compositing/geometry/limit-layer-bounds-fixed-positioned.html
-compositing/geometry/limit-layer-bounds-overflow-root.html
-compositing/geometry/limit-layer-bounds-positioned-transition.html
-compositing/geometry/limit-layer-bounds-positioned.html
-compositing/geometry/limit-layer-bounds-transformed-overflow.html
-compositing/geometry/limit-layer-bounds-transformed.html
-compositing/geometry/preserve-3d-switching.html
-compositing/iframes/become-overlapped-iframe.html
-compositing/iframes/composited-parent-iframe.html
-compositing/iframes/connect-compositing-iframe-delayed.html
-compositing/iframes/connect-compositing-iframe.html
-compositing/iframes/connect-compositing-iframe2.html
-compositing/iframes/connect-compositing-iframe3.html
-compositing/iframes/enter-compositing-iframe.html
-compositing/iframes/iframe-resize.html
+# Some compositing tests flakey
+# https://bugs.webkit.org/show_bug.cgi?id=48354
 compositing/iframes/iframe-size-from-zero.html
-compositing/iframes/iframe-size-to-zero.html
-compositing/iframes/iframe-src-change.html
-compositing/iframes/leave-compositing-iframe.html
-compositing/iframes/overlapped-iframe.html
-compositing/iframes/scrolling-iframe.html
-compositing/images/clip-on-directly-composited-image.html
-compositing/layer-creation/overflow-scroll-overlap.html
-compositing/overflow/clip-descendents.html
-compositing/overflow/resize-painting.html
-compositing/plugins/1x1-composited-plugin.html
-compositing/plugins/composited-plugin.html
-compositing/plugins/large-to-small-composited-plugin.html
-compositing/plugins/small-to-large-composited-plugin.html
-compositing/tiling/crash-reparent-tiled-layer.html
-compositing/tiling/huge-layer-add-remove-child.html
-compositing/tiling/huge-layer-resize.html
-compositing/tiling/huge-layer-with-layer-children-resize.html
-compositing/tiling/huge-layer-with-layer-children.html
-compositing/tiling/huge-layer.html
-compositing/video/video-poster.html
+compositing/iframes/iframe-src-change.html 
 
 # Uncategorized editing failures
 editing/deleting/delete-by-word-001.html
@@ -99,20 +61,6 @@ editing/style/style-boundary-005.html
 
 # WebKitTestRunner needs an implementation of eventSender
 # <https://bugs.webkit.org/show_bug.cgi?id=42194>
-svg/dynamic-updates/SVGFEDistantLightElement-dom-azimuth-attr.html
-svg/dynamic-updates/SVGFEDistantLightElement-dom-elevation-attr.html
-svg/dynamic-updates/SVGFEDistantLightElement-svgdom-azimuth-prop.html
-svg/dynamic-updates/SVGFEDistantLightElement-svgdom-elevation-prop.html
-svg/custom/mouse-move-on-svg-container-standalone.svg
-svg/custom/mouse-move-on-svg-container.xhtml
-svg/custom/mouse-move-on-svg-root-standalone.svg
-svg/custom/mouse-move-on-svg-root.xhtml
-svg/dynamic-updates/SVGFEPointLightElement-dom-x-attr.html
-svg/dynamic-updates/SVGFEPointLightElement-dom-y-attr.html
-svg/dynamic-updates/SVGFEPointLightElement-dom-z-attr.html
-svg/dynamic-updates/SVGFEPointLightElement-svgdom-x-prop.html
-svg/dynamic-updates/SVGFEPointLightElement-svgdom-y-prop.html
-svg/dynamic-updates/SVGFEPointLightElement-svgdom-z-prop.html
 compositing/iframes/layout-on-compositing-change.html
 editing/deleting/5390681-2.html
 editing/deleting/5729680.html
@@ -178,6 +126,7 @@ editing/selection/click-in-padding-with-multiple-line-boxes.html
 editing/selection/click-outside-editable-div.html
 editing/selection/click-start-of-line.html
 editing/selection/contains-boundaries.html
+editing/selection/context-menu-on-text.html
 editing/selection/crash-on-drag-with-mutation-events.html
 editing/selection/delete-word-granularity-text-control.html
 editing/selection/doubleclick-beside-cr-span.html
@@ -199,6 +148,7 @@ editing/selection/extend-selection-after-double-click.html
 editing/selection/fake-doubleclick.html
 editing/selection/fake-drag.html
 editing/selection/focus-and-display-none.html
+editing/selection/focus-crash.html
 editing/selection/hit-test-anonymous.html
 editing/selection/inline-closest-leaf-child.html
 editing/selection/last-empty-inline.html
@@ -220,7 +170,9 @@ editing/undo/undo-smart-delete-reversed-selection.html
 editing/undo/undo-smart-delete-word.html
 fast/block/float/float-in-float-hit-testing.html
 fast/block/float/relative-painted-twice.html
+fast/css-generated-content/drag-state.html
 fast/css-generated-content/hover-style-change.html
+fast/css-generated-content/malformed-url.html
 fast/css-generated-content/positioned-background-hit-test-crash.html
 fast/css-generated-content/spellingToolTip-assert.html
 fast/css/affected-by-hover-after-style-change.html
@@ -237,12 +189,13 @@ fast/css/resize-single-axis.html
 fast/css/universal-hover-quirk.html
 fast/css/user-drag-none.html
 fast/dom/Document/CaretRangeFromPoint/caretRangeFromPoint-in-zoom-and-scroll.html
+fast/dom/HTMLSelectElement/click-size-zero-no-crash.html
 fast/dom/HTMLTableColElement/resize-table-using-col-width.html
 fast/dom/Node/mutation-blur.html
-fast/dom/replaced-image-map.html
 fast/dom/Window/window-postmessage-clone-frames.html
 fast/dom/Window/window-postmessage-clone.html
 fast/dom/Window/window-xy-properties.html
+fast/dom/replaced-image-map.html
 fast/dynamic/hover-style-recalc-crash.html
 fast/dynamic/hovered-detach.html
 fast/dynamic/layer-hit-test-crash.html
@@ -261,6 +214,7 @@ fast/events/bogus-dropEffect-effectAllowed.html
 fast/events/capture-on-target.html
 fast/events/click-count.html
 fast/events/click-focus-anchor.html
+fast/events/click-focus-control.html
 fast/events/clientXY-in-zoom-and-scroll.html
 fast/events/content-changed-during-drop.html
 fast/events/context-no-deselect.html
@@ -304,6 +258,7 @@ fast/events/keypress-removed-node.html
 fast/events/mouse-click-events.html
 fast/events/mouse-drag-from-frame-to-other-frame.html
 fast/events/mouse-drag-from-frame.html
+fast/events/mouse-focus-imagemap.html
 fast/events/mouseclick-target-and-positioning.html
 fast/events/mousedown-in-subframe-scrollbar.html
 fast/events/mousedown_in_scrollbar.html
@@ -339,6 +294,7 @@ fast/events/recorded-keydown-event.html
 fast/events/related-target.html
 fast/events/remove-child-onscroll.html
 fast/events/right-click-focus.html
+fast/events/scroll-after-click-on-tab-index.html
 fast/events/scroll-to-anchor-in-overflow-hidden.html
 fast/events/scrollbar-double-click.html
 fast/events/select-onchange-crash.html
@@ -372,6 +328,7 @@ fast/forms/focus-selection-textarea.html
 fast/forms/get-file-upload.html
 fast/forms/implicit-submission.html
 fast/forms/input-appearance-preventDefault.html
+fast/forms/input-file-not-open-without-gesture.html
 fast/forms/input-file-re-render.html
 fast/forms/input-live-pseudo-selectors.html
 fast/forms/input-number-crash.html
@@ -407,6 +364,7 @@ fast/forms/password-doubleclick-selection.html
 fast/forms/radio-check-click-and-drag.html
 fast/forms/radio-nested-labels.html
 fast/forms/radio_checked_name.html
+fast/forms/render-text-crash.html
 fast/forms/restore-selection-after-layout.html
 fast/forms/search-abs-pos-cancel-button.html
 fast/forms/search-cancel-button-events.html
@@ -422,6 +380,7 @@ fast/forms/select-accesskey.html
 fast/forms/select-cache-desynchronization.html
 fast/forms/select-double-onchange.html
 fast/forms/select-empty-list.html
+fast/forms/select-listbox-focus-displaynone.html
 fast/forms/select-popup-pagekeys.html
 fast/forms/select-script-onchange.html
 fast/forms/select-type-ahead-list-box-no-selection.html
@@ -462,6 +421,7 @@ fast/loader/document-with-fragment-url-2.html
 fast/loader/document-with-fragment-url-3.html
 fast/loader/document-with-fragment-url-4.html
 fast/loader/early-load-cancel.html
+fast/loader/fragment-after-redirect-gets-back-entry.html
 fast/loader/policy-delegate-action-hit-test-zoomed.html
 fast/loader/repeat-same-document-navigation.html
 fast/overflow/hit-test-overflow-controls.html
@@ -486,14 +446,15 @@ http/tests/local/blob/send-data-blob.html
 http/tests/local/blob/send-hybrid-blob.html
 http/tests/local/blob/send-sliced-data-blob.html
 http/tests/local/drag-over-remote-content.html
-http/tests/local/formdata/send-form-data-with-sliced-file.html
-http/tests/local/formdata/send-form-data.html
-http/tests/local/formdata/upload-events.html
+http/tests/local/formdata
 http/tests/local/send-dragged-file.html
 http/tests/local/send-sliced-dragged-file.html
 http/tests/misc/bubble-drag-events.html
 http/tests/misc/drag-over-iframe-invalid-source-crash.html
 http/tests/misc/isindex-with-no-form.html
+http/tests/navigation/document-location-click-timeout.html
+http/tests/navigation/document-location-click.html
+http/tests/navigation/document-location-mouseover.html
 http/tests/navigation/no-referrer-reset.html
 http/tests/navigation/no-referrer-same-window.html
 http/tests/navigation/no-referrer-subframe.html
@@ -513,10 +474,26 @@ platform/mac/editing/deleting/backward-delete.html
 platform/mac/editing/pasteboard/dataTransfer-set-data-file-url.html
 platform/mac/editing/selection/doubleclick-should-not-expand-across-lines.html
 platform/mac/editing/selection/word-thai.html
+platform/mac/editing/spelling/autocorrection-delete.html
+platform/mac/editing/spelling/autocorrection-removing-underline-after-paste.html
+platform/mac/editing/spelling/autocorrection-removing-underline.html
+platform/mac/editing/spelling/autocorrection-simple.html
+platform/mac/editing/spelling/click-autocorrected-word.html
+platform/mac/editing/spelling/delete-into-autocorrected-word.html
+platform/mac/editing/spelling/delete-into-misspelled-word.html
+platform/mac/editing/spelling/editing-multiple-words-with-markers.html
+platform/mac/editing/spelling/editing-word-with-marker-1.html
+platform/mac/editing/spelling/editing-word-with-marker-2.html
+platform/mac/editing/spelling/forward-delete-into-autocorrected-word.html
+platform/mac/editing/spelling/move-cursor-around-misspelled-word.html
+platform/mac/editing/spelling/move-cursor-to-autocorrected-word.html
+platform/mac/editing/spelling/move-cursor-to-beginning-of-autocorrected-word.html
 platform/mac/fast/forms/input-appearance-spinbutton-up.html
 platform/mac/fast/forms/input-number-click.html
 platform/mac/fast/forms/listbox-scrollbar-hit-test.html
 platform/mac/fast/overflow/overflow-scrollbar-hit-test.html
+plugins/mouse-events.html
+plugins/mouse-move-over-plugin-in-frame.html
 plugins/resize-from-plugin.html
 scrollbars/overflow-custom-scrollbar-crash.html
 scrollbars/scrollbar-click-does-not-blur-content.html
@@ -524,10 +501,13 @@ scrollbars/scrollbar-iframe-click-does-not-blur-content.html
 scrollbars/scrollbar-middleclick-nopaste.html
 scrollbars/scrollbar-miss-mousemove-disabled.html
 scrollbars/scrollbar-miss-mousemove.html
+scrollbars/scrollevent-iframe-no-scrolling-wheel.html
+storage/multiple-transactions-on-different-handles.html
+svg/animations/animVal-basics.html
+svg/animations/animate-color-transparent.html
 svg/animations/animate-gradient-transform.html
 svg/animations/animate-keySplines.html
 svg/animations/animate-points.html
-svg/animations/animVal-basics.html
 svg/custom/absolute-sized-content-with-resources.xhtml
 svg/custom/circle-move-invalidation.svg
 svg/custom/clip-path-child-changes.svg
@@ -573,12 +553,17 @@ svg/custom/marker-strokeWidth-changes.svg
 svg/custom/marker-viewBox-changes.svg
 svg/custom/mask-changes.svg
 svg/custom/mask-child-changes.svg
+svg/custom/mouse-move-on-svg-container-standalone.svg
+svg/custom/mouse-move-on-svg-container.xhtml
+svg/custom/mouse-move-on-svg-root-standalone.svg
+svg/custom/mouse-move-on-svg-root.xhtml
 svg/custom/pointer-events-image.svg
 svg/custom/pointer-events-path.svg
 svg/custom/pointer-events-text.svg
 svg/custom/polyline-hittest.svg
 svg/custom/prevent-default.svg
 svg/custom/relative-sized-content-with-resources.xhtml
+svg/custom/repaint-on-constant-size-change.svg
 svg/custom/repaint-stroke-width-changes.svg
 svg/custom/resource-invalidate-on-target-update.svg
 svg/custom/scroll-hit-test.xhtml
@@ -621,6 +606,42 @@ svg/dynamic-updates/SVGEllipseElement-svgdom-cx-prop.html
 svg/dynamic-updates/SVGEllipseElement-svgdom-cy-prop.html
 svg/dynamic-updates/SVGEllipseElement-svgdom-rx-prop.html
 svg/dynamic-updates/SVGEllipseElement-svgdom-ry-prop.html
+svg/dynamic-updates/SVGFEBlendElement-dom-in-attr.html
+svg/dynamic-updates/SVGFEBlendElement-dom-in2-attr.html
+svg/dynamic-updates/SVGFEBlendElement-dom-mode-attr.html
+svg/dynamic-updates/SVGFEBlendElement-svgdom-in-prop.html
+svg/dynamic-updates/SVGFEBlendElement-svgdom-in2-prop.html
+svg/dynamic-updates/SVGFEBlendElement-svgdom-mode-prop.html
+svg/dynamic-updates/SVGFEColorMatrixElement-dom-in-attr.html
+svg/dynamic-updates/SVGFEColorMatrixElement-dom-type-attr.html
+svg/dynamic-updates/SVGFEColorMatrixElement-dom-values-attr.html
+svg/dynamic-updates/SVGFEColorMatrixElement-svgdom-in-prop.html
+svg/dynamic-updates/SVGFEColorMatrixElement-svgdom-type-prop.html
+svg/dynamic-updates/SVGFEColorMatrixElement-svgdom-values-prop.html
+svg/dynamic-updates/SVGFECompositeElement-dom-in-attr.html
+svg/dynamic-updates/SVGFECompositeElement-dom-in2-attr.html
+svg/dynamic-updates/SVGFECompositeElement-dom-k1-attr.html
+svg/dynamic-updates/SVGFECompositeElement-dom-k2-attr.html
+svg/dynamic-updates/SVGFECompositeElement-dom-k3-attr.html
+svg/dynamic-updates/SVGFECompositeElement-dom-k4-attr.html
+svg/dynamic-updates/SVGFECompositeElement-dom-operator-attr.html
+svg/dynamic-updates/SVGFECompositeElement-svgdom-in-prop.html
+svg/dynamic-updates/SVGFECompositeElement-svgdom-in2-prop.html
+svg/dynamic-updates/SVGFECompositeElement-svgdom-k1-prop.html
+svg/dynamic-updates/SVGFECompositeElement-svgdom-k2-prop.html
+svg/dynamic-updates/SVGFECompositeElement-svgdom-k3-prop.html
+svg/dynamic-updates/SVGFECompositeElement-svgdom-k4-prop.html
+svg/dynamic-updates/SVGFECompositeElement-svgdom-operator-prop.html
+svg/dynamic-updates/SVGFEConvolveMatrixElement-dom-bias-attr.html
+svg/dynamic-updates/SVGFEConvolveMatrixElement-dom-divisor-attr.html
+svg/dynamic-updates/SVGFEConvolveMatrixElement-dom-edgeMode-attr.html
+svg/dynamic-updates/SVGFEConvolveMatrixElement-dom-in-attr.html
+svg/dynamic-updates/SVGFEConvolveMatrixElement-dom-kernelMatrix-attr.html
+svg/dynamic-updates/SVGFEConvolveMatrixElement-dom-kernelUnitLength-attr.html
+svg/dynamic-updates/SVGFEConvolveMatrixElement-dom-order-attr.html
+svg/dynamic-updates/SVGFEConvolveMatrixElement-dom-preserveAlpha-attr.html
+svg/dynamic-updates/SVGFEConvolveMatrixElement-dom-targetX-attr.html
+svg/dynamic-updates/SVGFEConvolveMatrixElement-dom-targetY-attr.html
 svg/dynamic-updates/SVGFEDiffuseLightingElement-dom-diffuseConstant-attr.html
 svg/dynamic-updates/SVGFEDiffuseLightingElement-dom-in-attr.html
 svg/dynamic-updates/SVGFEDiffuseLightingElement-dom-lighting-color-attr.html
@@ -629,12 +650,38 @@ svg/dynamic-updates/SVGFEDiffuseLightingElement-lighting-color-css-prop.html
 svg/dynamic-updates/SVGFEDiffuseLightingElement-svgdom-diffuseConstant-prop.html
 svg/dynamic-updates/SVGFEDiffuseLightingElement-svgdom-in-prop.html
 svg/dynamic-updates/SVGFEDiffuseLightingElement-svgdom-surfaceScale-prop.html
+svg/dynamic-updates/SVGFEDistantLightElement-dom-azimuth-attr.html
+svg/dynamic-updates/SVGFEDistantLightElement-dom-elevation-attr.html
+svg/dynamic-updates/SVGFEDistantLightElement-svgdom-azimuth-prop.html
+svg/dynamic-updates/SVGFEDistantLightElement-svgdom-elevation-prop.html
+svg/dynamic-updates/SVGFEFloodElement-dom-flood-color-attr.html
+svg/dynamic-updates/SVGFEFloodElement-dom-flood-opacity-attr.html
+svg/dynamic-updates/SVGFEFloodElement-svgdom-flood-color-prop.html
+svg/dynamic-updates/SVGFEFloodElement-svgdom-flood-opacity-prop.html
+svg/dynamic-updates/SVGFEGaussianBlurElement-dom-in-attr.html
+svg/dynamic-updates/SVGFEGaussianBlurElement-dom-stdDeviation-attr.html
+svg/dynamic-updates/SVGFEGaussianBlurElement-dom-stdDeviation-call.html
+svg/dynamic-updates/SVGFEGaussianBlurElement-svgdom-in-prop.html
+svg/dynamic-updates/SVGFEMergeNodeElement-dom-in-attr.html
+svg/dynamic-updates/SVGFEMergeNodeElement-svgdom-in-prop.html
+svg/dynamic-updates/SVGFEMorphologyElement-dom-in-attr.html
+svg/dynamic-updates/SVGFEMorphologyElement-dom-operator-attr.html
+svg/dynamic-updates/SVGFEMorphologyElement-dom-radius-attr.html
+svg/dynamic-updates/SVGFEMorphologyElement-svgdom-in-prop.html
+svg/dynamic-updates/SVGFEMorphologyElement-svgdom-operator-prop.html
+svg/dynamic-updates/SVGFEMorphologyElement-svgdom-radius-call.html
 svg/dynamic-updates/SVGFEOffsetElement-dom-dx-attr.html
 svg/dynamic-updates/SVGFEOffsetElement-dom-dy-attr.html
 svg/dynamic-updates/SVGFEOffsetElement-dom-in-attr.html
 svg/dynamic-updates/SVGFEOffsetElement-svgdom-dx-prop.html
 svg/dynamic-updates/SVGFEOffsetElement-svgdom-dy-prop.html
 svg/dynamic-updates/SVGFEOffsetElement-svgdom-in-prop.html
+svg/dynamic-updates/SVGFEPointLightElement-dom-x-attr.html
+svg/dynamic-updates/SVGFEPointLightElement-dom-y-attr.html
+svg/dynamic-updates/SVGFEPointLightElement-dom-z-attr.html
+svg/dynamic-updates/SVGFEPointLightElement-svgdom-x-prop.html
+svg/dynamic-updates/SVGFEPointLightElement-svgdom-y-prop.html
+svg/dynamic-updates/SVGFEPointLightElement-svgdom-z-prop.html
 svg/dynamic-updates/SVGFESpotLightElement-dom-limitingConeAngle-attr.html
 svg/dynamic-updates/SVGFESpotLightElement-dom-pointsAtX-attr.html
 svg/dynamic-updates/SVGFESpotLightElement-dom-pointsAtY-attr.html
@@ -651,6 +698,16 @@ svg/dynamic-updates/SVGFESpotLightElement-svgdom-specularExponent-prop.html
 svg/dynamic-updates/SVGFESpotLightElement-svgdom-x-prop.html
 svg/dynamic-updates/SVGFESpotLightElement-svgdom-y-prop.html
 svg/dynamic-updates/SVGFESpotLightElement-svgdom-z-prop.html
+svg/dynamic-updates/SVGFETurbulenceElement-dom-baseFrequency-attr.html
+svg/dynamic-updates/SVGFETurbulenceElement-dom-numOctaves-attr.html
+svg/dynamic-updates/SVGFETurbulenceElement-dom-seed-attr.html
+svg/dynamic-updates/SVGFETurbulenceElement-dom-stitchTiles-attr.html
+svg/dynamic-updates/SVGFETurbulenceElement-dom-type-attr.html
+svg/dynamic-updates/SVGFETurbulenceElement-svgdom-baseFrequency-prop.html
+svg/dynamic-updates/SVGFETurbulenceElement-svgdom-numOctaves-prop.html
+svg/dynamic-updates/SVGFETurbulenceElement-svgdom-seed-prop.html
+svg/dynamic-updates/SVGFETurbulenceElement-svgdom-stitchTiles-prop.html
+svg/dynamic-updates/SVGFETurbulenceElement-svgdom-type-prop.html
 svg/dynamic-updates/SVGFilterElement-dom-filterRes-attr.html
 svg/dynamic-updates/SVGFilterElement-dom-filterUnits-attr.html
 svg/dynamic-updates/SVGFilterElement-dom-height-attr.html
@@ -695,6 +752,14 @@ svg/dynamic-updates/SVGImageElement-svgdom-preserveAspectRatio-prop.html
 svg/dynamic-updates/SVGImageElement-svgdom-width-prop.html
 svg/dynamic-updates/SVGImageElement-svgdom-x-prop.html
 svg/dynamic-updates/SVGImageElement-svgdom-y-prop.html
+svg/dynamic-updates/SVGLineElement-dom-x1-attr.html
+svg/dynamic-updates/SVGLineElement-dom-x2-attr.html
+svg/dynamic-updates/SVGLineElement-dom-y1-attr.html
+svg/dynamic-updates/SVGLineElement-dom-y2-attr.html
+svg/dynamic-updates/SVGLineElement-svgdom-x1-prop.html
+svg/dynamic-updates/SVGLineElement-svgdom-x2-prop.html
+svg/dynamic-updates/SVGLineElement-svgdom-y1-prop.html
+svg/dynamic-updates/SVGLineElement-svgdom-y2-prop.html
 svg/dynamic-updates/SVGLinearGradientElement-dom-gradientTransform-attr.html
 svg/dynamic-updates/SVGLinearGradientElement-dom-gradientUnits-attr.html
 svg/dynamic-updates/SVGLinearGradientElement-dom-x1-attr.html
@@ -707,14 +772,6 @@ svg/dynamic-updates/SVGLinearGradientElement-svgdom-x1-prop.html
 svg/dynamic-updates/SVGLinearGradientElement-svgdom-x2-prop.html
 svg/dynamic-updates/SVGLinearGradientElement-svgdom-y1-prop.html
 svg/dynamic-updates/SVGLinearGradientElement-svgdom-y2-prop.html
-svg/dynamic-updates/SVGLineElement-dom-x1-attr.html
-svg/dynamic-updates/SVGLineElement-dom-x2-attr.html
-svg/dynamic-updates/SVGLineElement-dom-y1-attr.html
-svg/dynamic-updates/SVGLineElement-dom-y2-attr.html
-svg/dynamic-updates/SVGLineElement-svgdom-x1-prop.html
-svg/dynamic-updates/SVGLineElement-svgdom-x2-prop.html
-svg/dynamic-updates/SVGLineElement-svgdom-y1-prop.html
-svg/dynamic-updates/SVGLineElement-svgdom-y2-prop.html
 svg/dynamic-updates/SVGMarkerElement-dom-markerHeight-attr.html
 svg/dynamic-updates/SVGMarkerElement-dom-markerUnits-attr.html
 svg/dynamic-updates/SVGMarkerElement-dom-markerWidth-attr.html
@@ -778,10 +835,10 @@ svg/dynamic-updates/SVGRectElement-svgdom-height-prop.html
 svg/dynamic-updates/SVGRectElement-svgdom-width-prop.html
 svg/dynamic-updates/SVGRectElement-svgdom-x-prop.html
 svg/dynamic-updates/SVGRectElement-svgdom-y-prop.html
+svg/dynamic-updates/SVGTRefElement-dom-href-attr.html
 svg/dynamic-updates/SVGTextElement-dom-transform-attr.html
 svg/dynamic-updates/SVGTextElement-svgdom-rotate-prop.html
 svg/dynamic-updates/SVGTextElement-svgdom-transform-prop.html
-svg/dynamic-updates/SVGTRefElement-dom-href-attr.html
 svg/filters/filter-width-update.svg
 svg/text/foreignObject-repaint.xml
 svg/text/select-textLength-spacing-squeeze-1.svg
@@ -829,6 +886,13 @@ java
 # <https://bugs.webkit.org/show_bug.cgi?id=42197>
 # Get accelerated compositing working with webkit2
 # <https://bugs.webkit.org/show_bug.cgi?id=41084>
+http/tests/navigation/ping-cross-origin-from-https.html
+http/tests/navigation/ping-cross-origin.html
+http/tests/navigation/ping-same-origin.html
+http/tests/canvas/webgl/origin-clean-conformance.html
+fast/canvas/webgl/gl-getstring.html
+fast/canvas/webgl/glsl-conformance.html
+fast/canvas/webgl/object-deletion-behaviour.html
 fast/loader/stateobjects/popstate-fires-with-page-cache.html
 fast/canvas/webgl/gl-teximage.html
 compositing/webgl/webgl-background-color.html
@@ -1066,109 +1130,6 @@ http/tests/inspector-enabled
 http/tests/inspector
 inspector
 
-# WebKitTestRunner needs to support layoutTestController.dumpBackForwardList
-# <https://bugs.webkit.org/show_bug.cgi?id=42322>
-fast/loader/fragment-after-redirect-gets-back-entry.html
-fast/loader/frame-location-change-not-added-to-history.html
-fast/loader/frame-src-change-added-to-history.html
-fast/loader/frame-src-change-not-added-to-history.html
-fast/loader/stateobjects/pushstate-object-types.html
-fast/loader/subframe-navigate-during-main-frame-load.html
-http/tests/history/redirect-200-refresh-0-seconds.pl
-http/tests/history/redirect-200-refresh-2-seconds.pl
-http/tests/history/redirect-301.html
-http/tests/history/redirect-302.html
-http/tests/history/redirect-303.html
-http/tests/history/redirect-307.html
-http/tests/history/redirect-js-document-location-0-seconds.html
-http/tests/history/redirect-js-document-location-2-seconds.html
-http/tests/history/redirect-js-document-location-before-load.html
-http/tests/history/redirect-js-form-submit-0-seconds.html
-http/tests/history/redirect-js-form-submit-2-seconds.html
-http/tests/history/redirect-js-form-submit-before-load.html
-http/tests/history/redirect-js-location-0-seconds.html
-http/tests/history/redirect-js-location-2-seconds.html
-http/tests/history/redirect-js-location-assign-0-seconds.html
-http/tests/history/redirect-js-location-assign-2-seconds.html
-http/tests/history/redirect-js-location-assign-before-load.html
-http/tests/history/redirect-js-location-before-load.html
-http/tests/history/redirect-js-location-href-0-seconds.html
-http/tests/history/redirect-js-location-href-2-seconds.html
-http/tests/history/redirect-js-location-href-before-load.html
-http/tests/history/redirect-js-location-replace-0-seconds.html
-http/tests/history/redirect-js-location-replace-2-seconds.html
-http/tests/history/redirect-js-location-replace-before-load.html
-http/tests/history/redirect-meta-refresh-0-seconds.html
-http/tests/history/redirect-meta-refresh-2-seconds.html
-http/tests/incremental/frame-focus-before-load.html
-http/tests/navigation/anchor-basic.html
-http/tests/navigation/anchor-frames.html
-http/tests/navigation/anchor-goback.html
-http/tests/navigation/anchor-subframeload.html
-http/tests/navigation/back-to-slow-frame.html
-http/tests/navigation/document-location-click-timeout.html
-http/tests/navigation/document-location-click.html
-http/tests/navigation/document-location-mouseover.html
-http/tests/navigation/document-location-onload.html
-http/tests/navigation/dynamic-iframe-dynamic-form-back-entry.html
-http/tests/navigation/error404-basic.html
-http/tests/navigation/error404-frames.html
-http/tests/navigation/error404-goback.html
-http/tests/navigation/error404-subframeload.html
-http/tests/navigation/javascriptlink-basic.html
-http/tests/navigation/javascriptlink-frames.html
-http/tests/navigation/javascriptlink-goback.html
-http/tests/navigation/javascriptlink-subframeload.html
-http/tests/navigation/location-assign-adds-history-item.html
-http/tests/navigation/location-href-set-adds-history-item.html
-http/tests/navigation/location-replace-adds-history-item.html
-http/tests/navigation/location-set-adds-history-item.html
-http/tests/navigation/lockedhistory-iframe.html
-http/tests/navigation/metaredirect-basic.html
-http/tests/navigation/metaredirect-frames.html
-http/tests/navigation/metaredirect-goback.html
-http/tests/navigation/metaredirect-subframeload.html
-http/tests/navigation/multiple-back-forward-entries.html
-http/tests/navigation/new-window-redirect-history.html
-http/tests/navigation/onload-navigation-iframe-2.html
-http/tests/navigation/onload-navigation-iframe-timeout.html
-http/tests/navigation/onload-navigation-iframe.html
-http/tests/navigation/parsed-iframe-dynamic-form-back-entry.html
-http/tests/navigation/post-basic.html
-http/tests/navigation/post-frames.html
-http/tests/navigation/post-goback-same-url.html
-http/tests/navigation/post-goback1.html
-http/tests/navigation/post-goback2.html
-http/tests/navigation/postredirect-basic.html
-http/tests/navigation/postredirect-frames.html
-http/tests/navigation/postredirect-goback1.html
-http/tests/navigation/postredirect-goback2.html
-http/tests/navigation/postredirect-reload.html
-http/tests/navigation/redirect-load-no-form-restoration.html
-http/tests/navigation/redirect302-basic.html
-http/tests/navigation/redirect302-frames.html
-http/tests/navigation/redirect302-goback.html
-http/tests/navigation/redirect302-subframeload.html
-http/tests/navigation/relativeanchor-basic.html
-http/tests/navigation/relativeanchor-frames.html
-http/tests/navigation/relativeanchor-goback.html
-http/tests/navigation/restore-form-state-https.html
-http/tests/navigation/slowmetaredirect-basic.html
-http/tests/navigation/slowtimerredirect-basic.html
-http/tests/navigation/success200-basic.html
-http/tests/navigation/success200-frames-loadsame.html
-http/tests/navigation/success200-frames.html
-http/tests/navigation/success200-goback.html
-http/tests/navigation/success200-loadsame.html
-http/tests/navigation/success200-reload.html
-http/tests/navigation/success200-subframeload.html
-http/tests/navigation/timerredirect-basic.html
-http/tests/navigation/timerredirect-frames.html
-http/tests/navigation/timerredirect-goback.html
-http/tests/navigation/timerredirect-subframeload.html
-http/tests/navigation/window-open-adds-history-item.html
-http/tests/navigation/window-open-adds-history-item2.html
-
 # WebKitTestRunner needs to support layoutTestController.dumpDOMAsWebArchive
 # <https://bugs.webkit.org/show_bug.cgi?id=42324>
 http/tests/webarchive/cross-origin-stylesheet-crash.html
@@ -1249,7 +1210,6 @@ printing/css2.1/page-break-inside-000.html
 printing/no-content-empty-pages.html
 printing/page-break-after-avoid.html
 printing/page-break-always.html
-printing/page-break-always-for-overflow.html
 printing/page-break-avoid.html
 printing/page-break-before-avoid.html
 printing/page-break-display-none.html
@@ -1331,9 +1291,15 @@ webarchive/loading/test-loading-archive.html
 
 # WebKitTestRunner needs layoutTestController.clearBackForwardList
 # <https://bugs.webkit.org/show_bug.cgi?id=42333>
-fast/history/redirect-via-iframe.html
 fast/dom/location-hash.html
+fast/history/form-submit-in-frame-via-onclick.html
+fast/history/form-submit-in-frame.html
+fast/history/gesture-before-onload-form-submit.html
+fast/history/gesture-before-onload-location-href.html
 fast/history/history-length.html
+fast/history/redirect-via-iframe.html
+fast/history/same-document-iframes-changing-fragment.html
+fast/history/same-document-iframes-changing-pushstate.html
 fast/loader/location-port.html
 fast/loader/stateobjects/document-destroyed-navigate-back-with-fragment-scroll.html
 fast/loader/stateobjects/document-destroyed-navigate-back.html
@@ -1349,9 +1315,6 @@ fast/loader/stateobjects/pushstate-within-popstate-handler-assert.html
 fast/loader/stateobjects/pushstate-without-history.html
 fast/loader/stateobjects/replacestate-then-pushstate.html
 http/tests/loading/state-object-security-exception.html
-fast/history/gesture-before-onload-form-submit.html
-fast/history/gesture-before-onload-location-href.html
-
 
 # WebKitTestRunner needs textInputController
 # <https://bugs.webkit.org/show_bug.cgi?id=42337>
@@ -1553,10 +1516,54 @@ fast/frames/frame-display-none-focus.html
 # <https://bugs.webkit.org/show_bug.cgi?id=42674>
 fast/frames/frame-navigation.html
 fast/history/go-back-to-changed-name.html
+http/tests/navigation/anchor-basic.html
+http/tests/navigation/anchor-goback.html
+http/tests/navigation/anchor-subframeload.html
+http/tests/navigation/back-to-slow-frame.html
+http/tests/navigation/error404-basic.html
+http/tests/navigation/error404-goback.html
+http/tests/navigation/error404-subframeload.html
+http/tests/navigation/javascriptlink-basic.html
+http/tests/navigation/javascriptlink-frames.html
+http/tests/navigation/javascriptlink-goback.html
+http/tests/navigation/javascriptlink-subframeload.html
+http/tests/navigation/metaredirect-basic.html
+http/tests/navigation/metaredirect-frames.html
+http/tests/navigation/metaredirect-goback.html
+http/tests/navigation/metaredirect-subframeload.html
+http/tests/navigation/post-goback-same-url.html
+http/tests/navigation/post-goback2.html
+http/tests/navigation/postredirect-basic.html
+http/tests/navigation/postredirect-frames.html
+http/tests/navigation/postredirect-goback1.html
+http/tests/navigation/postredirect-goback2.html
+http/tests/navigation/postredirect-reload.html
 http/tests/navigation/redirect-cycle.html
+http/tests/navigation/redirect302-basic.html
+http/tests/navigation/redirect302-frames.html
+http/tests/navigation/redirect302-goback.html
+http/tests/navigation/redirect302-metaredirect.html
+http/tests/navigation/redirect302-subframeload.html
+http/tests/navigation/relativeanchor-basic.html
+http/tests/navigation/relativeanchor-frames.html
+http/tests/navigation/relativeanchor-goback.html
 http/tests/navigation/reload-subframe-frame.html
 http/tests/navigation/reload-subframe-iframe.html
 http/tests/navigation/reload-subframe-object.html
+http/tests/navigation/restore-form-state-https.html
+http/tests/navigation/slowmetaredirect-basic.html
+http/tests/navigation/slowtimerredirect-basic.html
+http/tests/navigation/success200-basic.html
+http/tests/navigation/success200-frames-loadsame.html
+http/tests/navigation/success200-frames.html
+http/tests/navigation/success200-goback.html
+http/tests/navigation/success200-loadsame.html
+http/tests/navigation/success200-reload.html
+http/tests/navigation/success200-subframeload.html
+http/tests/navigation/timerredirect-basic.html
+http/tests/navigation/timerredirect-frames.html
+http/tests/navigation/timerredirect-goback.html
+http/tests/navigation/timerredirect-subframeload.html
 
 # WebKitTestRunner needs layoutTestController.queueLoadingScript
 # <https://bugs.webkit.org/show_bug.cgi?id=42675>
@@ -1608,11 +1615,15 @@ plugins/netscape-plugin-setwindow-size-2.html
 # WebKitTestRunner needs layoutTestController.setEditingBehavior
 # <https://bugs.webkit.org/show_bug.cgi?id=42689>
 editing/selection/5195166-1.html
+editing/execCommand/query-command-state.html
+editing/execCommand/query-text-alignment.html
+
 
 # WebKitTestRunner needs layoutTestController.setWillSendRequestReturnsNull
 # <https://bugs.webkit.org/show_bug.cgi?id=42690>
 fast/loader/onload-willSendRequest-null-for-frame.html
 fast/loader/onload-willSendRequest-null-for-script.html
+plugins/plugin-document-willSendRequest-null.html
 
 # WebKitTestRunner needs layoutTestController.setStopProvisionalFrameLoads
 # <https://bugs.webkit.org/show_bug.cgi?id=42691>
@@ -1630,6 +1641,7 @@ printing/compositing-layer-printing.html
 printing/media-queries-print.html
 printing/page-rule-in-media-query.html
 printing/setPrinting.html
+printing/simultaneous-position-float-change.html
 
 # WebKitTestRunner needs layoutTestController.numberOfPages
 # <https://bugs.webkit.org/show_bug.cgi?id=42694>
@@ -1694,6 +1706,28 @@ http/tests/loading/simple-subframe.html
 http/tests/loading/slow-parsing-subframe.html
 http/tests/loading/text-content-type-with-binary-extension.html
 
+# NPRuntime support for out-of-process plug-ins
+# <https://bugs.webkit.org/show_bug.cgi?id=48346>
+http/tests/plugins/cross-frame-object-access.html
+http/tests/plugins/get-url.html
+http/tests/plugins/geturlnotify-from-npp-destroystream.html
+http/tests/plugins/interrupted-get-url.html
+http/tests/plugins/local-geturl-from-remote.html
+http/tests/plugins/npapi-response-headers.html
+plugins/get-url-with-iframe-target.html
+plugins/netscape-plugin-setwindow-size.html
+plugins/nested-plugin-objects.html
+plugins/pass-different-npp-struct.html
+plugins/plugin-remove-subframe.html
+plugins/reentrant-update-widget-positions.html
+plugins/reloadplugins-no-pages.html
+plugins/return-negative-one-from-write.html
+plugins/set-status.html
+plugins/update-widgets-crash.html
+plugins/window-open.html
+plugins/npruntime/identifier-conversion.html
+plugins/npruntime/plugin-scriptable-object-invoke-default.html
+ 
 ########################################
 
 # NOT YET TRACKED BY BUG REPORTS
@@ -1759,6 +1793,8 @@ fast/events/popup-blocked-from-fake-focus.html
 fast/events/popup-blocked-from-fake-user-gesture.html
 fast/events/popup-blocked-to-post-blank.html
 fast/events/popup-blocked-from-iframe-script.html
+fast/events/popup-blocked-from-history-reload.html
+fast/events/popup-blocked-from-window-open.html
 
 # WebKitTestRunner needs layoutTestController.addDisallowedURL
 plugins/get-url-that-the-resource-load-delegate-will-disallow.html
@@ -1766,17 +1802,49 @@ plugins/get-url-that-the-resource-load-delegate-will-disallow.html
 # WebKitTestRunner needs layoutTestController.setSelectTrailingWhitespaceEnabled
 editing/selection/doubleclick-inline-first-last-contenteditable.html
 
-# WebKitTestRunner needs layoutTestController.suspendAnimations
-animations/suspend-resume-animation.html
-
 # WebKitTestRunner needs layoutTestController.pageProperty
 printing/page-rule-selection.html
+
+# WebKitTestRunner needs layoutTestController.hasSpellingMarker
+editing/spelling/design-mode-spellcheck-off.html
+editing/spelling/spellcheck-attribute.html
+editing/spelling/spelling-attribute-at-child.html
+editing/spelling/spelling-attribute-change.html
+editing/spelling/spelling-linebreak.html
+
+# WebKitTestRunner needs layoutTestController.nodesFromRect
+fast/dom/nodesFromRect-basic.html
+fast/dom/nodesFromRect-inner-documents.html
+fast/dom/nodesFromRect-links-and-text.html
+
+# WebKitTestRunner needs layoutTestController.setSpatialNavigationEnabled
+fast/events/spatial-navigation/snav-1st-stop.html
+fast/events/spatial-navigation/snav-clipped-overflowed-content.html
+fast/events/spatial-navigation/snav-div-scrollable-but-without-focusable-content.html
+fast/events/spatial-navigation/snav-fully-aligned-horizontally.html
+fast/events/spatial-navigation/snav-fully-aligned-vertically.html
+fast/events/spatial-navigation/snav-iframe-flattening-simple.html
+fast/events/spatial-navigation/snav-iframe-nested.html
+fast/events/spatial-navigation/snav-iframe-no-focusable-content.html
+fast/events/spatial-navigation/snav-iframe-no-scrollable-content.html
+fast/events/spatial-navigation/snav-iframe-recursive-offset-parent.html
+fast/events/spatial-navigation/snav-multiple-select.html
+fast/events/spatial-navigation/snav-offscreen-content.html
+fast/events/spatial-navigation/snav-only-clipped-overflow-content.html
+fast/events/spatial-navigation/snav-radio-group.html
+fast/events/spatial-navigation/snav-radio.html
+fast/events/spatial-navigation/snav-simple-content-overflow.html
+fast/events/spatial-navigation/snav-single-select.html
+fast/events/spatial-navigation/snav-table-traversal.html
+fast/events/spatial-navigation/snav-tiny-table-traversal.html
+fast/events/spatial-navigation/snav-zero-margin-content.html
 
 # WebKit2 needs support for moving/resizing and querying the location/size the window
 fast/dom/Window/window-resize-and-move-arguments.html
 fast/dom/Window/window-resize.html
 
 # WebKit2 needs undo/redo support
+editing/undo/replace-by-span-then-remove.html
 editing/undo/remove-css-property-and-remove-style.html
 editing/deleting/delete-and-undo.html
 editing/execCommand/convert-style-elements-to-spans.html
@@ -1958,15 +2026,47 @@ fast/js/sputnik/Conformance/10_Execution_Contexts/10.2_Entering_An_Execution_Con
 fast/js/sputnik/Conformance/10_Execution_Contexts/10.2_Entering_An_Execution_Context/10.2.2_Eval_Code/S10.2.2_A1.2_T10.html
 fast/js/sputnik/Conformance/10_Execution_Contexts/10.2_Entering_An_Execution_Context/10.2.2_Eval_Code/S10.2.2_A1.2_T11.html
 
+# Unexplained Java failures
+dom/html/level2/html/HTMLAppletElement01.html
+dom/html/level2/html/HTMLAppletElement02.html
+dom/html/level2/html/HTMLAppletElement03.html
+dom/html/level2/html/HTMLAppletElement04.html
+dom/html/level2/html/HTMLAppletElement05.html
+dom/html/level2/html/HTMLAppletElement06.html
+dom/html/level2/html/HTMLAppletElement07.html
+dom/html/level2/html/HTMLAppletElement08.html
+dom/html/level2/html/HTMLAppletElement09.html
+dom/html/level2/html/HTMLAppletElement10.html
+dom/xhtml/level2/html/HTMLAppletElement01.xhtml
+dom/xhtml/level2/html/HTMLAppletElement02.xhtml
+dom/xhtml/level2/html/HTMLAppletElement03.xhtml
+dom/xhtml/level2/html/HTMLAppletElement04.xhtml
+dom/xhtml/level2/html/HTMLAppletElement05.xhtml
+dom/xhtml/level2/html/HTMLAppletElement06.xhtml
+dom/xhtml/level2/html/HTMLAppletElement07.xhtml
+dom/xhtml/level2/html/HTMLAppletElement08.xhtml
+dom/xhtml/level2/html/HTMLAppletElement09.xhtml
+dom/xhtml/level2/html/HTMLAppletElement10.xhtml
+editing/selection/selection-applet.html
+fast/replaced/applet-disabled-positioned.html
+fast/replaced/applet-rendering-java-disabled.html
+
 # Unexplained failures
+http/tests/history/popstate-fires-with-pending-requests.html
+http/tests/media/reload-after-dialog.html
+svg/dom/fuzz-path-parser.html
+tables/mozilla_expected_failures/bugs/bug8499.html
+canvas/philip/tests/2d.text.draw.fontface.notinpage.html
 fast/dom/beforeload/remove-frame-in-beforeload-listener.html
 fast/dom/css-cached-import-rule.html
 fast/dom/Document/open-with-pending-load.html
 fast/dom/Window/window-appendages-cleared.html
 fast/dynamic/anchor-lock.html
 fast/events/simulated-key-state.html
+fast/frames/frame-element-name.html
 fast/frames/iframe-onload-remove-self-no-crash.html
 fast/frames/location-put-after-removal.html
+fast/frames/sandboxed-iframe-plugins.html
 fast/history/multiple-classes-visited.html
 fast/history/nested-visited-test.html
 fast/history/saves-state-after-fragment-nav.html
@@ -1979,6 +2079,7 @@ fast/loader/goto-anchor-infinite-layout.html
 fast/loader/hashchange-event-async.html
 fast/loader/hashchange-event.html
 fast/loader/onhashchange-attribute-listeners.html
+fast/loader/stateobjects/popstate-fires-on-history-traversal.html
 fast/loader/submit-form-while-parsing-2.html
 fast/overflow/overflow_hidden.html
 fast/overflow/scroll-vertical-not-horizontal.html
@@ -1987,11 +2088,16 @@ fast/regex/test1.html
 fast/regex/test4.html
 fast/table/giantCellspacing.html
 fast/workers/storage/change-version-handle-reuse-sync.html
+fast/workers/storage/executesql-accepts-only-one-statement-sync.html
+fast/workers/storage/interrupt-database-sync.html
+fast/workers/storage/interrupt-database.html
 fast/workers/storage/multiple-databases-garbage-collection.html
-storage/open-database-while-transaction-in-progress.html
+fast/workers/storage/multiple-transactions-on-different-handles-sync.html
+fast/workers/storage/multiple-transactions-on-different-handles.html
 fast/workers/storage/open-database-creation-callback-sync.html
 fast/workers/storage/open-database-inputs-sync.html
 fast/workers/storage/sql-exception-codes-sync.html
+fast/workers/storage/use-same-database-in-page-and-workers.html
 http/tests/appcache/different-https-origin-resource-main.html
 http/tests/appcache/fallback.html
 http/tests/cache/subresource-expiration.html
@@ -2015,7 +2121,9 @@ media/controls-after-reload.html
 media/controls-styling.html
 media/video-zoom-controls.html
 platform/mac/fast/loader/non-html-load-event.html
+plugins/embed-attributes-style.html
 storage/multiple-databases-garbage-collection.html
+storage/open-database-while-transaction-in-progress.html
 svg/custom/clip-path-referencing-use2.svg
 svg/custom/scrolling-embedded-svg-file-image-repaint-problem.html
 svg/hixie/cascade/002.xml
@@ -2023,7 +2131,30 @@ transitions/color-transition-all.html
 transitions/font-family-during-transition.html
 transitions/min-max-width-height-transitions.html
 transitions/text-indent-transition.html
-fast/loader/stateobjects/popstate-fires-on-history-traversal.html
+http/tests/security/cross-frame-access-put.html
+
+# Unexplained back/forward list failures
+fast/loader/frame-location-change-not-added-to-history.html
+fast/loader/frame-src-change-added-to-history.html
+fast/loader/frame-src-change-not-added-to-history.html
+http/tests/history/redirect-200-refresh-0-seconds.pl
+http/tests/history/redirect-js-document-location-before-load.html
+http/tests/history/redirect-js-form-submit-2-seconds.html
+http/tests/history/redirect-js-form-submit-before-load.html
+http/tests/history/redirect-js-location-assign-before-load.html
+http/tests/history/redirect-js-location-before-load.html
+http/tests/history/redirect-js-location-href-before-load.html
+http/tests/history/redirect-js-location-replace-0-seconds.html
+http/tests/history/redirect-js-location-replace-2-seconds.html
+http/tests/history/redirect-js-location-replace-before-load.html
+http/tests/history/redirect-meta-refresh-0-seconds.html
+http/tests/navigation/anchor-frames.html
+http/tests/navigation/document-location-script.html
+http/tests/navigation/location-replace-adds-history-item.html
+http/tests/navigation/multiple-back-forward-entries.html
+http/tests/navigation/new-window-redirect-history.html
+http/tests/navigation/post-basic.html
+http/tests/navigation/post-goback1.html
 
 ########################################
 

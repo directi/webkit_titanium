@@ -45,43 +45,43 @@ static const char* expressionEndOffsetPropertyName = "expressionEndOffset";
 JSObject* createError(JSGlobalObject* globalObject, const UString& message)
 {
     ASSERT(!message.isEmpty());
-    return ErrorInstance::create(globalObject->globalData(), globalObject->errorStructure(), message);
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->errorStructure(), message);
 }
 
 JSObject* createEvalError(JSGlobalObject* globalObject, const UString& message)
 {
     ASSERT(!message.isEmpty());
-    return ErrorInstance::create(globalObject->globalData(), globalObject->evalErrorConstructor()->errorStructure(), message);
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->evalErrorConstructor()->errorStructure(), message);
 }
 
 JSObject* createRangeError(JSGlobalObject* globalObject, const UString& message)
 {
     ASSERT(!message.isEmpty());
-    return ErrorInstance::create(globalObject->globalData(), globalObject->rangeErrorConstructor()->errorStructure(), message);
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->rangeErrorConstructor()->errorStructure(), message);
 }
 
 JSObject* createReferenceError(JSGlobalObject* globalObject, const UString& message)
 {
     ASSERT(!message.isEmpty());
-    return ErrorInstance::create(globalObject->globalData(), globalObject->referenceErrorConstructor()->errorStructure(), message);
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->referenceErrorConstructor()->errorStructure(), message);
 }
 
 JSObject* createSyntaxError(JSGlobalObject* globalObject, const UString& message)
 {
     ASSERT(!message.isEmpty());
-    return ErrorInstance::create(globalObject->globalData(), globalObject->syntaxErrorConstructor()->errorStructure(), message);
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->syntaxErrorConstructor()->errorStructure(), message);
 }
 
 JSObject* createTypeError(JSGlobalObject* globalObject, const UString& message)
 {
     ASSERT(!message.isEmpty());
-    return ErrorInstance::create(globalObject->globalData(), globalObject->typeErrorConstructor()->errorStructure(), message);
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->typeErrorConstructor()->errorStructure(), message);
 }
 
 JSObject* createURIError(JSGlobalObject* globalObject, const UString& message)
 {
     ASSERT(!message.isEmpty());
-    return ErrorInstance::create(globalObject->globalData(), globalObject->URIErrorConstructor()->errorStructure(), message);
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->URIErrorConstructor()->errorStructure(), message);
 }
 
 JSObject* createError(ExecState* exec, const UString& message)
@@ -125,19 +125,19 @@ static void addErrorSourceInfo(JSGlobalData* globalData, JSObject* error, int li
     const UString& sourceURL = source.provider()->url();
 
     if (line != -1)
-        error->putWithAttributes(globalData, Identifier(globalData, linePropertyName), jsNumber(globalData, line), ReadOnly | DontDelete);
+        error->putWithAttributes(globalData, Identifier(globalData, linePropertyName), jsNumber(line), ReadOnly | DontDelete);
     if (sourceID != -1)
-        error->putWithAttributes(globalData, Identifier(globalData, sourceIdPropertyName), jsNumber(globalData, (double)sourceID), ReadOnly | DontDelete);
+        error->putWithAttributes(globalData, Identifier(globalData, sourceIdPropertyName), jsNumber((double)sourceID), ReadOnly | DontDelete);
     if (!sourceURL.isNull())
         error->putWithAttributes(globalData, Identifier(globalData, sourceURLPropertyName), jsString(globalData, sourceURL), ReadOnly | DontDelete);
 }
 
 static void addErrorDivotInfo(JSGlobalData* globalData, JSObject* error, int divotPoint, int startOffset, int endOffset, bool withCaret)
 {
-    error->putWithAttributes(globalData, Identifier(globalData, expressionBeginOffsetPropertyName), jsNumber(globalData, divotPoint - startOffset), ReadOnly | DontDelete);
-    error->putWithAttributes(globalData, Identifier(globalData, expressionEndOffsetPropertyName), jsNumber(globalData, divotPoint + endOffset), ReadOnly | DontDelete);
+    error->putWithAttributes(globalData, Identifier(globalData, expressionBeginOffsetPropertyName), jsNumber(divotPoint - startOffset), ReadOnly | DontDelete);
+    error->putWithAttributes(globalData, Identifier(globalData, expressionEndOffsetPropertyName), jsNumber(divotPoint + endOffset), ReadOnly | DontDelete);
     if (withCaret)
-        error->putWithAttributes(globalData, Identifier(globalData, expressionCaretOffsetPropertyName), jsNumber(globalData, divotPoint), ReadOnly | DontDelete);
+        error->putWithAttributes(globalData, Identifier(globalData, expressionCaretOffsetPropertyName), jsNumber(divotPoint), ReadOnly | DontDelete);
 }
 
 JSObject* addErrorInfo(JSGlobalData* globalData, JSObject* error, int line, const SourceCode& source)
@@ -193,6 +193,49 @@ JSObject* throwTypeError(ExecState* exec)
 JSObject* throwSyntaxError(ExecState* exec)
 {
     return throwError(exec, createSyntaxError(exec, "Syntax error"));
+}
+
+class StrictModeTypeErrorFunction : public InternalFunction {
+public:
+    StrictModeTypeErrorFunction(ExecState* exec, JSGlobalObject* globalObject, NonNullPassRefPtr<Structure> structure, const UString& message)
+        : InternalFunction(&exec->globalData(), globalObject, structure, exec->globalData().propertyNames->emptyIdentifier)
+        , m_message(message)
+    {
+    }
+    
+    static EncodedJSValue JSC_HOST_CALL constructThrowTypeError(ExecState* exec)
+    {
+        throwTypeError(exec, static_cast<StrictModeTypeErrorFunction*>(exec->callee())->m_message);
+        return JSValue::encode(jsNull());
+    }
+    
+    ConstructType getConstructData(ConstructData& constructData)
+    {
+        constructData.native.function = constructThrowTypeError;
+        return ConstructTypeHost;
+    }
+    
+    static EncodedJSValue JSC_HOST_CALL callThrowTypeError(ExecState* exec)
+    {
+        throwTypeError(exec, static_cast<StrictModeTypeErrorFunction*>(exec->callee())->m_message);
+        return JSValue::encode(jsNull());
+    }
+
+    CallType getCallData(CallData& callData)
+    {
+        callData.native.function = callThrowTypeError;
+        return CallTypeHost;
+    }
+
+private:
+    UString m_message;
+};
+
+COMPILE_ASSERT(sizeof(StrictModeTypeErrorFunction) <= sizeof(CollectorCell), sizeof_StrictModeTypeErrorFunction_must_be_less_than_CollectorCell);
+
+JSValue createTypeErrorFunction(ExecState* exec, const UString& message)
+{
+    return new (exec) StrictModeTypeErrorFunction(exec, exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->internalFunctionStructure(), message);
 }
 
 } // namespace JSC

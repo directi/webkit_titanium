@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # Copyright (C) 2010 Google Inc. All rights reserved.
+# Copyright (C) 2010 Gabor Rapcsanyi (rgabor@inf.u-szeged.hu), University of Szeged
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -68,6 +69,7 @@ from layout_package import json_layout_results_generator
 from layout_package import printing
 from layout_package import test_expectations
 from layout_package import test_failures
+from layout_package import test_results
 from layout_package import test_results_uploader
 from test_types import image_diff
 from test_types import text_diff
@@ -82,6 +84,8 @@ _log = logging.getLogger("webkitpy.layout_tests.run_webkit_tests")
 
 # Builder base URL where we have the archived test results.
 BUILDER_BASE_URL = "http://build.chromium.org/buildbot/layout_test_results/"
+
+LAYOUT_TESTS_DIRECTORY = "LayoutTests" + os.sep
 
 TestExpectationsFile = test_expectations.TestExpectationsFile
 
@@ -281,11 +285,16 @@ class TestRunner:
           last_unexpected_results: list of unexpected results to retest, if any
 
         """
-        paths = [arg for arg in args if arg and arg != '']
+        paths = [self._strip_test_dir_prefix(arg) for arg in args if arg and arg != '']
         paths += last_unexpected_results
         if self._options.test_list:
             paths += read_test_files(self._options.test_list)
         self._test_files = self._port.tests(paths)
+
+    def _strip_test_dir_prefix(self, path):
+        if path.startswith(LAYOUT_TESTS_DIRECTORY):
+            return path[len(LAYOUT_TESTS_DIRECTORY):]
+        return path
 
     def lint(self):
         # Creating the expecations for each platform/configuration pair does
@@ -402,9 +411,8 @@ class TestRunner:
 
             # If we reached the end and we don't have enough tests, we run some
             # from the beginning.
-            if (self._options.run_chunk and
-                (slice_end - slice_start < chunk_len)):
-                extra = 1 + chunk_len - (slice_end - slice_start)
+            if slice_end - slice_start < chunk_len:
+                extra = chunk_len - (slice_end - slice_start)
                 extra_msg = ('   last chunk is partial, appending [0:%d]' %
                             extra)
                 self._printer.print_expected(extra_msg)
@@ -456,7 +464,7 @@ class TestRunner:
             # subtracted out of self._test_files, above), but we stub out the
             # results here so the statistics can remain accurate.
             for test in skip_chunk:
-                result = dump_render_tree_thread.TestResult(test,
+                result = test_results.TestResult(test,
                     failures=[], test_run_time=0, total_time_for_all_diffs=0,
                     time_for_diffs=0)
                 result.type = test_expectations.SKIP
@@ -468,9 +476,9 @@ class TestRunner:
     def _get_dir_for_test_file(self, test_file):
         """Returns the highest-level directory by which to shard the given
         test file."""
-        index = test_file.rfind(os.sep + 'LayoutTests' + os.sep)
+        index = test_file.rfind(os.sep + LAYOUT_TESTS_DIRECTORY)
 
-        test_file = test_file[index + len('LayoutTests/'):]
+        test_file = test_file[index + len(LAYOUT_TESTS_DIRECTORY):]
         test_file_parts = test_file.split(os.sep, 1)
         directory = test_file_parts[0]
         test_file = test_file_parts[1]
@@ -498,6 +506,12 @@ class TestRunner:
                             self._options.slow_time_out_ms)
         return TestInfo(self._port, test_file, self._options.time_out_ms)
 
+    def _test_requires_lock(self, test_file):
+        """Return True if the test needs to be locked when
+        running multiple copies of NRWTs."""
+        split_path = test_file.split(os.sep)
+        return 'http' in split_path or 'websocket' in split_path
+
     def _get_test_file_queue(self, test_files):
         """Create the thread safe queue of lists of (test filenames, test URIs)
         tuples. Each TestShellThread pulls a list from this queue and runs
@@ -511,46 +525,47 @@ class TestRunner:
           The Queue of lists of TestInfo objects.
         """
 
+        test_lists = []
+        tests_to_http_lock = []
         if (self._options.experimental_fully_parallel or
             self._is_single_threaded()):
-            filename_queue = Queue.Queue()
             for test_file in test_files:
-                filename_queue.put(
-                    ('.', [self._get_test_info_for_file(test_file)]))
-            return filename_queue
-
-        tests_by_dir = {}
-        for test_file in test_files:
-            directory = self._get_dir_for_test_file(test_file)
-            tests_by_dir.setdefault(directory, [])
-            tests_by_dir[directory].append(
-                self._get_test_info_for_file(test_file))
-
-        # Sort by the number of tests in the dir so that the ones with the
-        # most tests get run first in order to maximize parallelization.
-        # Number of tests is a good enough, but not perfect, approximation
-        # of how long that set of tests will take to run. We can't just use
-        # a PriorityQueue until we move # to Python 2.6.
-        test_lists = []
-        http_tests = None
-        for directory in tests_by_dir:
-            test_list = tests_by_dir[directory]
-            # Keep the tests in alphabetical order.
-            # TODO: Remove once tests are fixed so they can be run in any
-            # order.
-            test_list.reverse()
-            test_list_tuple = (directory, test_list)
-            if directory == 'LayoutTests' + os.sep + 'http':
-                http_tests = test_list_tuple
-            else:
+                test_info = self._get_test_info_for_file(test_file)
+                if self._test_requires_lock(test_file):
+                    tests_to_http_lock.append(test_info)
+                else:
+                    test_lists.append((".", [test_info]))
+        else:
+            tests_by_dir = {}
+            for test_file in test_files:
+                directory = self._get_dir_for_test_file(test_file)
+                test_info = self._get_test_info_for_file(test_file)
+                if self._test_requires_lock(test_file):
+                    tests_to_http_lock.append(test_info)
+                else:
+                    tests_by_dir.setdefault(directory, [])
+                    tests_by_dir[directory].append(test_info)
+            # Sort by the number of tests in the dir so that the ones with the
+            # most tests get run first in order to maximize parallelization.
+            # Number of tests is a good enough, but not perfect, approximation
+            # of how long that set of tests will take to run. We can't just use
+            # a PriorityQueue until we move to Python 2.6.
+            for directory in tests_by_dir:
+                test_list = tests_by_dir[directory]
+                # Keep the tests in alphabetical order.
+                # FIXME: Remove once tests are fixed so they can be run in any
+                # order.
+                test_list.reverse()
+                test_list_tuple = (directory, test_list)
                 test_lists.append(test_list_tuple)
-        test_lists.sort(lambda a, b: cmp(len(b[1]), len(a[1])))
+            test_lists.sort(lambda a, b: cmp(len(b[1]), len(a[1])))
 
         # Put the http tests first. There are only a couple hundred of them,
         # but each http test takes a very long time to run, so sorting by the
         # number of tests doesn't accurately capture how long they take to run.
-        if http_tests:
-            test_lists.insert(0, http_tests)
+        if tests_to_http_lock:
+            tests_to_http_lock.reverse()
+            test_lists.insert(0, ("tests_to_http_lock", tests_to_http_lock))
 
         filename_queue = Queue.Queue()
         for item in test_lists:
@@ -687,7 +702,7 @@ class TestRunner:
             thread_timings.append({'name': thread.getName(),
                                    'num_tests': thread.get_num_tests(),
                                    'total_time': thread.get_total_time()})
-            test_timings.update(thread.get_directory_timing_stats())
+            test_timings.update(thread.get_test_group_timing_stats())
             individual_test_timings.extend(thread.get_test_results())
 
         return (thread_timings, test_timings, individual_test_timings)
@@ -695,6 +710,10 @@ class TestRunner:
     def needs_http(self):
         """Returns whether the test runner needs an HTTP server."""
         return self._contains_tests(self.HTTP_SUBDIR)
+
+    def needs_websocket(self):
+        """Returns whether the test runner needs a WEBSOCKET server."""
+        return self._contains_tests(self.WEBSOCKET_SUBDIR)
 
     def set_up_run(self):
         """Configures the system to be ready to run tests.
@@ -727,15 +746,6 @@ class TestRunner:
         result_summary = self.prepare_lists_and_print_output()
         if not result_summary:
             return None
-
-        if self.needs_http():
-            self._printer.print_update('Starting HTTP server ...')
-            self._port.start_http_server()
-
-        if self._contains_tests(self.WEBSOCKET_SUBDIR):
-            self._printer.print_update('Starting WebSocket server ...')
-            self._port.start_websocket_server()
-            # self._websocket_secure_server.Start()
 
         return result_summary
 
@@ -826,10 +836,6 @@ class TestRunner:
         sys.stdout.flush()
         _log.debug("flushing stderr")
         sys.stderr.flush()
-        _log.debug("stopping http server")
-        self._port.stop_http_server()
-        _log.debug("stopping websocket server")
-        self._port.stop_websocket_server()
         _log.debug("stopping helper")
         self._port.stop_helper()
 
@@ -837,7 +843,7 @@ class TestRunner:
         """Update the summary and print results with any completed tests."""
         while True:
             try:
-                result = self._result_queue.get_nowait()
+                result = test_results.TestResult.loads(self._result_queue.get_nowait())
             except Queue.Empty:
                 return
 
@@ -932,10 +938,16 @@ class TestRunner:
         if not self._options.test_results_server:
             return
 
+        if not self._options.master_name:
+            _log.error("--test-results-server was set, but --master-name was not. Not uploading JSON files.")
+            return
+
         _log.info("Uploading JSON files for builder: %s",
                    self._options.builder_name)
 
-        attrs = [("builder", self._options.builder_name)]
+        attrs = [("builder", self._options.builder_name), ("testtype", "layout-tests"),
+            ("master", self._options.master_name)]
+
         json_files = ["expectations.json"]
         if self._options.upload_full_results:
             json_files.append("results.json")
@@ -996,16 +1008,13 @@ class TestRunner:
         tests = self._expectations.get_tests_with_result_type(result_type)
         now = result_summary.tests_by_timeline[test_expectations.NOW]
         wontfix = result_summary.tests_by_timeline[test_expectations.WONTFIX]
-        defer = result_summary.tests_by_timeline[test_expectations.DEFER]
 
         # We use a fancy format string in order to print the data out in a
         # nicely-aligned table.
-        fmtstr = ("Expect: %%5d %%-8s (%%%dd now, %%%dd defer, %%%dd wontfix)"
-                  % (self._num_digits(now), self._num_digits(defer),
-                  self._num_digits(wontfix)))
+        fmtstr = ("Expect: %%5d %%-8s (%%%dd now, %%%dd wontfix)"
+                  % (self._num_digits(now), self._num_digits(wontfix)))
         self._printer.print_expected(fmtstr %
-            (len(tests), result_type_str, len(tests & now),
-             len(tests & defer), len(tests & wontfix)))
+            (len(tests), result_type_str, len(tests & now), len(tests & wontfix)))
 
     def _num_digits(self, num):
         """Returns the number of digits needed to represent the length of a
@@ -1226,12 +1235,7 @@ class TestRunner:
                      (passed, total, pct_passed))
         self._printer.print_actual("")
         self._print_result_summary_entry(result_summary,
-            test_expectations.NOW, "Tests to be fixed for the current release")
-
-        self._printer.print_actual("")
-        self._print_result_summary_entry(result_summary,
-            test_expectations.DEFER,
-            "Tests we'll fix in the future if they fail (DEFER)")
+            test_expectations.NOW, "Tests to be fixed")
 
         self._printer.print_actual("")
         self._print_result_summary_entry(result_summary,
@@ -1286,7 +1290,8 @@ class TestRunner:
             page += u"<p><a href='%s'>%s</a><br />\n" % (test_url, test_name)
             test_failures = failures.get(test_file, [])
             for failure in test_failures:
-                page += u"&nbsp;&nbsp;%s<br/>" % failure.result_html_output(test_name)
+                page += (u"&nbsp;&nbsp;%s<br/>" %
+                         failure.result_html_output(test_name))
             page += "</p>\n"
         page += "</body></html>\n"
         return page
@@ -1421,7 +1426,8 @@ def _set_up_derived_options(port_obj, options):
 
     if not options.child_processes:
         # FIXME: Investigate perf/flakiness impact of using cpu_count + 1.
-        options.child_processes = str(port_obj.default_child_processes())
+        options.child_processes = os.environ.get("WEBKIT_TEST_CHILD_PROCESSES",
+                                                 str(port_obj.default_child_processes()))
 
     if not options.configuration:
         options.configuration = port_obj.default_configuration()
@@ -1432,13 +1438,10 @@ def _set_up_derived_options(port_obj, options):
     if not options.use_apache:
         options.use_apache = sys.platform in ('darwin', 'linux2')
 
-    if options.results_directory.startswith("/"):
-        # Assume it's an absolute path and normalize.
-        options.results_directory = port_obj.get_absolute_path(
-            options.results_directory)
-    else:
-        # If it's a relative path, make the output directory relative to
-        # Debug or Release.
+    if not os.path.isabs(options.results_directory):
+        # This normalizes the path to the build dir.
+        # FIXME: how this happens is not at all obvious; this is a dumb
+        # interface and should be cleaned up.
         options.results_directory = port_obj.results_directory()
 
     if not options.time_out_ms:
@@ -1503,11 +1506,15 @@ def parse_args(args=None):
             default=False, help="create a dialog on DumpRenderTree startup"),
         optparse.make_option("--gp-fault-error-box", action="store_true",
             default=False, help="enable Windows GP fault error box"),
+        optparse.make_option("--multiple-loads",
+            type="int", help="turn on multiple loads of each test"),
+        optparse.make_option("--js-flags",
+            type="string", help="JavaScript flags to pass to tests"),
         optparse.make_option("--nocheck-sys-deps", action="store_true",
             default=False,
             help="Don't check the system dependencies (themes)"),
         optparse.make_option("--use-drt", action="store_true",
-            default=False,
+            default=None,
             help="Use DumpRenderTree instead of test_shell"),
         optparse.make_option("--accelerated-compositing",
             action="store_true",
@@ -1549,8 +1556,9 @@ def parse_args(args=None):
             dest="pixel_tests", help="Enable pixel-to-pixel PNG comparisons"),
         optparse.make_option("--no-pixel-tests", action="store_false",
             dest="pixel_tests", help="Disable pixel-to-pixel PNG comparisons"),
-        # old-run-webkit-tests allows a specific tolerance: --tolerance t
-        # Ignore image differences less than this percentage (default: 0.1)
+        optparse.make_option("--tolerance",
+            help="Ignore image differences less than this percentage (some "
+                "ports may ignore this option)", type="float"),
         optparse.make_option("--results-directory",
             default="layout-test-results",
             help="Output results directory source dir, relative to Debug or "
@@ -1591,10 +1599,6 @@ def parse_args(args=None):
         # old-run-webkit-tests also has HTTP toggle options:
         # --[no-]http                     Run (or do not run) http tests
         #                                 (default: run)
-        # --[no-]wait-for-httpd           Wait for httpd if some other test
-        #                                 session is using it already (same
-        #                                 as WEBKIT_WAIT_FOR_HTTPD=1).
-        #                                 (default: 0)
     ]
 
     test_options = [
@@ -1675,6 +1679,7 @@ def parse_args(args=None):
 
     # FIXME: Move these into json_results_generator.py
     results_json_options = [
+        optparse.make_option("--master-name", help="The name of the buildbot master."),
         optparse.make_option("--builder-name", default="DUMMY_BUILDER_NAME",
             help=("The name of the builder shown on the waterfall running "
                   "this script e.g. WebKit.")),

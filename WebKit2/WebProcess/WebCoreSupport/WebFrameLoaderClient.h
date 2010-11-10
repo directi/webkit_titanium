@@ -69,7 +69,7 @@ private:
     virtual void dispatchDidFinishLoading(WebCore::DocumentLoader*, unsigned long identifier);
     virtual void dispatchDidFailLoading(WebCore::DocumentLoader*, unsigned long identifier, const WebCore::ResourceError&);
     virtual bool dispatchDidLoadResourceFromMemoryCache(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&, int length);
-    virtual void dispatchDidLoadResourceByXMLHttpRequest(unsigned long identifier, const WebCore::ScriptString&);
+    virtual void dispatchDidLoadResourceByXMLHttpRequest(unsigned long identifier, const WTF::String&);
     
     virtual void dispatchDidHandleOnloadEvents();
     virtual void dispatchDidReceiveServerRedirectForProvisionalLoad();
@@ -92,7 +92,7 @@ private:
     virtual void dispatchDidFirstLayout();
     virtual void dispatchDidFirstVisuallyNonEmptyLayout();
     
-    virtual WebCore::Frame* dispatchCreatePage();
+    virtual WebCore::Frame* dispatchCreatePage(const WebCore::NavigationAction&);
     virtual void dispatchShow();
     
     virtual void dispatchDecidePolicyForMIMEType(WebCore::FramePolicyFunction, const String& MIMEType, const WebCore::ResourceRequest&);
@@ -169,13 +169,16 @@ private:
     virtual void savePlatformDataToCachedFrame(WebCore::CachedFrame*);
     virtual void transitionToCommittedFromCachedFrame(WebCore::CachedFrame*);
     virtual void transitionToCommittedForNewPage();
-    
+
+    virtual void dispatchDidBecomeFrameset(bool);
+
     virtual bool canCachePage() const;
     virtual void download(WebCore::ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
     
     virtual PassRefPtr<WebCore::Frame> createFrame(const WebCore::KURL& url, const String& name, WebCore::HTMLFrameOwnerElement* ownerElement,
                                           const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight);
     virtual void didTransferChildFrameToNewDocument(WebCore::Page*);
+    virtual void transferLoadingResourceFromPage(unsigned long, WebCore::DocumentLoader*, const WebCore::ResourceRequest&, WebCore::Page*);
     
     virtual PassRefPtr<WebCore::Widget> createPlugin(const WebCore::IntSize&, WebCore::HTMLPlugInElement*, const WebCore::KURL&, const Vector<String>&, const Vector<String>&, const String&, bool loadManually);
     virtual void redirectDataToPlugin(WebCore::Widget* pluginWidget);
@@ -210,6 +213,9 @@ private:
     RefPtr<PluginView> m_pluginView;
     bool m_hasSentResponseToPluginView;
 };
+
+uint32_t modifiersForNavigationAction(const WebCore::NavigationAction&);
+int32_t mouseButtonForNavigationAction(const WebCore::NavigationAction&);
 
 } // namespace WebKit
 

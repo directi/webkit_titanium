@@ -29,6 +29,10 @@
 
 #include "BackingStore.h"
 #include "DataReference.h"
+#include "NPObjectProxy.h"
+#include "NPRemoteObjectMap.h"
+#include "NPRuntimeUtilities.h"
+#include "NPVariantData.h"
 #include "NetscapePlugin.h"
 #include "NotImplemented.h"
 #include "PluginProcess.h"
@@ -42,16 +46,18 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PassOwnPtr<PluginControllerProxy> PluginControllerProxy::create(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent)
+PassOwnPtr<PluginControllerProxy> PluginControllerProxy::create(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled)
 {
-    return adoptPtr(new PluginControllerProxy(connection, pluginInstanceID, userAgent));
+    return adoptPtr(new PluginControllerProxy(connection, pluginInstanceID, userAgent, isPrivateBrowsingEnabled));
 }
 
-PluginControllerProxy::PluginControllerProxy(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent)
+PluginControllerProxy::PluginControllerProxy(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled)
     : m_connection(connection)
     , m_pluginInstanceID(pluginInstanceID)
     , m_userAgent(userAgent)
+    , m_isPrivateBrowsingEnabled(isPrivateBrowsingEnabled)
     , m_paintTimer(RunLoop::main(), this, &PluginControllerProxy::paint)
+    , m_waitingForDidUpdate(false)
 {
 }
 
@@ -70,6 +76,8 @@ bool PluginControllerProxy::initialize(const Plugin::Parameters& parameters)
         return false;
     }
 
+    platformInitialize();
+
     return true;
 }
 
@@ -79,11 +87,14 @@ void PluginControllerProxy::destroy()
 
     m_plugin->destroy();
     m_plugin = 0;
+
+    platformDestroy();
 }
 
 void PluginControllerProxy::paint()
 {
     ASSERT(!m_dirtyRect.isEmpty());
+    m_paintTimer.stop();
 
     if (!m_backingStore)
         return;
@@ -101,6 +112,27 @@ void PluginControllerProxy::paint()
     m_connection->connection()->send(Messages::PluginProxy::Update(dirtyRect), m_pluginInstanceID);
 }
 
+void PluginControllerProxy::startPaintTimer()
+{
+    // Check if we should start the timer.
+    
+    if (m_dirtyRect.isEmpty())
+        return;
+
+    // FIXME: Check clip rect.
+    
+    if (m_paintTimer.isActive())
+        return;
+
+    if (m_waitingForDidUpdate)
+        return;
+
+    // Start the timer.
+    m_paintTimer.startOneShot(0);
+
+    m_waitingForDidUpdate = true;
+}
+
 void PluginControllerProxy::invalidate(const IntRect& rect)
 {
     // Convert the dirty rect to window coordinates.
@@ -112,18 +144,7 @@ void PluginControllerProxy::invalidate(const IntRect& rect)
 
     m_dirtyRect.unite(dirtyRect);
 
-    // Check if we should start the timer.
-    
-    if (m_dirtyRect.isEmpty())
-        return;
-    
-    // FIXME: Check clip rect.
-    
-    if (m_paintTimer.isActive())
-        return;
-
-    // Start the timer.
-    m_paintTimer.startOneShot(0);
+    startPaintTimer();
 }
 
 String PluginControllerProxy::userAgent()
@@ -148,20 +169,49 @@ void PluginControllerProxy::cancelManualStreamLoad()
 
 NPObject* PluginControllerProxy::windowScriptNPObject()
 {
-    notImplemented();
-    return 0;
+    uint64_t windowScriptNPObjectID = 0;
+
+    if (!m_connection->connection()->sendSync(Messages::PluginProxy::GetWindowScriptNPObject(), Messages::PluginProxy::GetWindowScriptNPObject::Reply(windowScriptNPObjectID), m_pluginInstanceID))
+        return 0;
+
+    if (!windowScriptNPObjectID)
+        return 0;
+
+    return m_connection->npRemoteObjectMap()->createNPObjectProxy(windowScriptNPObjectID);
 }
 
 NPObject* PluginControllerProxy::pluginElementNPObject()
 {
-    notImplemented();
-    return 0;
+    uint64_t pluginElementNPObjectID = 0;
+
+    if (!m_connection->connection()->sendSync(Messages::PluginProxy::GetPluginElementNPObject(), Messages::PluginProxy::GetPluginElementNPObject::Reply(pluginElementNPObjectID), m_pluginInstanceID))
+        return 0;
+
+    if (!pluginElementNPObjectID)
+        return 0;
+
+    return m_connection->npRemoteObjectMap()->createNPObjectProxy(pluginElementNPObjectID);
 }
 
-bool PluginControllerProxy::evaluate(NPObject*, const String& scriptString, NPVariant* result, bool allowPopups)
+bool PluginControllerProxy::evaluate(NPObject* npObject, const String& scriptString, NPVariant* result, bool allowPopups)
 {
-    notImplemented();
-    return false;
+    NPVariant npObjectAsNPVariant;
+    OBJECT_TO_NPVARIANT(npObject, npObjectAsNPVariant);
+
+    // Send the NPObject over as an NPVariantData.
+    NPVariantData npObjectAsNPVariantData = m_connection->npRemoteObjectMap()->npVariantToNPVariantData(npObjectAsNPVariant);
+
+    bool returnValue = false;
+    NPVariantData resultData;
+
+    if (!m_connection->connection()->sendSync(Messages::PluginProxy::Evaluate(npObjectAsNPVariantData, scriptString, allowPopups), Messages::PluginProxy::Evaluate::Reply(returnValue, resultData), m_pluginInstanceID))
+        return false;
+
+    if (!returnValue)
+        return false;
+
+    *result = m_connection->npRemoteObjectMap()->npVariantDataToNPVariant(resultData);
+    return true;
 }
 
 void PluginControllerProxy::setStatusbarText(const WTF::String&)
@@ -171,8 +221,7 @@ void PluginControllerProxy::setStatusbarText(const WTF::String&)
 
 bool PluginControllerProxy::isAcceleratedCompositingEnabled()
 {
-    notImplemented();
-    return false;
+    return PluginProcess::shared().compositingRenderServerPort();
 }
 
 void PluginControllerProxy::pluginProcessCrashed()
@@ -180,6 +229,36 @@ void PluginControllerProxy::pluginProcessCrashed()
     notImplemented();
 }
 
+String PluginControllerProxy::proxiesForURL(const String& urlString)
+{
+    String proxyString;
+    
+    if (!m_connection->connection()->sendSync(Messages::PluginProxy::CookiesForURL(urlString), Messages::PluginProxy::CookiesForURL::Reply(proxyString), m_pluginInstanceID))
+        return String();
+    
+    return proxyString;
+}
+
+String PluginControllerProxy::cookiesForURL(const String& urlString)
+{
+    String cookieString;
+
+    if (!m_connection->connection()->sendSync(Messages::PluginProxy::CookiesForURL(urlString), Messages::PluginProxy::CookiesForURL::Reply(cookieString), m_pluginInstanceID))
+        return String();
+
+    return cookieString;
+}
+
+void PluginControllerProxy::setCookiesForURL(const String& urlString, const String& cookieString)
+{
+    m_connection->connection()->send(Messages::PluginProxy::SetCookiesForURL(urlString, cookieString), m_pluginInstanceID);
+}
+
+bool PluginControllerProxy::isPrivateBrowsingEnabled()
+{
+    return m_isPrivateBrowsingEnabled;
+}
+    
 void PluginControllerProxy::geometryDidChange(const IntRect& frameRect, const IntRect& clipRect, const SharedMemory::Handle& backingStoreHandle)
 {
     m_frameRect = frameRect;
@@ -193,6 +272,8 @@ void PluginControllerProxy::geometryDidChange(const IntRect& frameRect, const In
     }
 
     m_plugin->geometryDidChange(frameRect, clipRect);
+
+    platformGeometryDidChange(frameRect, clipRect);
 }
 
 void PluginControllerProxy::didEvaluateJavaScript(uint64_t requestID, const String& requestURLString, const String& result)
@@ -239,10 +320,39 @@ void PluginControllerProxy::handleMouseLeaveEvent(const WebMouseEvent& mouseLeav
 {
     handled = m_plugin->handleMouseLeaveEvent(mouseLeaveEvent);
 }
-    
+
+void PluginControllerProxy::handleKeyboardEvent(const WebKeyboardEvent& keyboardEvent, bool& handled)
+{
+    handled = m_plugin->handleKeyboardEvent(keyboardEvent);
+}
+
+void PluginControllerProxy::paintEntirePlugin()
+{
+    m_dirtyRect = m_frameRect;
+    paint();
+}
+
 void PluginControllerProxy::setFocus(bool hasFocus)
 {
     m_plugin->setFocus(hasFocus);
+}
+
+void PluginControllerProxy::didUpdate()
+{
+    m_waitingForDidUpdate = false;
+    startPaintTimer();
+}
+
+void PluginControllerProxy::getPluginScriptableNPObject(uint64_t& pluginScriptableNPObjectID)
+{
+    NPObject* pluginScriptableNPObject = m_plugin->pluginScriptableNPObject();
+    if (!pluginScriptableNPObject) {
+        pluginScriptableNPObjectID = 0;
+        return;
+    }
+    
+    pluginScriptableNPObjectID = m_connection->npRemoteObjectMap()->registerNPObject(pluginScriptableNPObject);
+    releaseNPObject(pluginScriptableNPObject);
 }
 
 #if PLATFORM(MAC)
@@ -261,6 +371,11 @@ void PluginControllerProxy::windowVisibilityChanged(bool isVisible)
     m_plugin->windowVisibilityChanged(isVisible);
 }
 #endif
+
+void PluginControllerProxy::privateBrowsingStateChanged(bool isPrivateBrowsingEnabled)
+{
+    m_plugin->privateBrowsingStateChanged(isPrivateBrowsingEnabled);
+}
 
 } // namespace WebKit
 

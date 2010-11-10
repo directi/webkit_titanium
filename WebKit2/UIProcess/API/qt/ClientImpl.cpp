@@ -48,7 +48,7 @@ void qt_wk_didReceiveServerRedirectForProvisionalLoadForFrame(WKPageRef page, WK
 {
 }
 
-void qt_wk_didFailProvisionalLoadWithErrorForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void* clientInfo)
+void qt_wk_didFailProvisionalLoadWithErrorForFrame(WKPageRef page, WKFrameRef frame, WKErrorRef error, WKTypeRef userData, const void* clientInfo)
 {
 }
 
@@ -56,7 +56,7 @@ void qt_wk_didCommitLoadForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef use
 {
     if (!WKFrameIsMainFrame(frame))
         return;
-    WebFrameProxy* wkframe = toWK(frame);
+    WebFrameProxy* wkframe = toImpl(frame);
     QString urlStr(wkframe->url());
     QUrl qUrl = urlStr;
     emit toQWKPage(clientInfo)->urlChanged(qUrl);
@@ -76,7 +76,7 @@ void qt_wk_didFinishLoadForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef use
     QWKPagePrivate::get(toQWKPage(clientInfo))->updateNavigationActions();
 }
 
-void qt_wk_didFailLoadWithErrorForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void* clientInfo)
+void qt_wk_didFailLoadWithErrorForFrame(WKPageRef page, WKFrameRef frame, WKErrorRef error, WKTypeRef userData, const void* clientInfo)
 {
     if (!WKFrameIsMainFrame(frame))
         return;
@@ -134,7 +134,7 @@ void qt_wk_didBecomeResponsive(WKPageRef page, const void* clientInfo)
 {
 }
 
-WKPageRef qt_wk_createNewPage(WKPageRef page, const void* clientInfo)
+WKPageRef qt_wk_createNewPage(WKPageRef page, WKDictionaryRef features, WKEventModifiers modifiers, WKEventMouseButton mouseButton, const void* clientInfo)
 {
     QWKPage* wkPage = toQWKPage(clientInfo);
     QWKPagePrivate* d = QWKPagePrivate::get(wkPage);

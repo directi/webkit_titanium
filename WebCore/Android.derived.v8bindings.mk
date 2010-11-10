@@ -141,6 +141,7 @@ GEN := \
     $(intermediates)/bindings/V8Blob.h \
     $(intermediates)/bindings/V8BlobBuilder.h \
     $(intermediates)/bindings/V8DOMTokenList.h \
+    $(intermediates)/bindings/V8DOMSettableTokenList.h \
     $(intermediates)/bindings/V8DataGridColumn.h \
     $(intermediates)/bindings/V8DataGridColumnList.h \
     $(intermediates)/bindings/V8File.h \
@@ -198,6 +199,7 @@ GEN := \
     $(intermediates)/bindings/V8HTMLOptGroupElement.h \
     $(intermediates)/bindings/V8HTMLOptionElement.h \
     $(intermediates)/bindings/V8HTMLOptionsCollection.h \
+    $(intermediates)/bindings/V8HTMLOutputElement.h \
     $(intermediates)/bindings/V8HTMLParagraphElement.h \
     $(intermediates)/bindings/V8HTMLParamElement.h \
     $(intermediates)/bindings/V8HTMLPreElement.h \
@@ -502,7 +504,6 @@ GEN += \
     $(intermediates)/bindings/V8SVGAnimatedLengthList.h \
     $(intermediates)/bindings/V8SVGAnimatedNumber.h \
     $(intermediates)/bindings/V8SVGAnimatedNumberList.h \
-    $(intermediates)/bindings/V8SVGAnimatedPoints.h \
     $(intermediates)/bindings/V8SVGAnimatedPreserveAspectRatio.h \
     $(intermediates)/bindings/V8SVGAnimatedRect.h \
     $(intermediates)/bindings/V8SVGAnimatedString.h \

@@ -22,7 +22,7 @@
 #ifndef JSImmediate_h
 #define JSImmediate_h
 
-#if !USE(JSVALUE32_64)
+#if USE(JSVALUE64)
 
 #include <wtf/Assertions.h>
 #include <wtf/AlwaysInline.h>
@@ -39,12 +39,10 @@ namespace JSC {
 
     class ExecState;
     class JSCell;
-    class JSFastMath;
     class JSGlobalData;
     class JSObject;
     class UString;
 
-#if USE(JSVALUE64)
     inline intptr_t reinterpretDoubleToIntptr(double value)
     {
         return WTF::bitwise_cast<intptr_t>(value);
@@ -54,7 +52,6 @@ namespace JSC {
     {
         return WTF::bitwise_cast<double>(value);
     }
-#endif
 
     /*
      * A JSValue* is either a pointer to a cell (a heap-allocated object) or an immediate (a type-tagged 
@@ -135,7 +132,6 @@ namespace JSC {
     private:
         friend class JIT;
         friend class JSValue;
-        friend class JSFastMath;
         friend class JSInterfaceJIT;
         friend class SpecializedThunkJIT;
         friend JSValue jsNumber(ExecState* exec, double d);
@@ -159,16 +155,12 @@ namespace JSC {
         friend JSValue jsNumber(JSGlobalData* globalData, long long i);
         friend JSValue jsNumber(JSGlobalData* globalData, unsigned long long i);
 
-#if USE(JSVALUE64)
         // If all bits in the mask are set, this indicates an integer number,
         // if any but not all are set this value is a double precision number.
         static const intptr_t TagTypeNumber = 0xffff000000000000ll;
         // This value is 2^48, used to encode doubles such that the encoded value will begin
         // with a 16-bit pattern within the range 0x0001..0xFFFE.
         static const intptr_t DoubleEncodeOffset = 0x1000000000000ll;
-#elif USE(JSVALUE32)
-        static const intptr_t TagTypeNumber = 0x1; // bottom bit set indicates integer, this dominates the following bit
-#endif
         static const intptr_t TagBitTypeOther   = 0x2; // second bit set indicates immediate other than an integer
         static const intptr_t TagMask           = TagTypeNumber | TagBitTypeOther;
 
@@ -181,11 +173,7 @@ namespace JSC {
         static const intptr_t FullTagTypeUndefined = TagBitTypeOther | ExtendedTagBitUndefined;
         static const intptr_t FullTagTypeNull      = TagBitTypeOther;
 
-#if USE(JSVALUE64)
         static const int32_t IntegerPayloadShift  = 0;
-#else
-        static const int32_t IntegerPayloadShift  = 1;
-#endif
         static const int32_t ExtendedPayloadShift = 4;
 
         static const intptr_t ExtendedPayloadBitBoolValue = 1 << ExtendedPayloadShift;
@@ -204,19 +192,13 @@ namespace JSC {
 
         static ALWAYS_INLINE bool isIntegerNumber(JSValue v)
         {
-#if USE(JSVALUE64)
             return (rawValue(v) & TagTypeNumber) == TagTypeNumber;
-#else
-            return isNumber(v);
-#endif
         }
 
-#if USE(JSVALUE64)
         static ALWAYS_INLINE bool isDouble(JSValue v)
         {
             return isNumber(v) && !isIntegerNumber(v);
         }
-#endif
 
         static ALWAYS_INLINE bool isPositiveIntegerNumber(JSValue v)
         {
@@ -260,11 +242,7 @@ namespace JSC {
 
         static ALWAYS_INLINE bool areBothImmediateIntegerNumbers(JSValue v1, JSValue v2)
         {
-#if USE(JSVALUE64)
             return (rawValue(v1) & rawValue(v2) & TagTypeNumber) == TagTypeNumber;
-#else
-            return rawValue(v1) & rawValue(v2) & TagTypeNumber;
-#endif
         }
 
         static double toDouble(JSValue);
@@ -285,13 +263,8 @@ namespace JSC {
         static JSValue oneImmediate();
 
     private:
-#if USE(JSVALUE64)
         static const int minImmediateInt = ((-INT_MAX) - 1);
         static const int maxImmediateInt = INT_MAX;
-#else
-        static const int minImmediateInt = ((-INT_MAX) - 1) >> IntegerPayloadShift;
-        static const int maxImmediateInt = INT_MAX >> IntegerPayloadShift;
-#endif
         static const unsigned maxImmediateUInt = maxImmediateInt;
 
         static ALWAYS_INLINE JSValue makeValue(intptr_t integer)
@@ -302,21 +275,15 @@ namespace JSC {
         // With USE(JSVALUE64) we want the argument to be zero extended, so the
         // integer doesn't interfere with the tag bits in the upper word.  In the default encoding,
         // if intptr_t id larger then int32_t we sign extend the value through the upper word.
-#if USE(JSVALUE64)
         static ALWAYS_INLINE JSValue makeInt(uint32_t value)
-#else
-        static ALWAYS_INLINE JSValue makeInt(int32_t value)
-#endif
         {
             return makeValue((static_cast<intptr_t>(value) << IntegerPayloadShift) | TagTypeNumber);
         }
         
-#if USE(JSVALUE64)
         static ALWAYS_INLINE JSValue makeDouble(double value)
         {
             return makeValue(reinterpretDoubleToIntptr(value) + DoubleEncodeOffset);
         }
-#endif
         
         static ALWAYS_INLINE JSValue makeBool(bool b)
         {
@@ -336,12 +303,10 @@ namespace JSC {
         template<typename T>
         static JSValue fromNumberOutsideIntegerRange(T);
 
-#if USE(JSVALUE64)
         static ALWAYS_INLINE double doubleValue(JSValue v)
         {
             return reinterpretIntptrToDouble(rawValue(v) - DoubleEncodeOffset);
         }
-#endif
 
         static ALWAYS_INLINE int32_t intValue(JSValue v)
         {
@@ -371,7 +336,6 @@ namespace JSC {
     ALWAYS_INLINE JSValue JSImmediate::zeroImmediate() { return makeInt(0); }
     ALWAYS_INLINE JSValue JSImmediate::oneImmediate() { return makeInt(1); }
 
-#if USE(JSVALUE64)
     inline bool doubleToBoolean(double value)
     {
         return value < 0.0 || value > 0.0;
@@ -383,13 +347,6 @@ namespace JSC {
         return isNumber(v) ? isIntegerNumber(v) ? v != zeroImmediate()
             : doubleToBoolean(doubleValue(v)) : v == trueImmediate();
     }
-#else
-    ALWAYS_INLINE bool JSImmediate::toBoolean(JSValue v)
-    {
-        ASSERT(isImmediate(v));
-        return isIntegerNumber(v) ? v != zeroImmediate() : v == trueImmediate();
-    }
-#endif
 
     ALWAYS_INLINE uint32_t JSImmediate::getTruncatedUInt32(JSValue v)
     {
@@ -398,19 +355,11 @@ namespace JSC {
         return intValue(v);
     }
 
-#if USE(JSVALUE64)
     template<typename T>
     inline JSValue JSImmediate::fromNumberOutsideIntegerRange(T value)
     {
         return makeDouble(static_cast<double>(value));
     }
-#else
-    template<typename T>
-    inline JSValue JSImmediate::fromNumberOutsideIntegerRange(T)
-    {
-        return JSValue();
-    }
-#endif
 
     ALWAYS_INLINE JSValue JSImmediate::from(char i)
     {
@@ -439,10 +388,6 @@ namespace JSC {
 
     ALWAYS_INLINE JSValue JSImmediate::from(int i)
     {
-#if !USE(JSVALUE64)
-        if ((i < minImmediateInt) | (i > maxImmediateInt))
-            return fromNumberOutsideIntegerRange(i);
-#endif
         return makeInt(i);
     }
 
@@ -505,14 +450,10 @@ namespace JSC {
         if (isIntegerNumber(v))
             return intValue(v);
 
-#if USE(JSVALUE64)
         if (isNumber(v)) {
             ASSERT(isDouble(v));
             return doubleValue(v);
         }
-#else
-        ASSERT(!isNumber(v));
-#endif
 
         if (rawValue(v) == FullTagTypeUndefined)
             return nonInlineNaN();
@@ -620,104 +561,8 @@ namespace JSC {
         return JSImmediate::getTruncatedUInt32(asValue());
     }
 
-    class JSFastMath {
-    public:
-        static ALWAYS_INLINE bool canDoFastBitwiseOperations(JSValue v1, JSValue v2)
-        {
-            return JSImmediate::areBothImmediateIntegerNumbers(v1, v2);
-        }
-
-        static ALWAYS_INLINE JSValue equal(JSValue v1, JSValue v2)
-        {
-            ASSERT(canDoFastBitwiseOperations(v1, v2));
-            return jsBoolean(v1 == v2);
-        }
-
-        static ALWAYS_INLINE JSValue notEqual(JSValue v1, JSValue v2)
-        {
-            ASSERT(canDoFastBitwiseOperations(v1, v2));
-            return jsBoolean(v1 != v2);
-        }
-
-        static ALWAYS_INLINE JSValue andImmediateNumbers(JSValue v1, JSValue v2)
-        {
-            ASSERT(canDoFastBitwiseOperations(v1, v2));
-            return JSImmediate::makeValue(JSImmediate::rawValue(v1) & JSImmediate::rawValue(v2));
-        }
-
-        static ALWAYS_INLINE JSValue xorImmediateNumbers(JSValue v1, JSValue v2)
-        {
-            ASSERT(canDoFastBitwiseOperations(v1, v2));
-            return JSImmediate::makeValue((JSImmediate::rawValue(v1) ^ JSImmediate::rawValue(v2)) | JSImmediate::TagTypeNumber);
-        }
-
-        static ALWAYS_INLINE JSValue orImmediateNumbers(JSValue v1, JSValue v2)
-        {
-            ASSERT(canDoFastBitwiseOperations(v1, v2));
-            return JSImmediate::makeValue(JSImmediate::rawValue(v1) | JSImmediate::rawValue(v2));
-        }
-
-        static ALWAYS_INLINE bool canDoFastRshift(JSValue v1, JSValue v2)
-        {
-            return JSImmediate::areBothImmediateIntegerNumbers(v1, v2);
-        }
-
-        static ALWAYS_INLINE bool canDoFastUrshift(JSValue v1, JSValue v2)
-        {
-            return JSImmediate::areBothImmediateIntegerNumbers(v1, v2) && !(JSImmediate::rawValue(v1) & JSImmediate::signBit);
-        }
-
-        static ALWAYS_INLINE JSValue rightShiftImmediateNumbers(JSValue val, JSValue shift)
-        {
-            ASSERT(canDoFastRshift(val, shift) || canDoFastUrshift(val, shift));
-#if USE(JSVALUE64)
-            return JSImmediate::makeValue(static_cast<intptr_t>(static_cast<uint32_t>(static_cast<int32_t>(JSImmediate::rawValue(val)) >> ((JSImmediate::rawValue(shift) >> JSImmediate::IntegerPayloadShift) & 0x1f))) | JSImmediate::TagTypeNumber);
-#else
-            return JSImmediate::makeValue((JSImmediate::rawValue(val) >> ((JSImmediate::rawValue(shift) >> JSImmediate::IntegerPayloadShift) & 0x1f)) | JSImmediate::TagTypeNumber);
-#endif
-        }
-
-        static ALWAYS_INLINE bool canDoFastAdditiveOperations(JSValue v)
-        {
-            // Number is non-negative and an operation involving two of these can't overflow.
-            // Checking for allowed negative numbers takes more time than it's worth on SunSpider.
-            return (JSImmediate::rawValue(v) & (JSImmediate::TagTypeNumber + (JSImmediate::signBit | (JSImmediate::signBit >> 1)))) == JSImmediate::TagTypeNumber;
-        }
-
-        static ALWAYS_INLINE bool canDoFastAdditiveOperations(JSValue v1, JSValue v2)
-        {
-            // Number is non-negative and an operation involving two of these can't overflow.
-            // Checking for allowed negative numbers takes more time than it's worth on SunSpider.
-            return canDoFastAdditiveOperations(v1) && canDoFastAdditiveOperations(v2);
-        }
-
-        static ALWAYS_INLINE JSValue addImmediateNumbers(JSValue v1, JSValue v2)
-        {
-            ASSERT(canDoFastAdditiveOperations(v1, v2));
-            return JSImmediate::makeValue(JSImmediate::rawValue(v1) + JSImmediate::rawValue(v2) - JSImmediate::TagTypeNumber);
-        }
-
-        static ALWAYS_INLINE JSValue subImmediateNumbers(JSValue v1, JSValue v2)
-        {
-            ASSERT(canDoFastAdditiveOperations(v1, v2));
-            return JSImmediate::makeValue(JSImmediate::rawValue(v1) - JSImmediate::rawValue(v2) + JSImmediate::TagTypeNumber);
-        }
-
-        static ALWAYS_INLINE JSValue incImmediateNumber(JSValue v)
-        {
-            ASSERT(canDoFastAdditiveOperations(v));
-            return JSImmediate::makeValue(JSImmediate::rawValue(v) + (1 << JSImmediate::IntegerPayloadShift));
-        }
-
-        static ALWAYS_INLINE JSValue decImmediateNumber(JSValue v)
-        {
-            ASSERT(canDoFastAdditiveOperations(v));
-            return JSImmediate::makeValue(JSImmediate::rawValue(v) - (1 << JSImmediate::IntegerPayloadShift));
-        }
-    };
-
 } // namespace JSC
 
-#endif // !USE(JSVALUE32_64)
+#endif // USE(JSVALUE64)
 
 #endif // JSImmediate_h

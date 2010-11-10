@@ -27,15 +27,14 @@
 
 #include "ActivateFonts.h"
 #include "InjectedBundlePage.h"
+#include "StringFunctions.h"
 #include <WebKit2/WKBundle.h>
 #include <WebKit2/WKBundlePage.h>
 #include <WebKit2/WKBundlePagePrivate.h>
 #include <WebKit2/WKBundlePrivate.h>
 #include <WebKit2/WKRetainPtr.h>
-#include <WebKit2/WKStringCF.h>
 #include <WebKit2/WebKit2.h>
 #include <wtf/PassOwnPtr.h>
-#include <wtf/RetainPtr.h>
 #include <wtf/Vector.h>
 
 namespace WTR {
@@ -48,22 +47,21 @@ InjectedBundle& InjectedBundle::shared()
 
 InjectedBundle::InjectedBundle()
     : m_bundle(0)
-    , m_mainPage(0)
     , m_state(Idle)
 {
 }
 
-void InjectedBundle::_didCreatePage(WKBundleRef bundle, WKBundlePageRef page, const void* clientInfo)
+void InjectedBundle::didCreatePage(WKBundleRef bundle, WKBundlePageRef page, const void* clientInfo)
 {
     static_cast<InjectedBundle*>(const_cast<void*>(clientInfo))->didCreatePage(page);
 }
 
-void InjectedBundle::_willDestroyPage(WKBundleRef bundle, WKBundlePageRef page, const void* clientInfo)
+void InjectedBundle::willDestroyPage(WKBundleRef bundle, WKBundlePageRef page, const void* clientInfo)
 {
     static_cast<InjectedBundle*>(const_cast<void*>(clientInfo))->willDestroyPage(page);
 }
 
-void InjectedBundle::_didReceiveMessage(WKBundleRef bundle, WKStringRef messageName, WKTypeRef messageBody, const void *clientInfo)
+void InjectedBundle::didReceiveMessage(WKBundleRef bundle, WKStringRef messageName, WKTypeRef messageBody, const void *clientInfo)
 {
     static_cast<InjectedBundle*>(const_cast<void*>(clientInfo))->didReceiveMessage(messageName, messageBody);
 }
@@ -75,9 +73,9 @@ void InjectedBundle::initialize(WKBundleRef bundle)
     WKBundleClient client = {
         0,
         this,
-        _didCreatePage,
-        _willDestroyPage,
-        _didReceiveMessage
+        didCreatePage,
+        willDestroyPage,
+        didReceiveMessage
     };
     WKBundleSetClient(m_bundle, &client);
 
@@ -87,36 +85,42 @@ void InjectedBundle::initialize(WKBundleRef bundle)
 
 void InjectedBundle::didCreatePage(WKBundlePageRef page)
 {
-    // FIXME: we really need the main page ref to be sent over from the ui process
-    OwnPtr<InjectedBundlePage> pageWrapper = adoptPtr(new InjectedBundlePage(page));
-    if (!m_mainPage)
-        m_mainPage = pageWrapper.release();
-    else
-        m_otherPages.add(page, pageWrapper.leakPtr());
+    m_pages.append(adoptPtr(new InjectedBundlePage(page)));
 }
 
 void InjectedBundle::willDestroyPage(WKBundlePageRef page)
 {
-    if (m_mainPage && m_mainPage->page() == page)
-        m_mainPage.clear();
-    else
-        delete m_otherPages.take(page);
+    size_t size = m_pages.size();
+    for (size_t i = 0; i < size; ++i) {
+        if (m_pages[i]->page() == page) {
+            m_pages.remove(i);
+            break;
+        }
+    }
+}
+
+InjectedBundlePage* InjectedBundle::page() const
+{
+    // It might be better to have the UI process send over a reference to the main
+    // page instead of just assuming it's the first one.
+    return m_pages[0].get();
 }
 
 void InjectedBundle::didReceiveMessage(WKStringRef messageName, WKTypeRef messageBody)
 {
-    CFStringRef cfMessage = WKStringCopyCFString(0, messageName);
-    if (CFEqual(cfMessage, CFSTR("BeginTest"))) {
-        WKRetainPtr<WKStringRef> ackMessageName(AdoptWK, WKStringCreateWithCFString(CFSTR("Ack")));
-        WKRetainPtr<WKStringRef> ackMessageBody(AdoptWK, WKStringCreateWithCFString(CFSTR("BeginTest")));
+    if (WKStringIsEqualToUTF8CString(messageName, "BeginTest")) {
+        ASSERT(!messageBody);
+
+        WKRetainPtr<WKStringRef> ackMessageName(AdoptWK, WKStringCreateWithUTF8CString("Ack"));
+        WKRetainPtr<WKStringRef> ackMessageBody(AdoptWK, WKStringCreateWithUTF8CString("BeginTest"));
         WKBundlePostMessage(m_bundle, ackMessageName.get(), ackMessageBody.get());
 
         beginTesting();
         return;
     }
 
-    WKRetainPtr<WKStringRef> errorMessageName(AdoptWK, WKStringCreateWithCFString(CFSTR("Error")));
-    WKRetainPtr<WKStringRef> errorMessageBody(AdoptWK, WKStringCreateWithCFString(CFSTR("Unknown")));
+    WKRetainPtr<WKStringRef> errorMessageName(AdoptWK, WKStringCreateWithUTF8CString("Error"));
+    WKRetainPtr<WKStringRef> errorMessageBody(AdoptWK, WKStringCreateWithUTF8CString("Unknown"));
     WKBundlePostMessage(m_bundle, errorMessageName.get(), errorMessageBody.get());
 }
 
@@ -135,18 +139,17 @@ void InjectedBundle::beginTesting()
 
     WKBundleRemoveAllUserContent(m_bundle);
 
-    m_mainPage->reset();
+    page()->reset();
 }
 
 void InjectedBundle::done()
 {
-    m_mainPage->stopLoading();
+    m_state = Stopping;
 
-    WKRetainPtr<WKStringRef> doneMessageName(AdoptWK, WKStringCreateWithCFString(CFSTR("Done")));
+    page()->stopLoading();
 
-    std::string output = m_outputStream.str();
-    RetainPtr<CFStringRef> outputCFString(AdoptCF, CFStringCreateWithCString(0, output.c_str(), kCFStringEncodingUTF8));
-    WKRetainPtr<WKStringRef> doneMessageBody(AdoptWK, WKStringCreateWithCFString(outputCFString.get()));
+    WKRetainPtr<WKStringRef> doneMessageName(AdoptWK, WKStringCreateWithUTF8CString("Done"));
+    WKRetainPtr<WKStringRef> doneMessageBody(AdoptWK, WKStringCreateWithUTF8CString(m_outputStream.str().c_str()));
 
     WKBundlePostMessage(m_bundle, doneMessageName.get(), doneMessageBody.get());
 
@@ -155,10 +158,20 @@ void InjectedBundle::done()
 
 void InjectedBundle::closeOtherPages()
 {
-    Vector<WKBundlePageRef> pages;
-    copyKeysToVector(m_otherPages, pages);
-    for (size_t i = 0; i < pages.size(); ++i)
-        WKBundlePageClose(pages[i]);
+    Vector<WKBundlePageRef> pagesToClose;
+    size_t size = m_pages.size();
+    for (size_t i = 1; i < size; ++i)
+        pagesToClose.append(m_pages[i]->page());
+    size = pagesToClose.size();
+    for (size_t i = 0; i < size; ++i)
+        WKBundlePageClose(pagesToClose[i]);
+}
+
+void InjectedBundle::dumpBackForwardListsForAllPages()
+{
+    size_t size = m_pages.size();
+    for (size_t i = 0; i < size; ++i)
+        m_pages[i]->dumpBackForwardList();
 }
 
 } // namespace WTR

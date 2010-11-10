@@ -50,6 +50,8 @@ rect: style.getPropertyValue(border-top-width) : 0px
 rect: style.getPropertyCSSValue(border-top-width) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(bottom) : auto
 rect: style.getPropertyCSSValue(bottom) : [object CSSPrimitiveValue]
+rect: style.getPropertyValue(box-sizing) : content-box
+rect: style.getPropertyCSSValue(box-sizing) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(caption-side) : top
 rect: style.getPropertyCSSValue(caption-side) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(clear) : none
@@ -214,8 +216,6 @@ rect: style.getPropertyValue(-webkit-background-origin) : padding-box
 rect: style.getPropertyCSSValue(-webkit-background-origin) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-background-size) : auto auto
 rect: style.getPropertyCSSValue(-webkit-background-size) : [object CSSValueList]
-rect: style.getPropertyValue(-webkit-block-flow) : tb
-rect: style.getPropertyCSSValue(-webkit-block-flow) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-border-fit) : border
 rect: style.getPropertyCSSValue(-webkit-border-fit) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-border-horizontal-spacing) : 0px
@@ -244,8 +244,6 @@ rect: style.getPropertyValue(-webkit-box-reflect) : none
 rect: style.getPropertyCSSValue(-webkit-box-reflect) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-box-shadow) : none
 rect: style.getPropertyCSSValue(-webkit-box-shadow) : [object CSSPrimitiveValue]
-rect: style.getPropertyValue(-webkit-box-sizing) : content-box
-rect: style.getPropertyCSSValue(-webkit-box-sizing) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-color-correction) : default
 rect: style.getPropertyCSSValue(-webkit-color-correction) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-column-break-after) : auto
@@ -314,6 +312,8 @@ rect: style.getPropertyValue(-webkit-perspective-origin) : 0px 0px
 rect: style.getPropertyCSSValue(-webkit-perspective-origin) : [object CSSValueList]
 rect: style.getPropertyValue(-webkit-rtl-ordering) : logical
 rect: style.getPropertyCSSValue(-webkit-rtl-ordering) : [object CSSPrimitiveValue]
+rect: style.getPropertyValue(-webkit-text-combine) : none
+rect: style.getPropertyCSSValue(-webkit-text-combine) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-text-decorations-in-effect) : none
 rect: style.getPropertyCSSValue(-webkit-text-decorations-in-effect) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-text-fill-color) : rgb(0, 0, 0)
@@ -344,6 +344,8 @@ rect: style.getPropertyValue(-webkit-user-modify) : read-only
 rect: style.getPropertyCSSValue(-webkit-user-modify) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-user-select) : text
 rect: style.getPropertyCSSValue(-webkit-user-select) : [object CSSPrimitiveValue]
+rect: style.getPropertyValue(-webkit-writing-mode) : horizontal-tb
+rect: style.getPropertyCSSValue(-webkit-writing-mode) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(clip-path) : none
 rect: style.getPropertyCSSValue(clip-path) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(clip-rule) : nonzero
@@ -472,6 +474,8 @@ g: style.getPropertyValue(border-top-width) : 0px
 g: style.getPropertyCSSValue(border-top-width) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(bottom) : auto
 g: style.getPropertyCSSValue(bottom) : [object CSSPrimitiveValue]
+g: style.getPropertyValue(box-sizing) : content-box
+g: style.getPropertyCSSValue(box-sizing) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(caption-side) : top
 g: style.getPropertyCSSValue(caption-side) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(clear) : none
@@ -636,8 +640,6 @@ g: style.getPropertyValue(-webkit-background-origin) : padding-box
 g: style.getPropertyCSSValue(-webkit-background-origin) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-background-size) : auto auto
 g: style.getPropertyCSSValue(-webkit-background-size) : [object CSSValueList]
-g: style.getPropertyValue(-webkit-block-flow) : tb
-g: style.getPropertyCSSValue(-webkit-block-flow) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-border-fit) : border
 g: style.getPropertyCSSValue(-webkit-border-fit) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-border-horizontal-spacing) : 0px
@@ -666,8 +668,6 @@ g: style.getPropertyValue(-webkit-box-reflect) : none
 g: style.getPropertyCSSValue(-webkit-box-reflect) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-box-shadow) : none
 g: style.getPropertyCSSValue(-webkit-box-shadow) : [object CSSPrimitiveValue]
-g: style.getPropertyValue(-webkit-box-sizing) : content-box
-g: style.getPropertyCSSValue(-webkit-box-sizing) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-color-correction) : default
 g: style.getPropertyCSSValue(-webkit-color-correction) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-column-break-after) : auto
@@ -736,6 +736,8 @@ g: style.getPropertyValue(-webkit-perspective-origin) : 0px 0px
 g: style.getPropertyCSSValue(-webkit-perspective-origin) : [object CSSValueList]
 g: style.getPropertyValue(-webkit-rtl-ordering) : logical
 g: style.getPropertyCSSValue(-webkit-rtl-ordering) : [object CSSPrimitiveValue]
+g: style.getPropertyValue(-webkit-text-combine) : none
+g: style.getPropertyCSSValue(-webkit-text-combine) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-text-decorations-in-effect) : none
 g: style.getPropertyCSSValue(-webkit-text-decorations-in-effect) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-text-fill-color) : rgb(0, 0, 0)
@@ -766,6 +768,8 @@ g: style.getPropertyValue(-webkit-user-modify) : read-only
 g: style.getPropertyCSSValue(-webkit-user-modify) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-user-select) : text
 g: style.getPropertyCSSValue(-webkit-user-select) : [object CSSPrimitiveValue]
+g: style.getPropertyValue(-webkit-writing-mode) : horizontal-tb
+g: style.getPropertyCSSValue(-webkit-writing-mode) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(clip-path) : none
 g: style.getPropertyCSSValue(clip-path) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(clip-rule) : nonzero

@@ -31,6 +31,15 @@
 #include "Connection.h"
 #include "Plugin.h"
 
+#if PLATFORM(MAC)
+#include <wtf/RetainPtr.h>
+#ifdef __OBJC__
+@class CALayer;
+#else
+class CALayer;
+#endif
+#endif
+
 namespace WebCore {
     class HTTPHeaderMap;
 }
@@ -38,6 +47,7 @@ namespace WebCore {
 namespace WebKit {
 
 class BackingStore;
+class NPVariantData;
 class PluginProcessConnection;
 
 class PluginProxy : public Plugin {
@@ -49,6 +59,7 @@ public:
     void pluginProcessCrashed();
 
     void didReceivePluginProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments);
+    CoreIPC::SyncReplyMode didReceiveSyncPluginProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
 
 private:
     explicit PluginProxy(PassRefPtr<PluginProcessConnection>);
@@ -77,6 +88,7 @@ private:
     virtual bool handleWheelEvent(const WebWheelEvent&);
     virtual bool handleMouseEnterEvent(const WebMouseEvent&);
     virtual bool handleMouseLeaveEvent(const WebMouseEvent&);
+    virtual bool handleKeyboardEvent(const WebKeyboardEvent&);
     virtual void setFocus(bool);
     virtual NPObject* pluginScriptableNPObject();
 #if PLATFORM(MAC)
@@ -85,11 +97,21 @@ private:
     virtual void windowVisibilityChanged(bool);
 #endif
 
+    virtual void privateBrowsingStateChanged(bool);
+
     virtual PluginController* controller();
+
+    bool needsBackingStore() const;
 
     // Message handlers.
     void loadURL(uint64_t requestID, const String& method, const String& urlString, const String& target, const WebCore::HTTPHeaderMap& headerFields, const Vector<uint8_t>& httpBody, bool allowPopups);
     void update(const WebCore::IntRect& paintedRect);
+    void proxiesForURL(const String& urlString, String& proxyString);
+    void cookiesForURL(const String& urlString, String& cookieString);
+    void setCookiesForURL(const String& urlString, const String& cookieString);
+    void getWindowScriptNPObject(uint64_t& windowScriptNPObjectID);
+    void getPluginElementNPObject(uint64_t& pluginElementNPObjectID);
+    void evaluate(const NPVariantData& npObjectAsVariantData, const String& scriptString, bool allowPopups, bool& returnValue, NPVariantData& resultData);
 
     RefPtr<PluginProcessConnection> m_connection;
     uint64_t m_pluginInstanceID;
@@ -105,8 +127,21 @@ private:
     // This is the shared memory backing store that the plug-in paints into. When the plug-in tells us
     // that it's painted something in it, we'll blit from it to our own backing store.
     RefPtr<BackingStore> m_pluginBackingStore;
+    
+    // Whether all of the plug-in backing store contains valid data.
+    bool m_pluginBackingStoreContainsValidData;
 
     bool m_isStarted;
+
+    // Whether we're called invalidate in response to an update call, and are now waiting for a paint call.
+    bool m_waitingForPaintInResponseToUpdate;
+
+    // The client ID for the CA layer in the plug-in process. Will be 0 if the plug-in is not a CA plug-in.
+    uint32_t m_remoteLayerClientID;
+
+#if PLATFORM(MAC)
+    RetainPtr<CALayer> m_pluginLayer;
+#endif
 };
 
 } // namespace WebKit

@@ -35,22 +35,24 @@ messages -> WebPage {
     GoBack(uint64_t backForwardItemID)
     GoForward(uint64_t backForwardItemID)
     GoToBackForwardItem(uint64_t backForwardItemID)
-    LoadHTMLString(WTF::String htmlString, WTF::String url)
+    LoadHTMLString(WTF::String htmlString, WTF::String baseURL)
+    LoadAlternateHTMLString(WTF::String htmlString, WTF::String baseURL, WTF::String unreachableURL); 
     LoadPlainTextString(WTF::String string)
     LoadURL(WTF::String url)
     LoadURLRequest(WebCore::ResourceRequest request)
     Reload(bool reloadFromOrigin)
     StopLoading()
 
-    DidReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction)
+    DidReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction, uint64_t downloadID)
 
+    # Callbacks.
     GetRenderTreeExternalRepresentation(uint64_t callbackID)
-
+    GetContentsAsString(uint64_t callbackID)
     GetSourceForFrame(uint64_t frameID, uint64_t callbackID)
+    RunJavaScriptInMainFrame(WTF::String script, uint64_t callbackID)
+
 
     PreferencesDidChange(WebKit::WebPreferencesStore store)
-
-    RunJavaScriptInMainFrame(WTF::String script, uint64_t callbackID)
 
     SetCustomUserAgent(WTF::String customUserAgent)
 
@@ -67,6 +69,19 @@ messages -> WebPage {
     SetPageAndTextZoomFactors(double pageZoomFactor, double textZoomFactor)
     SetPageZoomFactor(double zoomFactor)
     SetTextZoomFactor(double zoomFactor)
+
+    ScaleWebView(double scale)
+
+    # Find.
+    FindString(WTF::String string, uint32_t findDirection, uint32_t findOptions, unsigned maxMatchCount)
+    HideFindUI()
+    CountStringMatches(WTF::String string, bool caseInsensitive, unsigned maxMatchCount)
+
+    # Popup menu.
+    DidChangeSelectedIndexForActivePopupMenu(int32_t newIndex);
+    
+    # Context menu.
+    DidSelectItemFromActiveContextMenu(WebKit::WebContextMenuItemData menuItem);
 
     SetWindowResizerSize(WebCore::IntSize intersectsView)
 

@@ -118,7 +118,7 @@ inline int getOffsetHeight(RenderObject* obj)
     return 0;
 }
 
-void  RenderMathMLUnderOver::stretchToHeight(int height)
+void RenderMathMLUnderOver::stretchToHeight(int height)
 {
 
     RenderObject* base = firstChild();
@@ -138,9 +138,7 @@ void  RenderMathMLUnderOver::stretchToHeight(int height)
     if (base && base->isRenderMathMLBlock()) {
         RenderMathMLBlock* block = toRenderMathMLBlock(base);
         block->stretchToHeight(height);
-        updateBoxModelInfoFromStyle();
-        setNeedsLayoutAndPrefWidthsRecalc();
-        markContainingBlocksForLayout();
+        setNeedsLayout(true);
     }
 }
 
@@ -157,7 +155,10 @@ void RenderMathMLUnderOver::layout()
         if (over) {
             // FIXME: descending glyphs intrude into base (e.g. lowercase y over base)
             // FIXME: bases that ascend higher than the line box intrude into the over
-            int overSpacing = static_cast<int>(gOverSpacingAdjustment * (getOffsetHeight(over) - over->firstChild()->baselinePosition(true)));
+            if (!over->firstChild()->isBoxModelObject())
+                break;
+            
+            int overSpacing = static_cast<int>(gOverSpacingAdjustment * (getOffsetHeight(over) - toRenderBoxModelObject(over->firstChild())->baselinePosition(true, HorizontalLine)));
             
             // base row wrapper
             base = over->nextSibling();
@@ -182,9 +183,12 @@ void RenderMathMLUnderOver::layout()
             int baseHeight = getOffsetHeight(base);
             // actual base
             base = base->firstChild();
+            if (!base->isBoxModelObject())
+                break;
+            
             // FIXME: We need to look at the space between a single maximum height of
             //        the line boxes and the baseline and squeeze them together
-            int underSpacing = baseHeight - base->baselinePosition(true);
+            int underSpacing = baseHeight - toRenderBoxModelObject(base)->baselinePosition(true, HorizontalLine);
             
             // adjust the base's intrusion into the under
             RenderObject* under = lastChild();
@@ -203,7 +207,9 @@ void RenderMathMLUnderOver::layout()
         if (over) {
             // FIXME: descending glyphs intrude into base (e.g. lowercase y over base)
             // FIXME: bases that ascend higher than the line box intrude into the over
-            int overSpacing = static_cast<int>(gOverSpacingAdjustment * (getOffsetHeight(over) - over->firstChild()->baselinePosition(true)));
+            if (!over->firstChild()->isBoxModelObject())
+                break;
+            int overSpacing = static_cast<int>(gOverSpacingAdjustment * (getOffsetHeight(over) - toRenderBoxModelObject(over->firstChild())->baselinePosition(true, HorizontalLine)));
             
             // base row wrapper
             base = over->nextSibling();
@@ -218,9 +224,12 @@ void RenderMathMLUnderOver::layout()
                 int baseHeight = getOffsetHeight(base);
                 // actual base
                 base = base->firstChild();
+                if (!base->isBoxModelObject())
+                    break;
+
                 // FIXME: We need to look at the space between a single maximum height of
                 //        the line boxes and the baseline and squeeze them together
-                int underSpacing = baseHeight - base->baselinePosition(true);
+                int underSpacing = baseHeight - toRenderBoxModelObject(base)->baselinePosition(true, HorizontalLine);
                 
                 RenderObject* under = lastChild();
                 if (under && under->firstChild()->isRenderInline() && underSpacing > 0)
@@ -230,15 +239,15 @@ void RenderMathMLUnderOver::layout()
         }
         break;
     }
-    setNeedsLayoutAndPrefWidthsRecalc();
+    setNeedsLayout(true);
     RenderBlock::layout();
 }
 
-int RenderMathMLUnderOver::baselinePosition(bool firstLine, bool isRootLineBox) const
+int RenderMathMLUnderOver::baselinePosition(bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
 {
     RenderObject* current = firstChild();
     if (!current)
-        return RenderBlock::baselinePosition(firstLine, isRootLineBox);
+        return RenderBlock::baselinePosition(firstLine, direction, linePositionMode);
 
     int baseline = 0;
     switch (m_kind) {
@@ -249,17 +258,17 @@ int RenderMathMLUnderOver::baselinePosition(bool firstLine, bool isRootLineBox) 
         if (current) {
             // actual base
             RenderObject* base = current->firstChild();
-            if (!base)
+            if (!base || !base->isBoxModelObject())
                 break;
-            baseline += base->baselinePosition(firstLine, isRootLineBox);
+            baseline += toRenderBoxModelObject(base)->baselinePosition(firstLine, HorizontalLine, linePositionMode);
             // added the negative top margin
             baseline += current->style()->marginTop().value();
         }
         break;
     case Under:
         RenderObject* base = current->firstChild();
-        if (base)
-            baseline += base->baselinePosition(true);
+        if (base && base->isBoxModelObject())
+            baseline += toRenderBoxModelObject(base)->baselinePosition(true, HorizontalLine);
     }
 
     // FIXME: Where is the extra 2-3px adjusted for zoom coming from?
@@ -271,7 +280,17 @@ int RenderMathMLUnderOver::baselinePosition(bool firstLine, bool isRootLineBox) 
 
 int RenderMathMLUnderOver::nonOperatorHeight() const 
 {
-    return 0;
+    int nonOperators = 0;
+    for (RenderObject* current = firstChild(); current; current = current->nextSibling()) {
+        if (current->firstChild()->isRenderMathMLBlock()) {
+            RenderMathMLBlock* block = toRenderMathMLBlock(current->firstChild());
+            if (!block->isRenderMathMLOperator()) 
+                nonOperators += getOffsetHeight(current);
+        } else {
+            nonOperators += getOffsetHeight(current);
+        }
+    }
+    return nonOperators;
 }
 
 }

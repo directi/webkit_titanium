@@ -59,18 +59,20 @@ JSValue JSCallbackData::invokeCallback(MarkedArgumentBuffer& args, bool* raisedE
         function = callback();
     }
     
-    globalObject()->globalData()->timeoutChecker.start();
+    globalObject()->globalData().timeoutChecker.start();
     ScriptExecutionContext* context = globalObject()->scriptExecutionContext();
     // We will fail to get the context if the frame has been detached.
     if (!context)
         return JSValue();
 
-    JSValue result = context->isDocument() 
+    bool contextIsDocument = context->isDocument();
+    JSValue result = contextIsDocument
         ? JSMainThreadExecState::call(exec, function, callType, callData, callback(), args)
         : JSC::call(exec, function, callType, callData, callback(), args);
-    globalObject()->globalData()->timeoutChecker.stop();
+    globalObject()->globalData().timeoutChecker.stop();
 
-    Document::updateStyleForAllDocuments();
+    if (contextIsDocument)
+        Document::updateStyleForAllDocuments();
 
     if (exec->hadException()) {
         reportCurrentException(exec);

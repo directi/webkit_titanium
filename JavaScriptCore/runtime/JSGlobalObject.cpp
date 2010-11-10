@@ -116,7 +116,7 @@ JSGlobalObject::~JSGlobalObject()
     for (HashSet<GlobalCodeBlock*>::const_iterator it = codeBlocks().begin(); it != end; ++it)
         (*it)->clearGlobalObject();
         
-    RegisterFile& registerFile = globalData()->interpreter->registerFile();
+    RegisterFile& registerFile = globalData().interpreter->registerFile();
     if (registerFile.clearGlobalObject(this))
         registerFile.setNumGlobals(0);
     d()->destructor(d());
@@ -204,6 +204,7 @@ void JSGlobalObject::reset(JSValue prototype)
 
     d()->functionPrototype = new (exec) FunctionPrototype(exec, this, FunctionPrototype::createStructure(jsNull())); // The real prototype will be set once ObjectPrototype is created.
     d()->prototypeFunctionStructure = PrototypeFunction::createStructure(d()->functionPrototype);
+    d()->internalFunctionStructure = InternalFunction::createStructure(d()->functionPrototype);
     NativeFunctionWrapper* callFunction = 0;
     NativeFunctionWrapper* applyFunction = 0;
     d()->functionPrototype->addFunctionProperties(exec, this, d()->prototypeFunctionStructure.get(), &callFunction, &applyFunction);
@@ -300,13 +301,13 @@ void JSGlobalObject::reset(JSValue prototype)
     // Set global values.
     GlobalPropertyInfo staticGlobals[] = {
         GlobalPropertyInfo(Identifier(exec, "Math"), new (exec) MathObject(exec, this, MathObject::createStructure(d()->objectPrototype)), DontEnum | DontDelete),
-        GlobalPropertyInfo(Identifier(exec, "NaN"), jsNaN(exec), DontEnum | DontDelete | ReadOnly),
-        GlobalPropertyInfo(Identifier(exec, "Infinity"), jsNumber(exec, Inf), DontEnum | DontDelete | ReadOnly),
+        GlobalPropertyInfo(Identifier(exec, "NaN"), jsNaN(), DontEnum | DontDelete | ReadOnly),
+        GlobalPropertyInfo(Identifier(exec, "Infinity"), jsNumber(Inf), DontEnum | DontDelete | ReadOnly),
         GlobalPropertyInfo(Identifier(exec, "undefined"), jsUndefined(), DontEnum | DontDelete | ReadOnly),
         GlobalPropertyInfo(Identifier(exec, "JSON"), new (exec) JSONObject(this, JSONObject::createStructure(d()->objectPrototype)), DontEnum | DontDelete)
     };
 
-    addStaticGlobals(staticGlobals, sizeof(staticGlobals) / sizeof(GlobalPropertyInfo));
+    addStaticGlobals(staticGlobals, WTF_ARRAY_LENGTH(staticGlobals));
 
     // Set global functions.
 
@@ -348,9 +349,9 @@ void JSGlobalObject::markChildren(MarkStack& markStack)
     for (HashSet<GlobalCodeBlock*>::const_iterator it = codeBlocks().begin(); it != end; ++it)
         (*it)->markAggregate(markStack);
 
-    RegisterFile& registerFile = globalData()->interpreter->registerFile();
+    RegisterFile& registerFile = globalData().interpreter->registerFile();
     if (registerFile.globalObject() == this)
-        registerFile.markGlobals(markStack, &globalData()->heap);
+        registerFile.markGlobals(markStack, &globalData().heap);
 
     markIfNeeded(markStack, d()->regExpConstructor);
     markIfNeeded(markStack, d()->errorConstructor);

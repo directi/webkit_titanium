@@ -94,10 +94,8 @@
 #import <WebCore/HTMLFrameElement.h>
 #import <WebCore/HTMLFrameOwnerElement.h>
 #import <WebCore/HTMLHeadElement.h>
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-#import <WebCore/HTMLMediaElement.h>
-#endif
 #import <WebCore/HTMLNames.h>
+#import <WebCore/HTMLParserIdioms.h>
 #import <WebCore/HTMLPlugInElement.h>
 #import <WebCore/HistoryItem.h>
 #import <WebCore/HitTestResult.h>
@@ -113,7 +111,6 @@
 #import <WebCore/ResourceLoader.h>
 #import <WebCore/ResourceRequest.h>
 #import <WebCore/ScriptController.h>
-#import <WebCore/ScriptString.h>
 #import <WebCore/SharedBuffer.h>
 #import <WebCore/WebCoreObjCExtras.h>
 #import <WebCore/Widget.h>
@@ -123,6 +120,10 @@
 #import <runtime/InitializeThreading.h>
 #import <wtf/PassRefPtr.h>
 #import <wtf/Threading.h>
+
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+#import <WebCore/HTMLMediaElement.h>
+#endif
 
 #if ENABLE(JAVA_BRIDGE)
 #import "WebJavaPlugIn.h"
@@ -696,7 +697,7 @@ void WebFrameLoaderClient::dispatchDidFirstVisuallyNonEmptyLayout()
         CallFrameLoadDelegate(implementations->didFirstVisuallyNonEmptyLayoutInFrameFunc, webView, @selector(webView:didFirstVisuallyNonEmptyLayoutInFrame:), m_webFrame.get());
 }
 
-Frame* WebFrameLoaderClient::dispatchCreatePage()
+Frame* WebFrameLoaderClient::dispatchCreatePage(const NavigationAction&)
 {
     WebView *currentWebView = getWebView(m_webFrame.get());
     NSDictionary *features = [[NSDictionary alloc] init];
@@ -1252,6 +1253,10 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
     }
 }
 
+void WebFrameLoaderClient::dispatchDidBecomeFrameset(bool)
+{
+}
+
 RetainPtr<WebFramePolicyListener> WebFrameLoaderClient::setUpPolicyListener(FramePolicyFunction function)
 {
     // FIXME: <rdar://5634381> We need to support multiple active policy listeners.
@@ -1384,11 +1389,16 @@ PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const KURL& url, const Strin
 
 void WebFrameLoaderClient::didTransferChildFrameToNewDocument(Page* oldPage)
 {
-    if (oldPage == core(m_webFrame.get())->page())
-        return;
+}
 
-    // Update resource tracking now that frame is in a different page.
-    // TODO(jennb): update resource tracking [bug 44713]
+void WebFrameLoaderClient::transferLoadingResourceFromPage(unsigned long identifier, DocumentLoader* loader, const ResourceRequest& request, Page* oldPage)
+{
+    ASSERT(oldPage != core(m_webFrame.get())->page());
+    ASSERT(![getWebView(m_webFrame.get()) _objectForIdentifier:identifier]);
+
+    assignIdentifierToInitialRequest(identifier, loader, request);
+
+    [kit(oldPage) _removeObjectForIdentifier:identifier];
 }
 
 ObjectContentType WebFrameLoaderClient::objectContentType(const KURL& url, const String& mimeType)
@@ -1628,7 +1638,7 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize& size, HTMLP
     }
     
     NSString *extension = [[pluginURL path] pathExtension];
-    if (!pluginPackage && [extension length] != 0) {
+    if (!pluginPackage && [extension length] && ![MIMEType length]) {
         pluginPackage = [webView _pluginForExtension:extension];
         if (pluginPackage) {
             NSString *newMIMEType = [pluginPackage MIMETypeForExtension:extension];
@@ -1668,7 +1678,7 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize& size, HTMLP
     if (errorCode && m_webFrame) {
         WebResourceDelegateImplementationCache* implementations = WebViewGetResourceLoadDelegateImplementations(webView);
         if (implementations->plugInFailedWithErrorFunc) {
-            KURL pluginPageURL = document->completeURL(deprecatedParseURL(parameterValue(paramNames, paramValues, "pluginspage")));
+            KURL pluginPageURL = document->completeURL(stripLeadingAndTrailingHTMLSpaces(parameterValue(paramNames, paramValues, "pluginspage")));
             if (!pluginPageURL.protocolInHTTPFamily())
                 pluginPageURL = KURL();
             NSString *pluginName = pluginPackage ? (NSString *)[pluginPackage pluginInfo].name : nil;
@@ -1742,6 +1752,8 @@ PassRefPtr<Widget> WebFrameLoaderClient::createJavaAppletWidget(const IntSize& s
                 [values addObject:[NSString stringWithFormat:@"%d", size.height()]];
             }
             view = pluginView(m_webFrame.get(), (WebPluginPackage *)pluginPackage, names, values, baseURL, kit(element), NO);
+            if (view)
+                return adoptRef(new PluginWidget(view));
         } 
 #if ENABLE(NETSCAPE_PLUGIN_API)
         else if ([pluginPackage isKindOfClass:[WebNetscapePluginPackage class]]) {
@@ -1754,6 +1766,8 @@ PassRefPtr<Widget> WebFrameLoaderClient::createJavaAppletWidget(const IntSize& s
                 attributeValues:kit(paramValues)
                 loadManually:NO
                 element:element] autorelease];
+            if (view)
+                return adoptRef(new NetscapePluginWidget(view));
         } else {
             ASSERT_NOT_REACHED();
         }
@@ -1771,15 +1785,9 @@ PassRefPtr<Widget> WebFrameLoaderClient::createJavaAppletWidget(const IntSize& s
         }
     }
 
-    ASSERT(view);
-    return adoptRef(new PluginWidget(view));
-
     END_BLOCK_OBJC_EXCEPTIONS;
-    
-    return adoptRef(new PluginWidget);
-#else
-    return 0;
 #endif // ENABLE(JAVA_BRIDGE)
+    return 0;
 }
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)

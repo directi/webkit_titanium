@@ -57,6 +57,7 @@ messages -> WebPage {
     DidReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction)
     Close()
 
+    PreferencesDidChange(WebKit::WebPreferencesStore store)
     SendDoubleAndFloat(double d, float f)
     SendInts(Vector<uint64_t> ints, Vector<Vector<uint64_t> > intVectors)
 
@@ -66,6 +67,11 @@ messages -> WebPage {
     GetPluginProcessConnection(WTF::String pluginPath) -> (CoreIPC::Connection::Handle connectionHandle) delayed
 
     DidCreateWebProcessConnection(CoreIPC::MachPort connectionIdentifier)
+
+#if PLATFORM(MAC)
+    # Keyboard support
+    InterpretKeyEvent(uint32_t type) -> (Vector<WebCore::KeypressCommand> commandName)
+#endif
 }
 
 #endif
@@ -81,7 +87,6 @@ _expected_results = {
                 ('WTF::String', 'url'),
             ),
             'condition': None,
-            'base_class': 'CoreIPC::Arguments1<const WTF::String&>',
         },
         {
             'name': 'TouchEvent',
@@ -89,7 +94,6 @@ _expected_results = {
                 ('WebKit::WebTouchEvent', 'event'),
             ),
             'condition': 'ENABLE(TOUCH_EVENTS)',
-            'base_class': 'CoreIPC::Arguments1<const WebKit::WebTouchEvent&>',
         },
         {
             'name': 'DidReceivePolicyDecision',
@@ -99,13 +103,18 @@ _expected_results = {
                 ('uint32_t', 'policyAction'),
             ),
             'condition': None,
-            'base_class': 'CoreIPC::Arguments3<uint64_t, uint64_t, uint32_t>',
         },
         {
             'name': 'Close',
             'parameters': (),
             'condition': None,
-            'base_class': 'CoreIPC::Arguments0',
+        },
+        {
+            'name': 'PreferencesDidChange',
+            'parameters': (
+                ('WebKit::WebPreferencesStore', 'store'),
+            ),
+            'condition': None,
         },
         {
             'name': 'SendDoubleAndFloat',
@@ -114,7 +123,6 @@ _expected_results = {
                 ('float', 'f'),
             ),
             'condition': None,
-            'base_class': 'CoreIPC::Arguments2<double, float>',
         },
         {
             'name': 'SendInts',
@@ -123,7 +131,6 @@ _expected_results = {
                 ('Vector<Vector<uint64_t> >', 'intVectors')
             ),
             'condition': None,
-            'base_class': 'CoreIPC::Arguments1<const Vector<uint64_t>&>',
         },
         {
             'name': 'CreatePlugin',
@@ -135,8 +142,6 @@ _expected_results = {
                 ('bool', 'result'),
             ),
             'condition': None,
-            'base_class': 'CoreIPC::Arguments2<uint64_t, const WebKit::Plugin::Parameters&>',
-            'reply_base_class': 'CoreIPC::Arguments1<bool>',
         },
         {
             'name': 'RunJavaScriptAlert',
@@ -146,8 +151,6 @@ _expected_results = {
             ),
             'reply_parameters': (),
             'condition': None,
-            'base_class': 'CoreIPC::Arguments2<uint64_t, const WTF::String&>',
-            'reply_base_class': 'CoreIPC::Arguments0',
         },
         {
             'name': 'GetPlugins',
@@ -158,8 +161,6 @@ _expected_results = {
                 ('Vector<WebCore::PluginInfo>', 'plugins'),
             ),
             'condition': None,
-            'base_class': 'CoreIPC::Arguments1<bool>',
-            'reply_base_class': 'CoreIPC::Arguments1<Vector<WebCore::PluginInfo>&>',
         },
         {
             'name': 'GetPluginProcessConnection',
@@ -170,9 +171,6 @@ _expected_results = {
                 ('CoreIPC::Connection::Handle', 'connectionHandle'),
             ),
             'condition': None,
-            'base_class': 'CoreIPC::Arguments1<const WTF::String&>',
-            'reply_base_class': 'CoreIPC::Arguments1<CoreIPC::Connection::Handle&>',
-            'delayed_reply_base_class': 'CoreIPC::Arguments1<const CoreIPC::Connection::Handle&>',
         },
         {
             'name': 'DidCreateWebProcessConnection',
@@ -180,7 +178,16 @@ _expected_results = {
                 ('CoreIPC::MachPort', 'connectionIdentifier'),
             ),
             'condition': None,
-            'base_class': 'CoreIPC::Arguments2<double, float>',
+        },
+        {
+            'name': 'InterpretKeyEvent',
+            'parameters': (
+                ('uint32_t', 'type'),
+            ),
+            'reply_parameters': (
+                ('Vector<WebCore::KeypressCommand>', 'commandName'),
+            ),
+            'condition': 'PLATFORM(MAC)',
         },
     ),
 }
@@ -244,8 +251,12 @@ _expected_header = """/*
 #if ENABLE(WEBKIT2)
 
 #include "Arguments.h"
+#include "Connection.h"
 #include "MessageID.h"
 #include "Plugin.h"
+#include <WebCore/KeyboardEvent.h>
+#include <WebCore/PluginData.h>
+#include <wtf/Vector.h>
 
 namespace CoreIPC {
     class MachPort;
@@ -256,6 +267,7 @@ namespace WTF {
 }
 
 namespace WebKit {
+    struct WebPreferencesStore;
     class WebTouchEvent;
 }
 
@@ -270,6 +282,7 @@ enum Kind {
 #endif
     DidReceivePolicyDecisionID,
     CloseID,
+    PreferencesDidChangeID,
     SendDoubleAndFloatID,
     SendIntsID,
     CreatePluginID,
@@ -277,10 +290,14 @@ enum Kind {
     GetPluginsID,
     GetPluginProcessConnectionID,
     DidCreateWebProcessConnectionID,
+#if PLATFORM(MAC)
+    InterpretKeyEventID,
+#endif
 };
 
 struct LoadURL : CoreIPC::Arguments1<const WTF::String&> {
     static const Kind messageID = LoadURLID;
+    typedef CoreIPC::Arguments1<const WTF::String&> DecodeType;
     explicit LoadURL(const WTF::String& url)
         : CoreIPC::Arguments1<const WTF::String&>(url)
     {
@@ -290,6 +307,7 @@ struct LoadURL : CoreIPC::Arguments1<const WTF::String&> {
 #if ENABLE(TOUCH_EVENTS)
 struct TouchEvent : CoreIPC::Arguments1<const WebKit::WebTouchEvent&> {
     static const Kind messageID = TouchEventID;
+    typedef CoreIPC::Arguments1<const WebKit::WebTouchEvent&> DecodeType;
     explicit TouchEvent(const WebKit::WebTouchEvent& event)
         : CoreIPC::Arguments1<const WebKit::WebTouchEvent&>(event)
     {
@@ -299,6 +317,7 @@ struct TouchEvent : CoreIPC::Arguments1<const WebKit::WebTouchEvent&> {
 
 struct DidReceivePolicyDecision : CoreIPC::Arguments3<uint64_t, uint64_t, uint32_t> {
     static const Kind messageID = DidReceivePolicyDecisionID;
+    typedef CoreIPC::Arguments3<uint64_t, uint64_t, uint32_t> DecodeType;
     DidReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction)
         : CoreIPC::Arguments3<uint64_t, uint64_t, uint32_t>(frameID, listenerID, policyAction)
     {
@@ -307,10 +326,21 @@ struct DidReceivePolicyDecision : CoreIPC::Arguments3<uint64_t, uint64_t, uint32
 
 struct Close : CoreIPC::Arguments0 {
     static const Kind messageID = CloseID;
+    typedef CoreIPC::Arguments0 DecodeType;
+};
+
+struct PreferencesDidChange : CoreIPC::Arguments1<const WebKit::WebPreferencesStore&> {
+    static const Kind messageID = PreferencesDidChangeID;
+    typedef CoreIPC::Arguments1<const WebKit::WebPreferencesStore&> DecodeType;
+    explicit PreferencesDidChange(const WebKit::WebPreferencesStore& store)
+        : CoreIPC::Arguments1<const WebKit::WebPreferencesStore&>(store)
+    {
+    }
 };
 
 struct SendDoubleAndFloat : CoreIPC::Arguments2<double, float> {
     static const Kind messageID = SendDoubleAndFloatID;
+    typedef CoreIPC::Arguments2<double, float> DecodeType;
     SendDoubleAndFloat(double d, float f)
         : CoreIPC::Arguments2<double, float>(d, f)
     {
@@ -319,6 +349,7 @@ struct SendDoubleAndFloat : CoreIPC::Arguments2<double, float> {
 
 struct SendInts : CoreIPC::Arguments2<const Vector<uint64_t>&, const Vector<Vector<uint64_t> >&> {
     static const Kind messageID = SendIntsID;
+    typedef CoreIPC::Arguments2<const Vector<uint64_t>&, const Vector<Vector<uint64_t> >&> DecodeType;
     SendInts(const Vector<uint64_t>& ints, const Vector<Vector<uint64_t> >& intVectors)
         : CoreIPC::Arguments2<const Vector<uint64_t>&, const Vector<Vector<uint64_t> >&>(ints, intVectors)
     {
@@ -328,6 +359,7 @@ struct SendInts : CoreIPC::Arguments2<const Vector<uint64_t>&, const Vector<Vect
 struct CreatePlugin : CoreIPC::Arguments2<uint64_t, const WebKit::Plugin::Parameters&> {
     static const Kind messageID = CreatePluginID;
     typedef CoreIPC::Arguments1<bool&> Reply;
+    typedef CoreIPC::Arguments2<uint64_t, const WebKit::Plugin::Parameters&> DecodeType;
     CreatePlugin(uint64_t pluginInstanceID, const WebKit::Plugin::Parameters& parameters)
         : CoreIPC::Arguments2<uint64_t, const WebKit::Plugin::Parameters&>(pluginInstanceID, parameters)
     {
@@ -337,6 +369,7 @@ struct CreatePlugin : CoreIPC::Arguments2<uint64_t, const WebKit::Plugin::Parame
 struct RunJavaScriptAlert : CoreIPC::Arguments2<uint64_t, const WTF::String&> {
     static const Kind messageID = RunJavaScriptAlertID;
     typedef CoreIPC::Arguments0 Reply;
+    typedef CoreIPC::Arguments2<uint64_t, const WTF::String&> DecodeType;
     RunJavaScriptAlert(uint64_t frameID, const WTF::String& message)
         : CoreIPC::Arguments2<uint64_t, const WTF::String&>(frameID, message)
     {
@@ -346,6 +379,7 @@ struct RunJavaScriptAlert : CoreIPC::Arguments2<uint64_t, const WTF::String&> {
 struct GetPlugins : CoreIPC::Arguments1<bool> {
     static const Kind messageID = GetPluginsID;
     typedef CoreIPC::Arguments1<Vector<WebCore::PluginInfo>&> Reply;
+    typedef CoreIPC::Arguments1<bool> DecodeType;
     explicit GetPlugins(bool refresh)
         : CoreIPC::Arguments1<bool>(refresh)
     {
@@ -354,7 +388,28 @@ struct GetPlugins : CoreIPC::Arguments1<bool> {
 
 struct GetPluginProcessConnection : CoreIPC::Arguments1<const WTF::String&> {
     static const Kind messageID = GetPluginProcessConnectionID;
-    typedef CoreIPC::Arguments1<CoreIPC::Connection::Handle&> Reply;
+    struct DelayedReply {
+        DelayedReply(PassRefPtr<CoreIPC::Connection> connection, PassOwnPtr<CoreIPC::ArgumentDecoder> arguments)
+            : m_connection(connection)
+            , m_arguments(arguments)
+        {
+        }
+
+        bool send(const CoreIPC::Connection::Handle& connectionHandle)
+        {
+            ASSERT(m_arguments);
+            m_arguments->encode(connectionHandle);
+            bool result = m_connection->sendSyncReply(m_arguments.release());
+            m_connection = nullptr;
+            return result;
+        }
+
+    private:
+        RefPtr<CoreIPC::Connection> m_connection;
+        OwnPtr<CoreIPC::ArgumentDecoder> m_arguments;
+    };
+
+    typedef CoreIPC::Arguments1<const WTF::String&> DecodeType;
     explicit GetPluginProcessConnection(const WTF::String& pluginPath)
         : CoreIPC::Arguments1<const WTF::String&>(pluginPath)
     {
@@ -363,11 +418,24 @@ struct GetPluginProcessConnection : CoreIPC::Arguments1<const WTF::String&> {
 
 struct DidCreateWebProcessConnection : CoreIPC::Arguments1<const CoreIPC::MachPort&> {
     static const Kind messageID = DidCreateWebProcessConnectionID;
+    typedef CoreIPC::Arguments1<const CoreIPC::MachPort&> DecodeType;
     explicit DidCreateWebProcessConnection(const CoreIPC::MachPort& connectionIdentifier)
         : CoreIPC::Arguments1<const CoreIPC::MachPort&>(connectionIdentifier)
     {
     }
 };
+
+#if PLATFORM(MAC)
+struct InterpretKeyEvent : CoreIPC::Arguments1<uint32_t> {
+    static const Kind messageID = InterpretKeyEventID;
+    typedef CoreIPC::Arguments1<Vector<WebCore::KeypressCommand>&> Reply;
+    typedef CoreIPC::Arguments1<uint32_t> DecodeType;
+    explicit InterpretKeyEvent(uint32_t type)
+        : CoreIPC::Arguments1<uint32_t>(type)
+    {
+    }
+};
+#endif
 
 } // namespace WebPage
 
@@ -416,11 +484,14 @@ _expected_receiver_implementation = """/*
 
 #include "ArgumentCoders.h"
 #include "ArgumentDecoder.h"
+#include "Connection.h"
 #include "HandleMessage.h"
 #include "MachPort.h"
 #include "Plugin.h"
+#include "WebCoreArgumentCoders.h"
 #include "WebEvent.h"
 #include "WebPageMessages.h"
+#include "WebPreferencesStore.h"
 
 namespace WebKit {
 
@@ -440,6 +511,9 @@ void WebPage::didReceiveWebPageMessage(CoreIPC::Connection*, CoreIPC::MessageID 
         return;
     case Messages::WebPage::CloseID:
         CoreIPC::handleMessage<Messages::WebPage::Close>(arguments, this, &WebPage::close);
+        return;
+    case Messages::WebPage::PreferencesDidChangeID:
+        CoreIPC::handleMessage<Messages::WebPage::PreferencesDidChange>(arguments, this, &WebPage::preferencesDidChange);
         return;
     case Messages::WebPage::SendDoubleAndFloatID:
         CoreIPC::handleMessage<Messages::WebPage::SendDoubleAndFloat>(arguments, this, &WebPage::sendDoubleAndFloat);
@@ -472,6 +546,11 @@ CoreIPC::SyncReplyMode WebPage::didReceiveSyncWebPageMessage(CoreIPC::Connection
     case Messages::WebPage::GetPluginProcessConnectionID:
         CoreIPC::handleMessage<Messages::WebPage::GetPluginProcessConnection>(arguments, reply, this, &WebPage::getPluginProcessConnection);
         return CoreIPC::AutomaticReply;
+#if PLATFORM(MAC)
+    case Messages::WebPage::InterpretKeyEventID:
+        CoreIPC::handleMessage<Messages::WebPage::InterpretKeyEvent>(arguments, reply, this, &WebPage::interpretKeyEvent);
+        return CoreIPC::AutomaticReply;
+#endif
     default:
         break;
     }

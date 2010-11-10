@@ -102,10 +102,33 @@ class StatusServer:
         self._browser["work_items"] = " ".join(work_items)
         return self._browser.submit().read()
 
+    def _post_work_item_to_ews(self, attachment_id):
+        submit_to_ews_url = "%s/submit-to-ews" % self.url
+        self._browser.open(submit_to_ews_url)
+        self._browser.select_form(name="submit_to_ews")
+        self._browser["attachment_id"] = unicode(attachment_id)
+        self._browser.submit()
+
+    def submit_to_ews(self, attachment_id):
+        _log.info("Submitting attachment %s to EWS queues" % attachment_id)
+        return NetworkTransaction().run(lambda: self._post_work_item_to_ews(attachment_id))
+
     def next_work_item(self, queue_name):
         _log.debug("Fetching next work item for %s" % queue_name)
         patch_status_url = "%s/next-patch/%s" % (self.url, queue_name)
         return self._fetch_url(patch_status_url)
+
+    def _post_release_work_item(self, queue_name, patch):
+        release_patch_url = "%s/release-patch" % (self.url)
+        self._browser.open(release_patch_url)
+        self._browser.select_form(name="release_patch")
+        self._browser["queue_name"] = queue_name
+        self._browser["attachment_id"] = unicode(patch.id())
+        self._browser.submit()
+
+    def release_work_item(self, queue_name, patch):
+        _log.info("Releasing work item %s from %s" % (patch.id(), queue_name))
+        return NetworkTransaction(convert_404_to_None=True).run(lambda: self._post_release_work_item(queue_name, patch))
 
     def update_work_items(self, queue_name, work_items):
         _log.debug("Recording work items: %s for %s" % (work_items, queue_name))
@@ -120,6 +143,7 @@ class StatusServer:
         return NetworkTransaction().run(lambda: self._post_svn_revision_to_server(svn_revision_number, broken_bot))
 
     def _fetch_url(self, url):
+        # FIXME: This should use NetworkTransaction's 404 handling instead.
         try:
             return urllib2.urlopen(url).read()
         except urllib2.HTTPError, e:

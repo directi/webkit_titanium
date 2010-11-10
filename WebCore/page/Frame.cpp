@@ -149,7 +149,7 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
     : m_page(page)
     , m_treeNode(this, parentFromOwnerElement(ownerElement))
     , m_loader(this, frameLoaderClient)
-    , m_redirectScheduler(this)
+    , m_navigationScheduler(this)
     , m_ownerElement(ownerElement)
     , m_script(this)
     , m_editor(this)
@@ -159,6 +159,7 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
     , m_lifeSupportTimer(this, &Frame::lifeSupportTimerFired)
     , m_pageZoomFactor(parentPageZoomFactor(this))
     , m_textZoomFactor(parentTextZoomFactor(this))
+    , m_pageScaleFactor(1)
 #if ENABLE(ORIENTATION_EVENTS)
     , m_orientation(0)
 #endif
@@ -275,6 +276,7 @@ void Frame::setView(PassRefPtr<FrameView> view)
 
 void Frame::setDocument(PassRefPtr<Document> newDoc)
 {
+    ASSERT(!newDoc || newDoc->frame());
     if (m_doc && m_doc->attached() && !m_doc->inPageCache()) {
         // FIXME: We don't call willRemove here. Why is that OK?
         m_doc->detach();
@@ -288,6 +290,9 @@ void Frame::setDocument(PassRefPtr<Document> newDoc)
 
     // Update the cached 'document' property, which is now stale.
     m_script.updateDocument();
+
+    if (m_page)
+        m_page->updateViewportArguments();
 }
 
 #if ENABLE(ORIENTATION_EVENTS)
@@ -340,35 +345,25 @@ static RegularExpression* createRegExpForLabels(const Vector<String>& labels)
 
 String Frame::searchForLabelsAboveCell(RegularExpression* regExp, HTMLTableCellElement* cell, size_t* resultDistanceFromStartOfCell)
 {
-    RenderObject* cellRenderer = cell->renderer();
-
-    if (cellRenderer && cellRenderer->isTableCell()) {
-        RenderTableCell* tableCellRenderer = toRenderTableCell(cellRenderer);
-        RenderTableCell* cellAboveRenderer = tableCellRenderer->table()->cellAbove(tableCellRenderer);
-
-        if (cellAboveRenderer) {
-            HTMLTableCellElement* aboveCell =
-                static_cast<HTMLTableCellElement*>(cellAboveRenderer->node());
-
-            if (aboveCell) {
-                // search within the above cell we found for a match
-                size_t lengthSearched = 0;    
-                for (Node* n = aboveCell->firstChild(); n; n = n->traverseNextNode(aboveCell)) {
-                    if (n->isTextNode() && n->renderer() && n->renderer()->style()->visibility() == VISIBLE) {
-                        // For each text chunk, run the regexp
-                        String nodeString = n->nodeValue();
-                        int pos = regExp->searchRev(nodeString);
-                        if (pos >= 0) {
-                            if (resultDistanceFromStartOfCell)
-                                *resultDistanceFromStartOfCell = lengthSearched;
-                            return nodeString.substring(pos, regExp->matchedLength());
-                        }
-                        lengthSearched += nodeString.length();
-                    }
+    HTMLTableCellElement* aboveCell = cell->cellAbove();
+    if (aboveCell) {
+        // search within the above cell we found for a match
+        size_t lengthSearched = 0;    
+        for (Node* n = aboveCell->firstChild(); n; n = n->traverseNextNode(aboveCell)) {
+            if (n->isTextNode() && n->renderer() && n->renderer()->style()->visibility() == VISIBLE) {
+                // For each text chunk, run the regexp
+                String nodeString = n->nodeValue();
+                int pos = regExp->searchRev(nodeString);
+                if (pos >= 0) {
+                    if (resultDistanceFromStartOfCell)
+                        *resultDistanceFromStartOfCell = lengthSearched;
+                    return nodeString.substring(pos, regExp->matchedLength());
                 }
+                lengthSearched += nodeString.length();
             }
         }
     }
+
     // Any reason in practice to search all cells in that are above cell?
     if (resultDistanceFromStartOfCell)
         *resultDistanceFromStartOfCell = notFound;
@@ -508,6 +503,9 @@ void Frame::injectUserScripts(UserScriptInjectionTime injectionTime)
 {
     if (!m_page)
         return;
+
+    if (loader()->stateMachine()->creatingInitialEmptyDocument())
+        return;
     
     // Walk the hashtable. Inject by world.
     const UserScriptMap* userScripts = m_page->group().userScripts();
@@ -643,7 +641,7 @@ void Frame::clearTimers(FrameView *view, Document *document)
     if (view) {
         view->unscheduleRelayout();
         if (view->frame()) {
-            view->frame()->animation()->suspendAnimations(document);
+            view->frame()->animation()->suspendAnimationsForDocument(document);
             view->frame()->eventHandler()->stopAutoscrollTimer();
         }
     }
@@ -719,11 +717,12 @@ void Frame::transferChildFrameToNewDocument()
     Page* newPage = newParent ? newParent->page() : 0;
     Page* oldPage = m_page;
     if (m_page != newPage) {
-        if (page()->focusController()->focusedFrame() == this)
-            page()->focusController()->setFocusedFrame(0);
+        if (m_page) {
+            if (m_page->focusController()->focusedFrame() == this)
+                m_page->focusController()->setFocusedFrame(0);
 
-        if (m_page)
-            m_page->decrementFrameCount();
+             m_page->decrementFrameCount();
+        }
 
         m_page = newPage;
 
@@ -750,6 +749,10 @@ void Frame::transferChildFrameToNewDocument()
     if (didTransfer) {
         // Let external clients update themselves.
         loader()->client()->didTransferChildFrameToNewDocument(oldPage);
+
+        // Update resource tracking now that frame could be in a different page.
+        if (oldPage != newPage)
+            loader()->transferLoadingResourcesFromPage(oldPage);
 
         // Do the same for all the children.
         for (Frame* child = tree()->firstChild(); child; child = child->tree()->nextSibling())
@@ -886,6 +889,13 @@ IntRect Frame::tiledBackingStoreVisibleRect()
         return IntRect();
     return m_page->chrome()->client()->visibleRectForTiledBackingStore();
 }
+
+Color Frame::tiledBackingStoreBackgroundColor() const
+{
+    if (!m_view)
+        return Color();
+    return m_view->baseBackgroundColor();
+}
 #endif
 
 String Frame::layerTreeAsText() const
@@ -952,6 +962,28 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
 
     for (Frame* child = tree()->firstChild(); child; child = child->tree()->nextSibling())
         child->setPageAndTextZoomFactors(m_pageZoomFactor, m_textZoomFactor);
+
+    if (FrameView* view = this->view()) {
+        if (document->renderer() && document->renderer()->needsLayout() && view->didFirstLayout())
+            view->layout();
+    }
+}
+
+void Frame::scalePage(float scale)
+{
+    if (m_pageScaleFactor == scale)
+        return;
+
+    m_pageScaleFactor = scale;
+
+    Document* document = this->document();
+    if (!document)
+        return;
+
+    if (document->renderer())
+        document->renderer()->setNeedsLayout(true);
+
+    document->recalcStyle(Node::Force);
 
     if (FrameView* view = this->view()) {
         if (document->renderer() && document->renderer()->needsLayout() && view->didFirstLayout())

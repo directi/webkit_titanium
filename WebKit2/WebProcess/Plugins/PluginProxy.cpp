@@ -29,6 +29,9 @@
 
 #include "BackingStore.h"
 #include "DataReference.h"
+#include "NPRemoteObjectMap.h"
+#include "NPRuntimeUtilities.h"
+#include "NPVariantData.h"
 #include "NotImplemented.h"
 #include "PluginController.h"
 #include "PluginControllerProxyMessages.h"
@@ -57,8 +60,10 @@ PluginProxy::PluginProxy(PassRefPtr<PluginProcessConnection> connection)
     : m_connection(connection)
     , m_pluginInstanceID(generatePluginInstanceID())
     , m_pluginController(0)
+    , m_pluginBackingStoreContainsValidData(false)
     , m_isStarted(false)
-
+    , m_waitingForPaintInResponseToUpdate(false)
+    , m_remoteLayerClientID(0)
 {
 }
 
@@ -79,19 +84,21 @@ bool PluginProxy::initialize(PluginController* pluginController, const Parameter
 
     m_pluginController = pluginController;
 
+    // Add the plug-in proxy before creating the plug-in; it needs to be in the map because CreatePlugin
+    // can call back out to the plug-in proxy.
+    m_connection->addPluginProxy(this);
+
     // Ask the plug-in process to create a plug-in.
     bool result = false;
 
-    if (!m_connection->connection()->sendSync(Messages::WebProcessConnection::CreatePlugin(m_pluginInstanceID, parameters, pluginController->userAgent()),
-                                              Messages::WebProcessConnection::CreatePlugin::Reply(result),
-                                              0, CoreIPC::Connection::NoTimeout))
+    uint32_t remoteLayerClientID = 0;
+    if (!m_connection->connection()->sendSync(Messages::WebProcessConnection::CreatePlugin(m_pluginInstanceID, parameters, pluginController->userAgent(), pluginController->isPrivateBrowsingEnabled()), Messages::WebProcessConnection::CreatePlugin::Reply(result, remoteLayerClientID), 0) || !result) {
+        m_connection->removePluginProxy(this);
         return false;
+    }
 
-    if (!result)
-        return false;
-
+    m_remoteLayerClientID = remoteLayerClientID;
     m_isStarted = true;
-    m_connection->addPluginProxy(this);
 
     return true;
 }
@@ -100,9 +107,7 @@ void PluginProxy::destroy()
 {
     ASSERT(m_isStarted);
 
-    m_connection->connection()->sendSync(Messages::WebProcessConnection::DestroyPlugin(m_pluginInstanceID),
-                                         Messages::WebProcessConnection::DestroyPlugin::Reply(),
-                                         0, CoreIPC::Connection::NoTimeout);
+    m_connection->connection()->sendSync(Messages::WebProcessConnection::DestroyPlugin(m_pluginInstanceID), Messages::WebProcessConnection::DestroyPlugin::Reply(), 0);
 
     m_isStarted = false;
     m_connection->removePluginProxy(this);
@@ -110,33 +115,43 @@ void PluginProxy::destroy()
 
 void PluginProxy::paint(GraphicsContext* graphicsContext, const IntRect& dirtyRect)
 {
-    if (!m_backingStore)
+    if (!needsBackingStore() || !m_backingStore)
         return;
+
+    if (!m_pluginBackingStoreContainsValidData) {
+        m_connection->connection()->sendSync(Messages::PluginControllerProxy::PaintEntirePlugin(), Messages::PluginControllerProxy::PaintEntirePlugin::Reply(), m_pluginInstanceID);
+    
+        // Blit the plug-in backing store into our own backing store.
+        OwnPtr<WebCore::GraphicsContext> graphicsContext = m_backingStore->createGraphicsContext();
+        
+        m_pluginBackingStore->paint(*graphicsContext, IntPoint(), IntRect(0, 0, m_frameRect.width(), m_frameRect.height()));
+
+        m_pluginBackingStoreContainsValidData = true;
+    }
 
     IntRect dirtyRectInPluginCoordinates = dirtyRect;
     dirtyRectInPluginCoordinates.move(-m_frameRect.x(), -m_frameRect.y());
 
-    graphicsContext->save();
+    m_backingStore->paint(*graphicsContext, m_frameRect.location(), dirtyRectInPluginCoordinates);
 
-    graphicsContext->translate(m_frameRect.x(), m_frameRect.y());
-    m_backingStore->paint(graphicsContext, dirtyRectInPluginCoordinates);
-
-    graphicsContext->restore();
+    if (m_waitingForPaintInResponseToUpdate) {
+        m_waitingForPaintInResponseToUpdate = false;
+        m_connection->connection()->send(Messages::PluginControllerProxy::DidUpdate(), m_pluginInstanceID);
+        return;
+    }
 }
-
-#if PLATFORM(MAC)
-PlatformLayer* PluginProxy::pluginLayer()
-{
-    notImplemented();
-    return 0;
-}
-#endif
 
 void PluginProxy::geometryDidChange(const IntRect& frameRect, const IntRect& clipRect)
 {
     ASSERT(m_isStarted);
 
     m_frameRect = frameRect;
+
+    if (!needsBackingStore()) {
+        SharedMemory::Handle pluginBackingStoreHandle;
+        m_connection->connection()->send(Messages::PluginControllerProxy::GeometryDidChange(frameRect, clipRect, pluginBackingStoreHandle), m_pluginInstanceID);
+        return;
+    }
 
     bool didUpdateBackingStore = false;
     if (!m_backingStore) {
@@ -163,6 +178,8 @@ void PluginProxy::geometryDidChange(const IntRect& frameRect, const IntRect& cli
             m_pluginBackingStore.clear();
             return;
         }
+
+        m_pluginBackingStoreContainsValidData = false;
     }
 
     m_connection->connection()->send(Messages::PluginControllerProxy::GeometryDidChange(frameRect, clipRect, pluginBackingStoreHandle), m_pluginInstanceID);
@@ -226,9 +243,7 @@ void PluginProxy::manualStreamDidFail(bool wasCancelled)
 bool PluginProxy::handleMouseEvent(const WebMouseEvent& mouseEvent)
 {
     bool handled = false;
-    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleMouseEvent(mouseEvent),
-                                              Messages::PluginControllerProxy::HandleMouseEvent::Reply(handled),
-                                              m_pluginInstanceID, CoreIPC::Connection::NoTimeout))
+    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleMouseEvent(mouseEvent), Messages::PluginControllerProxy::HandleMouseEvent::Reply(handled), m_pluginInstanceID))
         return false;
 
     return handled;
@@ -237,9 +252,7 @@ bool PluginProxy::handleMouseEvent(const WebMouseEvent& mouseEvent)
 bool PluginProxy::handleWheelEvent(const WebWheelEvent& wheelEvent)
 {
     bool handled = false;
-    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleWheelEvent(wheelEvent),
-                                              Messages::PluginControllerProxy::HandleWheelEvent::Reply(handled),
-                                              m_pluginInstanceID, CoreIPC::Connection::NoTimeout))
+    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleWheelEvent(wheelEvent), Messages::PluginControllerProxy::HandleWheelEvent::Reply(handled), m_pluginInstanceID))
         return false;
 
     return handled;
@@ -248,9 +261,7 @@ bool PluginProxy::handleWheelEvent(const WebWheelEvent& wheelEvent)
 bool PluginProxy::handleMouseEnterEvent(const WebMouseEvent& mouseEnterEvent)
 {
     bool handled = false;
-    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleMouseEnterEvent(mouseEnterEvent),
-                                              Messages::PluginControllerProxy::HandleMouseEnterEvent::Reply(handled),
-                                              m_pluginInstanceID, CoreIPC::Connection::NoTimeout))
+    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleMouseEnterEvent(mouseEnterEvent), Messages::PluginControllerProxy::HandleMouseEnterEvent::Reply(handled), m_pluginInstanceID))
         return false;
     
     return handled;
@@ -259,9 +270,16 @@ bool PluginProxy::handleMouseEnterEvent(const WebMouseEvent& mouseEnterEvent)
 bool PluginProxy::handleMouseLeaveEvent(const WebMouseEvent& mouseLeaveEvent)
 {
     bool handled = false;
-    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleMouseLeaveEvent(mouseLeaveEvent),
-                                              Messages::PluginControllerProxy::HandleMouseLeaveEvent::Reply(handled),
-                                              m_pluginInstanceID, CoreIPC::Connection::NoTimeout))
+    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleMouseLeaveEvent(mouseLeaveEvent), Messages::PluginControllerProxy::HandleMouseLeaveEvent::Reply(handled), m_pluginInstanceID))
+        return false;
+    
+    return handled;
+}
+
+bool PluginProxy::handleKeyboardEvent(const WebKeyboardEvent& keyboardEvent)
+{
+    bool handled = false;
+    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleKeyboardEvent(keyboardEvent), Messages::PluginControllerProxy::HandleKeyboardEvent::Reply(handled), m_pluginInstanceID))
         return false;
     
     return handled;
@@ -274,8 +292,15 @@ void PluginProxy::setFocus(bool hasFocus)
 
 NPObject* PluginProxy::pluginScriptableNPObject()
 {
-    notImplemented();
-    return 0;
+    uint64_t pluginScriptableNPObjectID = 0;
+    
+    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::GetPluginScriptableNPObject(), Messages::PluginControllerProxy::GetPluginScriptableNPObject::Reply(pluginScriptableNPObjectID), m_pluginInstanceID))
+        return 0;
+
+    if (!pluginScriptableNPObjectID)
+        return 0;
+
+    return m_connection->npRemoteObjectMap()->createNPObjectProxy(pluginScriptableNPObjectID);
 }
 
 #if PLATFORM(MAC)
@@ -296,6 +321,11 @@ void PluginProxy::windowVisibilityChanged(bool isVisible)
 }
 #endif
 
+void PluginProxy::privateBrowsingStateChanged(bool isPrivateBrowsingEnabled)
+{
+    m_connection->connection()->send(Messages::PluginControllerProxy::PrivateBrowsingStateChanged(isPrivateBrowsingEnabled), m_pluginInstanceID);
+}
+
 PluginController* PluginProxy::controller()
 {
     return m_pluginController;
@@ -306,19 +336,81 @@ void PluginProxy::loadURL(uint64_t requestID, const String& method, const String
     m_pluginController->loadURL(requestID, method, urlString, target, headerFields, httpBody, allowPopups);
 }
 
+void PluginProxy::proxiesForURL(const String& urlString, String& proxyString)
+{
+    proxyString = m_pluginController->proxiesForURL(urlString);
+}
+
+void PluginProxy::cookiesForURL(const String& urlString, String& cookieString)
+{
+    cookieString = m_pluginController->cookiesForURL(urlString);
+}
+
+void PluginProxy::setCookiesForURL(const String& urlString, const String& cookieString)
+{
+    m_pluginController->setCookiesForURL(urlString, cookieString);
+}
+
+void PluginProxy::getWindowScriptNPObject(uint64_t& windowScriptNPObjectID)
+{
+    NPObject* windowScriptNPObject = m_pluginController->windowScriptNPObject();
+    if (!windowScriptNPObject) {
+        windowScriptNPObjectID = 0;
+        return;
+    }
+
+    windowScriptNPObjectID = m_connection->npRemoteObjectMap()->registerNPObject(windowScriptNPObject);
+    releaseNPObject(windowScriptNPObject);
+}
+
+void PluginProxy::getPluginElementNPObject(uint64_t& pluginElementNPObjectID)
+{
+    NPObject* pluginElementNPObject = m_pluginController->pluginElementNPObject();
+    if (!pluginElementNPObject) {
+        pluginElementNPObjectID = 0;
+        return;
+    }
+
+    pluginElementNPObjectID = m_connection->npRemoteObjectMap()->registerNPObject(pluginElementNPObject);
+    releaseNPObject(pluginElementNPObject);
+}
+
+void PluginProxy::evaluate(const NPVariantData& npObjectAsVariantData, const String& scriptString, bool allowPopups, bool& returnValue, NPVariantData& resultData)
+{
+    NPVariant npObjectAsVariant = m_connection->npRemoteObjectMap()->npVariantDataToNPVariant(npObjectAsVariantData);
+    ASSERT(NPVARIANT_IS_OBJECT(npObjectAsVariant));
+
+    NPVariant result;
+    returnValue = m_pluginController->evaluate(NPVARIANT_TO_OBJECT(npObjectAsVariant), scriptString, &result, allowPopups);
+    if (!returnValue)
+        return;
+
+    // Convert the NPVariant to an NPVariantData.
+    resultData = m_connection->npRemoteObjectMap()->npVariantToNPVariantData(result);
+    
+    // And release the result.
+    releaseNPVariantValue(&result);
+
+    releaseNPVariantValue(&npObjectAsVariant);
+}
+
 void PluginProxy::update(const IntRect& paintedRect)
 {
+    if (paintedRect == m_frameRect)
+        m_pluginBackingStoreContainsValidData = true;
+
     IntRect paintedRectPluginCoordinates = paintedRect;
     paintedRectPluginCoordinates.move(-m_frameRect.x(), -m_frameRect.y());
 
     if (m_backingStore) {
         // Blit the plug-in backing store into our own backing store.
-        OwnPtr<WebCore::GraphicsContext> graphicsContext = m_backingStore->createGraphicsContext();
+        OwnPtr<GraphicsContext> graphicsContext = m_backingStore->createGraphicsContext();
 
-        m_pluginBackingStore->paint(graphicsContext.get(), paintedRectPluginCoordinates);
+        m_pluginBackingStore->paint(*graphicsContext, IntPoint(), paintedRectPluginCoordinates);
     }
 
-    // Ask the controller to invalidate the rect for us.        
+    // Ask the controller to invalidate the rect for us.
+    m_waitingForPaintInResponseToUpdate = true;
     m_pluginController->invalidate(paintedRectPluginCoordinates);
 }
 

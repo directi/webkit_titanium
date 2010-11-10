@@ -33,6 +33,7 @@
 #if USE(ACCELERATED_COMPOSITING)
 #include "VideoLayerChromium.h"
 
+#include "Extensions3DChromium.h"
 #include "GraphicsContext3D.h"
 #include "LayerRendererChromium.h"
 #include "RenderLayerBacking.h"
@@ -175,16 +176,22 @@ VideoLayerChromium::VideoLayerChromium(GraphicsLayerChromium* owner, VideoFrameP
     , m_skipsDraw(true)
     , m_frameFormat(VideoFrameChromium::Invalid)
     , m_provider(provider)
+    , m_currentFrame(0)
 {
-    for (unsigned plane = 0; plane < VideoFrameChromium::maxPlanes; plane++) {
-        m_textures[plane] = 0;
-        m_textureSizes[plane] = IntSize();
-        m_frameSizes[plane] = IntSize();
-    }
+    resetFrameParameters();
 }
 
 VideoLayerChromium::~VideoLayerChromium()
 {
+    cleanupResources();
+}
+
+void VideoLayerChromium::cleanupResources()
+{
+    releaseCurrentFrame();
+    if (!layerRenderer())
+        return;
+
     GraphicsContext3D* context = layerRendererContext();
     for (unsigned plane = 0; plane < VideoFrameChromium::maxPlanes; plane++) {
         if (m_textures[plane])
@@ -218,6 +225,14 @@ void VideoLayerChromium::updateContents()
         return;
     }
 
+    if (frame->surfaceType() == VideoFrameChromium::TypeTexture) {
+        releaseCurrentFrame();
+        saveCurrentFrame(frame);
+        m_dirtyRect.setSize(FloatSize());
+        m_contentsDirty = false;
+        return;
+    }
+
     // Allocate textures for planes if they are not allocated already, or
     // reallocate textures that are the wrong size for the frame.
     GraphicsContext3D* context = layerRendererContext();
@@ -236,6 +251,7 @@ void VideoLayerChromium::updateContents()
 
     m_dirtyRect.setSize(FloatSize());
     m_contentsDirty = false;
+
     m_provider->putCurrentFrame(frame);
 }
 
@@ -287,10 +303,10 @@ void VideoLayerChromium::updateTexture(GraphicsContext3D* context, unsigned text
 {
     ASSERT(context);
     GLC(context, context->bindTexture(GraphicsContext3D::TEXTURE_2D, textureId));
-    void* mem = context->mapTexSubImage2DCHROMIUM(GraphicsContext3D::TEXTURE_2D, 0, 0, 0, dimensions.width(), dimensions.height(), format, GraphicsContext3D::UNSIGNED_BYTE, GraphicsContext3D::WRITE_ONLY);
+    void* mem = static_cast<Extensions3DChromium*>(context->getExtensions())->mapTexSubImage2DCHROMIUM(GraphicsContext3D::TEXTURE_2D, 0, 0, 0, dimensions.width(), dimensions.height(), format, GraphicsContext3D::UNSIGNED_BYTE, Extensions3DChromium::WRITE_ONLY);
     if (mem) {
         memcpy(mem, data, dimensions.width() * dimensions.height());
-        GLC(context, context->unmapTexSubImage2DCHROMIUM(mem));
+        GLC(context, static_cast<Extensions3DChromium*>(context->getExtensions())->unmapTexSubImage2DCHROMIUM(mem));
     } else {
         // FIXME: We should have some sort of code to handle the case when
         // mapTexSubImage2D fails.
@@ -319,6 +335,17 @@ void VideoLayerChromium::draw()
         notImplemented();
         break;
     }
+    releaseCurrentFrame();
+}
+
+void VideoLayerChromium::releaseCurrentFrame()
+{
+    if (!m_currentFrame)
+        return;
+
+    m_provider->putCurrentFrame(m_currentFrame);
+    m_currentFrame = 0;
+    resetFrameParameters();
 }
 
 void VideoLayerChromium::drawYUV(const SharedValues* sv)
@@ -368,6 +395,26 @@ void VideoLayerChromium::drawRGBA(const SharedValues* sv)
     drawTexturedQuad(context, layerRenderer()->projectionMatrix(), drawTransform(),
                      bounds().width(), bounds().height(), drawOpacity(),
                      sv->rgbaShaderMatrixLocation(), sv->rgbaAlphaLocation());
+}
+
+void VideoLayerChromium::resetFrameParameters()
+{
+    for (unsigned plane = 0; plane < VideoFrameChromium::maxPlanes; plane++) {
+        m_textures[plane] = 0;
+        m_textureSizes[plane] = IntSize();
+        m_frameSizes[plane] = IntSize();
+    }
+}
+
+void VideoLayerChromium::saveCurrentFrame(VideoFrameChromium* frame)
+{
+    ASSERT(!m_currentFrame);
+    m_currentFrame = frame;
+    for (unsigned plane = 0; plane < frame->planes(); plane++) {
+        m_textures[plane] = frame->texture(plane);
+        m_textureSizes[plane] = frame->requiredTextureSize(plane);
+        m_frameSizes[plane] = m_textureSizes[plane];
+    }
 }
 
 } // namespace WebCore

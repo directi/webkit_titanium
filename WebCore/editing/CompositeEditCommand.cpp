@@ -77,6 +77,10 @@ CompositeEditCommand::CompositeEditCommand(Document *document)
 {
 }
 
+CompositeEditCommand::~CompositeEditCommand()
+{
+}
+
 void CompositeEditCommand::doUnapply()
 {
     size_t size = m_commands.size();
@@ -202,6 +206,8 @@ void CompositeEditCommand::removeChildrenInRange(PassRefPtr<Node> node, unsigned
 
 void CompositeEditCommand::removeNode(PassRefPtr<Node> node)
 {
+    if (!node || !node->parentNode())
+        return;
     applyCommandToComposite(RemoveNodeCommand::create(node));
 }
 
@@ -212,12 +218,12 @@ void CompositeEditCommand::removeNodePreservingChildren(PassRefPtr<Node> node)
 
 void CompositeEditCommand::removeNodeAndPruneAncestors(PassRefPtr<Node> node)
 {
-    RefPtr<Node> parent = node->parentNode();
+    RefPtr<ContainerNode> parent = node->parentNode();
     removeNode(node);
     prune(parent.release());
 }
 
-HTMLElement* CompositeEditCommand::replaceNodeWithSpanPreservingChildrenAndAttributes(PassRefPtr<Node> node)
+HTMLElement* CompositeEditCommand::replaceElementWithSpanPreservingChildrenAndAttributes(PassRefPtr<HTMLElement> node)
 {
     // It would also be possible to implement all of ReplaceNodeWithSpanCommand
     // as a series of existing smaller edit commands.  Someone who wanted to
@@ -250,7 +256,7 @@ void CompositeEditCommand::prune(PassRefPtr<Node> node)
         if (renderer && (!renderer->canHaveChildren() || hasARenderedDescendant(node.get()) || node->rootEditableElement() == node))
             return;
             
-        RefPtr<Node> next = node->parentNode();
+        RefPtr<ContainerNode> next = node->parentNode();
         removeNode(node);
         node = next;
     }
@@ -859,7 +865,8 @@ void CompositeEditCommand::moveParagraphWithClones(const VisiblePosition& startO
     beforeParagraph = VisiblePosition(beforeParagraph.deepEquivalent());
     afterParagraph = VisiblePosition(afterParagraph.deepEquivalent());
 
-    if (beforeParagraph.isNotNull() && !isTableElement(beforeParagraph.deepEquivalent().node()) && (!isEndOfParagraph(beforeParagraph) || beforeParagraph == afterParagraph)) {
+    if (beforeParagraph.isNotNull() && !isTableElement(beforeParagraph.deepEquivalent().node())
+        && ((!isEndOfParagraph(beforeParagraph) && !isStartOfParagraph(beforeParagraph)) || beforeParagraph == afterParagraph)) {
         // FIXME: Trim text between beforeParagraph and afterParagraph if they aren't equal.
         insertNodeAt(createBreakElement(document()), beforeParagraph.deepEquivalent());
     }
@@ -930,9 +937,9 @@ void CompositeEditCommand::moveParagraphs(const VisiblePosition& startOfParagrap
     // A non-empty paragraph's style is moved when we copy and move it.  We don't move 
     // anything if we're given an empty paragraph, but an empty paragraph can have style
     // too, <div><b><br></b></div> for example.  Save it so that we can preserve it later.
-    RefPtr<CSSMutableStyleDeclaration> styleInEmptyParagraph;
+    RefPtr<EditingStyle> styleInEmptyParagraph;
     if (startOfParagraphToMove == endOfParagraphToMove && preserveStyle) {
-        styleInEmptyParagraph = ApplyStyleCommand::editingStyleAtPosition(startOfParagraphToMove.deepEquivalent(), IncludeTypingStyle);
+        styleInEmptyParagraph = editingStyleIncludingTypingStyle(startOfParagraphToMove.deepEquivalent());
         // The moved paragraph should assume the block style of the destination.
         styleInEmptyParagraph->removeBlockProperties();
     }
@@ -976,8 +983,8 @@ void CompositeEditCommand::moveParagraphs(const VisiblePosition& startOfParagrap
     // If the selection is in an empty paragraph, restore styles from the old empty paragraph to the new empty paragraph.
     bool selectionIsEmptyParagraph = endingSelection().isCaret() && isStartOfParagraph(endingSelection().visibleStart()) && isEndOfParagraph(endingSelection().visibleStart());
     if (styleInEmptyParagraph && selectionIsEmptyParagraph)
-        applyStyle(styleInEmptyParagraph.get());
-    
+        applyStyle(styleInEmptyParagraph->style());
+
     if (preserveSelection && startIndex != -1) {
         // Fragment creation (using createMarkup) incorrectly uses regular
         // spaces instead of nbsps for some spaces that were rendered (11475), which
@@ -998,9 +1005,9 @@ bool CompositeEditCommand::breakOutOfEmptyListItem()
     if (!emptyListItem)
         return false;
 
-    RefPtr<CSSMutableStyleDeclaration> style = ApplyStyleCommand::editingStyleAtPosition(endingSelection().start(), IncludeTypingStyle);
+    RefPtr<EditingStyle> style = editingStyleIncludingTypingStyle(endingSelection().start());
 
-    Node* listNode = emptyListItem->parentNode();
+    ContainerNode* listNode = emptyListItem->parentNode();
     // FIXME: Can't we do something better when the immediate parent wasn't a list node?
     if (!listNode
         || (!listNode->hasTagName(ulTag) && !listNode->hasTagName(olTag))
@@ -1009,7 +1016,7 @@ bool CompositeEditCommand::breakOutOfEmptyListItem()
         return false;
 
     RefPtr<Element> newBlock = 0;
-    if (Node* blockEnclosingList = listNode->parentNode()) {
+    if (ContainerNode* blockEnclosingList = listNode->parentNode()) {
         if (blockEnclosingList->hasTagName(liTag)) { // listNode is inside another list item
             if (visiblePositionAfterNode(blockEnclosingList) == visiblePositionAfterNode(listNode)) {
                 // If listNode appears at the end of the outer list item, then move listNode outside of this list item
@@ -1047,10 +1054,10 @@ bool CompositeEditCommand::breakOutOfEmptyListItem()
     appendBlockPlaceholder(newBlock);
     setEndingSelection(VisibleSelection(Position(newBlock.get(), 0), DOWNSTREAM));
 
-    prepareEditingStyleToApplyAt(style.get(), endingSelection().start());
-    if (style->length())
-        applyStyle(style.get());
-    
+    style->prepareToApplyAt(endingSelection().start());
+    if (!style->isEmpty())
+        applyStyle(style->style());
+
     return true;
 }
 
@@ -1100,7 +1107,7 @@ bool CompositeEditCommand::breakOutOfEmptyMailBlockquotedParagraph()
     } else {
         ASSERT(caretPos.deprecatedEditingOffset() == 0);
         Text* textNode = static_cast<Text*>(caretPos.node());
-        Node* parentNode = textNode->parentNode();
+        ContainerNode* parentNode = textNode->parentNode();
         // The preserved newline must be the first thing in the node, since otherwise the previous
         // paragraph would be quoted, and we verified that it wasn't above.
         deleteTextFromNode(textNode, 0, 1);
@@ -1179,6 +1186,8 @@ PassRefPtr<Node> CompositeEditCommand::splitTreeToNode(Node* start, Node* end, b
 
     RefPtr<Node> node;
     for (node = start; node && node->parent() != end; node = node->parent()) {
+        if (!node->parent()->isElementNode())
+            break;
         VisiblePosition positionInParent(Position(node->parent(), 0), DOWNSTREAM);
         VisiblePosition positionInNode(Position(node, 0), DOWNSTREAM);
         if (positionInParent != positionInNode)

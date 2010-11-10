@@ -40,21 +40,17 @@ public:
     bool lastChangeWasUserEdit() const { return m_lastChangeWasUserEdit; }
     void setLastChangeWasUserEdit(bool lastChangeWasUserEdit);
 
-    int selectionStart();
-    int selectionEnd();
-    void setSelectionStart(int);
-    void setSelectionEnd(int);
-    void select();
-    void setSelectionRange(int start, int end);
-    VisibleSelection selection(int start, int end) const;
+    int selectionStart() const;
+    int selectionEnd() const;
+    PassRefPtr<Range> selection(int start, int end) const;
 
     virtual void subtreeHasChanged();
     String text();
     String textWithHardLineBreaks();
     void selectionChanged(bool userTriggered);
 
-    VisiblePosition visiblePositionForIndex(int index);
-    int indexForVisiblePosition(const VisiblePosition&);
+    VisiblePosition visiblePositionForIndex(int index) const;
+    int indexForVisiblePosition(const VisiblePosition&) const;
 
     void updatePlaceholderVisibility(bool, bool);
 
@@ -109,10 +105,15 @@ private:
 
     String finishText(Vector<UChar>&) const;
 
+    bool hasVisibleTextArea() const;
+    friend void setSelectionRange(Node*, int start, int end);
+
     bool m_wasChangedSinceLastChangeEvent;
     bool m_lastChangeWasUserEdit;
     RefPtr<TextControlInnerTextElement> m_innerText;
 };
+
+void setSelectionRange(Node*, int start, int end);
 
 inline RenderTextControl* toRenderTextControl(RenderObject* object)
 { 

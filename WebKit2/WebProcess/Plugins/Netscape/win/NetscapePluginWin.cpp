@@ -33,6 +33,8 @@
 
 using namespace WebCore;
 
+extern "C" HINSTANCE gInstance;
+
 namespace WebKit {
 
 static LPCWSTR windowClassName = L"org.webkit.NetscapePluginWindow";
@@ -45,13 +47,19 @@ static void registerPluginView()
     didRegister = true;
 
     WNDCLASSW windowClass = {0};
-    windowClass.style = CS_DBLCLKS | CS_PARENTDC;
+    windowClass.style = CS_DBLCLKS;
     windowClass.lpfnWndProc = ::DefWindowProcW;
+    windowClass.hInstance = gInstance;
     windowClass.hCursor = ::LoadCursorW(0, IDC_ARROW);
     windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
     windowClass.lpszClassName = windowClassName;
 
     ::RegisterClassW(&windowClass);
+}
+
+HWND NetscapePlugin::containingWindow() const
+{
+    return m_pluginController->nativeParentWindow();
 }
 
 bool NetscapePlugin::platformPostInitialize()
@@ -63,7 +71,7 @@ bool NetscapePlugin::platformPostInitialize()
 
     registerPluginView();
 
-    m_window = ::CreateWindowExW(0, windowClassName, 0, WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, m_pluginController->nativeParentWindow(), 0, 0, 0);
+    m_window = ::CreateWindowExW(0, windowClassName, 0, WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, containingWindow(), 0, 0, 0);
     if (!m_window)
         return false;
 
@@ -88,15 +96,41 @@ void NetscapePlugin::platformDestroy()
     ::DestroyWindow(m_window);
 }
 
+bool NetscapePlugin::platformInvalidate(const IntRect& invalidRect)
+{
+    if (!m_isWindowed)
+        return false;
+
+    RECT rect = invalidRect;
+    ::InvalidateRect(m_window, &rect, FALSE);
+    return true;
+}
+
+enum RedrawOrNot { DoNotRedraw, Redraw };
+static void setWindowRegion(HWND window, PassOwnPtr<HRGN> popRegion, RedrawOrNot redrawOrNot)
+{
+    OwnPtr<HRGN> region = popRegion;
+
+    if (!::SetWindowRgn(window, region.get(), redrawOrNot == Redraw))
+        return;
+
+    // Windows owns the region now.
+    region.leakPtr();
+}
+
 void NetscapePlugin::platformGeometryDidChange()
 {
     if (!m_isWindowed)
         return;
 
+    IntRect clipRectInPluginWindowCoordinates = m_clipRect;
+    clipRectInPluginWindowCoordinates.move(-m_frameRect.x(), -m_frameRect.y());
+
+    OwnPtr<HRGN> clipRegion = adoptPtr(::CreateRectRgn(clipRectInPluginWindowCoordinates.x(), clipRectInPluginWindowCoordinates.y(), clipRectInPluginWindowCoordinates.right(), clipRectInPluginWindowCoordinates.bottom()));
+    setWindowRegion(m_window, clipRegion.release(), Redraw);
+
     // FIXME: We should only update the size here and let the UI process update our position so
     // that we can keep our position in sync when scrolling, etc.
-    // FIXME: We should also set a window region based on m_clipRect. Perhaps that should happen in
-    // the UI process, too.
     ::MoveWindow(m_window, m_frameRect.x(), m_frameRect.y(), m_frameRect.width(), m_frameRect.height(), TRUE);
 }
 
@@ -150,7 +184,7 @@ NPEvent toNP(const WebMouseEvent& event)
     if (event.shiftKey())
         npEvent.wParam |= MK_SHIFT;
 
-    npEvent.lParam = MAKELPARAM(event.positionX(), event.positionY());
+    npEvent.lParam = MAKELPARAM(event.position().x(), event.position().y());
 
     switch (event.type()) {
     case WebEvent::MouseMove:
@@ -248,6 +282,12 @@ bool NetscapePlugin::platformHandleMouseLeaveEvent(const WebMouseEvent& event)
     NPEvent npEvent = toNP(event);
     NPP_HandleEvent(&npEvent);
     return true;
+}
+
+bool NetscapePlugin::platformHandleKeyboardEvent(const WebKeyboardEvent&)
+{
+    notImplemented();
+    return false;
 }
 
 } // namespace WebKit

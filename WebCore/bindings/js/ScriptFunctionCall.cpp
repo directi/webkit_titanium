@@ -33,7 +33,6 @@
 
 #include "JSDOMBinding.h"
 #include "JSMainThreadExecState.h"
-#include "ScriptString.h"
 #include "ScriptValue.h"
 
 #include <runtime/JSLock.h>
@@ -50,11 +49,6 @@ void ScriptCallArgumentHandler::appendArgument(const ScriptObject& argument)
         return;
     }
     m_arguments.append(argument.jsObject());
-}
-
-void ScriptCallArgumentHandler::appendArgument(const ScriptString& argument)
-{
-    m_arguments.append(jsString(m_exec, argument.ustring()));
 }
 
 void ScriptCallArgumentHandler::appendArgument(const ScriptValue& argument)
@@ -88,31 +82,31 @@ void ScriptCallArgumentHandler::appendArgument(JSC::JSValue argument)
 void ScriptCallArgumentHandler::appendArgument(long argument)
 {
     JSLock lock(SilenceAssertionsOnly);
-    m_arguments.append(jsNumber(m_exec, argument));
+    m_arguments.append(jsNumber(argument));
 }
 
 void ScriptCallArgumentHandler::appendArgument(long long argument)
 {
     JSLock lock(SilenceAssertionsOnly);
-    m_arguments.append(jsNumber(m_exec, argument));
+    m_arguments.append(jsNumber(argument));
 }
 
 void ScriptCallArgumentHandler::appendArgument(unsigned int argument)
 {
     JSLock lock(SilenceAssertionsOnly);
-    m_arguments.append(jsNumber(m_exec, argument));
+    m_arguments.append(jsNumber(argument));
 }
 
 void ScriptCallArgumentHandler::appendArgument(unsigned long argument)
 {
     JSLock lock(SilenceAssertionsOnly);
-    m_arguments.append(jsNumber(m_exec, argument));
+    m_arguments.append(jsNumber(argument));
 }
 
 void ScriptCallArgumentHandler::appendArgument(int argument)
 {
     JSLock lock(SilenceAssertionsOnly);
-    m_arguments.append(jsNumber(m_exec, argument));
+    m_arguments.append(jsNumber(argument));
 }
 
 void ScriptCallArgumentHandler::appendArgument(bool argument)

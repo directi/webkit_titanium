@@ -47,10 +47,7 @@ namespace WebKit {
 
 class PluginView : public WebCore::PluginViewBase, WebCore::MediaCanStartListener, PluginController, WebFrame::LoadListener {
 public:
-    static PassRefPtr<PluginView> create(WebCore::HTMLPlugInElement* pluginElement, PassRefPtr<Plugin> plugin, const Plugin::Parameters& parameters)
-    {
-        return adoptRef(new PluginView(pluginElement, plugin, parameters));
-    }
+    static PassRefPtr<PluginView> create(PassRefPtr<WebCore::HTMLPlugInElement>, PassRefPtr<Plugin>, const Plugin::Parameters&);
 
     WebCore::Frame* frame();
 
@@ -68,7 +65,7 @@ public:
 #endif
 
 private:
-    PluginView(WebCore::HTMLPlugInElement*, PassRefPtr<Plugin>, const Plugin::Parameters& parameters);
+    PluginView(PassRefPtr<WebCore::HTMLPlugInElement>, PassRefPtr<Plugin>, const Plugin::Parameters& parameters);
     virtual ~PluginView();
 
     void initializePlugin();
@@ -98,6 +95,7 @@ private:
     virtual PlatformLayer* platformLayer() const;
 #endif
     virtual JSC::JSObject* scriptObject(JSC::JSGlobalObject*);
+    virtual void privateBrowsingStateChanged(bool);
     
     // WebCore::Widget
     virtual void setFrameRect(const WebCore::IntRect&);
@@ -127,12 +125,16 @@ private:
 #if PLATFORM(WIN)
     virtual HWND nativeParentWindow();
 #endif
+    virtual String proxiesForURL(const String&);
+    virtual String cookiesForURL(const String&);
+    virtual void setCookiesForURL(const String& urlString, const String& cookieString);
+    virtual bool isPrivateBrowsingEnabled();
 
     // WebFrame::LoadListener
     virtual void didFinishLoad(WebFrame*);
     virtual void didFailLoad(WebFrame*, bool wasCancelled);
 
-    WebCore::HTMLPlugInElement* m_pluginElement;
+    RefPtr<WebCore::HTMLPlugInElement> m_pluginElement;
     RefPtr<Plugin> m_plugin;
     WebPage* m_webPage;
     Plugin::Parameters m_parameters;

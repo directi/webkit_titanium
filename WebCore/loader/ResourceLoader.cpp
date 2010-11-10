@@ -36,12 +36,12 @@
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
-#include "InspectorController.h"
-#include "InspectorTimelineAgent.h"
+#include "InspectorInstrumentation.h"
 #include "Page.h"
 #include "ProgressTracker.h"
-#include "ResourceHandle.h"
 #include "ResourceError.h"
+#include "ResourceHandle.h"
+#include "ResourceLoadScheduler.h"
 #include "Settings.h"
 #include "SharedBuffer.h"
 
@@ -96,6 +96,8 @@ void ResourceLoader::releaseResources()
 
     m_identifier = 0;
 
+    resourceLoadScheduler()->remove(this);
+
     if (m_handle) {
         // Clear out the ResourceHandle's client so that it doesn't try to call
         // us back after we release it, unless it has been replaced by someone else.
@@ -131,22 +133,33 @@ bool ResourceLoader::load(const ResourceRequest& r)
         didFail(frameLoader()->cancelledError(r));
         return false;
     }
+
+    if (m_defersLoading)
+        m_deferredRequest = clientRequest;
+
+    return true;
+}
+
+bool ResourceLoader::start()
+{
+    ASSERT(!m_handle);
+#ifndef NDEBUG
+    resourceLoadScheduler()->assertLoaderBeingCounted(this);
+#endif
     
-    if (m_documentLoader->scheduleArchiveLoad(this, clientRequest, r.url()))
+    if (m_documentLoader->scheduleArchiveLoad(this, m_request, m_request.url()))
         return true;
     
 #if ENABLE(OFFLINE_WEB_APPLICATIONS)
-    if (m_documentLoader->applicationCacheHost()->maybeLoadResource(this, clientRequest, r.url()))
+    if (m_documentLoader->applicationCacheHost()->maybeLoadResource(this, m_request, m_request.url()))
         return true;
 #endif
 
-    if (m_defersLoading) {
-        m_deferredRequest = clientRequest;
-        return true;
-    }
-    
-    m_handle = ResourceHandle::create(m_frame->loader()->networkingContext(), clientRequest, this, m_defersLoading, m_shouldContentSniff);
+    if (m_defersLoading)
+        return false;
 
+    if (!m_reachedTerminalState)
+        m_handle = ResourceHandle::create(m_frame->loader()->networkingContext(), m_request, this, m_defersLoading, m_shouldContentSniff);
     return true;
 }
 
@@ -224,6 +237,8 @@ void ResourceLoader::willSendRequest(ResourceRequest& request, const ResourceRes
         frameLoader()->notifier()->willSendRequest(this, request, redirectResponse);
     }
 
+    if (!redirectResponse.isNull())
+        resourceLoadScheduler()->crossOriginRedirectReceived(this, request.url());
     m_request = request;
 }
 
@@ -401,44 +416,20 @@ void ResourceLoader::didSendData(ResourceHandle*, unsigned long long bytesSent, 
 
 void ResourceLoader::didReceiveResponse(ResourceHandle*, const ResourceResponse& response)
 {
-#if ENABLE(INSPECTOR)
-    if (InspectorTimelineAgent::instanceCount()) {
-        InspectorTimelineAgent* timelineAgent = (m_frame && m_frame->page()) ? m_frame->page()->inspectorTimelineAgent() : 0;
-        if (timelineAgent)
-            timelineAgent->willReceiveResourceResponse(identifier(), response);
-    }
-#endif
 #if ENABLE(OFFLINE_WEB_APPLICATIONS)
     if (documentLoader()->applicationCacheHost()->maybeLoadFallbackForResponse(this, response))
         return;
 #endif
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willReceiveResourceResponse(m_frame.get(), identifier(), response);
     didReceiveResponse(response);
-#if ENABLE(INSPECTOR)
-    if (InspectorTimelineAgent::instanceCount()) {
-        InspectorTimelineAgent* timelineAgent = (m_frame && m_frame->page()) ? m_frame->page()->inspectorTimelineAgent() : 0;
-        if (timelineAgent)
-            timelineAgent->didReceiveResourceResponse();
-    }
-#endif
+    InspectorInstrumentation::didReceiveResourceResponse(cookie);
 }
 
 void ResourceLoader::didReceiveData(ResourceHandle*, const char* data, int length, int lengthReceived)
 {
-#if ENABLE(INSPECTOR)
-    if (InspectorTimelineAgent::instanceCount()) {
-        InspectorTimelineAgent* timelineAgent = (m_frame && m_frame->page()) ? m_frame->page()->inspectorTimelineAgent() : 0;
-        if (timelineAgent)
-            timelineAgent->willReceiveResourceData(identifier());
-    }
-#endif
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willReceiveResourceData(m_frame.get(), identifier());
     didReceiveData(data, length, lengthReceived, false);
-#if ENABLE(INSPECTOR)
-    if (InspectorTimelineAgent::instanceCount()) {
-        InspectorTimelineAgent* timelineAgent = (m_frame && m_frame->page()) ? m_frame->page()->inspectorTimelineAgent() : 0;
-        if (timelineAgent)
-            timelineAgent->didReceiveResourceData();
-    }
-#endif
+    InspectorInstrumentation::didReceiveResourceData(cookie);
 }
 
 void ResourceLoader::didFinishLoading(ResourceHandle*, double finishTime)

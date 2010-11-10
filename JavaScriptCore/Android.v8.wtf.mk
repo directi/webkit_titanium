@@ -36,6 +36,7 @@ LOCAL_SRC_FILES := \
 	wtf/ByteArray.cpp \
 	wtf/CurrentTime.cpp \
 	wtf/DateMath.cpp \
+	wtf/DecimalNumber.cpp \
 	wtf/FastMalloc.cpp \
 	wtf/HashTable.cpp \
 	wtf/MainThread.cpp \
@@ -54,6 +55,7 @@ LOCAL_SRC_FILES := \
 	\
 	wtf/text/AtomicString.cpp \
 	wtf/text/CString.cpp \
+	wtf/text/StringBuidler.cpp \
 	wtf/text/StringImpl.cpp \
 	wtf/text/WTFString.cpp \
 	\

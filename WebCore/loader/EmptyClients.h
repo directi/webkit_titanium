@@ -102,8 +102,9 @@ public:
     virtual void takeFocus(FocusDirection) { }
 
     virtual void focusedNodeChanged(Node*) { }
+    virtual void focusedFrameChanged(Frame*) { }
 
-    virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&) { return 0; }
+    virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, const NavigationAction&) { return 0; }
     virtual void show() { }
 
     virtual bool canRunModal() { return false; }
@@ -139,6 +140,10 @@ public:
     virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const { return adoptRef(new EmptyPopupMenu()); }
     virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const { return adoptRef(new EmptySearchPopupMenu()); }
 
+#if ENABLE(CONTEXT_MENUS)
+    virtual void showContextMenu() { }
+#endif
+
     virtual void setStatusbarText(const String&) { }
 
     virtual bool tabsToLinks() const { return false; }
@@ -149,6 +154,9 @@ public:
     virtual void invalidateContentsAndWindow(const IntRect&, bool) { }
     virtual void invalidateContentsForSlowScroll(const IntRect&, bool) {};
     virtual void scroll(const IntSize&, const IntRect&, const IntRect&) { }
+#if ENABLE(TILED_BACKING_STORE)
+    virtual void delegatedScrollRequested(const IntSize&) { }
+#endif
 
     virtual IntPoint screenToWindow(const IntPoint& p) const { return p; }
     virtual IntRect windowToScreen(const IntRect& r) const { return r; }
@@ -259,7 +267,7 @@ public:
     virtual void dispatchDidFirstLayout() { }
     virtual void dispatchDidFirstVisuallyNonEmptyLayout() { }
 
-    virtual Frame* dispatchCreatePage() { return 0; }
+    virtual Frame* dispatchCreatePage(const NavigationAction&) { return 0; }
     virtual void dispatchShow() { }
 
     virtual void dispatchDecidePolicyForMIMEType(FramePolicyFunction, const String&, const ResourceRequest&) { }
@@ -325,6 +333,8 @@ public:
     virtual void transitionToCommittedFromCachedFrame(CachedFrame*) { }
     virtual void transitionToCommittedForNewPage() { }    
 
+    virtual void dispatchDidBecomeFrameset(bool) { }
+
     virtual void updateGlobalHistory() { }
     virtual void updateGlobalHistoryRedirectLinks() { }
     virtual bool shouldGoToHistoryItem(HistoryItem*) const { return false; }
@@ -337,6 +347,7 @@ public:
     virtual void didRunInsecureContent(SecurityOrigin*) { }
     virtual PassRefPtr<Frame> createFrame(const KURL&, const String&, HTMLFrameOwnerElement*, const String&, bool, int, int) { return 0; }
     virtual void didTransferChildFrameToNewDocument(Page*) { }
+    virtual void transferLoadingResourceFromPage(unsigned long, DocumentLoader*, const ResourceRequest&, Page*) { }
     virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool) { return 0; }
     virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const KURL&, const Vector<String>&, const Vector<String>&) { return 0; }
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
@@ -468,9 +479,9 @@ public:
 #if PLATFORM(MAC) && !defined(BUILDING_ON_TIGER) && !defined(BUILDING_ON_LEOPARD)
     virtual void checkTextOfParagraph(const UChar*, int, uint64_t, Vector<TextCheckingResult>&) { };
 #endif
-#if PLATFORM(MAC) && !defined(BUILDING_ON_TIGER) && !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
-    virtual void showCorrectionPanel(const FloatRect&, const String&, const String&, Editor*) { }
-    virtual void dismissCorrectionPanel(bool) { }
+#if SUPPORT_AUTOCORRECTION_PANEL
+    virtual void showCorrectionPanel(CorrectionPanelInfo::PanelType, const FloatRect&, const String&, const String&, Editor*) { }
+    virtual void dismissCorrectionPanel(CorrectionWasRejectedOrNot) { }
     virtual bool isShowingCorrectionPanel() { return false; }
 #endif
     virtual void updateSpellingUIWithGrammarString(const String&, const GrammarDetail&) { }

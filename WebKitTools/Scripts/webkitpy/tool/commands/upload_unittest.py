@@ -52,11 +52,13 @@ class UploadCommandsTest(CommandsTest):
 
     def test_post(self):
         options = MockOptions()
+        options.cc = None
+        options.check_style = True
+        options.comment = None
         options.description = "MOCK description"
         options.request_commit = False
         options.review = True
-        options.comment = None
-        options.cc = None
+        options.suggest_reviewers = False
         expected_stderr = """Running check-webkit-style
 MOCK: user.open_url: file://...
 Obsoleting 2 old patches on bug 42
@@ -66,7 +68,8 @@ None
 -- End comment --
 MOCK: user.open_url: http://example.com/42
 """
-        self.assert_execute_outputs(Post(), [42], options=options, expected_stderr=expected_stderr)
+        expected_stdout = "Was that diff correct?\n"
+        self.assert_execute_outputs(Post(), [42], options=options, expected_stdout=expected_stdout, expected_stderr=expected_stderr)
 
     def test_land_safely(self):
         expected_stderr = "Obsoleting 2 old patches on bug 42\nMOCK add_patch_to_bug: bug_id=42, description=Patch for landing, mark_for_review=False, mark_for_commit_queue=False, mark_for_landing=True\n-- Begin comment --\nNone\n-- End comment --\n"
@@ -81,11 +84,13 @@ MOCK: user.open_url: http://example.com/42
 
     def test_upload(self):
         options = MockOptions()
+        options.cc = None
+        options.check_style = True
+        options.comment = None
         options.description = "MOCK description"
         options.request_commit = False
         options.review = True
-        options.comment = None
-        options.cc = None
+        options.suggest_reviewers = False
         expected_stderr = """Running check-webkit-style
 MOCK: user.open_url: file://...
 Obsoleting 2 old patches on bug 42
@@ -95,7 +100,8 @@ None
 -- End comment --
 MOCK: user.open_url: http://example.com/42
 """
-        self.assert_execute_outputs(Upload(), [42], options=options, expected_stderr=expected_stderr)
+        expected_stdout = "Was that diff correct?\n"
+        self.assert_execute_outputs(Upload(), [42], options=options, expected_stdout=expected_stdout, expected_stderr=expected_stderr)
 
     def test_mark_bug_fixed(self):
         tool = MockTool()
@@ -103,8 +109,9 @@ MOCK: user.open_url: http://example.com/42
         options = Mock()
         options.bug_id = 42
         options.comment = "MOCK comment"
-        expected_stderr = "Bug: <http://example.com/42> Bug with two r+'d and cq+'d patches, one of which has an invalid commit-queue setter.\nRevision: 9876\nMOCK: user.open_url: http://example.com/42\nAdding comment to Bug 42.\nMOCK bug comment: bug_id=42, cc=None\n--- Begin comment ---\\MOCK comment\n\nCommitted r9876: <http://trac.webkit.org/changeset/9876>\n--- End comment ---\n\n"
-        self.assert_execute_outputs(MarkBugFixed(), [], expected_stderr=expected_stderr, tool=tool, options=options)
+        expected_stderr = "Bug: <http://example.com/42> Bug with two r+'d and cq+'d patches, one of which has an invalid commit-queue setter.\nRevision: 9876\nMOCK: user.open_url: http://example.com/42\nAdding comment to Bug 42.\nMOCK bug comment: bug_id=42, cc=None\n--- Begin comment ---\nMOCK comment\n\nCommitted r9876: <http://trac.webkit.org/changeset/9876>\n--- End comment ---\n\n"
+        expected_stdout = "Is this correct?\n"
+        self.assert_execute_outputs(MarkBugFixed(), [], expected_stdout=expected_stdout, expected_stderr=expected_stderr, tool=tool, options=options)
 
     def test_edit_changelog(self):
         self.assert_execute_outputs(EditChangeLogs(), [])

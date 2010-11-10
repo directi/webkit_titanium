@@ -29,8 +29,6 @@
 
 import os
 
-from optparse import make_option
-
 import webkitpy.tool.steps as steps
 
 from webkitpy.common.checkout.changelog import ChangeLog, view_source_url
@@ -41,6 +39,17 @@ from webkitpy.tool.comments import bug_comment_from_commit_text
 from webkitpy.tool.grammar import pluralize
 from webkitpy.tool.multicommandtool import AbstractDeclarativeCommand
 from webkitpy.common.system.deprecated_logging import error, log
+
+
+class Clean(AbstractSequencedCommand):
+    name = "clean"
+    help_text = "Clean the working copy"
+    steps = [
+        steps.CleanWorkingDirectory,
+    ]
+
+    def _prepare_state(self, options, args, tool):
+        options.force_clean = True
 
 
 class Update(AbstractSequencedCommand):
@@ -60,6 +69,9 @@ class Build(AbstractSequencedCommand):
         steps.Update,
         steps.Build,
     ]
+
+    def _prepare_state(self, options, args, tool):
+        options.build = True
 
 
 class BuildAndTest(AbstractSequencedCommand):
@@ -92,8 +104,10 @@ land will NOT build and run the tests before committing, but you can use the --b
 If a bug id is provided, or one can be found in the ChangeLog land will update the bug after committing."""
 
     def _prepare_state(self, options, args, tool):
+        changed_files = self._tool.scm().changed_files(options.git_commit)
         return {
-            "bug_id": (args and args[0]) or tool.checkout().bug_id_for_this_commit(options.git_commit),
+            "changed_files": changed_files,
+            "bug_id": (args and args[0]) or tool.checkout().bug_id_for_this_commit(options.git_commit, changed_files),
         }
 
 
@@ -204,18 +218,6 @@ class BuildAndTestAttachment(AbstractPatchSequencingCommand, ProcessAttachmentsM
         steps.ApplyPatch,
         steps.Build,
         steps.RunTests,
-    ]
-
-
-class PostAttachmentToRietveld(AbstractPatchSequencingCommand, ProcessAttachmentsMixin):
-    name = "post-attachment-to-rietveld"
-    help_text = "Uploads a bugzilla attachment to rietveld"
-    arguments_names = "ATTACHMENTID"
-    main_steps = [
-        steps.CleanWorkingDirectory,
-        steps.Update,
-        steps.ApplyPatch,
-        steps.PostCodeReview,
     ]
 
 

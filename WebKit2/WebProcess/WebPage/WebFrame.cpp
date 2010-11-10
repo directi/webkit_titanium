@@ -25,11 +25,13 @@
 
 #include "WebFrame.h"
 
+#include "DownloadManager.h"
 #include "InjectedBundleNodeHandle.h"
 #include "InjectedBundleRangeHandle.h"
 #include "InjectedBundleScriptWorld.h"
 #include "WebChromeClient.h"
 #include "WebPage.h"
+#include "WebPageProxyMessages.h"
 #include "WebProcess.h"
 #include <JavaScriptCore/APICast.h>
 #include <JavaScriptCore/JSLock.h>
@@ -45,7 +47,9 @@
 #include <WebCore/JSRange.h>
 #include <WebCore/Page.h>
 #include <WebCore/RenderTreeAsText.h>
+#include <WebCore/TextIterator.h>
 #include <WebCore/TextResourceDecoder.h>
+#include <wtf/text/StringBuilder.h>
 
 #ifndef NDEBUG
 #include <wtf/RefCountedLeakCounter.h>
@@ -74,45 +78,46 @@ static uint64_t generateListenerID()
 
 PassRefPtr<WebFrame> WebFrame::createMainFrame(WebPage* page)
 {
-    return create(page, String(), 0);
+    RefPtr<WebFrame> frame = create();
+
+    page->send(Messages::WebPageProxy::DidCreateMainFrame(frame->frameID()));
+
+    frame->init(page, String(), 0);
+
+    return frame.release();
 }
 
 PassRefPtr<WebFrame> WebFrame::createSubframe(WebPage* page, const String& frameName, HTMLFrameOwnerElement* ownerElement)
 {
-    return create(page, frameName, ownerElement);
-}
+    RefPtr<WebFrame> frame = create();
 
-PassRefPtr<WebFrame> WebFrame::create(WebPage* page, const String& frameName, HTMLFrameOwnerElement* ownerElement)
-{
-    RefPtr<WebFrame> frame = adoptRef(new WebFrame(page, frameName, ownerElement));
-    
-    // Add explict ref() that will be balanced in WebFrameLoaderClient::frameLoaderDestroyed().
-    frame->ref();
-    
+    page->send(Messages::WebPageProxy::DidCreateSubFrame(frame->frameID()));
+
+    frame->init(page, frameName, ownerElement);
+
     return frame.release();
 }
 
-WebFrame::WebFrame(WebPage* page, const String& frameName, HTMLFrameOwnerElement* ownerElement)
+PassRefPtr<WebFrame> WebFrame::create()
+{
+    RefPtr<WebFrame> frame = adoptRef(new WebFrame);
+
+    // Add explict ref() that will be balanced in WebFrameLoaderClient::frameLoaderDestroyed().
+    frame->ref();
+
+    return frame.release();
+}
+
+WebFrame::WebFrame()
     : m_coreFrame(0)
     , m_policyListenerID(0)
     , m_policyFunction(0)
+    , m_policyDownloadID(0)
     , m_frameLoaderClient(this)
     , m_loadListener(0)
     , m_frameID(generateFrameID())
 {
     WebProcess::shared().addWebFrame(m_frameID, this);
-
-    RefPtr<Frame> frame = Frame::create(page->corePage(), ownerElement, &m_frameLoaderClient);
-    m_coreFrame = frame.get();
-
-    frame->tree()->setName(frameName);
-
-    if (ownerElement) {
-        ASSERT(ownerElement->document()->frame());
-        ownerElement->document()->frame()->tree()->appendChild(frame);
-    }
-
-    frame->init();
 
 #ifndef NDEBUG
     webFrameCounter.increment();
@@ -126,6 +131,21 @@ WebFrame::~WebFrame()
 #ifndef NDEBUG
     webFrameCounter.decrement();
 #endif
+}
+
+void WebFrame::init(WebPage* page, const String& frameName, HTMLFrameOwnerElement* ownerElement)
+{
+    RefPtr<Frame> frame = Frame::create(page->corePage(), ownerElement, &m_frameLoaderClient);
+    m_coreFrame = frame.get();
+
+    frame->tree()->setName(frameName);
+
+    if (ownerElement) {
+        ASSERT(ownerElement->document()->frame());
+        ownerElement->document()->frame()->tree()->appendChild(frame);
+    }
+
+    frame->init();
 }
 
 WebPage* WebFrame::page() const
@@ -161,11 +181,12 @@ void WebFrame::invalidatePolicyListener()
     if (!m_policyListenerID)
         return;
 
+    m_policyDownloadID = 0;
     m_policyListenerID = 0;
     m_policyFunction = 0;
 }
 
-void WebFrame::didReceivePolicyDecision(uint64_t listenerID, PolicyAction action)
+void WebFrame::didReceivePolicyDecision(uint64_t listenerID, PolicyAction action, uint64_t downloadID)
 {
     if (!m_coreFrame)
         return;
@@ -182,7 +203,18 @@ void WebFrame::didReceivePolicyDecision(uint64_t listenerID, PolicyAction action
 
     invalidatePolicyListener();
 
+    m_policyDownloadID = downloadID;
+
     (m_coreFrame->loader()->policyChecker()->*function)(action);
+}
+
+void WebFrame::startDownload(const WebCore::ResourceRequest& request)
+{
+    ASSERT(m_policyDownloadID);
+
+    DownloadManager::shared().startDownload(m_policyDownloadID, request);
+
+    m_policyDownloadID = 0;
 }
 
 String WebFrame::source() const 
@@ -204,6 +236,51 @@ String WebFrame::source() const
     return decoder->encoding().decode(mainResourceData->data(), mainResourceData->size());
 }
 
+String WebFrame::contentsAsString() const 
+{
+    if (!m_coreFrame)
+        return String();
+
+    if (isFrameSet()) {
+        StringBuilder builder;
+        for (Frame* child = m_coreFrame->tree()->firstChild(); child; child = child->tree()->nextSibling()) {
+            if (!builder.isEmpty())
+                builder.append(' ');
+            builder.append(static_cast<WebFrameLoaderClient*>(child->loader()->client())->webFrame()->contentsAsString());
+        }
+        // FIXME: It may make sense to use toStringPreserveCapacity() here.
+        return builder.toString();
+    }
+
+    Document* document = m_coreFrame->document();
+    if (!document)
+        return String();
+
+    RefPtr<Element> documentElement = document->documentElement();
+    if (!documentElement)
+        return String();
+
+    RefPtr<Range> range = document->createRange();
+
+    ExceptionCode ec = 0;
+    range->selectNode(documentElement.get(), ec);
+    if (ec)
+        return String();
+
+    return plainText(range.get());
+}
+
+bool WebFrame::isFrameSet() const
+{
+    if (!m_coreFrame)
+        return false;
+
+    Document* document = m_coreFrame->document();
+    if (!document)
+        return false;
+    return document->isFrameSet();
+}
+
 bool WebFrame::isMainFrame() const
 {
     if (WebPage* p = page())
@@ -217,7 +294,7 @@ String WebFrame::name() const
     if (!m_coreFrame)
         return String();
 
-    return m_coreFrame->tree()->name();
+    return m_coreFrame->tree()->uniqueName();
 }
 
 String WebFrame::url() const
@@ -259,7 +336,7 @@ PassRefPtr<ImmutableArray> WebFrame::childFrames()
     return ImmutableArray::adopt(vector);
 }
 
-unsigned WebFrame::numberOfActiveAnimations()
+unsigned WebFrame::numberOfActiveAnimations() const
 {
     if (!m_coreFrame)
         return 0;
@@ -290,7 +367,39 @@ bool WebFrame::pauseAnimationOnElementWithId(const String& animationName, const 
     return controller->pauseAnimationAtTime(coreNode->renderer(), animationName, time);
 }
 
-unsigned WebFrame::pendingUnloadCount()
+void WebFrame::suspendAnimations()
+{
+    if (!m_coreFrame)
+        return;
+
+    AnimationController* controller = m_coreFrame->animation();
+    if (!controller)
+        return;
+
+    controller->suspendAnimations();
+}
+
+void WebFrame::resumeAnimations()
+{
+    if (!m_coreFrame)
+        return;
+
+    AnimationController* controller = m_coreFrame->animation();
+    if (!controller)
+        return;
+
+    controller->resumeAnimations();
+}
+
+String WebFrame::layerTreeAsText() const
+{
+    if (!m_coreFrame)
+        return "";
+
+    return m_coreFrame->layerTreeAsText();
+}
+
+unsigned WebFrame::pendingUnloadCount() const
 {
     if (!m_coreFrame)
         return 0;

@@ -32,15 +32,13 @@ public:
     RenderReplaced(Node*, const IntSize& intrinsicSize);
     virtual ~RenderReplaced();
 
-    virtual void setStyle(PassRefPtr<RenderStyle>);
-
 protected:
     virtual void layout();
 
     virtual IntSize intrinsicSize() const;
 
-    virtual int computeReplacedWidth(bool includeMaxWidth = true) const;
-    virtual int computeReplacedHeight() const;
+    virtual int computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
+    virtual int computeReplacedLogicalHeight() const;
     virtual int minimumReplacedHeight() const { return 0; }
 
     virtual void setSelectionState(SelectionState);
@@ -55,20 +53,17 @@ protected:
 
     virtual void paint(PaintInfo&, int tx, int ty);
     bool shouldPaint(PaintInfo&, int& tx, int& ty);
-    IntRect localSelectionRect(bool checkWhetherSelected = true) const;
+    IntRect localSelectionRect(bool checkWhetherSelected = true) const; // This is in local coordinates, but it's a physical rect (so the top left corner is physical top left).
 
 private:
     virtual const char* renderName() const { return "RenderReplaced"; }
 
     virtual bool canHaveChildren() const { return false; }
 
-    virtual int lineHeight(bool firstLine, bool isRootLineBox = false) const;
-    virtual int baselinePosition(bool firstLine, bool isRootLineBox = false) const;
-
     virtual void computePreferredLogicalWidths();
 
-    int calcAspectRatioWidth() const;
-    int calcAspectRatioHeight() const;
+    int calcAspectRatioLogicalWidth() const;
+    int calcAspectRatioLogicalHeight() const;
 
     virtual void paintReplaced(PaintInfo&, int /*tx*/, int /*ty*/) { }
 

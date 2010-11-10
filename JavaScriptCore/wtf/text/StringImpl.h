@@ -29,7 +29,7 @@
 #include <wtf/Forward.h>
 #include <wtf/OwnFastMallocPtr.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/StringHashFunctions.h>
+#include <wtf/StringHasher.h>
 #include <wtf/Vector.h>
 #include <wtf/text/StringImplBase.h>
 #include <wtf/unicode/Unicode.h>
@@ -110,7 +110,7 @@ private:
     StringImpl(const UChar* characters, unsigned length, PassRefPtr<StringImpl> base)
         : StringImplBase(length, BufferSubstring)
         , m_data(characters)
-        , m_substringBuffer(base.releaseRef())
+        , m_substringBuffer(base.leakRef())
         , m_hash(0)
     {
         ASSERT(m_data);
@@ -122,7 +122,7 @@ private:
     StringImpl(const UChar* characters, unsigned length, PassRefPtr<SharedUChar> sharedBuffer)
         : StringImplBase(length, BufferShared)
         , m_data(characters)
-        , m_sharedBuffer(sharedBuffer.releaseRef())
+        , m_sharedBuffer(sharedBuffer.leakRef())
         , m_hash(0)
     {
         ASSERT(m_data);
@@ -165,7 +165,7 @@ public:
             return empty();
         }
 
-        if (length > ((std::numeric_limits<size_t>::max() - sizeof(StringImpl)) / sizeof(UChar))) {
+        if (length > ((std::numeric_limits<unsigned>::max() - sizeof(StringImpl)) / sizeof(UChar))) {
             output = 0;
             return 0;
         }
@@ -187,6 +187,8 @@ public:
     {
         if (size_t size = vector.size()) {
             ASSERT(vector.data());
+            if (size > std::numeric_limits<unsigned>::max())
+                CRASH();
             return adoptRef(new StringImpl(vector.releaseBuffer(), size));
         }
         return empty();

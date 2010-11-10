@@ -53,8 +53,9 @@ public:
     virtual void takeFocus(FocusDirection);
 
     virtual void focusedNodeChanged(Node*);
+    virtual void focusedFrameChanged(Frame*);
 
-    virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&);
+    virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, const NavigationAction&);
     virtual void show();
 
     virtual bool canRunModal();
@@ -115,6 +116,10 @@ public:
     virtual void reachedApplicationCacheOriginQuota(SecurityOrigin*);
 #endif
 
+#if ENABLE(CONTEXT_MENUS)
+    virtual void showContextMenu() { }
+#endif
+
     virtual void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
     virtual void chooseIconForFiles(const Vector<String>&, FileChooser*);
     virtual void formStateDidChange(const Node*);
@@ -137,7 +142,7 @@ public:
     virtual void cancelGeolocationPermissionRequestForFrame(Frame*);
     virtual void iconForFiles(const Vector<String, 0u>&, PassRefPtr<FileChooser>);
 
-    virtual void didReceiveViewportArguments(Frame* frame, const ViewportArguments& arguments) const;
+    virtual void dispatchViewportDataDidChange(const ViewportArguments&) const;
 
     virtual bool selectItemWritingDirectionIsNatural();
     virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const;

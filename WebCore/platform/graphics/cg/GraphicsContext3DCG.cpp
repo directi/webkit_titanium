@@ -41,6 +41,52 @@
 
 namespace WebCore {
 
+enum SourceDataFormatBase {
+    SourceFormatBaseR = 0,
+    SourceFormatBaseA,
+    SourceFormatBaseRA,
+    SourceFormatBaseAR,
+    SourceFormatBaseRGB,
+    SourceFormatBaseRGBA,
+    SourceFormatBaseARGB,
+    SourceFormatBaseNumFormats
+};
+
+enum AlphaFormat {
+    AlphaFormatNone = 0,
+    AlphaFormatFirst,
+    AlphaFormatLast,
+    AlphaFormatNumFormats
+};
+
+// This returns SourceFormatNumFormats if the combination of input parameters is unsupported.
+static GraphicsContext3D::SourceDataFormat getSourceDataFormat(unsigned int componentsPerPixel, AlphaFormat alphaFormat, bool is16BitFormat, bool bigEndian)
+{
+    const static SourceDataFormatBase formatTableBase[4][AlphaFormatNumFormats] = { // componentsPerPixel x AlphaFormat
+        // AlphaFormatNone            AlphaFormatFirst            AlphaFormatLast
+        { SourceFormatBaseR,          SourceFormatBaseA,          SourceFormatBaseA          }, // 1 componentsPerPixel
+        { SourceFormatBaseNumFormats, SourceFormatBaseAR,         SourceFormatBaseRA         }, // 2 componentsPerPixel
+        { SourceFormatBaseRGB,        SourceFormatBaseNumFormats, SourceFormatBaseNumFormats }, // 3 componentsPerPixel
+        { SourceFormatBaseNumFormats, SourceFormatBaseARGB,       SourceFormatBaseRGBA        } // 4 componentsPerPixel
+    };
+    const static GraphicsContext3D::SourceDataFormat formatTable[SourceFormatBaseNumFormats][4] = { // SourceDataFormatBase x bitsPerComponent x endian
+        // 8bits, little endian                 8bits, big endian                     16bits, little endian                        16bits, big endian
+        { GraphicsContext3D::SourceFormatR8,    GraphicsContext3D::SourceFormatR8,    GraphicsContext3D::SourceFormatR16Little,    GraphicsContext3D::SourceFormatR16Big },
+        { GraphicsContext3D::SourceFormatA8,    GraphicsContext3D::SourceFormatA8,    GraphicsContext3D::SourceFormatA16Little,    GraphicsContext3D::SourceFormatA16Big },
+        { GraphicsContext3D::SourceFormatAR8,   GraphicsContext3D::SourceFormatRA8,   GraphicsContext3D::SourceFormatRA16Little,   GraphicsContext3D::SourceFormatRA16Big },
+        { GraphicsContext3D::SourceFormatRA8,   GraphicsContext3D::SourceFormatAR8,   GraphicsContext3D::SourceFormatAR16Little,   GraphicsContext3D::SourceFormatAR16Big },
+        { GraphicsContext3D::SourceFormatBGR8,  GraphicsContext3D::SourceFormatRGB8,  GraphicsContext3D::SourceFormatRGB16Little,  GraphicsContext3D::SourceFormatRGB16Big },
+        { GraphicsContext3D::SourceFormatABGR8, GraphicsContext3D::SourceFormatRGBA8, GraphicsContext3D::SourceFormatRGBA16Little, GraphicsContext3D::SourceFormatRGBA16Big },
+        { GraphicsContext3D::SourceFormatBGRA8, GraphicsContext3D::SourceFormatARGB8, GraphicsContext3D::SourceFormatARGB16Little, GraphicsContext3D::SourceFormatARGB16Big }
+    };
+
+    ASSERT(componentsPerPixel <= 4 && componentsPerPixel > 0);
+    SourceDataFormatBase formatBase = formatTableBase[componentsPerPixel - 1][alphaFormat];
+    if (formatBase == SourceFormatBaseNumFormats)
+        return GraphicsContext3D::SourceFormatNumFormats;
+    return formatTable[formatBase][(is16BitFormat ? 2 : 0) + (bigEndian ? 1 : 0)];
+}
+
 bool GraphicsContext3D::getImageData(Image* image,
                                      unsigned int format,
                                      unsigned int type,
@@ -62,13 +108,61 @@ bool GraphicsContext3D::getImageData(Image* image,
         cgImage = image->nativeImageForCurrentFrame();
     if (!cgImage)
         return false;
+
     size_t width = CGImageGetWidth(cgImage);
     size_t height = CGImageGetHeight(cgImage);
-    if (!width || !height || CGImageGetBitsPerComponent(cgImage) != 8)
+    if (!width || !height)
         return false;
-    size_t componentsPerPixel = CGImageGetBitsPerPixel(cgImage) / 8;
-    SourceDataFormat srcDataFormat = kSourceFormatRGBA8;
-    AlphaOp neededAlphaOp = kAlphaDoNothing;
+    size_t bitsPerComponent = CGImageGetBitsPerComponent(cgImage);
+    size_t bitsPerPixel = CGImageGetBitsPerPixel(cgImage);
+    if (bitsPerComponent != 8 && bitsPerComponent != 16)
+        return false;
+    if (bitsPerPixel % bitsPerComponent)
+        return false;
+    size_t componentsPerPixel = bitsPerPixel / bitsPerComponent;
+
+    CGBitmapInfo bitInfo = CGImageGetBitmapInfo(cgImage);
+    bool bigEndianSource = false;
+    // These could technically be combined into one large switch
+    // statement, but we prefer not to so that we fail fast if we
+    // encounter an unexpected image configuration.
+    if (bitsPerComponent == 16) {
+        switch (bitInfo & kCGBitmapByteOrderMask) {
+        case kCGBitmapByteOrder16Big:
+            bigEndianSource = true;
+            break;
+        case kCGBitmapByteOrder16Little:
+            bigEndianSource = false;
+            break;
+        case kCGBitmapByteOrderDefault:
+            // This is a bug in earlier version of cg where the default endian
+            // is little whereas the decoded 16-bit png image data is actually
+            // Big. Later version (10.6.4) no longer returns ByteOrderDefault.
+            bigEndianSource = true;
+            break;
+        default:
+            return false;
+        }
+    } else {
+        switch (bitInfo & kCGBitmapByteOrderMask) {
+        case kCGBitmapByteOrder32Big:
+            bigEndianSource = true;
+            break;
+        case kCGBitmapByteOrder32Little:
+            bigEndianSource = false;
+            break;
+        case kCGBitmapByteOrderDefault:
+            // It appears that the default byte order is actually big
+            // endian even on little endian architectures.
+            bigEndianSource = true;
+            break;
+        default:
+            return false;
+        }
+    }
+
+    AlphaOp neededAlphaOp = AlphaDoNothing;
+    AlphaFormat alphaFormat = AlphaFormatNone;
     switch (CGImageGetAlphaInfo(cgImage)) {
     case kCGImageAlphaPremultipliedFirst:
         // This path is only accessible for MacOS earlier than 10.6.4.
@@ -76,110 +170,45 @@ bool GraphicsContext3D::getImageData(Image* image,
         // in which case image->data() should be null.
         ASSERT(!image->data());
         if (!premultiplyAlpha)
-            neededAlphaOp = kAlphaDoUnmultiply;
-        switch (componentsPerPixel) {
-        case 2:
-            srcDataFormat = kSourceFormatAR8;
-            break;
-        case 4:
-            srcDataFormat = kSourceFormatARGB8;
-            break;
-        default:
-            return false;
-        }
+            neededAlphaOp = AlphaDoUnmultiply;
+        alphaFormat = AlphaFormatFirst;
         break;
     case kCGImageAlphaFirst:
         // This path is only accessible for MacOS earlier than 10.6.4.
         if (premultiplyAlpha)
-            neededAlphaOp = kAlphaDoPremultiply;
-        switch (componentsPerPixel) {
-        case 1:
-            srcDataFormat = kSourceFormatA8;
-            break;
-        case 2:
-            srcDataFormat = kSourceFormatAR8;
-            break;
-        case 4:
-            srcDataFormat = kSourceFormatARGB8;
-            break;
-        default:
-            return false;
-        }
+            neededAlphaOp = AlphaDoPremultiply;
+        alphaFormat = AlphaFormatFirst;
         break;
     case kCGImageAlphaNoneSkipFirst:
         // This path is only accessible for MacOS earlier than 10.6.4.
-        switch (componentsPerPixel) {
-        case 2:
-            srcDataFormat = kSourceFormatAR8;
-            break;
-        case 4:
-            srcDataFormat = kSourceFormatARGB8;
-            break;
-        default:
-            return false;
-        }
+        alphaFormat = AlphaFormatFirst;
         break;
     case kCGImageAlphaPremultipliedLast:
         // This is a special case for texImage2D with HTMLCanvasElement input,
         // in which case image->data() should be null.
         ASSERT(!image->data());
         if (!premultiplyAlpha)
-            neededAlphaOp = kAlphaDoUnmultiply;
-        switch (componentsPerPixel) {
-        case 2:
-            srcDataFormat = kSourceFormatRA8;
-            break;
-        case 4:
-            srcDataFormat = kSourceFormatRGBA8;
-            break;
-        default:
-            return false;
-        }
+            neededAlphaOp = AlphaDoUnmultiply;
+        alphaFormat = AlphaFormatLast;
         break;
     case kCGImageAlphaLast:
         if (premultiplyAlpha)
-            neededAlphaOp = kAlphaDoPremultiply;
-        switch (componentsPerPixel) {
-        case 1:
-            srcDataFormat = kSourceFormatA8;
-            break;
-        case 2:
-            srcDataFormat = kSourceFormatRA8;
-            break;
-        case 4:
-            srcDataFormat = kSourceFormatRGBA8;
-            break;
-        default:
-            return false;
-        }
+            neededAlphaOp = AlphaDoPremultiply;
+        alphaFormat = AlphaFormatLast;
         break;
     case kCGImageAlphaNoneSkipLast:
-        switch (componentsPerPixel) {
-        case 2:
-            srcDataFormat = kSourceFormatRA8;
-            break;
-        case 4:
-            srcDataFormat = kSourceFormatRGBA8;
-            break;
-        default:
-            return false;
-        }
+        alphaFormat = AlphaFormatLast;
         break;
     case kCGImageAlphaNone:
-        switch (componentsPerPixel) {
-        case 1:
-            srcDataFormat = kSourceFormatR8;
-            break;
-        case 3:
-            srcDataFormat = kSourceFormatRGB8;
-            break;
-        default:
-            return false;
-        }
+        alphaFormat = AlphaFormatNone;
         break;
     default:
         return false;
     }
+    SourceDataFormat srcDataFormat = getSourceDataFormat(componentsPerPixel, alphaFormat, bitsPerComponent == 16, bigEndianSource);
+    if (srcDataFormat == SourceFormatNumFormats)
+        return false;
+
     RetainPtr<CFDataRef> pixelData;
     pixelData.adoptCF(CGDataProviderCopyData(CGImageGetDataProvider(cgImage)));
     if (!pixelData)
@@ -188,7 +217,7 @@ bool GraphicsContext3D::getImageData(Image* image,
     outputVector.resize(width * height * 4);
     unsigned int srcUnpackAlignment = 0;
     size_t bytesPerRow = CGImageGetBytesPerRow(cgImage);
-    unsigned int padding = bytesPerRow - componentsPerPixel * width;
+    unsigned int padding = bytesPerRow - bitsPerPixel / 8 * width;
     if (padding) {
         srcUnpackAlignment = padding + 1;
         while (bytesPerRow % srcUnpackAlignment)

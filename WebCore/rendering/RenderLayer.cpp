@@ -524,8 +524,13 @@ void RenderLayer::setHasVisibleContent(bool b)
         RenderBoxModelObject* repaintContainer = renderer()->containerForRepaint();
         m_repaintRect = renderer()->clippedOverflowRectForRepaint(repaintContainer);
         m_outlineBox = renderer()->outlineBoundsForRepaint(repaintContainer);
-        if (!isNormalFlowOnly())
-            dirtyStackingContextZOrderLists();
+        if (!isNormalFlowOnly()) {
+            for (RenderLayer* sc = stackingContext(); sc; sc = sc->stackingContext()) {
+                sc->dirtyZOrderLists();
+                if (sc->hasVisibleContent())
+                    break;
+            }
+        }
     }
     if (parent())
         parent()->childVisibilityChanged(m_hasVisibleContent);
@@ -672,7 +677,7 @@ void RenderLayer::updateLayerPosition()
                 setHeight(box->bottomLayoutOverflow());
         }
         
-        localPoint += box->locationOffset();
+        localPoint += box->locationOffsetIncludingFlipping();
     }
 
     // Clear our cached clip rect information.
@@ -686,13 +691,13 @@ void RenderLayer::updateLayerPosition()
             if (curr->isBox() && !curr->isTableRow()) {
                 // Rows and cells share the same coordinate space (that of the section).
                 // Omit them when computing our xpos/ypos.
-                localPoint += toRenderBox(curr)->locationOffset();
+                localPoint += toRenderBox(curr)->locationOffsetIncludingFlipping();
             }
             curr = curr->parent();
         }
         if (curr->isBox() && curr->isTableRow()) {
             // Put ourselves into the row coordinate space.
-            localPoint -= toRenderBox(curr)->locationOffset();
+            localPoint -= toRenderBox(curr)->locationOffsetIncludingFlipping();
         }
     }
     
@@ -969,7 +974,7 @@ void RenderLayer::beginTransparencyLayers(GraphicsContext* p, const RenderLayer*
         p->clip(clipRect);
         p->beginTransparencyLayer(renderer()->opacity());
 #ifdef REVEAL_TRANSPARENCY_LAYERS
-        p->setFillColor(Color(0.0f, 0.0f, 0.5f, 0.2f), DeviceColorSpace);
+        p->setFillColor(Color(0.0f, 0.0f, 0.5f, 0.2f), ColorSpaceDeviceRGB);
         p->fillRect(clipRect);
 #endif
     }
@@ -1960,7 +1965,7 @@ void RenderLayer::computeScrollDimensions(bool* needHBar, bool* needVBar)
     
     m_scrollDimensionsDirty = false;
     
-    bool ltr = renderer()->style()->direction() == LTR;
+    bool ltr = renderer()->style()->isLeftToRightDirection();
 
     int clientWidth = box->clientWidth();
     int clientHeight = box->clientHeight();
@@ -2201,9 +2206,9 @@ void RenderLayer::paintResizer(GraphicsContext* context, int tx, int ty, const I
         context->clip(absRect);
         IntRect largerCorner = absRect;
         largerCorner.setSize(IntSize(largerCorner.width() + 1, largerCorner.height() + 1));
-        context->setStrokeColor(Color(makeRGB(217, 217, 217)), DeviceColorSpace);
+        context->setStrokeColor(Color(makeRGB(217, 217, 217)), ColorSpaceDeviceRGB);
         context->setStrokeThickness(1.0f);
-        context->setFillColor(Color::transparent, DeviceColorSpace);
+        context->setFillColor(Color::transparent, ColorSpaceDeviceRGB);
         context->drawRect(largerCorner);
         context->restore();
     }
@@ -2439,7 +2444,7 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* p,
     if (paintingRoot && !renderer()->isDescendantOf(paintingRoot))
         paintingRootForRenderer = paintingRoot;
 
-    if (overlapTestRequests)
+    if (overlapTestRequests && isSelfPaintingLayer())
         performOverlapTests(*overlapTestRequests, layerBounds);
 
     // We want to paint our layer, but only if we intersect the damage rect.
@@ -2778,7 +2783,7 @@ RenderLayer* RenderLayer::hitTestLayer(RenderLayer* rootLayer, RenderLayer* cont
     useTemporaryClipRects = compositor()->inCompositingMode();
 #endif
 
-    IntRect hitTestArea = result.rectFromPoint(hitTestPoint);
+    IntRect hitTestArea = result.rectForPoint(hitTestPoint);
 
     // Apply a transform if we have one.
     if (transform() && !appliedTransform) {
@@ -3061,7 +3066,7 @@ RenderLayer* RenderLayer::hitTestChildLayerColumns(RenderLayer* childLayer, Rend
         IntRect localClipRect(hitTestRect);
         localClipRect.intersect(colRect);
         
-        if (!localClipRect.isEmpty() && localClipRect.intersects(result.rectFromPoint(hitTestPoint))) {
+        if (!localClipRect.isEmpty() && localClipRect.intersects(result.rectForPoint(hitTestPoint))) {
             RenderLayer* hitLayer = 0;
             if (!columnIndex) {
                 // Apply a translation transform to change where the layer paints.
@@ -3740,8 +3745,14 @@ void RenderLayer::repaintIncludingNonCompositingDescendants(RenderBoxModelObject
 
 bool RenderLayer::shouldBeNormalFlowOnly() const
 {
-    return (renderer()->hasOverflowClip() || renderer()->hasReflection() || renderer()->hasMask() || renderer()->isVideo() || renderer()->isEmbeddedObject() || 
-            renderer()->isRenderIFrame() || renderer()->style()->specifiesColumns())
+    return (renderer()->hasOverflowClip()
+                || renderer()->hasReflection()
+                || renderer()->hasMask()
+                || renderer()->isVideo()
+                || renderer()->isEmbeddedObject()
+                || renderer()->isApplet()
+                || renderer()->isRenderIFrame()
+                || renderer()->style()->specifiesColumns())
             && !renderer()->isPositioned()
             && !renderer()->isRelPositioned()
             && !renderer()->hasTransform()
@@ -3750,7 +3761,14 @@ bool RenderLayer::shouldBeNormalFlowOnly() const
 
 bool RenderLayer::isSelfPaintingLayer() const
 {
-    return !isNormalFlowOnly() || renderer()->hasReflection() || renderer()->hasMask() || renderer()->isTableRow() || renderer()->isVideo() || renderer()->isEmbeddedObject() || renderer()->isRenderIFrame();
+    return !isNormalFlowOnly()
+        || renderer()->hasReflection()
+        || renderer()->hasMask()
+        || renderer()->isTableRow()
+        || renderer()->isVideo()
+        || renderer()->isEmbeddedObject()
+        || renderer()->isApplet()
+        || renderer()->isRenderIFrame();
 }
 
 void RenderLayer::styleChanged(StyleDifference diff, const RenderStyle*)
@@ -3906,8 +3924,15 @@ void showLayerTree(const WebCore::RenderLayer* layer)
         return;
 
     if (WebCore::Frame* frame = layer->renderer()->frame()) {
-        WTF::String output = externalRepresentation(frame, WebCore::RenderAsTextShowAllLayers | WebCore::RenderAsTextShowLayerNesting | WebCore::RenderAsTextShowCompositedLayers | WebCore::RenderAsTextShowAddresses | WebCore::RenderAsTextShowIDAndClass);
+        WTF::String output = externalRepresentation(frame, WebCore::RenderAsTextShowAllLayers | WebCore::RenderAsTextShowLayerNesting | WebCore::RenderAsTextShowCompositedLayers | WebCore::RenderAsTextShowAddresses | WebCore::RenderAsTextShowIDAndClass | WebCore::RenderAsTextDontUpdateLayout | WebCore::RenderAsTextShowLayoutState);
         fprintf(stderr, "%s\n", output.utf8().data());
     }
+}
+
+void showLayerTree(const WebCore::RenderObject* renderer)
+{
+    if (!renderer)
+        return;
+    showLayerTree(renderer->enclosingLayer());
 }
 #endif

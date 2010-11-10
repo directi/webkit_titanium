@@ -201,6 +201,16 @@ bool WebURLRequest::reportLoadTiming() const
     return m_private->m_resourceRequest->reportLoadTiming();
 }
 
+void WebURLRequest::setReportRawHeaders(bool reportRawHeaders)
+{
+    m_private->m_resourceRequest->setReportRawHeaders(reportRawHeaders);
+}
+
+bool WebURLRequest::reportRawHeaders() const
+{
+    return m_private->m_resourceRequest->reportRawHeaders();
+}
+
 void WebURLRequest::setReportLoadTiming(bool reportLoadTiming)
 {
     m_private->m_resourceRequest->setReportLoadTiming(reportLoadTiming);
@@ -209,6 +219,16 @@ void WebURLRequest::setReportLoadTiming(bool reportLoadTiming)
 WebURLRequest::TargetType WebURLRequest::targetType() const
 {
     return static_cast<TargetType>(m_private->m_resourceRequest->targetType());
+}
+
+bool WebURLRequest::hasUserGesture() const
+{
+    return m_private->m_resourceRequest->hasUserGesture();
+}
+
+void WebURLRequest::setHasUserGesture(bool hasUserGesture)
+{
+    m_private->m_resourceRequest->setHasUserGesture(hasUserGesture);
 }
 
 void WebURLRequest::setTargetType(TargetType targetType)

@@ -34,22 +34,22 @@
 #include "DRTDevToolsAgent.h"
 #include "DRTDevToolsClient.h"
 #include "LayoutTestController.h"
+#include "WebDataSource.h"
+#include "WebDocument.h"
+#include "WebElement.h"
+#include "WebFrame.h"
+#include "WebHistoryItem.h"
+#include "WebKit.h"
+#include "WebRuntimeFeatures.h"
+#include "WebScriptController.h"
+#include "WebSettings.h"
+#include "WebSize.h"
+#include "WebSpeechInputControllerMock.h"
+#include "WebString.h"
+#include "WebURLRequest.h"
+#include "WebURLResponse.h"
+#include "WebView.h"
 #include "WebViewHost.h"
-#include "public/WebDataSource.h"
-#include "public/WebDocument.h"
-#include "public/WebElement.h"
-#include "public/WebFrame.h"
-#include "public/WebHistoryItem.h"
-#include "public/WebKit.h"
-#include "public/WebRuntimeFeatures.h"
-#include "public/WebScriptController.h"
-#include "public/WebSettings.h"
-#include "public/WebSize.h"
-#include "public/WebSpeechInputControllerMock.h"
-#include "public/WebString.h"
-#include "public/WebURLRequest.h"
-#include "public/WebURLResponse.h"
-#include "public/WebView.h"
 #include "skia/ext/bitmap_platform_device.h"
 #include "skia/ext/platform_canvas.h"
 #include "webkit/support/webkit_support.h"
@@ -84,10 +84,14 @@ TestShell::TestShell(bool testShellMode)
     , m_testShellMode(testShellMode)
     , m_devTools(0)
     , m_allowExternalPages(false)
+    , m_acceleratedCompositingEnabled(false)
     , m_accelerated2dCanvasEnabled(false)
+    , m_loadCount(1)
+    , m_dumpWhenFinished(true)
 {
     WebRuntimeFeatures::enableGeolocation(true);
     WebRuntimeFeatures::enableIndexedDatabase(true);
+    WebRuntimeFeatures::enableFileSystem(true);
     m_accessibilityController.set(new AccessibilityController(this));
     m_layoutTestController.set(new LayoutTestController(this));
     m_eventSender.set(new EventSender(this));
@@ -156,6 +160,7 @@ void TestShell::closeDevTools()
 void TestShell::resetWebSettings(WebView& webView)
 {
     m_prefs.reset();
+    m_prefs.acceleratedCompositingEnabled = m_acceleratedCompositingEnabled;
     m_prefs.accelerated2dCanvasEnabled = m_accelerated2dCanvasEnabled;
     m_prefs.applyTo(&webView);
 }
@@ -179,7 +184,8 @@ void TestShell::runFileTest(const TestParams& params)
     if (inspectorTestMode)
         showDevTools();
 
-    m_printer->handleTestHeader(testUrl.c_str());
+    if (m_dumpWhenFinished)
+        m_printer->handleTestHeader(testUrl.c_str());
     loadURL(m_params.testUrl);
 
     m_testIsPreparing = false;
@@ -268,7 +274,8 @@ void TestShell::testFinished()
     if (!m_testIsPending)
         return;
     m_testIsPending = false;
-    dump();
+    if (m_dumpWhenFinished)
+        dump();
     webkit_support::QuitMessageLoop();
 }
 

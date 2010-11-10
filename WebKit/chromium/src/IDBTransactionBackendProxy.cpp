@@ -45,6 +45,8 @@ PassRefPtr<IDBTransactionBackendInterface> IDBTransactionBackendProxy::create(Pa
 IDBTransactionBackendProxy::IDBTransactionBackendProxy(PassOwnPtr<WebKit::WebIDBTransaction> transaction)
     : m_webIDBTransaction(transaction)
 {
+    if (!m_webIDBTransaction)
+        m_webIDBTransaction = adoptPtr(new WebKit::WebIDBTransaction());
 }
 
 IDBTransactionBackendProxy::~IDBTransactionBackendProxy()
@@ -69,7 +71,7 @@ void IDBTransactionBackendProxy::abort()
     m_webIDBTransaction->abort();
 }
 
-bool IDBTransactionBackendProxy::scheduleTask(PassOwnPtr<ScriptExecutionContext::Task>)
+bool IDBTransactionBackendProxy::scheduleTask(PassOwnPtr<ScriptExecutionContext::Task>, PassOwnPtr<ScriptExecutionContext::Task>)
 {
     // This should never be reached as it's the impl objects who get to
     // execute tasks in the browser process.
@@ -80,11 +82,6 @@ bool IDBTransactionBackendProxy::scheduleTask(PassOwnPtr<ScriptExecutionContext:
 void IDBTransactionBackendProxy::didCompleteTaskEvents()
 {
     m_webIDBTransaction->didCompleteTaskEvents();
-}
-
-int IDBTransactionBackendProxy::id() const
-{
-    return m_webIDBTransaction->id();
 }
 
 void IDBTransactionBackendProxy::setCallbacks(IDBTransactionCallbacks* callbacks)

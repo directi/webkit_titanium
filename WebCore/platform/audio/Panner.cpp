@@ -34,7 +34,6 @@
 
 #include "EqualPowerPanner.h"
 #include "HRTFPanner.h"
-#include "PassThroughPanner.h"
 #include <wtf/OwnPtr.h>
 
 namespace WebCore {
@@ -45,15 +44,11 @@ PassOwnPtr<Panner> Panner::create(PanningModel model, double sampleRate)
 
     switch (model) {
     case PanningModelEqualPower:
-        panner = adoptPtr(new EqualPowerPanner());
+        panner = adoptPtr(new EqualPowerPanner(sampleRate));
         break;
 
     case PanningModelHRTF:
         panner = adoptPtr(new HRTFPanner(sampleRate));
-        break;
-
-    case PanningModelPassthrough:
-        panner = adoptPtr(new PassThroughPanner());
         break;
 
     // FIXME: sound field panning is not yet implemented...

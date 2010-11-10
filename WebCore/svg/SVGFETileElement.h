@@ -35,10 +35,11 @@ private:
     SVGFETileElement(const QualifiedName&, Document*);
 
     virtual void parseMappedAttribute(Attribute*);
+    virtual void svgAttributeChanged(const QualifiedName&);
     virtual void synchronizeProperty(const QualifiedName&);
     virtual PassRefPtr<FilterEffect> build(SVGFilterBuilder*);
 
-    DECLARE_ANIMATED_PROPERTY(SVGFETileElement, SVGNames::inAttr, String, In1, in1)
+    DECLARE_ANIMATED_STATIC_PROPERTY_NEW(SVGFETileElement, SVGNames::inAttr, String, In1, in1)
 };
 
 } // namespace WebCore

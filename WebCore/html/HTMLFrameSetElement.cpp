@@ -29,6 +29,8 @@
 #include "Document.h"
 #include "Event.h"
 #include "EventNames.h"
+#include "Frame.h"
+#include "FrameLoaderClient.h"
 #include "HTMLNames.h"
 #include "Length.h"
 #include "MouseEvent.h"
@@ -164,7 +166,7 @@ void HTMLFrameSetElement::attach()
 {
     // Inherit default settings from parent frameset
     // FIXME: This is not dynamic.
-    for (Node* node = parentNode(); node; node = node->parentNode()) {
+    for (ContainerNode* node = parentNode(); node; node = node->parentNode()) {
         if (node->hasTagName(framesetTag)) {
             HTMLFrameSetElement* frameset = static_cast<HTMLFrameSetElement*>(node);
             if (!frameBorderSet)
@@ -186,7 +188,7 @@ void HTMLFrameSetElement::attach()
 
 void HTMLFrameSetElement::defaultEventHandler(Event* evt)
 {
-    if (evt->isMouseEvent() && !noresize && renderer()) {
+    if (evt->isMouseEvent() && !noresize && renderer() && renderer()->isFrameSet()) {
         if (toRenderFrameSet(renderer())->userResize(static_cast<MouseEvent*>(evt))) {
             evt->setDefaultHandled();
             return;
@@ -202,6 +204,20 @@ void HTMLFrameSetElement::recalcStyle(StyleChange ch)
         clearNeedsStyleRecalc();
     }
     HTMLElement::recalcStyle(ch);
+}
+
+void HTMLFrameSetElement::insertedIntoDocument()
+{
+    HTMLElement::insertedIntoDocument();
+    if (Frame* frame = document()->frame())
+        frame->loader()->client()->dispatchDidBecomeFrameset(document()->isFrameSet());
+}
+
+void HTMLFrameSetElement::removedFromDocument()
+{
+    HTMLElement::removedFromDocument();
+    if (Frame* frame = document()->frame())
+        frame->loader()->client()->dispatchDidBecomeFrameset(document()->isFrameSet());
 }
 
 } // namespace WebCore

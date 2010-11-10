@@ -35,6 +35,7 @@
 
 #include "DocumentLoadTiming.h"
 #include "DocumentLoader.h"
+#include "DocumentTiming.h"
 #include "Frame.h"
 #include "ResourceLoadTiming.h"
 #include "ResourceResponse.h"
@@ -100,7 +101,7 @@ unsigned long long Timing::unloadEventEnd() const
 
     return toIntegerMilliseconds(timing->unloadEventEnd);
 }
-    
+
 unsigned long long Timing::redirectStart() const
 {
     DocumentLoadTiming* timing = documentLoadTiming();
@@ -109,7 +110,7 @@ unsigned long long Timing::redirectStart() const
 
     return toIntegerMilliseconds(timing->redirectStart);
 }
-    
+
 unsigned long long Timing::redirectEnd() const
 {
     DocumentLoadTiming* timing = documentLoadTiming();
@@ -216,16 +217,6 @@ unsigned long long Timing::requestStart() const
     return resourceLoadTimeRelativeToAbsolute(timing->sendStart);
 }
 
-unsigned long long Timing::requestEnd() const
-{
-    ResourceLoadTiming* timing = resourceLoadTiming();
-    if (!timing)
-        return 0;
-
-    ASSERT(timing->sendEnd >= 0);
-    return resourceLoadTimeRelativeToAbsolute(timing->sendEnd);
-}
-
 unsigned long long Timing::responseStart() const
 {
     ResourceLoadTiming* timing = resourceLoadTiming();
@@ -249,6 +240,51 @@ unsigned long long Timing::responseEnd() const
         return 0;
 
     return toIntegerMilliseconds(timing->responseEnd);
+}
+
+unsigned long long Timing::domLoading() const
+{
+    const DocumentTiming* timing = documentTiming();
+    if (!timing)
+        return 0;
+
+    return toIntegerMilliseconds(timing->domLoading);
+}
+
+unsigned long long Timing::domInteractive() const
+{
+    const DocumentTiming* timing = documentTiming();
+    if (!timing)
+        return 0;
+
+    return toIntegerMilliseconds(timing->domInteractive);
+}
+
+unsigned long long Timing::domContentLoadedStart() const
+{
+    const DocumentTiming* timing = documentTiming();
+    if (!timing)
+        return 0;
+
+    return toIntegerMilliseconds(timing->domContentLoadedStart);
+}
+
+unsigned long long Timing::domContentLoadedEnd() const
+{
+    const DocumentTiming* timing = documentTiming();
+    if (!timing)
+        return 0;
+
+    return toIntegerMilliseconds(timing->domContentLoadedEnd);
+}
+
+unsigned long long Timing::domComplete() const
+{
+    const DocumentTiming* timing = documentTiming();
+    if (!timing)
+        return 0;
+
+    return toIntegerMilliseconds(timing->domComplete);
 }
 
 unsigned long long Timing::loadEventStart() const
@@ -275,6 +311,18 @@ DocumentLoader* Timing::documentLoader() const
         return 0;
 
     return m_frame->loader()->documentLoader();
+}
+
+const DocumentTiming* Timing::documentTiming() const
+{
+    if (!m_frame)
+        return 0;
+
+    Document* document = m_frame->document();
+    if (!document)
+        return 0;
+
+    return document->timing();
 }
 
 DocumentLoadTiming* Timing::documentLoadTiming() const

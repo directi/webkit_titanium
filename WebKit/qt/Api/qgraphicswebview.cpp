@@ -80,7 +80,7 @@ public:
     {
         if (!page || !page->d->client)
             return 0;
-        return static_cast<PageClientQGraphicsWidget*>(page->d->client)->overlay.data();
+        return static_cast<PageClientQGraphicsWidget*>(page->d->client)->overlay;
     }
 };
 
@@ -140,6 +140,7 @@ void QGraphicsWebViewPrivate::updateResizesToContentsForPage()
         QObject::disconnect(page->mainFrame(), SIGNAL(contentsSizeChanged(QSize)),
                          q, SLOT(_q_contentsSizeChanged(const QSize&)));
     }
+    page->d->page->settings()->setShouldDelegateScrolling(resizesToContents);
 }
 
 void QGraphicsWebViewPrivate::_q_contentsSizeChanged(const QSize& size)
@@ -297,7 +298,7 @@ void QGraphicsWebView::paint(QPainter* painter, const QStyleOptionGraphicsItem* 
         return;
     } 
 #endif
-#if USE(ACCELERATED_COMPOSITING)
+#if USE(ACCELERATED_COMPOSITING) && !USE(TEXTURE_MAPPER)
     page()->mainFrame()->render(painter, d->overlay() ? QWebFrame::ContentsLayer : QWebFrame::AllLayers, option->exposedRect.toAlignedRect());
 #else
     page()->mainFrame()->render(painter, QWebFrame::AllLayers, option->exposedRect.toRect());
@@ -410,6 +411,8 @@ void QGraphicsWebViewPrivate::detachCurrentPage()
 {
     if (!page)
         return;
+
+    page->d->page->settings()->setShouldDelegateScrolling(false);
 
     page->d->view.clear();
 

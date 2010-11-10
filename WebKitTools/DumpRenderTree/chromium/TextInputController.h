@@ -61,7 +61,7 @@ public:
     void characterIndexForPoint(const CppArgumentList&, CppVariant*);
     void validAttributesForMarkedText(const CppArgumentList&, CppVariant*);
     void makeAttributedString(const CppArgumentList&, CppVariant*);
-    void hasSpellingMarker(const CppArgumentList&, CppVariant*);
+    void setComposition(const CppArgumentList&, CppVariant*);
 
 private:
     // Returns the test shell's main WebFrame.

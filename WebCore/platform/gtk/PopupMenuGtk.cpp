@@ -90,14 +90,14 @@ void PopupMenuGtk::show(const IntRect& rect, FrameView* view, int index)
 #ifdef GTK_API_VERSION_2
     gtk_widget_size_request(GTK_WIDGET(m_popup.get()), &requisition);
 #else
-    gtk_size_request_get_size(GTK_SIZE_REQUEST(m_popup.get()), &requisition, NULL);
+    gtk_widget_get_preferred_size(GTK_WIDGET(m_popup.get()), &requisition, 0);
 #endif
 
     gtk_widget_set_size_request(GTK_WIDGET(m_popup.get()), std::max(rect.width(), requisition.width), -1);
 
     GList* children = gtk_container_get_children(GTK_CONTAINER(m_popup.get()));
     GList* p = children;
-    if (size)
+    if (size) {
         for (int i = 0; i < size; i++) {
             if (i > index)
               break;
@@ -107,14 +107,16 @@ void PopupMenuGtk::show(const IntRect& rect, FrameView* view, int index)
 #ifdef GTK_API_VERSION_2
             gtk_widget_get_child_requisition(item, &itemRequisition);
 #else
-            gtk_size_request_get_size(GTK_SIZE_REQUEST(item), &itemRequisition, NULL);
+            gtk_widget_get_preferred_size(item, &itemRequisition, 0);
 #endif
             m_menuPosition.setY(m_menuPosition.y() - itemRequisition.height);
 
             p = g_list_next(p);
-        } else
-            // Center vertically the empty popup in the combo box area
-            m_menuPosition.setY(m_menuPosition.y() - rect.height() / 2);
+        }
+    } else {
+        // Center vertically the empty popup in the combo box area
+        m_menuPosition.setY(m_menuPosition.y() - rect.height() / 2);
+    }
 
     g_list_free(children);
     gtk_menu_popup(m_popup.get(), 0, 0, reinterpret_cast<GtkMenuPositionFunc>(menuPositionFunction), this, 0, gtk_get_current_event_time());

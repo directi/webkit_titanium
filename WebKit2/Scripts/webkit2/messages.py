@@ -21,6 +21,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import collections
+import itertools
 import re
 
 
@@ -56,7 +57,8 @@ class MessageReceiver(object):
         self.condition = condition
 
     def iterparameters(self):
-        return (parameter for message in self.messages for parameter in message.parameters)
+        return itertools.chain((parameter for message in self.messages for parameter in message.parameters),
+            (reply_parameter for message in self.messages if message.reply_parameters for reply_parameter in message.reply_parameters))
 
     @classmethod
     def parse(cls, file):
@@ -107,6 +109,10 @@ class Message(object):
         if self.reply_parameters is not None:
             self.delayed = delayed
         self.condition = condition
+        if len(self.parameters) != 0:
+            self.is_variadic = parameter_type_is_variadic(self.parameters[-1].type)
+        else:
+            self.is_variadic = False
 
     def id(self):
         return '%sID' % self.name
@@ -140,6 +146,14 @@ def messages_to_kind_enum(messages):
     return ''.join(result)
 
 
+def parameter_type_is_variadic(type):
+    variadic_types = frozenset([
+        'WebKit::InjectedBundleUserMessageEncoder',
+        'WebKit::WebContextUserMessageEncoder',
+    ])
+
+    return type in variadic_types
+
 def function_parameter_type(type):
     # Don't use references for built-in types.
     builtin_types = frozenset([
@@ -150,6 +164,10 @@ def function_parameter_type(type):
         'uint16_t',
         'uint32_t',
         'uint64_t',
+        'int8_t',
+        'int16_t',
+        'int32_t',
+        'int64_t',
     ])
 
     if type in builtin_types:
@@ -177,6 +195,12 @@ def reply_type(message):
     return arguments_type(message.reply_parameters, reply_parameter_type)
 
 
+def decode_type(message):
+    if message.is_variadic:
+        return arguments_type(message.parameters[:-1], reply_parameter_type)
+    return base_class(message)
+
+
 def delayed_reply_type(message):
     return arguments_type(message.reply_parameters, function_parameter_type)
 
@@ -188,7 +212,32 @@ def message_to_struct_declaration(message):
     result.append(' {\n')
     result.append('    static const Kind messageID = %s;\n' % message.id())
     if message.reply_parameters != None:
-        result.append('    typedef %s Reply;\n' % reply_type(message))
+        if message.delayed:
+            send_parameters = [(function_parameter_type(x.type), x.name) for x in message.reply_parameters]
+            result.append('    struct DelayedReply {\n')
+            result.append('        DelayedReply(PassRefPtr<CoreIPC::Connection> connection, PassOwnPtr<CoreIPC::ArgumentDecoder> arguments)\n')
+            result.append('            : m_connection(connection)\n')
+            result.append('            , m_arguments(arguments)\n')
+            result.append('        {\n')
+            result.append('        }\n')
+            result.append('\n')
+            result.append('        bool send(%s)\n' % ', '.join([' '.join(x) for x in send_parameters]))
+            result.append('        {\n')
+            result.append('            ASSERT(m_arguments);\n')
+            result += ['            m_arguments->encode(%s);\n' % x.name for x in message.reply_parameters]
+            result.append('            bool result = m_connection->sendSyncReply(m_arguments.release());\n')
+            result.append('            m_connection = nullptr;\n')
+            result.append('            return result;\n')
+            result.append('        }\n')
+            result.append('\n')
+            result.append('    private:\n')
+            result.append('        RefPtr<CoreIPC::Connection> m_connection;\n')
+            result.append('        OwnPtr<CoreIPC::ArgumentDecoder> m_arguments;\n')
+            result.append('    };\n\n')
+        else:
+            result.append('    typedef %s Reply;\n' % reply_type(message))
+
+    result.append('    typedef %s DecodeType;\n' % decode_type(message))
     if len(function_parameters):
         result.append('    %s%s(%s)' % (len(function_parameters) == 1 and 'explicit ' or '', message.name, ', '.join([' '.join(x) for x in function_parameters])))
         result.append('\n        : %s(%s)\n' % (base_class(message), ', '.join([x[1] for x in function_parameters])))
@@ -198,10 +247,29 @@ def message_to_struct_declaration(message):
     return surround_in_condition(''.join(result), message.condition)
 
 
+def struct_or_class(namespace, type):
+    structs = frozenset([
+        'WebCore::KeypressCommand',
+        'WebCore::PluginInfo',
+        'WebCore::ViewportArguments',
+        'WebCore::WindowFeatures',
+        'WebKit::PluginProcessCreationParameters',
+        'WebKit::WebNavigationDataStore',
+        'WebKit::WebPageCreationParameters',
+        'WebKit::WebPreferencesStore',
+        'WebKit::WebProcessCreationParameters',
+    ])
+
+    qualified_name = '%s::%s' % (namespace, type)
+    if qualified_name in structs:
+        return 'struct %s' % type
+
+    return 'class %s' % type
+
 def forward_declarations_for_namespace(namespace, types):
     result = []
     result.append('namespace %s {\n' % namespace)
-    result += ['    class %s;\n' % x for x in types]
+    result += ['    %s;\n' % struct_or_class(namespace, x) for x in types]
     result.append('}\n')
     return ''.join(result)
 
@@ -216,6 +284,12 @@ def forward_declarations_and_headers(receiver):
 
     for parameter in receiver.iterparameters():
         type = parameter.type
+
+        if type.find('<') != -1:
+            # Don't forward declare class templates.
+            headers.update(headers_for_type(type))
+            continue
+
         split = type.split('::')
 
         if len(split) == 2:
@@ -280,9 +354,13 @@ def handler_function(receiver, message):
 
 
 def async_case_statement(receiver, message):
+    dispatch_function = 'handleMessage'
+    if message.is_variadic:
+        dispatch_function += 'Variadic'
+
     result = []
     result.append('    case Messages::%s::%s:\n' % (receiver.name, message.id()))
-    result.append('        CoreIPC::handleMessage<Messages::%s::%s>(arguments, this, &%s);\n' % (receiver.name, message.name, handler_function(receiver, message)))
+    result.append('        CoreIPC::%s<Messages::%s::%s>(arguments, this, &%s);\n' % (dispatch_function, receiver.name, message.name, handler_function(receiver, message)))
     result.append('        return;\n')
     return surround_in_condition(''.join(result), message.condition)
 
@@ -305,6 +383,8 @@ def argument_coder_headers_for_type(type):
 
     special_cases = {
         'WTF::String': '"ArgumentCoders.h"',
+        'WebKit::InjectedBundleUserMessageEncoder': '"InjectedBundleUserMessageCoders.h"',
+        'WebKit::WebContextUserMessageEncoder': '"WebContextUserMessageCoders.h"',
     }
 
     if type in special_cases:
@@ -320,8 +400,16 @@ def argument_coder_headers_for_type(type):
 
 
 def headers_for_type(type):
+    # Check for Vector.
+    match = re.search(r'Vector<(.+)>', type)
+    if match:
+        element_type = match.groups()[0].strip()
+        return ['<wtf/Vector.h>'] + headers_for_type(element_type)
+
     special_cases = {
         'WTF::String': '<wtf/text/WTFString.h>',
+        'WebCore::KeypressCommand': '<WebCore/KeyboardEvent.h>',
+        'WebCore::PluginInfo': '<WebCore/PluginData.h>',
         'WebKit::WebKeyboardEvent': '"WebEvent.h"',
         'WebKit::WebMouseEvent': '"WebEvent.h"',
         'WebKit::WebWheelEvent': '"WebEvent.h"',
@@ -357,6 +445,18 @@ def generate_message_handler(file):
 
         type_headers = headers_for_type(type)
         headers.update(type_headers)
+
+    for message in receiver.messages:
+        if message.reply_parameters is not None:
+            for reply_parameter in message.reply_parameters:
+                type = reply_parameter.type
+                argument_encoder_headers = argument_coder_headers_for_type(type)
+                if argument_encoder_headers:
+                    headers.update(argument_encoder_headers)
+                    continue
+
+                type_headers = headers_for_type(type)
+                headers.update(type_headers)
 
     result = []
 

@@ -26,7 +26,9 @@
 #include "IDBBindingUtilities.h"
 #include "IDBKey.h"
 #include "RuntimeEnabledFeatures.h"
+#include "ScriptArguments.h"
 #include "ScriptCallStack.h"
+#include "ScriptCallStackFactory.h"
 #include "SerializedScriptValue.h"
 #include "V8Binding.h"
 #include "V8BindingMacros.h"
@@ -678,8 +680,18 @@ static v8::Handle<v8::Value> idbKeyCallback(const v8::Arguments& args)
 {
     INC_STATS("DOM.TestObj.idbKey");
     TestObj* imp = V8TestObj::toNative(args.Holder());
-    EXCEPTION_BLOCK(RefPtr<IDBKey>, key, createIDBKeyFromValue(args[0]));
+    ExceptionCode ec = 0;
+    {
+    RefPtr<IDBKey> key = createIDBKeyFromValue(args[0]);
+    if (UNLIKELY(!key)) {
+        ec = TYPE_MISMATCH_ERR;
+        goto fail;
+    }
     imp->idbKey(key);
+    return v8::Handle<v8::Value>();
+    }
+    fail:
+    V8Proxy::setDOMException(ec);
     return v8::Handle<v8::Value>();
 }
 
@@ -705,11 +717,13 @@ static v8::Handle<v8::Value> customArgsAndExceptionCallback(const v8::Arguments&
     TestObj* imp = V8TestObj::toNative(args.Holder());
     ExceptionCode ec = 0;
     {
-    OwnPtr<ScriptCallStack> callStack(ScriptCallStack::create(args, 1));
+    OwnPtr<ScriptArguments> scriptArguments(createScriptArguments(args, 1));
+    size_t maxStackSize = imp->shouldCaptureFullStackTrace() ? ScriptCallStack::maxCallStackSizeToCapture : 1;
+    OwnPtr<ScriptCallStack> callStack(createScriptCallStack(maxStackSize));
     if (!callStack)
         return v8::Undefined();
     EXCEPTION_BLOCK(log*, intArg, V8log::HasInstance(args[0]) ? V8log::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
-    imp->customArgsAndException(intArg, callStack.get(), ec);
+    imp->customArgsAndException(intArg, scriptArguments.release(), callStack.release(), ec);
     if (UNLIKELY(ec))
         goto fail;
     return v8::Handle<v8::Value>();

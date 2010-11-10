@@ -38,6 +38,7 @@
 #include "Blob.h"
 #include "ExceptionCode.h"
 #include "FileError.h"
+#include "FileException.h"
 #include "ProgressEvent.h"
 
 namespace WebCore {
@@ -46,6 +47,7 @@ FileWriter::FileWriter(ScriptExecutionContext* context)
     : ActiveDOMObject(context, this)
     , m_readyState(INIT)
     , m_position(0)
+    , m_startedWriting(false)
     , m_bytesWritten(0)
     , m_bytesToWrite(0)
     , m_truncateLength(-1)
@@ -81,6 +83,7 @@ void FileWriter::stop()
 {
     if (m_writer && m_readyState == WRITING)
         m_writer->abort();
+    m_blobBeingWritten.clear();
     m_readyState = DONE;
 }
 
@@ -88,12 +91,17 @@ void FileWriter::write(Blob* data, ExceptionCode& ec)
 {
     ASSERT(m_writer);
     if (m_readyState == WRITING) {
-        ec = INVALID_STATE_ERR;
-        m_error = FileError::create(ec);
+        setError(FileError::INVALID_STATE_ERR, ec);
+        return;
+    }
+    if (!data) {
+        setError(FileError::TYPE_MISMATCH_ERR, ec);
         return;
     }
 
+    m_blobBeingWritten = data;
     m_readyState = WRITING;
+    m_startedWriting = false;
     m_bytesWritten = 0;
     m_bytesToWrite = data->size();
     m_writer->write(m_position, data);
@@ -103,8 +111,7 @@ void FileWriter::seek(long long position, ExceptionCode& ec)
 {
     ASSERT(m_writer);
     if (m_readyState == WRITING) {
-        ec = INVALID_STATE_ERR;
-        m_error = FileError::create(ec);
+        setError(FileError::INVALID_STATE_ERR, ec);
         return;
     }
 
@@ -123,8 +130,7 @@ void FileWriter::truncate(long long position, ExceptionCode& ec)
 {
     ASSERT(m_writer);
     if (m_readyState == WRITING || position < 0) {
-        ec = INVALID_STATE_ERR;
-        m_error = FileError::create(ec);
+        setError(FileError::INVALID_STATE_ERR, ec);
         return;
     }
     m_readyState = WRITING;
@@ -138,29 +144,31 @@ void FileWriter::abort(ExceptionCode& ec)
 {
     ASSERT(m_writer);
     if (m_readyState != WRITING) {
-        ec = INVALID_STATE_ERR;
-        m_error = FileError::create(ec);
+        setError(FileError::INVALID_STATE_ERR, ec);
         return;
     }
-    
-    m_error = FileError::create(ABORT_ERR);
+
+    m_error = FileError::create(FileError::ABORT_ERR);
     m_writer->abort();
 }
 
 void FileWriter::didWrite(long long bytes, bool complete)
 {
-    ASSERT(bytes > 0);
     ASSERT(bytes + m_bytesWritten > 0);
     ASSERT(bytes + m_bytesWritten <= m_bytesToWrite);
-    if (!m_bytesWritten)
+    if (!m_startedWriting) {
         fireEvent(eventNames().writestartEvent);
+        m_startedWriting = true;
+    }
     m_bytesWritten += bytes;
-    ASSERT((m_bytesWritten == m_bytesToWrite) == complete);
+    ASSERT((m_bytesWritten == m_bytesToWrite) || !complete);
     m_position += bytes;
     if (m_position > m_length)
         m_length = m_position;
-    fireEvent(eventNames().writeEvent);
+    fireEvent(eventNames().progressEvent);
     if (complete) {
+        m_blobBeingWritten.clear();
+        fireEvent(eventNames().writeEvent);
         m_readyState = DONE;
         fireEvent(eventNames().writeendEvent);
     }
@@ -179,13 +187,14 @@ void FileWriter::didTruncate()
     fireEvent(eventNames().writeendEvent);
 }
 
-void FileWriter::didFail(ExceptionCode ec)
+void FileWriter::didFail(FileError::ErrorCode code)
 {
-    m_error = FileError::create(ec);
+    m_error = FileError::create(code);
     fireEvent(eventNames().errorEvent);
-    if (ABORT_ERR == ec)
+    if (FileError::ABORT_ERR == code)
         fireEvent(eventNames().abortEvent);
     fireEvent(eventNames().errorEvent);
+    m_blobBeingWritten.clear();
     m_readyState = DONE;
     fireEvent(eventNames().writeendEvent);
 }
@@ -196,6 +205,12 @@ void FileWriter::fireEvent(const AtomicString& type)
     dispatchEvent(ProgressEvent::create(type, true, static_cast<unsigned>(m_bytesWritten), static_cast<unsigned>(m_bytesToWrite)));
 }
 
+void FileWriter::setError(FileError::ErrorCode errorCode, ExceptionCode& ec)
+{
+    ec = FileException::ErrorCodeToExceptionCode(errorCode);
+    m_error = FileError::create(errorCode);
+}
+
 } // namespace WebCore
- 
+
 #endif // ENABLE(FILE_SYSTEM)

@@ -41,6 +41,7 @@
 #include "Page.h"
 #include "RenderListBox.h"
 #include "RenderMenuList.h"
+#include "SpatialNavigation.h"
 #include <wtf/Assertions.h>
 
 #if ENABLE(WML)
@@ -151,7 +152,7 @@ void SelectElement::setActiveSelectionEndIndex(SelectElementData& data, int inde
 void SelectElement::updateListBoxSelection(SelectElementData& data, Element* element, bool deselectOtherOptions)
 {
     ASSERT(element->renderer() && (element->renderer()->isListBox() || data.multiple()));
-    ASSERT(data.activeSelectionAnchorIndex() >= 0);
+    ASSERT(!data.listItems(element).size() || data.activeSelectionAnchorIndex() >= 0);
 
     unsigned start = min(data.activeSelectionAnchorIndex(), data.activeSelectionEndIndex());
     unsigned end = max(data.activeSelectionAnchorIndex(), data.activeSelectionEndIndex());
@@ -546,6 +547,10 @@ void SelectElement::menuListDefaultEventHandler(SelectElementData& data, Element
 #if ARROW_KEYS_POP_MENU
         if (keyIdentifier == "Down" || keyIdentifier == "Up") {
             element->focus();
+
+            if (!element->renderer()) // Calling focus() may cause us to lose our renderer, in which case do not want to handle the event.
+                return;
+
             // Save the selection so it can be compared to the new selection when dispatching change events during setSelectedIndex,
             // which gets called from RenderMenuList::valueChanged, which gets called after the user makes a selection from the menu.
             saveLastSelection(data, element);
@@ -554,6 +559,12 @@ void SelectElement::menuListDefaultEventHandler(SelectElementData& data, Element
             handled = true;
         }
 #else
+        // When using spatial navigation, we want to be able to navigate away from the select element
+        // when the user hits any of the arrow keys, instead of changing the selection.
+        if (isSpatialNavigationEnabled(element->document()->frame()))
+            if (!data.activeSelectionState())
+                return;
+
         UNUSED_PARAM(htmlForm);
         const Vector<Element*>& listItems = data.listItems(element);
 
@@ -594,9 +605,20 @@ void SelectElement::menuListDefaultEventHandler(SelectElementData& data, Element
         int keyCode = static_cast<KeyboardEvent*>(event)->keyCode();
         bool handled = false;
 
+        if (keyCode == ' ' && isSpatialNavigationEnabled(element->document()->frame())) {
+            // Use space to toggle arrow key handling for selection change or spatial navigation.
+            data.setActiveSelectionState(!data.activeSelectionState());
+            event->setDefaultHandled();
+            return;
+        }
+
 #if SPACE_OR_RETURN_POP_MENU
         if (keyCode == ' ' || keyCode == '\r') {
             element->focus();
+
+            if (!element->renderer()) // Calling focus() may cause us to lose our renderer, in which case do not want to handle the event.
+                return;
+
             // Save the selection so it can be compared to the new selection when dispatching change events during setSelectedIndex,
             // which gets called from RenderMenuList::valueChanged, which gets called after the user makes a selection from the menu.
             saveLastSelection(data, element);
@@ -607,6 +629,10 @@ void SelectElement::menuListDefaultEventHandler(SelectElementData& data, Element
 #elif ARROW_KEYS_POP_MENU
         if (keyCode == ' ') {
             element->focus();
+
+            if (!element->renderer()) // Calling focus() may cause us to lose our renderer, in which case do not want to handle the event.
+                return;
+
             // Save the selection so it can be compared to the new selection when dispatching change events during setSelectedIndex,
             // which gets called from RenderMenuList::valueChanged, which gets called after the user makes a selection from the menu.
             saveLastSelection(data, element);
@@ -702,6 +728,9 @@ void SelectElement::listBoxDefaultEventHandler(SelectElementData& data, Element*
     if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton) {
         element->focus();
 
+        if (!element->renderer()) // Calling focus() may cause us to lose our renderer, in which case do not want to handle the event.
+            return;
+
         // Convert to coords relative to the list box if needed.
         MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
         IntPoint localOffset = roundedIntPoint(element->renderer()->absoluteToLocal(mouseEvent->absoluteLocation(), false, true));
@@ -739,12 +768,17 @@ void SelectElement::listBoxDefaultEventHandler(SelectElementData& data, Element*
             else if (keyIdentifier == "Up")
                 endIndex = previousSelectableListIndex(data, element, data.activeSelectionEndIndex());    
         }
-        
+
+        if (isSpatialNavigationEnabled(element->document()->frame()))
+            // Check if the selection moves to the boundary.
+            if (keyIdentifier == "Left" || keyIdentifier == "Right" || ((keyIdentifier == "Down" || keyIdentifier == "Up") && endIndex == data.activeSelectionEndIndex()))
+                return;
+
         if (keyIdentifier == "Down" || keyIdentifier == "Up") {
             // Save the selection so it can be compared to the new selection when dispatching change events immediately after making the new selection.
             saveLastSelection(data, element);
 
-            ASSERT_UNUSED(listItems, endIndex >= 0 && (unsigned) endIndex < listItems.size());
+            ASSERT_UNUSED(listItems, !listItems.size() || (endIndex >= 0 && (unsigned) endIndex < listItems.size()));
             setActiveSelectionEndIndex(data, endIndex);
             
             // If the anchor is unitialized, or if we're going to deselect all other options, then set the anchor index equal to the end index.
@@ -942,6 +976,10 @@ SelectElementData::SelectElementData()
     , m_recalcListItems(false)
     , m_repeatingChar(0)
     , m_lastCharTime(0)
+{
+}
+
+SelectElementData::~SelectElementData()
 {
 }
 

@@ -642,6 +642,8 @@ bool SelectionController::modify(EAlteration alter, EDirection direction, TextGr
 
     willBeModified(alter, direction);
 
+    bool wasRange = m_selection.isRange();
+    Position originalStartPosition = m_selection.start();
     VisiblePosition position;
     switch (direction) {
     case DirectionRight:
@@ -672,6 +674,10 @@ bool SelectionController::modify(EAlteration alter, EDirection direction, TextGr
 
     if (position.isNull())
         return false;
+
+    if (isSpatialNavigationEnabled(m_frame))
+        if (!wasRange && alter == AlterationMove && position == originalStartPosition)
+            return false;
 
     // Some of the above operations set an xPosForVerticalArrowNavigation.
     // Setting a selection will clear it, so save it to possibly restore later.
@@ -1085,7 +1091,7 @@ void SelectionController::paintCaret(GraphicsContext* context, int tx, int ty, c
         return;
 
     Color caretColor = Color::black;
-    ColorSpace colorSpace = DeviceColorSpace;
+    ColorSpace colorSpace = ColorSpaceDeviceRGB;
     Element* element = rootEditableElement();
     if (element && element->renderer()) {
         caretColor = element->renderer()->style()->visitedDependentColor(CSSPropertyColor);
@@ -1222,11 +1228,10 @@ void SelectionController::selectFrameElementInParentIfFullySelected()
         return;
 
     // Get to the <iframe> or <frame> (or even <object>) element in the parent frame.
-    Document* doc = m_frame->document();
-    Element* ownerElement = doc->ownerElement();
+    Element* ownerElement = m_frame->document()->ownerElement();
     if (!ownerElement)
         return;
-    Node* ownerElementParent = ownerElement->parentNode();
+    ContainerNode* ownerElementParent = ownerElement->parentNode();
     if (!ownerElementParent)
         return;
         

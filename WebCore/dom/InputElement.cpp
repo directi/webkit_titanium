@@ -107,10 +107,7 @@ void InputElement::updateSelectionRange(InputElement* inputElement, Element* ele
     if (!inputElement->isTextField())
         return;
 
-    element->document()->updateLayoutIgnorePendingStylesheets();
-
-    if (RenderTextControl* renderer = toRenderTextControl(element->renderer()))
-        renderer->setSelectionRange(start, end);
+    setSelectionRange(element, start, end);
 }
 
 void InputElement::aboutToUnload(InputElement* inputElement, Element* element)
@@ -276,6 +273,10 @@ InputElementData::InputElementData()
     , m_inputFormatMask("*m")
     , m_maxInputCharsAllowed(InputElement::s_maximumLength)
 #endif
+{
+}
+
+InputElementData::~InputElementData()
 {
 }
 

@@ -67,12 +67,12 @@ namespace WebCore {
 
         virtual bool selfHasRelativeLengths() const;
 
-        DECLARE_ANIMATED_PROPERTY(SVGTextPathElement, SVGNames::startOffsetAttr, SVGLength, StartOffset, startOffset)
-        DECLARE_ANIMATED_PROPERTY(SVGTextPathElement, SVGNames::methodAttr, int, Method, method)
-        DECLARE_ANIMATED_PROPERTY(SVGTextPathElement, SVGNames::spacingAttr, int, Spacing, spacing)
+        DECLARE_ANIMATED_PROPERTY_NEW(SVGTextPathElement, SVGNames::startOffsetAttr, SVGLength, StartOffset, startOffset)
+        DECLARE_ANIMATED_STATIC_PROPERTY_NEW(SVGTextPathElement, SVGNames::methodAttr, int, Method, method)
+        DECLARE_ANIMATED_STATIC_PROPERTY_NEW(SVGTextPathElement, SVGNames::spacingAttr, int, Spacing, spacing)
     
         // SVGURIReference
-        DECLARE_ANIMATED_PROPERTY(SVGTextPathElement, XLinkNames::hrefAttr, String, Href, href)
+        DECLARE_ANIMATED_STATIC_PROPERTY_NEW(SVGTextPathElement, XLinkNames::hrefAttr, String, Href, href)
     };
 
 } // namespace WebCore

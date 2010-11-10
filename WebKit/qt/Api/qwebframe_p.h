@@ -33,11 +33,16 @@
 #include "Frame.h"
 #include "ViewportArguments.h"
 
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+#include "texmap/TextureMapper.h"
+#endif
+
 namespace WebCore {
     class FrameLoaderClientQt;
     class FrameView;
     class HTMLFrameOwnerElement;
     class Scrollbar;
+    class TextureMapperContentLayer;
 }
 class QWebPage;
 
@@ -72,6 +77,9 @@ public:
         , allowsScrolling(true)
         , marginWidth(-1)
         , marginHeight(-1)
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+        , rootGraphicsLayer(0)
+#endif
         , zoomTextOnly(false)
         {}
     void init(QWebFrame* qframe, QWebFrameData* frameData);
@@ -90,8 +98,9 @@ public:
     void renderFromTiledBackingStore(WebCore::GraphicsContext*, const QRegion& clip);
 #endif
 
-    WebCore::ViewportArguments viewportArguments();
-
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+    void renderCompositedLayers(WebCore::GraphicsContext* context, const WebCore::IntRect& clip);
+#endif
     QWebFrame *q;
     Qt::ScrollBarPolicy horizontalScrollBarPolicy;
     Qt::ScrollBarPolicy verticalScrollBarPolicy;
@@ -102,6 +111,10 @@ public:
     bool allowsScrolling;
     int marginWidth;
     int marginHeight;
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+    WebCore::TextureMapperContentLayer* rootGraphicsLayer;
+    OwnPtr<WebCore::TextureMapper> textureMapper;
+#endif
     bool zoomTextOnly;
 };
 

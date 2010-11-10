@@ -48,13 +48,24 @@ public:
     void pageDidEnterAcceleratedCompositing() { }
     void pageDidLeaveAcceleratedCompositing() { }
 #endif // USE(ACCELERATED_COMPOSITING)
-    virtual void processDidExit() { }
-    virtual void processDidRevive() { }
+    virtual void pageDidRequestScroll(const WebCore::IntSize&);
+    virtual void processDidCrash() { }
+    virtual void didRelaunchProcess() { }
+    virtual void didChangeContentsSize(const WebCore::IntSize&);
     virtual void setCursor(const WebCore::Cursor&);
+    virtual void setViewportArguments(const WebCore::ViewportArguments&);
     virtual void takeFocus(bool direction) { }
     virtual void toolTipChanged(const WTF::String&, const WTF::String&);
-    virtual void registerEditCommand(PassRefPtr<WebKit::WebEditCommandProxy>, UndoOrRedo);
+    virtual void registerEditCommand(PassRefPtr<WebKit::WebEditCommandProxy>, WebKit::WebPageProxy::UndoOrRedo);
     virtual void clearAllEditCommands();
+    virtual WebCore::FloatRect convertToDeviceSpace(const WebCore::FloatRect&);
+    virtual WebCore::FloatRect convertToUserSpace(const WebCore::FloatRect&);
+    virtual void didNotHandleKeyEvent(const WebKit::NativeWebKeyboardEvent&);
+    virtual void selectionChanged(bool, bool, bool, bool);
+    virtual PassRefPtr<WebKit::WebPopupMenuProxy> createPopupMenuProxy();
+    virtual PassRefPtr<WebKit::WebContextMenuProxy> createContextMenuProxy(WebKit::WebPageProxy*);
+
+    virtual void setFindIndicator(PassRefPtr<WebKit::FindIndicator>, bool fadeOut);
 
     void paint(QPainter* painter, QRect);
 
@@ -77,11 +88,14 @@ public:
 
     QWKPage* q;
 
+    QWKHistory* history;
+
     QAction* actions[QWKPage::WebActionCount];
     QWKPreferences* preferences;
 
     RefPtr<WebKit::WebPageProxy> page;
-    WKPageNamespaceRef pageNamespaceRef;
+
+    WebCore::ViewportArguments viewportArguments;
 
     QWKPage::CreateNewPageFn createNewPageFn;
 
@@ -89,13 +103,13 @@ public:
     QBasicTimer tripleClickTimer;
 };
 
-class QtViewportConfigurationPrivate : public QSharedData {
+class QtViewportAttributesPrivate : public QSharedData {
 public:
-    QtViewportConfigurationPrivate(QWKPage::ViewportConfiguration* qq)
+    QtViewportAttributesPrivate(QWKPage::ViewportAttributes* qq)
         : q(qq)
     { }
 
-    QWKPage::ViewportConfiguration* q;
+    QWKPage::ViewportAttributes* q;
 };
 
 

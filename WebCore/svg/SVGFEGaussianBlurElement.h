@@ -27,9 +27,6 @@
 
 namespace WebCore {
 
-extern char SVGStdDeviationXAttrIdentifier[];
-extern char SVGStdDeviationYAttrIdentifier[];
-
 class SVGFEGaussianBlurElement : public SVGFilterPrimitiveStandardAttributes {
 public:
     static PassRefPtr<SVGFEGaussianBlurElement> create(const QualifiedName&, Document*);
@@ -40,12 +37,16 @@ private:
     SVGFEGaussianBlurElement(const QualifiedName&, Document*);
 
     virtual void parseMappedAttribute(Attribute*);
+    virtual void svgAttributeChanged(const QualifiedName&);
     virtual void synchronizeProperty(const QualifiedName&);
     virtual PassRefPtr<FilterEffect> build(SVGFilterBuilder*);
 
-    DECLARE_ANIMATED_PROPERTY(SVGFEGaussianBlurElement, SVGNames::inAttr, String, In1, in1)
-    DECLARE_ANIMATED_PROPERTY_MULTIPLE_WRAPPERS(SVGFEGaussianBlurElement, SVGNames::stdDeviationAttr, SVGStdDeviationXAttrIdentifier, float, StdDeviationX, stdDeviationX)
-    DECLARE_ANIMATED_PROPERTY_MULTIPLE_WRAPPERS(SVGFEGaussianBlurElement, SVGNames::stdDeviationAttr, SVGStdDeviationYAttrIdentifier, float, StdDeviationY, stdDeviationY)
+    static const AtomicString& stdDeviationXIdentifier();
+    static const AtomicString& stdDeviationYIdentifier();
+
+    DECLARE_ANIMATED_STATIC_PROPERTY_NEW(SVGFEGaussianBlurElement, SVGNames::inAttr, String, In1, in1)
+    DECLARE_ANIMATED_STATIC_PROPERTY_MULTIPLE_WRAPPERS_NEW(SVGFEGaussianBlurElement, SVGNames::stdDeviationAttr, stdDeviationXIdentifier(), float, StdDeviationX, stdDeviationX)
+    DECLARE_ANIMATED_STATIC_PROPERTY_MULTIPLE_WRAPPERS_NEW(SVGFEGaussianBlurElement, SVGNames::stdDeviationAttr, stdDeviationYIdentifier(), float, StdDeviationY, stdDeviationY)
 };
 
 } // namespace WebCore

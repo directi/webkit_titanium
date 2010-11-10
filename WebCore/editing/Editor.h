@@ -28,6 +28,7 @@
 
 #include "ClipboardAccessPolicy.h"
 #include "Color.h"
+#include "CorrectionPanelInfo.h"
 #include "EditAction.h"
 #include "EditingBehavior.h"
 #include "EditorDeleteAction.h"
@@ -125,7 +126,6 @@ public:
 
     TriState selectionHasStyle(CSSStyleDeclaration*) const;
     String selectionStartCSSPropertyValue(int propertyID);
-    Element* elementForFormatBlockCommand() const;
     const SimpleFontData* fontForSelection(bool&) const;
     WritingDirection textDirectionForSelection(bool&) const;
     
@@ -208,7 +208,8 @@ public:
     Vector<String> guessesForMisspelledSelection();
     Vector<String> guessesForUngrammaticalSelection();
     Vector<String> guessesForMisspelledOrUngrammaticalSelection(bool& misspelled, bool& ungrammatical);
-    bool spellCheckingEnabledInFocusedNode() const;
+    bool isSpellCheckingEnabledInFocusedNode() const;
+    bool isSpellCheckingEnabledFor(Node*) const;
     void markMisspellingsAfterTypingToPosition(const VisiblePosition&);
     void markMisspellings(const VisibleSelection&, RefPtr<Range>& firstMisspellingRange);
     void markBadGrammar(const VisibleSelection&);
@@ -312,7 +313,7 @@ public:
     void addToKillRing(Range*, bool prepend);
 
     void handleCancelOperation();
-    void startCorrectionPanelTimer();
+    void startCorrectionPanelTimer(CorrectionPanelInfo::PanelType);
     void handleRejectedCorrection();
     bool isShowingCorrectionPanel();
 
@@ -363,6 +364,7 @@ public:
 #endif
 
     bool selectionStartHasSpellingMarkerFor(int from, int length) const;
+    void removeSpellAndCorrectionMarkersFromWordsToBeEdited(bool doNotRemoveIfSelectionAtWordBoundary);
 
 private:
     Frame* m_frame;
@@ -377,8 +379,7 @@ private:
     bool m_shouldStartNewKillRingSequence;
     bool m_shouldStyleWithCSS;
     OwnPtr<KillRing> m_killRing;
-    RefPtr<Range> m_rangeToBeReplacedByCorrection;
-    String m_stringToBeReplacedByCorrection;
+    CorrectionPanelInfo m_correctionPanelInfo;
     Timer<Editor> m_correctionPanelTimer;
     VisibleSelection m_mark;
     bool m_areMarkedTextMatchesHighlighted;
@@ -392,6 +393,7 @@ private:
     void replaceSelectionWithText(const String&, bool selectReplacement, bool smartReplace);
     void writeSelectionToPasteboard(Pasteboard*);
     void revealSelectionAfterEditingOperation();
+    void markMisspellingsOrBadGrammar(const VisibleSelection&, bool checkSpelling, RefPtr<Range>& firstMisspellingRange);
 
     void selectComposition();
     void confirmComposition(const String&, bool preserveSelection);
@@ -404,6 +406,8 @@ private:
     void correctionPanelTimerFired(Timer<Editor>*);
     Node* findEventTargetFromSelection() const;
     void stopCorrectionPanelTimer();
+    void dismissCorrectionPanel(CorrectionWasRejectedOrNot);
+    void applyCorrectionPanelInfo(bool addCorrectionIndicatorMarker);
 };
 
 inline void Editor::setStartNewKillRingSequence(bool flag)

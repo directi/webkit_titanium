@@ -46,7 +46,6 @@
 #include "WebFramePolicyListener.h"
 #include "WebHistory.h"
 #include "WebHistoryItem.h"
-#include "WebIconFetcher.h"
 #include "WebKit.h"
 #include "WebKitStatisticsPrivate.h"
 #include "WebMutableURLRequest.h"
@@ -56,7 +55,7 @@
 #include "WebView.h"
 #pragma warning( push, 0 )
 #include <WebCore/BString.h>
-#include <WebCore/Cache.h>
+#include <WebCore/MemoryCache.h>
 #include <WebCore/Document.h>
 #include <WebCore/DocumentLoader.h>
 #include <WebCore/DOMImplementation.h>
@@ -439,7 +438,7 @@ HRESULT STDMETHODCALLTYPE WebFrame::name(
     if (!coreFrame)
         return E_FAIL;
 
-    *frameName = BString(coreFrame->tree()->name()).release();
+    *frameName = BString(coreFrame->tree()->uniqueName()).release();
     return S_OK;
 }
 
@@ -1015,26 +1014,20 @@ HRESULT STDMETHODCALLTYPE WebFrame::pendingFrameUnloadEventCount(
     return S_OK;
 }
 
-HRESULT STDMETHODCALLTYPE WebFrame::fetchApplicationIcon( 
-    /* [in] */ IWebIconFetcherDelegate *delegate,
-    /* [retval][out] */ IWebIconFetcher **result)
+HRESULT STDMETHODCALLTYPE WebFrame::unused2()
 {
-    if (!result)
-        return E_POINTER;
+    return E_NOTIMPL;
+}
 
-    *result = 0;
-
-    if (!delegate)
-        return E_FAIL;
-
+HRESULT STDMETHODCALLTYPE WebFrame::hasSpellingMarker(
+        /* [in] */ UINT from,
+        /* [in] */ UINT length,
+        /* [retval][out] */ BOOL* result)
+{
     Frame* coreFrame = core(this);
     if (!coreFrame)
         return E_FAIL;
-
-    *result = WebIconFetcher::fetchApplicationIcon(coreFrame, delegate);
-    if (!*result)
-        return E_FAIL;
-
+    *result = coreFrame->editor()->selectionStartHasSpellingMarkerFor(from, length);
     return S_OK;
 }
 
@@ -1306,11 +1299,7 @@ HRESULT WebFrame::suspendAnimations()
     if (!frame)
         return E_FAIL;
 
-    AnimationController* controller = frame->animation();
-    if (!controller)
-        return E_FAIL;
-
-    controller->suspendAnimations(frame->document());
+    frame->animation()->suspendAnimations();
     return S_OK;
 }
 
@@ -1320,11 +1309,7 @@ HRESULT WebFrame::resumeAnimations()
     if (!frame)
         return E_FAIL;
 
-    AnimationController* controller = frame->animation();
-    if (!controller)
-        return E_FAIL;
-
-    controller->resumeAnimations(frame->document());
+    frame->animation()->resumeAnimations();
     return S_OK;
 }
 
@@ -1725,7 +1710,13 @@ ResourceError WebFrame::pluginWillHandleLoadError(const ResourceResponse& respon
 
 bool WebFrame::shouldFallBack(const ResourceError& error)
 {
-    return error.errorCode() != WebURLErrorCancelled;
+    if (error.errorCode() == WebURLErrorCancelled && error.domain() == String(WebURLErrorDomain))
+        return false;
+
+    if (error.errorCode() == WebKitErrorPlugInWillHandleLoad && error.domain() == String(WebKitErrorDomain))
+        return false;
+
+    return true;
 }
 
 COMPtr<WebFramePolicyListener> WebFrame::setUpPolicyListener(WebCore::FramePolicyFunction function)
@@ -2591,6 +2582,11 @@ void WebFrame::unmarkAllBadGrammar()
 WebView* WebFrame::webView() const
 {
     return d->webView;
+}
+
+void WebFrame::setWebView(WebView* webView)
+{
+    d->webView = webView;
 }
 
 COMPtr<IAccessible> WebFrame::accessible() const

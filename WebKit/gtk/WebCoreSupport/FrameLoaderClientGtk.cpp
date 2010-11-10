@@ -50,7 +50,6 @@
 #include "MouseEvent.h"
 #include "NotImplemented.h"
 #include "Page.h"
-#include "PlatformString.h"
 #include "PluginDatabase.h"
 #include "RenderPart.h"
 #include "ResourceHandle.h"
@@ -67,6 +66,7 @@
 #include "webkitwebpolicydecision.h"
 #include "webkitwebview.h"
 #include <wtf/text/CString.h>
+#include <wtf/text/StringConcatenate.h>
 
 #include <JavaScriptCore/APICast.h>
 #include <gio/gio.h>
@@ -116,6 +116,7 @@ static void initializeDomainsList(HashSet<String>& googleDomains)
     googleDomains.add("cl");
     googleDomains.add("com.br");
     googleDomains.add("co.uk");
+    googleDomains.add("co.kr");
     googleDomains.add("co.jp");
     googleDomains.add("de");
     googleDomains.add("dj");
@@ -583,13 +584,15 @@ PassRefPtr<Frame> FrameLoaderClient::createFrame(const KURL& url, const String& 
     RefPtr<Frame> childFrame = Frame::create(page, ownerElement, new FrameLoaderClient(kitFrame));
     framePrivate->coreFrame = childFrame.get();
 
-    parentFrame->tree()->appendChild(childFrame);
     childFrame->tree()->setName(name);
+    parentFrame->tree()->appendChild(childFrame);
     childFrame->init();
 
     // The creation of the frame may have run arbitrary JavaScript that removed it from the page already.
     if (!childFrame->page())
         return 0;
+
+    g_signal_emit_by_name(webView, "frame-created", kitFrame);
 
     childFrame->loader()->loadURLIntoChildFrame(url, referrer, childFrame.get());
 
@@ -597,7 +600,6 @@ PassRefPtr<Frame> FrameLoaderClient::createFrame(const KURL& url, const String& 
     if (!childFrame->tree()->parent())
         return 0;
 
-    g_signal_emit_by_name(webView, "frame-created", kitFrame);
     return childFrame.release();
 }
 
@@ -616,6 +618,18 @@ void FrameLoaderClient::didTransferChildFrameToNewDocument(WebCore::Page*)
         m_frame->priv->webView = parentWebView;
 
     ASSERT(core(getViewFromFrame(m_frame)) == coreFrame->page());
+}
+
+void FrameLoaderClient::transferLoadingResourceFromPage(unsigned long identifier, WebCore::DocumentLoader* docLoader, const WebCore::ResourceRequest& request, WebCore::Page* oldPage)
+{
+    ASSERT(oldPage != core(m_frame)->page());
+
+    GOwnPtr<gchar> identifierString(toString(identifier));
+    ASSERT(!webkit_web_view_get_resource(getViewFromFrame(m_frame), identifierString.get()));
+
+    assignIdentifierToInitialRequest(identifier, docLoader, request);
+
+    webkit_web_view_remove_resource(kit(oldPage), identifierString.get());
 }
 
 void FrameLoaderClient::redirectDataToPlugin(Widget* pluginWidget)
@@ -1119,11 +1133,11 @@ void FrameLoaderClient::dispatchDidFailLoad(const ResourceError& error)
     g_free(errorURI);
 
     if (!errorFile)
-        content = String::format("<html><body>%s</body></html>", webError->message);
+        content = makeString("<html><body>", webError->message, "</body></html>");
     else {
         gboolean loaded = g_file_load_contents(errorFile, 0, &fileContent, 0, 0, 0);
         if (!loaded)
-            content = String::format("<html><body>%s</body></html>", webError->message);
+            content = makeString("<html><body>", webError->message, "</body></html>");
         else
             content = String::format(fileContent, error.failingURL().utf8().data(), webError->message);
     }
@@ -1199,7 +1213,7 @@ bool FrameLoaderClient::canCachePage() const
     return true;
 }
 
-Frame* FrameLoaderClient::dispatchCreatePage()
+Frame* FrameLoaderClient::dispatchCreatePage(const NavigationAction&)
 {
     WebKitWebView* webView = getViewFromFrame(m_frame);
     WebKitWebView* newWebView = 0;
@@ -1305,6 +1319,10 @@ void FrameLoaderClient::transitionToCommittedForNewPage()
         return;
 
     postCommitFrameViewSetup(m_frame, frame->view(), true);
+}
+
+void FrameLoaderClient::dispatchDidBecomeFrameset(bool)
+{
 }
 
 PassRefPtr<FrameNetworkingContext> FrameLoaderClient::createNetworkingContext()

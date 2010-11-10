@@ -45,9 +45,8 @@ public:
     virtual PassRefPtr<IDBObjectStoreBackendInterface> objectStore(const String& name);
     virtual unsigned short mode() const;
     virtual void abort();
-    virtual bool scheduleTask(PassOwnPtr<ScriptExecutionContext::Task>);
+    virtual bool scheduleTask(PassOwnPtr<ScriptExecutionContext::Task>, PassOwnPtr<ScriptExecutionContext::Task>);
     virtual void didCompleteTaskEvents();
-    virtual int id() const;
     virtual void setCallbacks(IDBTransactionCallbacks*);
 
     WebKit::WebIDBTransaction* getWebIDBTransaction() const { return m_webIDBTransaction.get(); }

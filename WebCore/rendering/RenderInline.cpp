@@ -31,6 +31,7 @@
 #include "RenderArena.h"
 #include "RenderBlock.h"
 #include "RenderLayer.h"
+#include "RenderTheme.h"
 #include "RenderView.h"
 #include "TransformState.h"
 #include "VisiblePosition.h"
@@ -471,28 +472,28 @@ static int computeMargin(const RenderInline* renderer, const Length& margin)
 
 int RenderInline::marginLeft() const
 {
-    if (!style()->isVerticalBlockFlow())
+    if (!style()->isHorizontalWritingMode())
         return 0;
     return computeMargin(this, style()->marginLeft());
 }
 
 int RenderInline::marginRight() const
 {
-    if (!style()->isVerticalBlockFlow())
+    if (!style()->isHorizontalWritingMode())
         return 0;
     return computeMargin(this, style()->marginRight());
 }
 
 int RenderInline::marginTop() const
 {
-    if (style()->isVerticalBlockFlow())
+    if (style()->isHorizontalWritingMode())
         return 0;
     return computeMargin(this, style()->marginTop());
 }
 
 int RenderInline::marginBottom() const
 {
-    if (style()->isVerticalBlockFlow())
+    if (style()->isHorizontalWritingMode())
         return 0;
     return computeMargin(this, style()->marginBottom());
 }
@@ -558,18 +559,22 @@ IntRect RenderInline::linesBoundingBox() const
     ASSERT(!firstLineBox() == !lastLineBox());  // Either both are null or both exist.
     if (firstLineBox() && lastLineBox()) {
         // Return the width of the minimal left side and the maximal right side.
-        int leftSide = 0;
-        int rightSide = 0;
+        int logicalLeftSide = 0;
+        int logicalRightSide = 0;
         for (InlineFlowBox* curr = firstLineBox(); curr; curr = curr->nextLineBox()) {
-            if (curr == firstLineBox() || curr->x() < leftSide)
-                leftSide = curr->x();
-            if (curr == firstLineBox() || curr->x() + curr->logicalWidth() > rightSide)
-                rightSide = curr->x() + curr->logicalWidth();
+            if (curr == firstLineBox() || curr->logicalLeft() < logicalLeftSide)
+                logicalLeftSide = curr->logicalLeft();
+            if (curr == firstLineBox() || curr->logicalRight() > logicalRightSide)
+                logicalRightSide = curr->logicalRight();
         }
-        result.setWidth(rightSide - leftSide);
-        result.setX(leftSide);
-        result.setHeight(lastLineBox()->y() + lastLineBox()->logicalHeight() - firstLineBox()->y());
-        result.setY(firstLineBox()->y());
+        
+        bool isHorizontal = style()->isHorizontalWritingMode();
+        
+        int x = isHorizontal ? logicalLeftSide : firstLineBox()->x();
+        int y = isHorizontal ? firstLineBox()->y() : logicalLeftSide;
+        int width = isHorizontal ? logicalRightSide - logicalLeftSide : lastLineBox()->logicalBottom() - x;
+        int height = isHorizontal ? lastLineBox()->logicalBottom() - y : logicalRightSide - logicalLeftSide;
+        result = IntRect(x, y, width, height);
     }
 
     return result;
@@ -581,15 +586,20 @@ IntRect RenderInline::linesVisibleOverflowBoundingBox() const
         return IntRect();
 
     // Return the width of the minimal left side and the maximal right side.
-    int leftSide = numeric_limits<int>::max();
-    int rightSide = numeric_limits<int>::min();
+    int logicalLeftSide = numeric_limits<int>::max();
+    int logicalRightSide = numeric_limits<int>::min();
     for (InlineFlowBox* curr = firstLineBox(); curr; curr = curr->nextLineBox()) {
-        leftSide = min(leftSide, curr->leftVisibleOverflow());
-        rightSide = max(rightSide, curr->rightVisibleOverflow());
+        logicalLeftSide = min(logicalLeftSide, curr->logicalLeftVisibleOverflow());
+        logicalRightSide = max(logicalRightSide, curr->logicalRightVisibleOverflow());
     }
 
-    return IntRect(leftSide, firstLineBox()->topVisibleOverflow(), rightSide - leftSide,
-        lastLineBox()->bottomVisibleOverflow() - firstLineBox()->topVisibleOverflow());
+    bool isHorizontal = style()->isHorizontalWritingMode();
+        
+    int x = isHorizontal ? logicalLeftSide : firstLineBox()->leftVisibleOverflow();
+    int y = isHorizontal ? firstLineBox()->topVisibleOverflow() : logicalLeftSide;
+    int width = isHorizontal ? logicalRightSide - logicalLeftSide : lastLineBox()->rightVisibleOverflow() - firstLineBox()->leftVisibleOverflow();
+    int height = isHorizontal ? lastLineBox()->bottomVisibleOverflow() - firstLineBox()->topVisibleOverflow() : logicalRightSide - logicalLeftSide;
+    return IntRect(x, y, width, height);
 }
 
 IntRect RenderInline::clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer)
@@ -618,6 +628,8 @@ IntRect RenderInline::clippedOverflowRectForRepaint(RenderBoxModelObject* repain
     }
 
     IntRect r(-ow + left, -ow + top, boundingBox.width() + ow * 2, boundingBox.height() + ow * 2);
+    cb->flipForWritingMode(r);
+
     if (cb->hasColumns())
         cb->adjustRectForColumns(r);
 
@@ -878,7 +890,7 @@ InlineFlowBox* RenderInline::createAndAppendInlineFlowBox()
     return flowBox;
 }
 
-int RenderInline::lineHeight(bool firstLine, bool /*isRootLineBox*/) const
+int RenderInline::lineHeight(bool firstLine, LineDirectionMode /*direction*/, LinePositionMode /*linePositionMode*/) const
 {
     if (firstLine && document()->usesFirstLineRules()) {
         RenderStyle* s = style(firstLine);
@@ -890,6 +902,12 @@ int RenderInline::lineHeight(bool firstLine, bool /*isRootLineBox*/) const
         m_lineHeight = style()->computedLineHeight();
     
     return m_lineHeight;
+}
+
+int RenderInline::baselinePosition(bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
+{
+    const Font& f = style(firstLine)->font();
+    return f.ascent() + (lineHeight(firstLine, direction, linePositionMode) - f.height()) / 2;
 }
 
 int RenderInline::verticalPositionFromCache(bool firstLine) const
@@ -993,15 +1011,10 @@ void RenderInline::paintOutline(GraphicsContext* graphicsContext, int tx, int ty
     
     RenderStyle* styleToUse = style();
     if (styleToUse->outlineStyleIsAuto() || hasOutlineAnnotation()) {
-        int ow = styleToUse->outlineWidth();
-        Color oc = styleToUse->visitedDependentColor(CSSPropertyOutlineColor);
-
-        Vector<IntRect> focusRingRects;
-        addFocusRingRects(focusRingRects, tx, ty);
-        if (styleToUse->outlineStyleIsAuto())
-            graphicsContext->drawFocusRing(focusRingRects, ow, styleToUse->outlineOffset(), oc);
-        else
-            addPDFURLRect(graphicsContext, unionRect(focusRingRects));
+        if (!theme()->supportsFocusRing(styleToUse)) {
+            // Only paint the focus ring by hand if the theme isn't able to draw the focus ring.
+            paintFocusRing(graphicsContext, tx, ty, styleToUse);
+        }
     }
 
     if (styleToUse->outlineStyleIsAuto() || styleToUse->outlineStyle() == BNONE)

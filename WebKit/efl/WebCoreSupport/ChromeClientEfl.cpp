@@ -46,6 +46,7 @@
 #include "HitTestResult.h"
 #include "IntRect.h"
 #include "KURL.h"
+#include "NavigationAction.h"
 #include "NotImplemented.h"
 #include "PlatformString.h"
 #include "SecurityOrigin.h"
@@ -90,6 +91,10 @@ void ChromeClientEfl::focusedNodeChanged(Node*)
     notImplemented();
 }
 
+void ChromeClientEfl::focusedFrameChanged(Frame*)
+{
+}
+
 FloatRect ChromeClientEfl::windowRect()
 {
     Ecore_Evas* ee = 0;
@@ -111,6 +116,9 @@ void ChromeClientEfl::setWindowRect(const FloatRect& rect)
     if (!m_view)
         return;
 
+    if (!ewk_view_setting_enable_auto_resize_window_get(m_view))
+        return;
+
     ee = ecore_evas_ecore_evas_get(evas_object_evas_get(m_view));
     ecore_evas_move(ee, intrect.x(), intrect.y());
     ecore_evas_resize(ee, intrect.width(), intrect.height());
@@ -118,8 +126,10 @@ void ChromeClientEfl::setWindowRect(const FloatRect& rect)
 
 FloatRect ChromeClientEfl::pageRect()
 {
-    notImplemented();
-    return FloatRect();
+    if (!m_view)
+        return FloatRect();
+
+    return ewk_view_page_rect_get(m_view);
 }
 
 float ChromeClientEfl::scaleFactor()
@@ -138,7 +148,7 @@ void ChromeClientEfl::unfocus()
     evas_object_focus_set(m_view, EINA_FALSE);
 }
 
-Page* ChromeClientEfl::createWindow(Frame*, const FrameLoadRequest& frameLoadRequest, const WindowFeatures& features)
+Page* ChromeClientEfl::createWindow(Frame*, const FrameLoadRequest& frameLoadRequest, const WindowFeatures& features, const NavigationAction&)
 {
     Evas_Object* newView = ewk_view_window_create(m_view, EINA_TRUE, &features);
     if (!newView)
@@ -319,6 +329,8 @@ IntRect ChromeClientEfl::windowResizerRect() const
 void ChromeClientEfl::contentsSizeChanged(Frame* frame, const IntSize& size) const
 {
     ewk_frame_contents_size_changed(kit(frame), size.width(), size.height());
+    if (ewk_view_frame_main_get(m_view) == kit(frame))
+        ewk_view_contents_size_changed(m_view, size.width(), size.height());
 }
 
 IntRect ChromeClientEfl::windowToScreen(const IntRect& rect) const
@@ -513,13 +525,9 @@ void ChromeClientEfl::chooseIconForFiles(const Vector<String>&, FileChooser*)
     notImplemented();
 }
 
-void ChromeClientEfl::didReceiveViewportArguments(Frame* frame, const ViewportArguments& arguments) const
+void ChromeClientEfl::dispatchViewportDataDidChange(const ViewportArguments& arguments) const
 {
-    FrameLoaderClientEfl* client = static_cast<FrameLoaderClientEfl*>(frame->loader()->client());
-    if (client->getInitLayoutCompleted())
-        return;
-
-    ewk_view_viewport_set(m_view, arguments.width, arguments.height, arguments.initialScale, arguments.minimumScale, arguments.maximumScale, arguments.userScalable);
+    ewk_view_viewport_attributes_set(m_view, arguments);
 }
 
 bool ChromeClientEfl::selectItemWritingDirectionIsNatural()

@@ -24,14 +24,26 @@
  */
 
 #import "WKView.h"
+#import <WebCore/KeyboardEvent.h>
+
+namespace WebKit {
+    class FindIndicator;
+}
 
 @interface WKView (Internal)
-- (void)_processDidExit;
-- (void)_processDidRevive;
+- (void)_processDidCrash;
+- (void)_didRelaunchProcess;
 - (void)_takeFocus:(BOOL)direction;
 - (void)_toolTipChangedFrom:(NSString *)oldToolTip to:(NSString *)newToolTip;
 - (void)_setCursor:(NSCursor *)cursor;
 - (void)_setUserInterfaceItemState:(NSString *)commandName enabled:(BOOL)isEnabled state:(int)newState;
+- (Vector<WebCore::KeypressCommand>&)_interceptKeyEvent:(NSEvent *)theEvent;
+- (void)_setEventBeingResent:(NSEvent *)event;
+- (NSRect)_convertToDeviceSpace:(NSRect)rect;
+- (NSRect)_convertToUserSpace:(NSRect)rect;
+- (void)_selectionChanged:(BOOL)isNone isEditable:(BOOL)isContentEditable isPassword:(BOOL)isPasswordField hasMarkedText:(BOOL)hasComposition;
+
+- (void)_setFindIndicator:(PassRefPtr<WebKit::FindIndicator>)findIndicator fadeOut:(BOOL)fadeOut;
 
 #if USE(ACCELERATED_COMPOSITING)
 - (void)_startAcceleratedCompositing:(CALayer *)rootLayer;

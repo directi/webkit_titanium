@@ -43,7 +43,7 @@
 #include "HTMLMediaElement.h"
 #include "HTMLNames.h"
 #if USE(QT_MOBILE_THEME)
-#include "Maemo5Webstyle.h"
+#include "QtMobileWebStyle.h"
 #endif
 #include "NotImplemented.h"
 #include "Page.h"
@@ -79,6 +79,19 @@
 namespace WebCore {
 
 using namespace HTMLNames;
+
+inline static void initStyleOption(QWidget *widget, QStyleOption& option)
+{
+    if (widget)
+        option.initFrom(widget);
+    else {
+        /*
+          If a widget is not directly available for rendering, we fallback to default
+          value for an active widget.
+         */
+        option.state = QStyle::State_Active | QStyle::State_Enabled;
+    }
+}
 
 
 StylePainter::StylePainter(RenderThemeQt* theme, const PaintInfo& paintInfo)
@@ -152,7 +165,7 @@ RenderThemeQt::RenderThemeQt(Page* page)
 #endif
 
 #if USE(QT_MOBILE_THEME)
-    m_fallbackStyle = new Maemo5WebStyle;
+    m_fallbackStyle = new QtMobileWebStyle;
 #else
     m_fallbackStyle = QStyleFactory::create(QLatin1String("windows"));
 #endif
@@ -538,9 +551,7 @@ bool RenderThemeQt::paintButton(RenderObject* o, const PaintInfo& i, const IntRe
        return true;
 
     QStyleOptionButton option;
-    if (p.widget)
-       option.initFrom(p.widget);
-
+    initStyleOption(p.widget, option);
     option.rect = r;
     option.state |= QStyle::State_Small;
 
@@ -571,9 +582,7 @@ bool RenderThemeQt::paintTextField(RenderObject* o, const PaintInfo& i, const In
         return true;
 
     QStyleOptionFrameV2 panel;
-    if (p.widget)
-        panel.initFrom(p.widget);
-
+    initStyleOption(p.widget, panel);
     panel.rect = r;
     panel.lineWidth = findFrameLineWidth(qStyle());
     panel.state |= QStyle::State_Sunken;
@@ -640,8 +649,7 @@ bool RenderThemeQt::paintMenuList(RenderObject* o, const PaintInfo& i, const Int
         return true;
 
     QtStyleOptionWebComboBox opt(o);
-    if (p.widget)
-        opt.initFrom(p.widget);
+    initStyleOption(p.widget, opt);
     initializeCommonQStyleOptions(opt, o);
 
     const QPoint topLeft = r.topLeft();
@@ -684,8 +692,7 @@ bool RenderThemeQt::paintMenuListButton(RenderObject* o, const PaintInfo& i,
         return true;
 
     QtStyleOptionWebComboBox option(o);
-    if (p.widget)
-        option.initFrom(p.widget);
+    initStyleOption(p.widget, option);
     initializeCommonQStyleOptions(option, o);
     option.rect = r;
 
@@ -735,8 +742,7 @@ bool RenderThemeQt::paintProgressBar(RenderObject* o, const PaintInfo& pi, const
        return true;
 
     QStyleOptionProgressBarV2 option;
-    if (p.widget)
-       option.initFrom(p.widget);
+    initStyleOption(p.widget, option);
     initializeCommonQStyleOptions(option, o);
 
     RenderProgress* renderProgress = toRenderProgress(o);
@@ -777,8 +783,8 @@ bool RenderThemeQt::paintSliderTrack(RenderObject* o, const PaintInfo& pi,
        return true;
 
     QStyleOptionSlider option;
-    if (p.widget)
-       option.initFrom(p.widget);
+    initStyleOption(p.widget, option);
+    option.subControls = QStyle::SC_SliderGroove | QStyle::SC_SliderHandle;
     ControlPart appearance = initializeCommonQStyleOptions(option, o);
 
     RenderSlider* renderSlider = toRenderSlider(o);

@@ -371,7 +371,7 @@ void LayoutTestController::setGeolocationPermission(bool allow)
     [[[mainFrame webView] UIDelegate] didSetMockGeolocationPermission];
 }
 
-void LayoutTestController::setMockSpeechInputResult(JSStringRef result)
+void LayoutTestController::setMockSpeechInputResult(JSStringRef result, JSStringRef language)
 {
     // FIXME: Implement for speech input layout tests.
     // See https://bugs.webkit.org/show_bug.cgi?id=39485.
@@ -422,7 +422,7 @@ void LayoutTestController::setFrameFlatteningEnabled(bool enabled)
 
 void LayoutTestController::setSpatialNavigationEnabled(bool enabled)
 {
-    // FIXME: Implement for SpatialNavigation layout tests.
+    [[[mainFrame webView] preferences] setSpatialNavigationEnabled:enabled];
 }
 
 void LayoutTestController::setAllowUniversalAccessFromFileURLs(bool enabled)
@@ -935,12 +935,19 @@ void LayoutTestController::setEditingBehavior(const char* editingBehavior)
     NSString* editingBehaviorNS = [[NSString alloc] initWithUTF8String:editingBehavior];
     if ([editingBehaviorNS isEqualToString:@"mac"])
         [[WebPreferences standardPreferences] setEditingBehavior:WebKitEditingMacBehavior];
-    if ([editingBehaviorNS isEqualToString:@"win"])
+    else if ([editingBehaviorNS isEqualToString:@"win"])
         [[WebPreferences standardPreferences] setEditingBehavior:WebKitEditingWinBehavior];
+    else if ([editingBehaviorNS isEqualToString:@"unix"])
+        [[WebPreferences standardPreferences] setEditingBehavior:WebKitEditingUnixBehavior];
     [editingBehaviorNS release];
 }
 
 void LayoutTestController::abortModal()
 {
     [NSApp abortModal];
+}
+
+bool LayoutTestController::hasSpellingMarker(int from, int length)
+{
+    return [mainFrame hasSpellingMarker:from length:length];
 }

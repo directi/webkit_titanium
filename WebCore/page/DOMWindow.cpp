@@ -27,6 +27,7 @@
 #include "DOMWindow.h"
 
 #include "AbstractDatabase.h"
+#include "BackForwardController.h"
 #include "Base64.h"
 #include "BarInfo.h"
 #include "BeforeUnloadEvent.h"
@@ -38,6 +39,7 @@
 #include "DocumentLoader.h"
 #include "DOMApplicationCache.h"
 #include "DOMSelection.h"
+#include "DOMSettableTokenList.h"
 #include "DOMStringList.h"
 #include "DOMTimer.h"
 #include "DOMTokenList.h"
@@ -62,7 +64,7 @@
 #include "IDBFactory.h"
 #include "IDBFactoryBackendInterface.h"
 #include "InspectorController.h"
-#include "InspectorTimelineAgent.h"
+#include "InspectorInstrumentation.h"
 #include "KURL.h"
 #include "Location.h"
 #include "StyleMedia.h"
@@ -86,7 +88,7 @@
 #include <algorithm>
 #include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
-#include <wtf/text/CString.h>
+#include <wtf/text/StringConcatenate.h>
 
 #if ENABLE(FILE_SYSTEM)
 #include "AsyncFileSystem.h"
@@ -700,7 +702,7 @@ void DOMWindow::pageDestroyed()
 }
 
 #if ENABLE(INDEXED_DATABASE)
-IDBFactory* DOMWindow::indexedDB() const
+IDBFactory* DOMWindow::webkitIndexedDB() const
 {
     if (m_idbFactory)
         return m_idbFactory.get();
@@ -730,17 +732,17 @@ void DOMWindow::requestFileSystem(int type, long long size, PassRefPtr<FileSyste
         return;
 
     if (!AsyncFileSystem::isAvailable() || !document->securityOrigin()->canAccessFileSystem()) {
-        DOMFileSystem::scheduleCallback(document, errorCallback, FileError::create(SECURITY_ERR));
+        DOMFileSystem::scheduleCallback(document, errorCallback, FileError::create(FileError::SECURITY_ERR));
         return;
     }
 
     AsyncFileSystem::Type fileSystemType = static_cast<AsyncFileSystem::Type>(type);
     if (fileSystemType != AsyncFileSystem::Temporary && fileSystemType != AsyncFileSystem::Persistent) {
-        DOMFileSystem::scheduleCallback(document, errorCallback, FileError::create(INVALID_MODIFICATION_ERR));
+        DOMFileSystem::scheduleCallback(document, errorCallback, FileError::create(FileError::INVALID_MODIFICATION_ERR));
         return;
     }
 
-    LocalFileSystem::localFileSystem().requestFileSystem(document, fileSystemType, size, FileSystemCallbacks::create(successCallback, errorCallback, document));
+    LocalFileSystem::localFileSystem().requestFileSystem(document, fileSystemType, size, FileSystemCallbacks::create(successCallback, errorCallback, document), false);
 }
 
 COMPILE_ASSERT(static_cast<int>(DOMWindow::TEMPORARY) == static_cast<int>(AsyncFileSystem::Temporary), enum_mismatch);
@@ -798,8 +800,8 @@ void DOMWindow::postMessageTimerFired(PostMessageTimer* t)
     if (timer->targetOrigin()) {
         // Check target origin now since the target document may have changed since the simer was scheduled.
         if (!timer->targetOrigin()->isSameSchemeHostPort(document()->securityOrigin())) {
-            String message = String::format("Unable to post message to %s. Recipient has origin %s.\n", 
-                timer->targetOrigin()->toString().utf8().data(), document()->securityOrigin()->toString().utf8().data());
+            String message = makeString("Unable to post message to ", timer->targetOrigin()->toString(),
+                                        ". Recipient has origin ", document()->securityOrigin()->toString(), ".\n");
             console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, 0, String());
             return;
         }
@@ -872,7 +874,7 @@ void DOMWindow::close()
     Settings* settings = m_frame->settings();
     bool allowScriptsToCloseWindows = settings && settings->allowScriptsToCloseWindows();
 
-    if (!(page->openedByDOM() || page->getHistoryLength() <= 1 || allowScriptsToCloseWindows))
+    if (!(page->openedByDOM() || page->backForward()->count() <= 1 || allowScriptsToCloseWindows))
         return;
 
     if (!m_frame->loader()->shouldClose())
@@ -993,11 +995,8 @@ String DOMWindow::atob(const String& encodedString, ExceptionCode& ec)
         return String();
     }
 
-    Vector<char> in;
-    in.append(encodedString.characters(), encodedString.length());
     Vector<char> out;
-
-    if (!base64Decode(in, out)) {
+    if (!base64Decode(encodedString, out, FailOnInvalidCharacter)) {
         ec = INVALID_CHARACTER_ERR;
         return String();
     }
@@ -1257,8 +1256,8 @@ PassRefPtr<CSSRuleList> DOMWindow::getMatchedCSSRules(Element* elt, const String
     if (!m_frame)
         return 0;
 
-    Document* doc = m_frame->document();
-    return doc->styleSelector()->styleRulesForElement(elt, authorOnly);
+    Settings* settings = m_frame->settings();
+    return m_frame->document()->styleSelector()->styleRulesForElement(elt, authorOnly, false, settings && settings->crossOriginCheckInGetMatchedCSSRulesDisabled() ? AllCSSRules : SameOriginCSSRulesOnly);
 }
 
 PassRefPtr<WebKitPoint> DOMWindow::webkitConvertPointFromNodeToPage(Node* node, const WebKitPoint* p) const
@@ -1525,15 +1524,6 @@ void DOMWindow::dispatchLoadEvent()
 #endif
 }
 
-#if ENABLE(INSPECTOR)
-InspectorTimelineAgent* DOMWindow::inspectorTimelineAgent() 
-{
-    if (frame() && frame()->page())
-        return frame()->page()->inspectorTimelineAgent();
-    return 0;
-}
-#endif
-
 bool DOMWindow::dispatchEvent(PassRefPtr<Event> prpEvent, PassRefPtr<EventTarget> prpTarget)
 {
     RefPtr<EventTarget> protect = this;
@@ -1543,23 +1533,11 @@ bool DOMWindow::dispatchEvent(PassRefPtr<Event> prpEvent, PassRefPtr<EventTarget
     event->setCurrentTarget(this);
     event->setEventPhase(Event::AT_TARGET);
 
-#if ENABLE(INSPECTOR)
-    Page* inspectedPage = InspectorTimelineAgent::instanceCount() && frame() ? frame()->page() : 0;
-    if (inspectedPage) {
-        if (InspectorTimelineAgent* timelineAgent = hasEventListeners(event->type()) ? inspectedPage->inspectorTimelineAgent() : 0)
-            timelineAgent->willDispatchEvent(*event);
-        else
-            inspectedPage = 0;
-    }
-#endif
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willDispatchEventOnWindow(frame(), *event, this);
 
     bool result = fireEventListeners(event.get());
 
-#if ENABLE(INSPECTOR)
-    if (inspectedPage)
-        if (InspectorTimelineAgent* timelineAgent = inspectedPage->inspectorTimelineAgent())
-            timelineAgent->didDispatchEvent();
-#endif
+    InspectorInstrumentation::didDispatchEventOnWindow(cookie);
 
     return result;
 }
@@ -1600,12 +1578,12 @@ EventTargetData* DOMWindow::ensureEventTargetData()
 }
 
 #if ENABLE(BLOB)
-String DOMWindow::createBlobURL(Blob* blob)
+String DOMWindow::createObjectURL(Blob* blob)
 {
     return scriptExecutionContext()->createPublicBlobURL(blob).string();
 }
 
-void DOMWindow::revokeBlobURL(const String& blobURLString)
+void DOMWindow::revokeObjectURL(const String& blobURLString)
 {
     scriptExecutionContext()->revokePublicBlobURL(KURL(KURL(), blobURLString));
 }

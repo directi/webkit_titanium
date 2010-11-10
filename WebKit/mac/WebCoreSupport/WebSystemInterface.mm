@@ -44,6 +44,7 @@ void InitWebCoreSystemInterface(void)
 
     INIT(AdvanceDefaultButtonPulseAnimation);
     INIT(CGContextGetShouldSmoothFonts);
+    INIT(CopyCFLocalizationPreferredName);
     INIT(CopyCONNECTProxyResponse);
     INIT(CopyNSURLResponseStatusLine);
     INIT(CreateCustomCFReadStream);
@@ -72,6 +73,7 @@ void InitWebCoreSystemInterface(void)
     INIT(SetCGFontRenderingMode);
     INIT(SetCONNECTProxyAuthorizationForStream);
     INIT(SetCONNECTProxyForStream);
+    INIT(SetCookieStoragePrivateBrowsingEnabled);
     INIT(SetDragImage);
     INIT(SetNSURLConnectionDefersCallbacks);
     INIT(SetNSURLRequestShouldContentSniff);
@@ -112,12 +114,13 @@ void InitWebCoreSystemInterface(void)
     INIT(SupportsMultipartXMixedReplace);
 #endif
 
-#if !defined(BUILDING_ON_TIGER) && !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
-    INIT(NoteOpenPanelFiles);
-#endif
-
 #if defined(BUILDING_ON_TIGER) || defined(BUILDING_ON_LEOPARD) || defined(BUILDING_ON_SNOW_LEOPARD)
     INIT(GetHyphenationLocationBeforeIndex);
+#endif
+
+    INIT(CreateCTLineWithUniCharProvider);
+#if !defined(BUILDING_ON_TIGER) && !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
+    INIT(CreateCTTypesetterWithUniCharProviderAndOptions);
 #endif
 
     didInit = true;

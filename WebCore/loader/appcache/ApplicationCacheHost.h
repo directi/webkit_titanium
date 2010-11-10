@@ -43,6 +43,7 @@
 namespace WebCore {
     class DOMApplicationCache;
     class DocumentLoader;
+    class Frame;
     class ResourceLoader;
     class ResourceError;
     class ResourceRequest;
@@ -121,6 +122,7 @@ namespace WebCore {
         void selectCacheWithManifest(const KURL& manifestURL);
 
         void maybeLoadMainResource(ResourceRequest&, SubstituteData&);
+        void maybeLoadMainResourceForRedirect(ResourceRequest&, SubstituteData&);
         bool maybeLoadFallbackForMainResponse(const ResourceRequest&, const ResourceResponse&);
         bool maybeLoadFallbackForMainError(const ResourceRequest&, const ResourceError&);
         void mainResourceDataReceived(const char* data, int length, long long lengthReceived, bool allAtOnce);
@@ -143,6 +145,8 @@ namespace WebCore {
 
         void setDOMApplicationCache(DOMApplicationCache*);
         void notifyDOMApplicationCache(EventID, int progressTotal, int progressDone);
+
+        void stopLoadingInFrame(Frame*);
 
         void stopDeferringEvents(); // Also raises the events that have been queued up.
 

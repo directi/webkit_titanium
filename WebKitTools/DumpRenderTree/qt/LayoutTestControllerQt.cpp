@@ -73,6 +73,7 @@ void LayoutTestController::reset()
 
     DumpRenderTreeSupportQt::dumpEditingCallbacks(false);
     DumpRenderTreeSupportQt::dumpFrameLoader(false);
+    DumpRenderTreeSupportQt::dumpUserGestureInFrameLoader(false);
     DumpRenderTreeSupportQt::dumpResourceLoadCallbacks(false);
     DumpRenderTreeSupportQt::dumpResourceResponseMIMETypes(false);
     DumpRenderTreeSupportQt::setDeferMainResourceDataLoad(true);
@@ -246,6 +247,11 @@ void LayoutTestController::dumpFrameLoadCallbacks()
     DumpRenderTreeSupportQt::dumpFrameLoader(true);
 }
 
+void LayoutTestController::dumpUserGestureInFrameLoadCallbacks()
+{
+    DumpRenderTreeSupportQt::dumpUserGestureInFrameLoader(true);
+}
+
 void LayoutTestController::dumpResourceLoadCallbacks()
 {
     DumpRenderTreeSupportQt::dumpResourceLoadCallbacks(true);
@@ -284,13 +290,15 @@ void LayoutTestController::setDeferMainResourceDataLoad(bool defer)
 void LayoutTestController::queueBackNavigation(int howFarBackward)
 {
     //qDebug() << ">>>queueBackNavigation" << howFarBackward;
-    WorkQueue::shared()->queue(new BackItem(howFarBackward, m_drt->webPage()));
+    for (int i = 0; i != howFarBackward; ++i)
+        WorkQueue::shared()->queue(new BackItem(1, m_drt->webPage()));
 }
 
 void LayoutTestController::queueForwardNavigation(int howFarForward)
 {
     //qDebug() << ">>>queueForwardNavigation" << howFarForward;
-    WorkQueue::shared()->queue(new ForwardItem(howFarForward, m_drt->webPage()));
+    for (int i = 0; i != howFarForward; ++i)
+        WorkQueue::shared()->queue(new ForwardItem(1, m_drt->webPage()));
 }
 
 void LayoutTestController::queueLoad(const QString& url, const QString& target)
@@ -757,7 +765,7 @@ void LayoutTestController::setMockGeolocationPosition(double latitude, double lo
     DumpRenderTreeSupportQt::setMockGeolocationPosition(latitude, longitude, accuracy);
 }
 
-void LayoutTestController::setMockSpeechInputResult(const QString& result)
+void LayoutTestController::setMockSpeechInputResult(const QString& result, const QString& language)
 {
     // FIXME: Implement for speech input layout tests.
     // See https://bugs.webkit.org/show_bug.cgi?id=39485.
@@ -794,6 +802,17 @@ void LayoutTestController::removeAllVisitedLinks()
     QWebHistory* history = m_drt->webPage()->history();
     history->clear();
     DumpRenderTreeSupportQt::dumpVisitedLinksCallbacks(true);
+}
+
+bool LayoutTestController::hasSpellingMarker(int, int)
+{
+    // FIXME: Implement.
+    return false;
+}
+
+QVariantList LayoutTestController::nodesFromRect(const QWebElement& document, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping)
+{
+    return DumpRenderTreeSupportQt::nodesFromRect(document, x, y, top, right, bottom, left, ignoreClipping);
 }
 
 const unsigned LayoutTestController::maxViewWidth = 800;

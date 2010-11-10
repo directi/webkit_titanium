@@ -36,21 +36,19 @@ namespace WebCore {
         Request(CachedResourceLoader*, CachedResource*, bool incremental, SecurityCheckPolicy, bool sendResourceLoadCallbacks);
         ~Request();
         
-        Vector<char>& buffer() { return m_buffer; }
-        CachedResource* cachedResource() { return m_object; }
-        CachedResourceLoader* cachedResourceLoader() { return m_cachedResourceLoader; }
+        CachedResource* cachedResource() const { return m_object; }
+        CachedResourceLoader* cachedResourceLoader() const { return m_cachedResourceLoader; }
 
-        bool isIncremental() { return m_incremental; }
+        bool isIncremental() const { return m_incremental; }
         void setIsIncremental(bool b = true) { m_incremental = b; }
 
-        bool isMultipart() { return m_multipart; }
+        bool isMultipart() const { return m_multipart; }
         void setIsMultipart(bool b = true) { m_multipart = b; }
 
         SecurityCheckPolicy shouldDoSecurityCheck() const { return m_shouldDoSecurityCheck; }
         bool sendResourceLoadCallbacks() const { return m_sendResourceLoadCallbacks; }
         
     private:
-        Vector<char> m_buffer;
         CachedResource* m_object;
         CachedResourceLoader* m_cachedResourceLoader;
         bool m_incremental;

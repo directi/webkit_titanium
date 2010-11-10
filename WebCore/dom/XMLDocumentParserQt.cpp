@@ -37,7 +37,9 @@
 #include "FrameLoader.h"
 #include "FrameView.h"
 #include "HTMLEntityParser.h"
+#include "HTMLHtmlElement.h"
 #include "HTMLLinkElement.h"
+#include "HTMLNames.h"
 #include "HTMLStyleElement.h"
 #include "ProcessingInstruction.h"
 #include "ResourceError.h"
@@ -190,6 +192,10 @@ void XMLDocumentParser::doWrite(const String& parseString)
 
     QString data(parseString);
     if (!data.isEmpty()) {
+        // JavaScript may cause the parser to detach,
+        // keep this alive until this function is done.
+        RefPtr<XMLDocumentParser> protect(this);
+
         m_stream.addData(data);
         parse();
     }
@@ -524,6 +530,11 @@ void XMLDocumentParser::parseStartElement()
     if (m_view && !newElement->attached())
         newElement->attach();
 
+#if ENABLE(OFFLINE_WEB_APPLICATIONS)
+    if (newElement->hasTagName(HTMLNames::htmlTag))
+        static_cast<HTMLHtmlElement*>(newElement.get())->insertedByParser();
+#endif
+
     if (isFirstElement && document()->frame())
         document()->frame()->loader()->dispatchDocumentElementAvailable();
 }
@@ -709,4 +720,3 @@ void XMLDocumentParser::parseDtd()
 
 }
 }
-

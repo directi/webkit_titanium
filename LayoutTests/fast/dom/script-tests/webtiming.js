@@ -34,9 +34,118 @@ function checkTimingBeforeLoad()
     shouldBeGreaterThanOrEqual("timing.connectEnd", "timing.connectStart");
 
     shouldBeGreaterThanOrEqual("timing.requestStart", "timing.connectEnd");
-    shouldBeGreaterThanOrEqual("timing.requestEnd", "timing.requestStart");
 
-    shouldBeGreaterThanOrEqual("timing.responseStart", "timing.requestEnd");
+    shouldBeGreaterThanOrEqual("timing.responseStart", "timing.requestStart");
+
+    shouldBeGreaterThanOrEqual("timing.domLoading", "timing.fetchStart");
+    shouldBe("timing.domInteractive", "0");
+    shouldBe("timing.domContentLoadedStart", "0");
+    shouldBe("timing.domContentLoadedEnd", "0");
+    shouldBe("timing.domComplete", "0");
+
+    shouldBe("timing.loadEventStart", "0");
+    shouldBe("timing.loadEventEnd", "0");
+}
+
+function checkTimingWhileDeferred()
+{
+    shouldBeGreaterThanOrEqual("timing.navigationStart", "oneHourAgoUTC");
+
+    shouldBeGreaterThanOrEqual("timing.unloadEventEnd", "timing.navigationStart");
+
+    shouldBe("timing.redirectStart", "0");
+    shouldBe("timing.redirectEnd", "0");
+    shouldBe("navigation.redirectCount", "0");
+
+    shouldBeGreaterThanOrEqual("timing.fetchStart", "timing.navigationStart");
+
+    shouldBeGreaterThanOrEqual("timing.domainLookupStart", "timing.fetchStart");
+    shouldBeGreaterThanOrEqual("timing.domainLookupEnd", "timing.domainLookupStart");
+
+    shouldBeGreaterThanOrEqual("timing.connectStart", "timing.domainLookupEnd");
+    shouldBeGreaterThanOrEqual("timing.connectEnd", "timing.connectStart");
+
+    shouldBeGreaterThanOrEqual("timing.requestStart", "timing.connectEnd");
+
+    shouldBeGreaterThanOrEqual("timing.responseStart", "timing.requestStart");
+
+    shouldBeGreaterThanOrEqual("timing.domLoading", "timing.fetchStart");
+    shouldBeGreaterThanOrEqual("timing.domInteractive", "timing.domLoading");
+    shouldBe("timing.domContentLoadedStart", "0");
+    shouldBe("timing.domContentLoadedEnd", "0");
+    shouldBe("timing.domComplete", "0");
+
+    shouldBe("timing.loadEventStart", "0");
+    shouldBe("timing.loadEventEnd", "0");
+
+    window.addEventListener("DOMContentLoaded", checkWebTimingOnDOMContentLoaded, false);
+}
+
+function checkWebTimingOnDOMContentLoaded() {
+    shouldBeGreaterThanOrEqual("timing.navigationStart", "oneHourAgoUTC");
+
+    shouldBeGreaterThanOrEqual("timing.unloadEventEnd", "timing.navigationStart");
+
+    shouldBe("timing.redirectStart", "0");
+    shouldBe("timing.redirectEnd", "0");
+    shouldBe("navigation.redirectCount", "0");
+
+    shouldBeGreaterThanOrEqual("timing.fetchStart", "timing.navigationStart");
+
+    shouldBeGreaterThanOrEqual("timing.domainLookupStart", "timing.fetchStart");
+    shouldBeGreaterThanOrEqual("timing.domainLookupEnd", "timing.domainLookupStart");
+
+    shouldBeGreaterThanOrEqual("timing.connectStart", "timing.domainLookupEnd");
+    shouldBeGreaterThanOrEqual("timing.connectEnd", "timing.connectStart");
+
+    shouldBeGreaterThanOrEqual("timing.requestStart", "timing.connectEnd");
+    
+    shouldBeGreaterThanOrEqual("timing.responseStart", "timing.requestStart");
+
+    shouldBeGreaterThanOrEqual("timing.domLoading", "timing.fetchStart");
+    shouldBeGreaterThanOrEqual("timing.domInteractive", "timing.domLoading");
+    shouldBeGreaterThanOrEqual("timing.domContentLoadedStart", "timing.domInteractive");
+    shouldBe("timing.domContentLoadedEnd", "0");
+    shouldBe("timing.domComplete", "0");
+
+    shouldBe("timing.loadEventStart", "0");
+    shouldBe("timing.loadEventEnd", "0");
+
+    var body = document.getElementsByTagName("body")[0];
+    var script = document.createElement("script");
+    script.async = true;
+    script.type = "text/javascript";
+    script.src = "script-tests/webtiming-async.js";
+    body.appendChild(script);
+}
+
+function checkWebTimingWhileAsync()
+{
+    shouldBeGreaterThanOrEqual("timing.navigationStart", "oneHourAgoUTC");
+
+    shouldBeGreaterThanOrEqual("timing.unloadEventEnd", "timing.navigationStart");
+
+    shouldBe("timing.redirectStart", "0");
+    shouldBe("timing.redirectEnd", "0");
+    shouldBe("navigation.redirectCount", "0");
+
+    shouldBeGreaterThanOrEqual("timing.fetchStart", "timing.navigationStart");
+
+    shouldBeGreaterThanOrEqual("timing.domainLookupStart", "timing.fetchStart");
+    shouldBeGreaterThanOrEqual("timing.domainLookupEnd", "timing.domainLookupStart");
+
+    shouldBeGreaterThanOrEqual("timing.connectStart", "timing.domainLookupEnd");
+    shouldBeGreaterThanOrEqual("timing.connectEnd", "timing.connectStart");
+
+    shouldBeGreaterThanOrEqual("timing.requestStart", "timing.connectEnd");
+
+    shouldBeGreaterThanOrEqual("timing.responseStart", "timing.requestStart");
+
+    shouldBeGreaterThanOrEqual("timing.domLoading", "timing.fetchStart");
+    shouldBeGreaterThanOrEqual("timing.domInteractive", "timing.responseEnd");
+    shouldBeGreaterThanOrEqual("timing.domContentLoadedStart", "timing.domInteractive");
+    shouldBeGreaterThanOrEqual("timing.domContentLoadedEnd", "timing.domContentLoadedStart");
+    shouldBe("timing.domComplete", "0");
 
     shouldBe("timing.loadEventStart", "0");
     shouldBe("timing.loadEventEnd", "0");
@@ -63,10 +172,15 @@ function checkWebTimingOnLoad()
     shouldBeGreaterThanOrEqual("timing.connectEnd", "timing.connectStart");
 
     shouldBeGreaterThanOrEqual("timing.requestStart", "timing.connectEnd");
-    shouldBeGreaterThanOrEqual("timing.requestEnd", "timing.requestStart");
 
-    shouldBeGreaterThanOrEqual("timing.responseStart", "timing.requestEnd");
+    shouldBeGreaterThanOrEqual("timing.responseStart", "timing.requestStart");
     shouldBeGreaterThanOrEqual("timing.responseEnd", "timing.responseStart");
+
+    shouldBeGreaterThanOrEqual("timing.domLoading", "timing.fetchStart");
+    shouldBeGreaterThanOrEqual("timing.domInteractive", "timing.responseEnd");
+    shouldBeGreaterThanOrEqual("timing.domContentLoadedStart", "timing.domInteractive");
+    shouldBeGreaterThanOrEqual("timing.domContentLoadedEnd", "timing.domContentLoadedStart");
+    shouldBeGreaterThanOrEqual("timing.domComplete", "timing.domContentLoadedEnd");
 
     shouldBeGreaterThanOrEqual("timing.loadEventStart", "timing.responseEnd");
     shouldBe("timing.loadEventEnd", "0");
@@ -93,10 +207,15 @@ function checkWebTimingAfterLoad()
     shouldBeGreaterThanOrEqual("timing.connectEnd", "timing.connectStart");
 
     shouldBeGreaterThanOrEqual("timing.requestStart", "timing.connectEnd");
-    shouldBeGreaterThanOrEqual("timing.requestEnd", "timing.requestStart");
 
-    shouldBeGreaterThanOrEqual("timing.responseStart", "timing.requestEnd");
+    shouldBeGreaterThanOrEqual("timing.responseStart", "timing.requestStart");
     shouldBeGreaterThanOrEqual("timing.responseEnd", "timing.responseStart");
+
+    shouldBeGreaterThanOrEqual("timing.domLoading", "timing.fetchStart");
+    shouldBeGreaterThanOrEqual("timing.domInteractive", "timing.responseEnd");
+    shouldBeGreaterThanOrEqual("timing.domContentLoadedStart", "timing.domInteractive");
+    shouldBeGreaterThanOrEqual("timing.domContentLoadedEnd", "timing.domContentLoadedStart");
+    shouldBeGreaterThanOrEqual("timing.domComplete", "timing.domContentLoadedEnd");
 
     shouldBeGreaterThanOrEqual("timing.loadEventStart", "timing.responseEnd");
     shouldBeGreaterThanOrEqual("timing.loadEventEnd", "timing.loadEventStart + 50");

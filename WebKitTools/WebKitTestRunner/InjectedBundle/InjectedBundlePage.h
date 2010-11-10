@@ -45,29 +45,31 @@ public:
 
     void reset();
 
+    void dumpBackForwardList();
+
 private:
     // Loader Client
     static void didStartProvisionalLoadForFrame(WKBundlePageRef, WKBundleFrameRef, WKTypeRef*, const void*);
     static void didReceiveServerRedirectForProvisionalLoadForFrame(WKBundlePageRef, WKBundleFrameRef, WKTypeRef*, const void*);
-    static void didFailProvisionalLoadWithErrorForFrame(WKBundlePageRef, WKBundleFrameRef, WKTypeRef*, const void*);
+    static void didFailProvisionalLoadWithErrorForFrame(WKBundlePageRef, WKBundleFrameRef, WKErrorRef, WKTypeRef*, const void*);
     static void didCommitLoadForFrame(WKBundlePageRef, WKBundleFrameRef, WKTypeRef*, const void*);
     static void didFinishLoadForFrame(WKBundlePageRef, WKBundleFrameRef, WKTypeRef*, const void*);
     static void didFinishDocumentLoadForFrame(WKBundlePageRef, WKBundleFrameRef,  WKTypeRef*, const void*);
-    static void didFailLoadWithErrorForFrame(WKBundlePageRef, WKBundleFrameRef, WKTypeRef*, const void*);
+    static void didFailLoadWithErrorForFrame(WKBundlePageRef, WKBundleFrameRef, WKErrorRef, WKTypeRef*, const void*);
     static void didReceiveTitleForFrame(WKBundlePageRef, WKStringRef title, WKBundleFrameRef, WKTypeRef*, const void*);
     static void didClearWindowForFrame(WKBundlePageRef, WKBundleFrameRef, WKBundleScriptWorldRef, const void*);
     static void didCancelClientRedirectForFrame(WKBundlePageRef, WKBundleFrameRef, const void*);
     static void willPerformClientRedirectForFrame(WKBundlePageRef, WKBundleFrameRef, WKURLRef url, double delay, double date, const void*);
     static void didChangeLocationWithinPageForFrame(WKBundlePageRef, WKBundleFrameRef, const void*);
     static void didHandleOnloadEventsForFrame(WKBundlePageRef, WKBundleFrameRef, const void*);
-    static void didDisplayInsecureContentForFrame(WKBundlePageRef, WKBundleFrameRef, const void*);
-    static void didRunInsecureContentForFrame(WKBundlePageRef, WKBundleFrameRef, const void*);
+    static void didDisplayInsecureContentForFrame(WKBundlePageRef, WKBundleFrameRef, WKTypeRef*, const void*);
+    static void didRunInsecureContentForFrame(WKBundlePageRef, WKBundleFrameRef, WKTypeRef*, const void*);
     void didStartProvisionalLoadForFrame(WKBundleFrameRef);
     void didReceiveServerRedirectForProvisionalLoadForFrame(WKBundleFrameRef);
-    void didFailProvisionalLoadWithErrorForFrame(WKBundleFrameRef);
+    void didFailProvisionalLoadWithErrorForFrame(WKBundleFrameRef, WKErrorRef);
     void didCommitLoadForFrame(WKBundleFrameRef);
     void didFinishLoadForFrame(WKBundleFrameRef);
-    void didFailLoadWithErrorForFrame(WKBundleFrameRef);
+    void didFailLoadWithErrorForFrame(WKBundleFrameRef, WKErrorRef);
     void didReceiveTitleForFrame(WKStringRef title, WKBundleFrameRef);
     void didClearWindowForFrame(WKBundleFrameRef, WKBundleScriptWorldRef);
     void didCancelClientRedirectForFrame(WKBundleFrameRef);
@@ -119,6 +121,7 @@ private:
 
     WKBundlePageRef m_page;
     WKRetainPtr<WKBundleScriptWorldRef> m_world;
+    WKRetainPtr<WKBundleBackForwardListItemRef> m_previousTestBackForwardListItem;
     bool m_isLoading;
 };
 

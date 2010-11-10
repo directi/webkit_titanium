@@ -50,11 +50,11 @@
 #include <wtf/Vector.h>
 
 #if ENABLE(SVG)
-#include "RenderPath.h"
 #include "RenderSVGContainer.h"
 #include "RenderSVGGradientStop.h"
 #include "RenderSVGImage.h"
 #include "RenderSVGInlineText.h"
+#include "RenderSVGPath.h"
 #include "RenderSVGRoot.h"
 #include "RenderSVGText.h"
 #include "SVGRenderTreeAsText.h"
@@ -413,6 +413,41 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o, 
             }
         }
     }
+    
+    if (behavior & RenderAsTextShowLayoutState) {
+        bool needsLayout = o.selfNeedsLayout() || o.needsPositionedMovementLayout() || o.posChildNeedsLayout() || o.normalChildNeedsLayout();
+        if (needsLayout)
+            ts << " (needs layout:";
+        
+        bool havePrevious = false;
+        if (o.selfNeedsLayout()) {
+            ts << " self";
+            havePrevious = true;
+        }
+
+        if (o.needsPositionedMovementLayout()) {
+            if (havePrevious)
+                ts << ",";
+            havePrevious = true;
+            ts << " positioned movement";
+        }
+
+        if (o.normalChildNeedsLayout()) {
+            if (havePrevious)
+                ts << ",";
+            havePrevious = true;
+            ts << " child";
+        }
+
+        if (o.posChildNeedsLayout()) {
+            if (havePrevious)
+                ts << ",";
+            ts << " positioned child";
+        }
+
+        if (needsLayout)
+            ts << ")";
+    }
 
 #if PLATFORM(QT)
     // Print attributes of embedded QWidgets. E.g. when the WebCore::Widget
@@ -440,8 +475,8 @@ static void writeTextRun(TextStream& ts, const RenderText& o, const InlineTextBo
     if (o.containingBlock()->isTableCell())
         y -= toRenderTableCell(o.containingBlock())->intrinsicPaddingBefore();
     ts << "text run at (" << run.m_x << "," << y << ") width " << run.m_logicalWidth;
-    if (run.direction() == RTL || run.m_dirOverride) {
-        ts << (run.direction() == RTL ? " RTL" : " LTR");
+    if (!run.isLeftToRightDirection() || run.m_dirOverride) {
+        ts << (!run.isLeftToRightDirection() ? " RTL" : " LTR");
         if (run.m_dirOverride)
             ts << " override";
     }
@@ -453,8 +488,8 @@ static void writeTextRun(TextStream& ts, const RenderText& o, const InlineTextBo
 void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavior behavior)
 {
 #if ENABLE(SVG)
-    if (o.isRenderPath()) {
-        write(ts, *toRenderPath(&o), indent);
+    if (o.isSVGPath()) {
+        write(ts, *toRenderSVGPath(&o), indent);
         return;
     }
     if (o.isSVGGradientStop()) {
@@ -691,7 +726,8 @@ String externalRepresentation(Frame* frame, RenderAsTextBehavior behavior)
         printContext.begin(frame->contentRenderer()->width());
     }
 
-    frame->document()->updateLayout();
+    if (!(behavior & RenderAsTextDontUpdateLayout))
+        frame->document()->updateLayout();
 
     RenderObject* o = frame->contentRenderer();
     if (!o)

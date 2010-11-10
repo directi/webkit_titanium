@@ -39,7 +39,7 @@ Event::Event()
     , m_cancelBubble(false)
     , m_eventPhase(0)
     , m_currentTarget(0)
-    , m_createTime(static_cast<DOMTimeStamp>(currentTime() * 1000.0))
+    , m_createTime(convertSecondsToDOMTimeStamp(currentTime()))
 {
 }
 
@@ -54,7 +54,7 @@ Event::Event(const AtomicString& eventType, bool canBubbleArg, bool cancelableAr
     , m_cancelBubble(false)
     , m_eventPhase(0)
     , m_currentTarget(0)
-    , m_createTime(static_cast<DOMTimeStamp>(currentTime() * 1000.0))
+    , m_createTime(convertSecondsToDOMTimeStamp(currentTime()))
 {
 }
 
@@ -280,27 +280,6 @@ void Event::setUnderlyingEvent(PassRefPtr<Event> ue)
         if (e == this)
             return;
     m_underlyingEvent = ue;
-}
-
-const AtomicString& Event::aliasedType() const
-{
-    if (type() == eventNames().focusinEvent)
-        return eventNames().DOMFocusInEvent;
-    if (type() == eventNames().focusoutEvent)
-        return eventNames().DOMFocusOutEvent;
-    if (type() == eventNames().DOMFocusInEvent)
-        return eventNames().focusinEvent;
-    if (type() == eventNames().DOMFocusOutEvent)
-        return eventNames().focusoutEvent;
-    
-    ASSERT_NOT_REACHED();
-    return type();
-}
-
-bool Event::hasAliasedType() const
-{
-    return type() == eventNames().focusinEvent || type() == eventNames().focusoutEvent ||
-           type() == eventNames().DOMFocusInEvent || type() == eventNames().DOMFocusOutEvent;
 }
 
 } // namespace WebCore

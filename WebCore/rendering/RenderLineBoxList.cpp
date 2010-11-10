@@ -145,6 +145,57 @@ void RenderLineBoxList::dirtyLineBoxes()
         curr->dirtyLineBoxes();
 }
 
+bool RenderLineBoxList::rangeIntersectsRect(RenderBoxModelObject* renderer, int logicalTop, int logicalBottom, const IntRect& rect, int tx, int ty) const
+{
+    RenderBox* block;
+    if (renderer->isBox())
+        block = toRenderBox(renderer);
+    else
+        block = renderer->containingBlock();
+    int physicalStart = block->flipForWritingMode(logicalTop);
+    int physicalEnd = block->flipForWritingMode(logicalBottom);
+    int physicalExtent = abs(physicalEnd - physicalStart);
+    physicalStart = min(physicalStart, physicalEnd);
+    
+    if (renderer->style()->isHorizontalWritingMode()) {
+        physicalStart += ty;
+        if (physicalStart >= rect.bottom() || physicalStart + physicalExtent <= rect.y())
+            return false;
+    } else {
+        physicalStart += tx;
+        if (physicalStart >= rect.right() || physicalStart + physicalExtent <= rect.x())
+            return false;
+    }
+    
+    return true;
+}
+
+bool RenderLineBoxList::anyLineIntersectsRect(RenderBoxModelObject* renderer, const IntRect& rect, int tx, int ty, bool usePrintRect, int outlineSize) const
+{
+    // We can check the first box and last box and avoid painting/hit testing if we don't
+    // intersect.  This is a quick short-circuit that we can take to avoid walking any lines.
+    // FIXME: This check is flawed in the following extremely obscure way:
+    // if some line in the middle has a huge overflow, it might actually extend below the last line.
+    int firstLineTop = firstLineBox()->logicalTopVisibleOverflow();
+    if (usePrintRect && !firstLineBox()->parent())
+        firstLineTop = min(firstLineTop, firstLineBox()->root()->lineTop());
+    int lastLineBottom = lastLineBox()->logicalBottomVisibleOverflow();
+    if (usePrintRect && !lastLineBox()->parent())
+        lastLineBottom = max(lastLineBottom, lastLineBox()->root()->lineBottom());
+    int logicalTop = firstLineTop - outlineSize;
+    int logicalBottom = outlineSize + lastLineBottom;
+    
+    return rangeIntersectsRect(renderer, logicalTop, logicalBottom, rect, tx, ty);
+}
+
+bool RenderLineBoxList::lineIntersectsDirtyRect(RenderBoxModelObject* renderer, InlineFlowBox* box, const PaintInfo& paintInfo, int tx, int ty) const
+{
+    int logicalTop = min(box->logicalTopVisibleOverflow(), box->root()->selectionTop()) - renderer->maximalOutlineSize(paintInfo.phase);
+    int logicalBottom = box->logicalBottomVisibleOverflow() + renderer->maximalOutlineSize(paintInfo.phase);
+    
+    return rangeIntersectsRect(renderer, logicalTop, logicalBottom, paintInfo.rect, tx, ty);
+}
+
 void RenderLineBoxList::paint(RenderBoxModelObject* renderer, PaintInfo& paintInfo, int tx, int ty) const
 {
     // Only paint during the foreground/selection phases.
@@ -163,21 +214,8 @@ void RenderLineBoxList::paint(RenderBoxModelObject* renderer, PaintInfo& paintIn
     // NSViews.  Do not add any more code for this.
     RenderView* v = renderer->view();
     bool usePrintRect = !v->printRect().isEmpty();
-    
-    // We can check the first box and last box and avoid painting if we don't
-    // intersect.  This is a quick short-circuit that we can take to avoid walking any lines.
-    // FIXME: This check is flawed in the following extremely obscure way:
-    // if some line in the middle has a huge overflow, it might actually extend below the last line.
-    int firstLineTop = firstLineBox()->topVisibleOverflow();
-    if (usePrintRect && !firstLineBox()->parent())
-        firstLineTop = min(firstLineTop, firstLineBox()->root()->lineTop());
-    int lastLineBottom = lastLineBox()->bottomVisibleOverflow();
-    if (usePrintRect && !lastLineBox()->parent())
-        lastLineBottom = max(lastLineBottom, lastLineBox()->root()->lineBottom());
-    int yPos = firstLineTop - renderer->maximalOutlineSize(paintInfo.phase);
-    int h = renderer->maximalOutlineSize(paintInfo.phase) + lastLineBottom - yPos;
-    yPos += ty;
-    if (yPos >= paintInfo.rect.bottom() || yPos + h <= paintInfo.rect.y())
+    int outlineSize = renderer->maximalOutlineSize(paintInfo.phase);
+    if (!anyLineIntersectsRect(renderer, paintInfo.rect, tx, ty, usePrintRect, outlineSize))
         return;
 
     PaintInfo info(paintInfo);
@@ -189,11 +227,9 @@ void RenderLineBoxList::paint(RenderBoxModelObject* renderer, PaintInfo& paintIn
     // based off positions of our first line box or our last line box.
     for (InlineFlowBox* curr = firstLineBox(); curr; curr = curr->nextLineBox()) {
         if (usePrintRect) {
-            // FIXME: This is a feeble effort to avoid splitting a line across two pages.
-            // It is utterly inadequate, and this should not be done at paint time at all.
-            // The whole way objects break across pages needs to be redone.
-            // Try to avoid splitting a line vertically, but only if it's less than the height
-            // of the entire page.
+            // FIXME: This is the deprecated pagination model that is still needed
+            // for embedded views inside AppKit.  AppKit is incapable of paginating vertical
+            // text pages, so we don't have to deal with vertical lines at all here.
             int topForPaginationCheck = curr->topVisibleOverflow();
             int bottomForPaginationCheck = curr->bottomVisibleOverflow();
             if (!curr->parent()) {
@@ -202,6 +238,10 @@ void RenderLineBoxList::paint(RenderBoxModelObject* renderer, PaintInfo& paintIn
                 bottomForPaginationCheck = max(bottomForPaginationCheck, curr->root()->lineBottom());
             }
             if (bottomForPaginationCheck - topForPaginationCheck <= v->printRect().height()) {
+                if (ty + bottomForPaginationCheck > v->printRect().bottom()) {
+                    if (RootInlineBox* nextRootBox = curr->root()->nextRootBox())
+                        bottomForPaginationCheck = min(bottomForPaginationCheck, min(nextRootBox->topVisibleOverflow(), nextRootBox->lineTop()));
+                }
                 if (ty + bottomForPaginationCheck > v->printRect().bottom()) {
                     if (ty + topForPaginationCheck < v->truncatedAt())
                         v->setBestTruncatedAt(ty + topForPaginationCheck, renderer);
@@ -212,11 +252,7 @@ void RenderLineBoxList::paint(RenderBoxModelObject* renderer, PaintInfo& paintIn
             }
         }
 
-        int top = min(curr->topVisibleOverflow(), curr->root()->selectionTop()) - renderer->maximalOutlineSize(info.phase);
-        int bottom = curr->bottomVisibleOverflow() + renderer->maximalOutlineSize(info.phase);
-        h = bottom - top;
-        yPos = ty + top;
-        if (yPos < info.rect.bottom() && yPos + h > info.rect.y())
+        if (lineIntersectsDirtyRect(renderer, curr, info, tx, ty))
             curr->paint(info, tx, ty);
     }
 
@@ -242,20 +278,21 @@ bool RenderLineBoxList::hitTest(RenderBoxModelObject* renderer, const HitTestReq
     if (!firstLineBox())
         return false;
 
-    // We can check the first box and last box and avoid hit testing if we don't
-    // contain the point.  This is a quick short-circuit that we can take to avoid walking any lines.
-    // FIXME: This check is flawed in the following extremely obscure way:
-    // if some line in the middle has a huge overflow, it might actually extend below the last line.
-    if (y - result.topPadding() >= ty + lastLineBox()->root()->bottomVisibleOverflow()
-     || y + result.bottomPadding() < ty + firstLineBox()->root()->topVisibleOverflow())
+    bool isHorizontal = firstLineBox()->isHorizontal();
+    
+    int logicalPointStart = isHorizontal ? y - result.topPadding() : x - result.leftPadding();
+    int logicalPointEnd = (isHorizontal ? y + result.bottomPadding() : x + result.rightPadding()) + 1;
+    IntRect rect(isHorizontal ? x : logicalPointStart, isHorizontal ? logicalPointStart : y,
+                 isHorizontal ? 1 : logicalPointEnd - logicalPointStart,
+                 isHorizontal ? logicalPointEnd - logicalPointStart : 1);    
+    if (!anyLineIntersectsRect(renderer, rect, tx, ty))
         return false;
 
     // See if our root lines contain the point.  If so, then we hit test
     // them further.  Note that boxes can easily overlap, so we can't make any assumptions
     // based off positions of our first line box or our last line box.
     for (InlineFlowBox* curr = lastLineBox(); curr; curr = curr->prevLineBox()) {
-        if (y + result.bottomPadding() >= ty + curr->root()->topVisibleOverflow()
-         && y - result.topPadding() < ty + curr->root()->bottomVisibleOverflow()) {
+        if (rangeIntersectsRect(renderer, curr->logicalTopVisibleOverflow(), curr->logicalBottomVisibleOverflow(), rect, tx, ty)) {
             bool inside = curr->nodeAtPoint(request, result, x, y, tx, ty);
             if (inside) {
                 renderer->updateHitTestResult(result, IntPoint(x - tx, y - ty));

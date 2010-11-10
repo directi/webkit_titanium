@@ -60,14 +60,15 @@
 #include "RenderText.h"
 #include "TextEncoding.h"
 #include "TextIterator.h"
-#include <wtf/text/CString.h>
-#include <wtf/text/AtomicString.h>
+#include "WebKitAccessibleHyperlink.h"
 
 #include <atk/atk.h>
 #include <glib.h>
 #include <glib/gprintf.h>
 #include <libgail-util/gail-util.h>
 #include <pango/pango.h>
+#include <wtf/text/AtomicString.h>
+#include <wtf/text/CString.h>
 
 using namespace WebCore;
 
@@ -141,6 +142,11 @@ static AccessibilityObject* core(AtkImage* image)
 static AccessibilityObject* core(AtkTable* table)
 {
     return core(ATK_OBJECT(table));
+}
+
+static AccessibilityObject* core(AtkHypertext* hypertext)
+{
+    return core(ATK_OBJECT(hypertext));
 }
 
 static AccessibilityObject* core(AtkDocument* document)
@@ -329,14 +335,23 @@ static AtkAttributeSet* addAttributeToSet(AtkAttributeSet* attributeSet, const c
 static AtkAttributeSet* webkit_accessible_get_attributes(AtkObject* object)
 {
     AtkAttributeSet* attributeSet = 0;
-
     attributeSet = addAttributeToSet(attributeSet, "toolkit", "WebKitGtk");
 
-    int headingLevel = core(object)->headingLevel();
+    AccessibilityObject* coreObject = core(object);
+    if (!coreObject)
+        return attributeSet;
+
+    int headingLevel = coreObject->headingLevel();
     if (headingLevel) {
         String value = String::number(headingLevel);
         attributeSet = addAttributeToSet(attributeSet, "level", value.utf8().data());
     }
+
+    // Set the 'layout-guess' attribute to help Assistive
+    // Technologies know when an exposed table is not data table.
+    if (coreObject->isAccessibilityTable() && !coreObject->isDataTable())
+        attributeSet = addAttributeToSet(attributeSet, "layout-guess", "true");
+
     return attributeSet;
 }
 
@@ -861,6 +876,59 @@ static gchar* convertUniCharToUTF8(const UChar* characters, gint length, int fro
     return g_string_free(ret, FALSE);
 }
 
+gchar* textForRenderer(RenderObject* renderer)
+{
+    GString* resultText = g_string_new(0);
+
+    if (!renderer)
+        return g_string_free(resultText, FALSE);
+
+    // For RenderBlocks, piece together the text from the RenderText objects they contain.
+    for (RenderObject* object = renderer->firstChild(); object; object = object->nextSibling()) {
+        if (object->isBR()) {
+            g_string_append(resultText, "\n");
+            continue;
+        }
+
+        RenderText* renderText;
+        if (object->isText())
+            renderText = toRenderText(object);
+        else {
+            // We need to check children, if any, to consider when
+            // current object is not a text object but some of its
+            // children are, in order not to miss those portions of
+            // text by not properly handling those situations
+            if (object->firstChild())
+                g_string_append(resultText, textForRenderer(object));
+
+            continue;
+        }
+
+        InlineTextBox* box = renderText->firstTextBox();
+        while (box) {
+            gchar* text = convertUniCharToUTF8(renderText->characters(), renderText->textLength(), box->start(), box->end());
+            g_string_append(resultText, text);
+            // Newline chars in the source result in separate text boxes, so check
+            // before adding a newline in the layout. See bug 25415 comment #78.
+            // If the next sibling is a BR, we'll add the newline when we examine that child.
+            if (!box->nextOnLineExists() && (!object->nextSibling() || !object->nextSibling()->isBR()))
+                g_string_append(resultText, "\n");
+            box = box->nextTextBox();
+        }
+    }
+
+    // Insert the text of the marker for list item in the right place, if present
+    if (renderer->isListItem()) {
+        String markerText = toRenderListItem(renderer)->markerTextWithSuffix();
+        if (renderer->style()->direction() == LTR)
+            g_string_prepend(resultText, markerText.utf8().data());
+        else
+            g_string_append(resultText, markerText.utf8().data());
+    }
+
+    return g_string_free(resultText, FALSE);
+}
+
 gchar* textForObject(AccessibilityRenderObject* accObject)
 {
     GString* str = g_string_new(0);
@@ -879,48 +947,9 @@ gchar* textForObject(AccessibilityRenderObject* accObject)
             g_string_append(str, "\n");
             range = accObject->doAXRangeForLine(++lineNumber);
         }
-    } else {
-        RenderObject* renderer = accObject->renderer();
-        if (!renderer)
-            return g_string_free(str, FALSE);
-
-        // For RenderBlocks, piece together the text from the RenderText objects they contain.
-        for (RenderObject* obj = renderer->firstChild(); obj; obj = obj->nextSibling()) {
-            if (obj->isBR()) {
-                g_string_append(str, "\n");
-                continue;
-            }
-
-            RenderText* renderText;
-            if (obj->isText())
-                renderText = toRenderText(obj);
-            else if (obj->firstChild() && obj->firstChild()->isText()) {
-                // Handle RenderInlines (and any other similiar RenderObjects).
-                renderText = toRenderText(obj->firstChild());
-            } else
-                continue;
-
-            InlineTextBox* box = renderText->firstTextBox();
-            while (box) {
-                gchar* text = convertUniCharToUTF8(renderText->characters(), renderText->textLength(), box->start(), box->end());
-                g_string_append(str, text);
-                // Newline chars in the source result in separate text boxes, so check
-                // before adding a newline in the layout. See bug 25415 comment #78.
-                // If the next sibling is a BR, we'll add the newline when we examine that child.
-                if (!box->nextOnLineExists() && (!obj->nextSibling() || !obj->nextSibling()->isBR()))
-                    g_string_append(str, "\n");
-                box = box->nextTextBox();
-            }
-        }
-
-        // Insert the text of the marker for list item in the right place, if present
-        if (renderer->isListItem()) {
-            String markerText = toRenderListItem(renderer)->markerTextWithSuffix();
-            if (renderer->style()->direction() == LTR)
-                g_string_prepend(str, markerText.utf8().data());
-            else
-                g_string_append(str, markerText.utf8().data());
-        }
+    } else if (accObject->isAccessibilityRenderObject()) {
+        GOwnPtr<gchar> rendererText(textForRenderer(accObject->renderer()));
+        g_string_append(str, rendererText.get());
     }
 
     return g_string_free(str, FALSE);
@@ -1039,6 +1068,15 @@ static gint webkit_accessible_text_get_caret_offset(AtkText* text)
     return offset;
 }
 
+static int baselinePositionForAccessibilityRenderObject(RenderObject* renderObject)
+{
+    // FIXME: This implementation of baselinePosition originates from RenderObject.cpp and was
+    // removed in r70072. The implementation looks incorrect though, because this is not the
+    // baseline of the underlying RenderObject, but of the AccessibilityRenderObject.
+    const Font& f = renderObject->firstLineStyle()->font();
+    return f.ascent() + (renderObject->firstLineStyle()->computedLineHeight() - f.height()) / 2;
+}
+
 static AtkAttributeSet* getAttributeSetForAccessibilityObject(const AccessibilityObject* object)
 {
     if (!object->isAccessibilityRenderObject())
@@ -1069,10 +1107,10 @@ static AtkAttributeSet* getAttributeSetForAccessibilityObject(const Accessibilit
     bool includeRise = true;
     switch (style->verticalAlign()) {
     case SUB:
-        baselinePosition = -1 * renderer->baselinePosition(true);
+        baselinePosition = -1 * baselinePositionForAccessibilityRenderObject(renderer);
         break;
     case SUPER:
-        baselinePosition = renderer->baselinePosition(true);
+        baselinePosition = baselinePositionForAccessibilityRenderObject(renderer);
         break;
     case BASELINE:
         baselinePosition = 0;
@@ -1922,6 +1960,89 @@ static void atk_table_interface_init(AtkTableIface* iface)
     iface->get_row_description = webkit_accessible_table_get_row_description;
 }
 
+static AtkHyperlink* webkitAccessibleHypertextGetLink(AtkHypertext* hypertext, gint index)
+{
+    AccessibilityObject::AccessibilityChildrenVector children = core(hypertext)->children();
+    if (index < 0 || static_cast<unsigned>(index) >= children.size())
+        return 0;
+
+    gint currentLink = -1;
+    for (unsigned i = 0; i < children.size(); i++) {
+        AccessibilityObject* coreChild = children.at(i).get();
+        if (!coreChild->accessibilityIsIgnored() && coreChild->isLink()) {
+            currentLink++;
+            if (index != currentLink)
+                continue;
+
+            AtkObject* axObject = coreChild->wrapper();
+            if (!axObject || !ATK_IS_HYPERLINK_IMPL(axObject))
+                return 0;
+
+            return atk_hyperlink_impl_get_hyperlink(ATK_HYPERLINK_IMPL(axObject));
+        }
+    }
+
+    return 0;
+}
+
+static gint webkitAccessibleHypertextGetNLinks(AtkHypertext* hypertext)
+{
+    AccessibilityObject::AccessibilityChildrenVector children = core(hypertext)->children();
+    if (!children.size())
+        return 0;
+
+    gint linksFound = 0;
+    for (size_t i = 0; i < children.size(); i++) {
+        AccessibilityObject* coreChild = children.at(i).get();
+        if (!coreChild->accessibilityIsIgnored() && coreChild->isLink())
+            linksFound++;
+    }
+
+    return linksFound;
+}
+
+static gint webkitAccessibleHypertextGetLinkIndex(AtkHypertext* hypertext, gint charIndex)
+{
+    size_t linksCount = webkitAccessibleHypertextGetNLinks(hypertext);
+    if (!linksCount)
+        return -1;
+
+    for (size_t i = 0; i < linksCount; i++) {
+        AtkHyperlink* hyperlink = ATK_HYPERLINK(webkitAccessibleHypertextGetLink(hypertext, i));
+        gint startIndex = atk_hyperlink_get_start_index(hyperlink);
+        gint endIndex = atk_hyperlink_get_end_index(hyperlink);
+
+        // Check if the char index in the link's offset range
+        if (startIndex <= charIndex && charIndex < endIndex)
+            return i;
+    }
+
+    // Not found if reached
+    return -1;
+}
+
+static void atkHypertextInterfaceInit(AtkHypertextIface* iface)
+{
+    iface->get_link = webkitAccessibleHypertextGetLink;
+    iface->get_n_links = webkitAccessibleHypertextGetNLinks;
+    iface->get_link_index = webkitAccessibleHypertextGetLinkIndex;
+}
+
+static AtkHyperlink* webkitAccessibleHyperlinkImplGetHyperlink(AtkHyperlinkImpl* hyperlink)
+{
+    AtkHyperlink* hyperlinkObject = ATK_HYPERLINK(g_object_get_data(G_OBJECT(hyperlink), "hyperlink-object"));
+    if (!hyperlinkObject) {
+        hyperlinkObject = ATK_HYPERLINK(webkitAccessibleHyperlinkNew(hyperlink));
+        g_object_set_data(G_OBJECT(hyperlink), "hyperlink-object", hyperlinkObject);
+    }
+    return hyperlinkObject;
+}
+
+static void atkHyperlinkImplInterfaceInit(AtkHyperlinkImplIface* iface)
+{
+    iface->get_hyperlink = webkitAccessibleHyperlinkImplGetHyperlink;
+}
+
 static const gchar* documentAttributeValue(AtkDocument* document, const gchar* attribute)
 {
     Document* coreDocument = core(document)->document();
@@ -1993,6 +2114,10 @@ static const GInterfaceInfo AtkInterfacesInitFunctions[] = {
      (GInterfaceFinalizeFunc) 0, 0},
     {(GInterfaceInitFunc)atk_table_interface_init,
      (GInterfaceFinalizeFunc) 0, 0},
+    {(GInterfaceInitFunc)atkHypertextInterfaceInit,
+     (GInterfaceFinalizeFunc) 0, 0},
+    {(GInterfaceInitFunc)atkHyperlinkImplInterfaceInit,
+     (GInterfaceFinalizeFunc) 0, 0},
     {(GInterfaceInitFunc)atk_document_interface_init,
      (GInterfaceFinalizeFunc) 0, 0}
 };
@@ -2005,31 +2130,37 @@ enum WAIType {
     WAI_COMPONENT,
     WAI_IMAGE,
     WAI_TABLE,
+    WAI_HYPERTEXT,
+    WAI_HYPERLINK,
     WAI_DOCUMENT
 };
 
 static GType GetAtkInterfaceTypeFromWAIType(WAIType type)
 {
-  switch (type) {
-  case WAI_ACTION:
-      return ATK_TYPE_ACTION;
-  case WAI_SELECTION:
-      return ATK_TYPE_SELECTION;
-  case WAI_EDITABLE_TEXT:
-      return ATK_TYPE_EDITABLE_TEXT;
-  case WAI_TEXT:
-      return ATK_TYPE_TEXT;
-  case WAI_COMPONENT:
-      return ATK_TYPE_COMPONENT;
-  case WAI_IMAGE:
-      return ATK_TYPE_IMAGE;
-  case WAI_TABLE:
-      return ATK_TYPE_TABLE;
-  case WAI_DOCUMENT:
-      return ATK_TYPE_DOCUMENT;
-  }
+    switch (type) {
+    case WAI_ACTION:
+        return ATK_TYPE_ACTION;
+    case WAI_SELECTION:
+        return ATK_TYPE_SELECTION;
+    case WAI_EDITABLE_TEXT:
+        return ATK_TYPE_EDITABLE_TEXT;
+    case WAI_TEXT:
+        return ATK_TYPE_TEXT;
+    case WAI_COMPONENT:
+        return ATK_TYPE_COMPONENT;
+    case WAI_IMAGE:
+        return ATK_TYPE_IMAGE;
+    case WAI_TABLE:
+        return ATK_TYPE_TABLE;
+    case WAI_HYPERTEXT:
+        return ATK_TYPE_HYPERTEXT;
+    case WAI_HYPERLINK:
+        return ATK_TYPE_HYPERLINK_IMPL;
+    case WAI_DOCUMENT:
+        return ATK_TYPE_DOCUMENT;
+    }
 
-  return G_TYPE_INVALID;
+    return G_TYPE_INVALID;
 }
 
 static guint16 getInterfaceMaskFromObject(AccessibilityObject* coreObject)
@@ -2039,20 +2170,24 @@ static guint16 getInterfaceMaskFromObject(AccessibilityObject* coreObject)
     // Component interface is always supported
     interfaceMask |= 1 << WAI_COMPONENT;
 
+    AccessibilityRole role = coreObject->roleValue();
+
     // Action
-    if (!coreObject->actionVerb().isEmpty())
+    if (!coreObject->actionVerb().isEmpty()) {
         interfaceMask |= 1 << WAI_ACTION;
+
+        if (!coreObject->accessibilityIsIgnored() && coreObject->isLink())
+            interfaceMask |= 1 << WAI_HYPERLINK;
+    }
 
     // Selection
     if (coreObject->isListBox())
         interfaceMask |= 1 << WAI_SELECTION;
 
     // Text & Editable Text
-    AccessibilityRole role = coreObject->roleValue();
-
     if (role == StaticTextRole)
         interfaceMask |= 1 << WAI_TEXT;
-    else if (coreObject->isAccessibilityRenderObject())
+    else if (coreObject->isAccessibilityRenderObject()) {
         if (coreObject->isTextControl()) {
             interfaceMask |= 1 << WAI_TEXT;
             if (!coreObject->isReadOnly())
@@ -2060,11 +2195,15 @@ static guint16 getInterfaceMaskFromObject(AccessibilityObject* coreObject)
         } else {
             AccessibilityRenderObject* axRenderObject = static_cast<AccessibilityRenderObject*>(coreObject);
             RenderObject* renderer = axRenderObject->renderer();
-            if (role != TableRole && renderer && renderer->childrenInline())
-                interfaceMask |= 1 << WAI_TEXT;
-            else if (role == ListItemRole) {
-                // Add the TEXT interface for list items whose
-                // first accessible child has a text renderer
+            if (role != TableRole) {
+                interfaceMask |= 1 << WAI_HYPERTEXT;
+                if (renderer && renderer->childrenInline())
+                    interfaceMask |= 1 << WAI_TEXT;
+            }
+
+            // Add the TEXT interface for list items whose
+            // first accessible child has a text renderer
+            if (role == ListItemRole) {
                 AccessibilityObject::AccessibilityChildrenVector children = axRenderObject->children();
                 if (children.size()) {
                     AccessibilityObject* axRenderChild = children.at(0).get();
@@ -2072,6 +2211,7 @@ static guint16 getInterfaceMaskFromObject(AccessibilityObject* coreObject)
                 }
             }
         }
+    }
 
     // Image
     if (coreObject->isImage())

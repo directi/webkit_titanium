@@ -220,6 +220,11 @@ void DocumentLoader::stopLoading(DatabasePolicy databasePolicy)
     // Always cancel multipart loaders
     cancelAll(m_multipartSubresourceLoaders);
 
+    // Appcache uses ResourceHandle directly, DocumentLoader doesn't count these loads.
+#if ENABLE(OFFLINE_WEB_APPLICATIONS)
+    m_applicationCacheHost->stopLoadingInFrame(m_frame);
+#endif
+
     if (!loading)
         return;
     
@@ -486,7 +491,7 @@ PassRefPtr<ArchiveResource> DocumentLoader::mainResource() const
     if (!mainResourceBuffer)
         mainResourceBuffer = SharedBuffer::create();
         
-    return ArchiveResource::create(mainResourceBuffer, r.url(), r.mimeType(), r.textEncodingName(), frame()->tree()->name());
+    return ArchiveResource::create(mainResourceBuffer, r.url(), r.mimeType(), r.textEncodingName(), frame()->tree()->uniqueName());
 }
 
 PassRefPtr<ArchiveResource> DocumentLoader::subresource(const KURL& url) const
@@ -780,6 +785,29 @@ void DocumentLoader::subresourceLoaderFinishedLoadingOnePart(ResourceLoader* loa
     updateLoading();
     if (Frame* frame = m_frame)
         frame->loader()->checkLoadComplete();    
+}
+
+void DocumentLoader::transferLoadingResourcesFromPage(Page* oldPage)
+{
+    ASSERT(oldPage != m_frame->page());
+
+    FrameLoader* loader = frameLoader();
+    ASSERT(loader);
+
+    const ResourceRequest& request = originalRequest();
+    if (isLoadingMainResource()) {
+        loader->dispatchTransferLoadingResourceFromPage(
+            m_mainResourceLoader->identifier(), this, request, oldPage);
+    }
+
+    if (isLoadingSubresources()) {
+        ResourceLoaderSet::const_iterator it = m_subresourceLoaders.begin();
+        ResourceLoaderSet::const_iterator end = m_subresourceLoaders.end();
+        for (; it != end; ++it) {
+            loader->dispatchTransferLoadingResourceFromPage(
+                (*it)->identifier(), this, request, oldPage);
+        }
+    }
 }
 
 void DocumentLoader::iconLoadDecisionAvailable()

@@ -31,6 +31,7 @@
 #include "CSSParser.h"
 #include "CSSSelectorList.h"
 #include "CSSStyleSelector.h"
+#include "ClassList.h"
 #include "ClientRect.h"
 #include "ClientRectList.h"
 #include "DOMTokenList.h"
@@ -44,20 +45,21 @@
 #include "FrameView.h"
 #include "HTMLElement.h"
 #include "HTMLNames.h"
-#include "InspectorController.h"
+#include "HTMLParserIdioms.h"
+#include "InspectorInstrumentation.h"
 #include "NodeList.h"
 #include "NodeRenderStyle.h"
 #include "Page.h"
 #include "RenderLayer.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
-#include "SVGStyledLocatableElement.h"
 #include "Settings.h"
 #include "TextIterator.h"
 #include "XMLNames.h"
 #include <wtf/text/CString.h>
 
 #if ENABLE(SVG)
+#include "SVGElement.h"
 #include "SVGNames.h"
 #endif
 
@@ -93,6 +95,11 @@ NodeRareData* Element::createRareData()
     return new ElementRareData;
 }
 
+DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, blur);
+DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, error);
+DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, focus);
+DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, load);
+
 PassRefPtr<DocumentFragment> Element::deprecatedCreateContextualFragment(const String& markup, FragmentScriptingPermission scriptingPermission)
 {
     RefPtr<DocumentFragment> fragment = document()->createDocumentFragment();
@@ -116,18 +123,19 @@ PassRefPtr<DocumentFragment> Element::deprecatedCreateContextualFragment(const S
     for (RefPtr<Node> node = fragment->firstChild(); node; node = nextNode) {
         nextNode = node->nextSibling();
         if (node->hasTagName(htmlTag) || node->hasTagName(bodyTag)) {
-            Node* firstChild = node->firstChild();
+            HTMLElement* element = static_cast<HTMLElement*>(node.get());
+            Node* firstChild = element->firstChild();
             if (firstChild)
                 nextNode = firstChild;
             RefPtr<Node> nextChild;
             for (RefPtr<Node> child = firstChild; child; child = nextChild) {
                 nextChild = child->nextSibling();
-                node->removeChild(child.get(), ignoredExceptionCode);
+                element->removeChild(child.get(), ignoredExceptionCode);
                 ASSERT(!ignoredExceptionCode);
-                fragment->insertBefore(child, node.get(), ignoredExceptionCode);
+                fragment->insertBefore(child, element, ignoredExceptionCode);
                 ASSERT(!ignoredExceptionCode);
             }
-            fragment->removeChild(node.get(), ignoredExceptionCode);
+            fragment->removeChild(element, ignoredExceptionCode);
             ASSERT(!ignoredExceptionCode);
         } else if (node->hasTagName(headTag)) {
             fragment->removeChild(node.get(), ignoredExceptionCode);
@@ -450,6 +458,41 @@ int Element::scrollHeight() const
     return 0;
 }
 
+IntRect Element::boundsInWindowSpace() const
+{
+    document()->updateLayoutIgnorePendingStylesheets();
+
+    FrameView* view = document()->view();
+    if (!view)
+        return IntRect();
+
+    Vector<FloatQuad> quads;
+#if ENABLE(SVG)
+    if (isSVGElement() && renderer()) {
+        // Get the bounding rectangle from the SVG model.
+        const SVGElement* svgElement = static_cast<const SVGElement*>(this);
+        FloatRect localRect;
+        if (svgElement->boundingBox(localRect))
+            quads.append(renderer()->localToAbsoluteQuad(localRect));
+    } else
+#endif
+    {
+        // Get the bounding rectangle from the box model.
+        if (renderBoxModelObject())
+            renderBoxModelObject()->absoluteQuads(quads);
+    }
+
+    if (quads.isEmpty())
+        return IntRect();
+
+    IntRect result = quads[0].enclosingBoundingBox();
+    for (size_t i = 1; i < quads.size(); ++i)
+        result.unite(quads[i].enclosingBoundingBox());
+
+    result = view->contentsToWindow(result);
+    return result;
+}
+
 PassRefPtr<ClientRectList> Element::getClientRects() const
 {
     document()->updateLayoutIgnorePendingStylesheets();
@@ -481,15 +524,12 @@ PassRefPtr<ClientRect> Element::getBoundingClientRect() const
 
     Vector<FloatQuad> quads;
 #if ENABLE(SVG)
-    if (isSVGElement()) {
+    if (isSVGElement() && renderer()) {
         // Get the bounding rectangle from the SVG model.
         const SVGElement* svgElement = static_cast<const SVGElement*>(this);
-        if (svgElement->isStyledLocatable()) {
-            if (renderer()) {
-                const FloatRect& localRect = static_cast<const SVGStyledLocatableElement*>(svgElement)->getBBox();
-                quads.append(renderer()->localToAbsoluteQuad(localRect));
-            }
-        }
+        FloatRect localRect;
+        if (svgElement->boundingBox(localRect))
+            quads.append(renderer()->localToAbsoluteQuad(localRect));
     } else
 #endif
     {
@@ -510,9 +550,7 @@ PassRefPtr<ClientRect> Element::getBoundingClientRect() const
         result.move(-visibleContentRect.x(), -visibleContentRect.y());
     }
 
-    if (renderBoxModelObject())
-        adjustIntRectForAbsoluteZoom(result, renderBoxModelObject());
-
+    adjustIntRectForAbsoluteZoom(result, renderer());
     return ClientRect::create(result);
 }
 
@@ -558,7 +596,7 @@ void Element::setAttribute(const AtomicString& name, const AtomicString& value, 
 
 #if ENABLE(INSPECTOR)
     if (!isSynchronizingStyleAttribute())
-        InspectorController::willModifyDOMAttr(this);
+        InspectorInstrumentation::willModifyDOMAttr(document(), this);
 #endif
 
     const AtomicString& localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
@@ -588,7 +626,7 @@ void Element::setAttribute(const AtomicString& name, const AtomicString& value, 
 
 #if ENABLE(INSPECTOR)
     if (!isSynchronizingStyleAttribute())
-        InspectorController::didModifyDOMAttr(this);
+        InspectorInstrumentation::didModifyDOMAttr(document(), this);
 #endif
 }
 
@@ -596,7 +634,7 @@ void Element::setAttribute(const QualifiedName& name, const AtomicString& value,
 {
 #if ENABLE(INSPECTOR)
     if (!isSynchronizingStyleAttribute())
-        InspectorController::willModifyDOMAttr(this);
+        InspectorInstrumentation::willModifyDOMAttr(document(), this);
 #endif
 
     document()->incDOMTreeVersion();
@@ -621,7 +659,7 @@ void Element::setAttribute(const QualifiedName& name, const AtomicString& value,
 
 #if ENABLE(INSPECTOR)
     if (!isSynchronizingStyleAttribute())
-        InspectorController::didModifyDOMAttr(this);
+        InspectorInstrumentation::didModifyDOMAttr(document(), this);
 #endif
 }
 
@@ -680,7 +718,7 @@ static bool isEventHandlerAttribute(const QualifiedName& name)
 
 static bool isAttributeToRemove(const QualifiedName& name, const AtomicString& value)
 {    
-    return (name.localName().endsWith(hrefAttr.localName()) || name == srcAttr || name == actionAttr) && protocolIsJavaScript(deprecatedParseURL(value));       
+    return (name.localName().endsWith(hrefAttr.localName()) || name == srcAttr || name == actionAttr) && protocolIsJavaScript(stripLeadingAndTrailingHTMLSpaces(value));       
 }
 
 void Element::setAttributeMap(PassRefPtr<NamedNodeMap> list, FragmentScriptingPermission scriptingPermission)
@@ -769,7 +807,7 @@ KURL Element::baseURI() const
     if (!base.protocol().isEmpty())
         return base;
 
-    Node* parent = parentNode();
+    ContainerNode* parent = parentNode();
     if (!parent)
         return base;
 
@@ -1257,7 +1295,7 @@ void Element::setAttributeNS(const AtomicString& namespaceURI, const AtomicStrin
 
 void Element::removeAttribute(const String& name, ExceptionCode& ec)
 {
-    InspectorController::willModifyDOMAttr(this);
+    InspectorInstrumentation::willModifyDOMAttr(document(), this);
 
     String localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
 
@@ -1267,7 +1305,7 @@ void Element::removeAttribute(const String& name, ExceptionCode& ec)
             ec = 0;
     }
     
-    InspectorController::didModifyDOMAttr(this);
+    InspectorInstrumentation::didModifyDOMAttr(document(), this);
 }
 
 void Element::removeAttributeNS(const String& namespaceURI, const String& localName, ExceptionCode& ec)
@@ -1578,7 +1616,7 @@ DOMTokenList* Element::classList()
 {
     ElementRareData* data = ensureRareData();
     if (!data->m_classList)
-        data->m_classList = DOMTokenList::create(this);
+        data->m_classList = ClassList::create(this);
     return data->m_classList.get();
 }
 
@@ -1612,7 +1650,7 @@ KURL Element::getURLAttribute(const QualifiedName& name) const
             ASSERT(isURLAttribute(attribute));
     }
 #endif
-    return document()->completeURL(deprecatedParseURL(getAttribute(name)));
+    return document()->completeURL(stripLeadingAndTrailingHTMLSpaces(getAttribute(name)));
 }
 
 KURL Element::getNonEmptyURLAttribute(const QualifiedName& name) const
@@ -1623,7 +1661,7 @@ KURL Element::getNonEmptyURLAttribute(const QualifiedName& name) const
             ASSERT(isURLAttribute(attribute));
     }
 #endif
-    String value = deprecatedParseURL(getAttribute(name));
+    String value = stripLeadingAndTrailingHTMLSpaces(getAttribute(name));
     if (value.isEmpty())
         return KURL();
     return document()->completeURL(value);
@@ -1670,5 +1708,38 @@ void Element::webkitRequestFullScreen(unsigned short flags)
     document()->webkitRequestFullScreenForElement(this, flags);
 }
 #endif    
+
+SpellcheckAttributeState Element::spellcheckAttributeState() const
+{
+    if (!hasAttribute(HTMLNames::spellcheckAttr))
+        return SpellcheckAttributeDefault;
+
+    const AtomicString& value = getAttribute(HTMLNames::spellcheckAttr);
+    if (equalIgnoringCase(value, "true") || equalIgnoringCase(value, ""))
+        return SpellcheckAttributeTrue;
+    if (equalIgnoringCase(value, "false"))
+        return SpellcheckAttributeFalse;
+
+    return SpellcheckAttributeDefault;
+}
+
+bool Element::isSpellCheckingEnabled() const
+{
+    const Element* element = this;
+    while (element) {
+        switch (element->spellcheckAttributeState()) {
+        case SpellcheckAttributeTrue:
+            return true;
+        case SpellcheckAttributeFalse:
+            return false;
+        case SpellcheckAttributeDefault:
+            break;
+        }
+
+        element = element->parentElement();
+    }
+
+    return true;
+}
 
 } // namespace WebCore

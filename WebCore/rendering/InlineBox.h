@@ -21,6 +21,7 @@
 #ifndef InlineBox_h
 #define InlineBox_h
 
+#include "RenderBR.h"
 #include "RenderBoxModelObject.h"
 #include "TextDirection.h"
 
@@ -50,7 +51,7 @@ public:
 #if ENABLE(SVG)
         , m_hasVirtualLogicalHeight(false)
 #endif
-        , m_isVertical(false)
+        , m_isHorizontal(true)
         , m_endsWithBreak(false)
         , m_hasSelectedChildren(false)
         , m_hasEllipsisBoxOrHyphen(false)
@@ -68,7 +69,7 @@ public:
     }
 
     InlineBox(RenderObject* obj, int x, int y, int logicalWidth, bool firstLine, bool constructed,
-              bool dirty, bool extracted, bool isVertical, InlineBox* next, InlineBox* prev, InlineFlowBox* parent)
+              bool dirty, bool extracted, bool isHorizontal, InlineBox* next, InlineBox* prev, InlineFlowBox* parent)
         : m_next(next)
         , m_prev(prev)
         , m_parent(parent)
@@ -84,7 +85,7 @@ public:
 #if ENABLE(SVG)
         , m_hasVirtualLogicalHeight(false)
 #endif
-        , m_isVertical(isVertical)
+        , m_isHorizontal(isHorizontal)
         , m_endsWithBreak(false)
         , m_hasSelectedChildren(false)   
         , m_hasEllipsisBoxOrHyphen(false)
@@ -112,6 +113,13 @@ public:
     virtual bool isLineBreak() const { return false; }
 
     virtual void adjustPosition(int dx, int dy);
+    void adjustLineDirectionPosition(int delta)
+    {
+        if (isHorizontal())
+            adjustPosition(delta, 0);
+        else
+            adjustPosition(0, delta);
+    }
 
     virtual void paint(PaintInfo&, int tx, int ty);
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, int x, int y, int tx, int ty);
@@ -139,6 +147,7 @@ public:
     virtual bool isRootInlineBox() const { return false; }
 #if ENABLE(SVG)
     virtual bool isSVGInlineTextBox() const { return false; }
+    virtual bool isSVGInlineFlowBox() const { return false; }
     virtual bool isSVGRootInlineBox() const { return false; }
 #endif
 
@@ -150,8 +159,8 @@ public:
         return 0;
     }
 
-    bool isVertical() const { return m_isVertical; }
-    void setIsVertical(bool v) { m_isVertical = v; }
+    bool isHorizontal() const { return m_isHorizontal; }
+    void setIsHorizontal(bool horizontal) { m_isHorizontal = horizontal; }
 
     virtual IntRect calculateBoundaries() const
     {
@@ -214,21 +223,26 @@ public:
     void setY(int y) { m_y = y; }
     int y() const { return m_y; }
 
+    int width() const { return isHorizontal() ? logicalWidth() : logicalHeight(); }
+    int height() const { return isHorizontal() ? logicalHeight() : logicalWidth(); }
+
     // The logicalLeft position is the left edge of the line box in a horizontal line and the top edge in a vertical line.
-    int logicalLeft() const { return !m_isVertical ? m_x : m_y; }
+    int logicalLeft() const { return isHorizontal() ? m_x : m_y; }
+    int logicalRight() const { return logicalLeft() + logicalWidth(); }
     void setLogicalLeft(int left)
     {
-        if (!m_isVertical)
+        if (isHorizontal())
             m_x = left;
         else
             m_y = left;
     }
 
     // The logicalTop[ position is the top edge of the line box in a horizontal line and the left edge in a vertical line.
-    int logicalTop() const { return !m_isVertical ? m_y : m_x; }
+    int logicalTop() const { return isHorizontal() ? m_y : m_x; }
+    int logicalBottom() const { return logicalTop() + logicalHeight(); }
     void setLogicalTop(int top)
     {
-        if (!m_isVertical)
+        if (isHorizontal())
             m_y = top;
         else
             m_x = top;
@@ -241,8 +255,9 @@ public:
     // The logical height is our extent in the block flow direction, i.e., height for horizontal text and width for vertical text.
     int logicalHeight() const;
 
-    inline int baselinePosition(bool isRootLineBox) const { return renderer()->baselinePosition(m_firstLine, isRootLineBox); }
-    inline int lineHeight(bool isRootLineBox) const { return renderer()->lineHeight(m_firstLine, isRootLineBox); }
+    virtual int baselinePosition() const { return boxModelObject()->baselinePosition(m_firstLine, isHorizontal() ? HorizontalLine : VerticalLine, PositionOnContainingLine); }
+    virtual int lineHeight() const { return boxModelObject()->lineHeight(m_firstLine, isHorizontal() ? HorizontalLine : VerticalLine, PositionOnContainingLine); }
+    
 
     virtual int caretMinOffset() const;
     virtual int caretMaxOffset() const;
@@ -251,8 +266,9 @@ public:
     unsigned char bidiLevel() const { return m_bidiEmbeddingLevel; }
     void setBidiLevel(unsigned char level) { m_bidiEmbeddingLevel = level; }
     TextDirection direction() const { return m_bidiEmbeddingLevel % 2 ? RTL : LTR; }
-    int caretLeftmostOffset() const { return direction() == LTR ? caretMinOffset() : caretMaxOffset(); }
-    int caretRightmostOffset() const { return direction() == LTR ? caretMaxOffset() : caretMinOffset(); }
+    bool isLeftToRightDirection() const { return direction() == LTR; }
+    int caretLeftmostOffset() const { return isLeftToRightDirection() ? caretMinOffset() : caretMaxOffset(); }
+    int caretRightmostOffset() const { return isLeftToRightDirection() ? caretMaxOffset() : caretMinOffset(); }
 
     virtual void clearTruncation() { }
 
@@ -281,6 +297,10 @@ public:
         return 0;
     }
 
+    IntPoint locationIncludingFlipping();
+    void flipForWritingMode(IntRect&);
+    IntPoint flipForWritingMode(const IntPoint&);
+
 private:
     InlineBox* m_next; // The next element on the same line as us.
     InlineBox* m_prev; // The previous element on the same line as us.
@@ -307,7 +327,7 @@ protected:
     bool m_extracted : 1;
     bool m_hasVirtualLogicalHeight : 1;
 
-    bool m_isVertical : 1;
+    bool m_isHorizontal : 1;
 
     // for RootInlineBox
     bool m_endsWithBreak : 1;  // Whether the line ends with a <br>.

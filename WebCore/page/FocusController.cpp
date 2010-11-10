@@ -86,6 +86,7 @@ FocusController::FocusController(Page* page)
 
 void FocusController::setFocusedFrame(PassRefPtr<Frame> frame)
 {
+    ASSERT(!frame || frame->page() == m_page);
     if (m_focusedFrame == frame || m_isChangingFocusedFrame)
         return;
 
@@ -106,6 +107,8 @@ void FocusController::setFocusedFrame(PassRefPtr<Frame> frame)
         newFrame->selection()->setFocused(true);
         newFrame->document()->dispatchWindowEvent(Event::create(eventNames().focusEvent, false, false));
     }
+
+    m_page->chrome()->focusedFrameChanged(newFrame.get());
 
     m_isChangingFocusedFrame = false;
 }
@@ -298,7 +301,7 @@ bool FocusController::advanceFocusDirectionally(FocusDirection direction, Keyboa
     if (!focusedNode) {
         // Just move to the first focusable node.
         FocusDirection tabDirection = (direction == FocusDirectionUp || direction == FocusDirectionLeft) ?
-                                       FocusDirectionForward : FocusDirectionBackward;
+                                       FocusDirectionBackward : FocusDirectionForward;
         // 'initialFocus' is set to true so the chrome is not focused.
         return advanceFocusInDocumentOrder(tabDirection, event, true);
     }

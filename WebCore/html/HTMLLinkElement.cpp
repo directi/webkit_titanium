@@ -25,7 +25,6 @@
 #include "HTMLLinkElement.h"
 
 #include "Attribute.h"
-#include "CSSHelper.h"
 #include "CachedCSSStyleSheet.h"
 #include "CachedResourceLoader.h"
 #include "Document.h"
@@ -34,6 +33,7 @@
 #include "FrameLoaderClient.h"
 #include "FrameTree.h"
 #include "HTMLNames.h"
+#include "HTMLParserIdioms.h"
 #include "MediaList.h"
 #include "MediaQueryEvaluator.h"
 #include "Page.h"
@@ -118,7 +118,7 @@ void HTMLLinkElement::parseMappedAttribute(Attribute* attr)
         tokenizeRelAttribute(attr->value(), m_relAttribute);
         process();
     } else if (attr->name() == hrefAttr) {
-        m_url = document()->completeURL(deprecatedParseURL(attr->value()));
+        m_url = document()->completeURL(stripLeadingAndTrailingHTMLSpaces(attr->value()));
         process();
     } else if (attr->name() == typeAttr) {
         m_type = attr->value();
@@ -189,8 +189,13 @@ void HTMLLinkElement::process()
     if (m_relAttribute.m_isIcon && m_url.isValid() && !m_url.isEmpty())
         document()->setIconURL(m_url.string(), type);
 
-    if (m_relAttribute.m_isDNSPrefetch && document()->isDNSPrefetchEnabled() && m_url.isValid() && !m_url.isEmpty())
-        ResourceHandle::prepareForURL(m_url);
+    if (m_relAttribute.m_isDNSPrefetch) {
+        Settings* settings = document()->settings();
+        // FIXME: The href attribute of the link element can be in "//hostname" form, and we shouldn't attempt
+        // to complete that as URL <https://bugs.webkit.org/show_bug.cgi?id=48857>.
+        if (settings && settings->dnsPrefetchingEnabled() && m_url.isValid() && !m_url.isEmpty())
+            ResourceHandle::prepareForURL(m_url);
+    }
 
 #if ENABLE(LINK_PREFETCH)
     if (m_relAttribute.m_isLinkPrefetch && m_url.isValid() && document()->frame())

@@ -26,6 +26,7 @@
 #include "config.h"
 #include "WebContextMenuClient.h"
 
+#include "UserGestureIndicator.h"
 #include "WebElementPropertyBag.h"
 #include "WebLocalizableStrings.h"
 #include "WebView.h"
@@ -59,7 +60,7 @@ static bool isPreInspectElementTagSafari(IWebUIDelegate* uiDelegate)
         return false;
 
     TCHAR modulePath[MAX_PATH];
-    DWORD length = ::GetModuleFileName(0, modulePath, _countof(modulePath));
+    DWORD length = ::GetModuleFileName(0, modulePath, WTF_ARRAY_LENGTH(modulePath));
     if (!length)
         return false;
 
@@ -140,8 +141,10 @@ void WebContextMenuClient::searchWithGoogle(const Frame* frame)
     url.append(encoded);
     url.append("&ie=UTF-8&oe=UTF-8");
 
-    if (Page* page = frame->page())
-        page->mainFrame()->loader()->urlSelected(KURL(ParsedURLString, url), String(), 0, false, false, true, SendReferrer);
+    if (Page* page = frame->page()) {
+        UserGestureIndicator indicator(DefinitelyProcessingUserGesture);
+        page->mainFrame()->loader()->urlSelected(KURL(ParsedURLString, url), String(), 0, false, false, SendReferrer);
+    }
 }
 
 void WebContextMenuClient::lookUpInDictionary(Frame*)

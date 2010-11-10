@@ -46,6 +46,9 @@
 
 namespace WebCore {
 
+    // FIXME: Do we want better encapsulation?
+    typedef Vector<char> ColorProfile;
+
     // The RGBA32Buffer object represents the decoded image data in RGBA32
     // format.  This buffer is what all decoders write a single frame into.
     // Frames are then instantiated for drawing by being handed this buffer.
@@ -85,7 +88,11 @@ namespace WebCore {
 
         // Creates a new copy of the image data in |other|, so the two images
         // can be modified independently.  Returns whether the copy succeeded.
-        bool copyBitmapData(const RGBA32Buffer& other);
+        bool copyBitmapData(const RGBA32Buffer&);
+
+        // Creates a new reference to the image data in |other|.  The two images
+        // share a common backing store.
+        void copyReferenceToBitmapData(const RGBA32Buffer&);
 
         // Copies the pixel data at [(startX, startY), (endX, startY)) to the
         // same X-coordinates on each subsequent row up to but not including
@@ -121,6 +128,7 @@ namespace WebCore {
         bool premultiplyAlpha() const { return m_premultiplyAlpha; }
 
         void setHasAlpha(bool alpha);
+        void setColorProfile(const ColorProfile&);
         void setRect(const IntRect& r) { m_rect = r; }
         void setStatus(FrameStatus status);
         void setDuration(unsigned duration) { m_duration = duration; }
@@ -137,6 +145,12 @@ namespace WebCore {
 #endif
 
     private:
+#if PLATFORM(CG)
+        typedef RetainPtr<CFMutableDataRef> NativeBackingStore;
+#else
+        typedef Vector<PixelData> NativeBackingStore;
+#endif
+
         int width() const;
         int height() const;
 
@@ -149,7 +163,7 @@ namespace WebCore {
             m_pixmap = QPixmap();
             return reinterpret_cast_ptr<QRgb*>(m_image.scanLine(y)) + x;
 #else
-            return m_bytes.data() + (y * width()) + x;
+            return m_bytes + (y * width()) + x;
 #endif
         }
 
@@ -176,26 +190,26 @@ namespace WebCore {
         bool m_hasAlpha;
         IntSize m_size;
 #else
-        Vector<PixelData> m_bytes;
-        IntSize m_size;       // The size of the buffer.  This should be the
-                              // same as ImageDecoder::m_size.
-        bool m_hasAlpha;      // Whether or not any of the pixels in the buffer
-                              // have transparency.
+        NativeBackingStore m_backingStore;
+        PixelData* m_bytes; // The memory is backed by m_backingStore.
+        IntSize m_size; // The size of the buffer.  This should be the
+                        // same as ImageDecoder::m_size.
+        bool m_hasAlpha; // Whether or not any of the pixels in the buffer
+                         // have transparency.
+        ColorProfile m_colorProfile;
 #endif
-        IntRect m_rect;       // The rect of the original specified frame within
-                              // the overall buffer.  This will always just be
-                              // the entire buffer except for GIF frames whose
-                              // original rect was smaller than the overall
-                              // image size.
+        IntRect m_rect; // The rect of the original specified frame within
+                        // the overall buffer.  This will always just be
+                        // the entire buffer except for GIF frames whose
+                        // original rect was smaller than the overall
+                        // image size.
         FrameStatus m_status; // Whether or not this frame is completely
                               // finished decoding.
-        unsigned m_duration;  // The animation delay.
-        FrameDisposalMethod m_disposalMethod;
-                              // What to do with this frame's data when
-                              // initializing the next frame.
-        bool m_premultiplyAlpha;
-                              // Whether to premultiply alpha into R, G, B
-                              // channels; by default it's true.
+        unsigned m_duration; // The animation delay.
+        FrameDisposalMethod m_disposalMethod; // What to do with this frame's data when
+                                              // initializing the next frame.
+        bool m_premultiplyAlpha; // Whether to premultiply alpha into R, G, B
+                                 // channels; by default it's true.
     };
 
     // The ImageDecoder class represents a base class for specific image format
@@ -335,6 +349,7 @@ namespace WebCore {
 
         RefPtr<SharedBuffer> m_data; // The encoded data.
         Vector<RGBA32Buffer> m_frameBufferCache;
+        ColorProfile m_colorProfile;
         bool m_scaled;
         Vector<int> m_scaledColumns;
         Vector<int> m_scaledRows;

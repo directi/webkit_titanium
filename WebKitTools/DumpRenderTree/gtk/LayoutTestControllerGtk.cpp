@@ -34,6 +34,7 @@
 #include "LayoutTestController.h"
 
 #include "DumpRenderTree.h"
+#include "WebCoreSupport/DumpRenderTreeSupportGtk.h"
 #include "WorkQueue.h"
 #include "WorkQueueItem.h"
 #include <JavaScriptCore/JSRetainPtr.h>
@@ -183,8 +184,16 @@ JSRetainPtr<JSStringRef> LayoutTestController::pageSizeAndMarginsInPixels(int pa
 
 size_t LayoutTestController::webHistoryItemCount()
 {
-    // FIXME: implement
-    return 0;
+    WebKitWebView* webView = webkit_web_frame_get_web_view(mainFrame);
+    WebKitWebBackForwardList* list = webkit_web_view_get_back_forward_list(webView);
+
+    if (!list)
+        return -1;
+
+    // We do not add the current page to the total count as it's not
+    // considered in DRT tests
+    return webkit_web_back_forward_list_get_back_length(list) +
+            webkit_web_back_forward_list_get_forward_length(list);
 }
 
 unsigned LayoutTestController::workerThreadCount() const
@@ -423,7 +432,11 @@ void LayoutTestController::setXSSAuditorEnabled(bool flag)
 
 void LayoutTestController::setFrameFlatteningEnabled(bool flag)
 {
-    // FIXME: implement
+    WebKitWebView* view = webkit_web_frame_get_web_view(mainFrame);
+    ASSERT(view);
+
+    WebKitWebSettings* settings = webkit_web_view_get_settings(view);
+    g_object_set(G_OBJECT(settings), "enable-frame-flattening", flag, NULL);
 }
 
 void LayoutTestController::setSpatialNavigationEnabled(bool flag)
@@ -488,7 +501,7 @@ void LayoutTestController::setGeolocationPermission(bool allow)
     setGeolocationPermissionCommon(allow);
 }
 
-void LayoutTestController::setMockSpeechInputResult(JSStringRef result)
+void LayoutTestController::setMockSpeechInputResult(JSStringRef result, JSStringRef language)
 {
     // FIXME: Implement for speech input layout tests.
     // See https://bugs.webkit.org/show_bug.cgi?id=39485.
@@ -671,10 +684,13 @@ void LayoutTestController::overridePreference(JSStringRef key, JSStringRef value
     else if (g_str_equal(originalName.get(), "WebKitUsesPageCachePreferenceKey"))
         propertyName = "enable-page-cache";
     else if (g_str_equal(originalName.get(), "WebKitPluginsEnabled"))
-         propertyName = "enable-plugins";
+        propertyName = "enable-plugins";
     else if (g_str_equal(originalName.get(), "WebKitHyperlinkAuditingEnabled"))
-         propertyName = "enable-hyperlink-auditing";
-    else {
+        propertyName = "enable-hyperlink-auditing";
+    else if (g_str_equal(originalName.get(), "WebKitTabToLinksPreferenceKey")) {
+        DumpRenderTreeSupportGtk::setLinksIncludedInFocusChain(!g_ascii_strcasecmp(valueAsString.get(), "true") || !g_ascii_strcasecmp(valueAsString.get(), "1"));
+        return;
+    } else {
         fprintf(stderr, "LayoutTestController::overridePreference tried to override "
                 "unknown preference '%s'.\n", originalName.get());
         return;
@@ -797,10 +813,18 @@ void LayoutTestController::setEditingBehavior(const char* editingBehavior)
 
     if (!strcmp(editingBehavior, "win"))
         g_object_set(G_OBJECT(settings), "editing-behavior", WEBKIT_EDITING_BEHAVIOR_WINDOWS, NULL);
-    if (!strcmp(editingBehavior, "mac"))
+    else if (!strcmp(editingBehavior, "mac"))
         g_object_set(G_OBJECT(settings), "editing-behavior", WEBKIT_EDITING_BEHAVIOR_MAC, NULL);
+    else if (!strcmp(editingBehavior, "unix"))
+        g_object_set(G_OBJECT(settings), "editing-behavior", WEBKIT_EDITING_BEHAVIOR_UNIX, NULL);
 }
 
 void LayoutTestController::abortModal()
 {
+}
+
+bool LayoutTestController::hasSpellingMarker(int, int)
+{
+    // FIXME: Implement this.
+    return false;
 }

@@ -261,6 +261,12 @@ static void frameContentAsPlainText(size_t maxChars, Frame* frame,
     }
 }
 
+static long long generateFrameIdentifier()
+{
+    static long long next = 0;
+    return ++next;
+}
+
 WebPluginContainerImpl* WebFrameImpl::pluginContainerFromFrame(Frame* frame)
 {
     if (!frame)
@@ -480,12 +486,17 @@ WebFrame* WebFrame::fromFrameOwnerElement(const WebElement& element)
 
 WebString WebFrameImpl::name() const
 {
-    return m_frame->tree()->name();
+    return m_frame->tree()->uniqueName();
 }
 
 void WebFrameImpl::setName(const WebString& name)
 {
     m_frame->tree()->setName(name);
+}
+
+long long WebFrameImpl::identifier() const
+{
+    return m_identifier;
 }
 
 WebURL WebFrameImpl::url() const
@@ -975,7 +986,7 @@ WebHistoryItem WebFrameImpl::previousHistoryItem() const
     // only get saved to history when it becomes the previous item.  The caller
     // is expected to query the history item after a navigation occurs, after
     // the desired history item has become the previous entry.
-    return WebHistoryItem(viewImpl()->previousHistoryItem());
+    return WebHistoryItem(m_frame->loader()->history()->previousItem());
 }
 
 WebHistoryItem WebFrameImpl::currentHistoryItem() const
@@ -1759,6 +1770,13 @@ bool WebFrameImpl::pauseSVGAnimation(const WebString& animationId, double time, 
 #endif
 }
 
+WebString WebFrameImpl::layerTreeAsText() const
+{
+    if (!m_frame)
+        return WebString();
+    return WebString(m_frame->layerTreeAsText());
+}
+
 // WebFrameImpl public ---------------------------------------------------------
 
 PassRefPtr<WebFrameImpl> WebFrameImpl::create(WebFrameClient* client)
@@ -1779,6 +1797,7 @@ WebFrameImpl::WebFrameImpl(WebFrameClient* client)
     , m_scopingComplete(false)
     , m_nextInvalidateAfter(0)
     , m_animationController(this)
+    , m_identifier(generateFrameIdentifier())
 {
     ChromiumBridge::incrementStatsCounter(webFrameActiveCount);
     frameCount++;
@@ -1869,7 +1888,7 @@ void WebFrameImpl::paintWithContext(GraphicsContext& gc, const WebRect& rect)
         frameView()->paint(&gc, dirtyRect);
         m_frame->page()->inspectorController()->drawNodeHighlight(gc);
     } else
-        gc.fillRect(dirtyRect, Color::white, DeviceColorSpace);
+        gc.fillRect(dirtyRect, Color::white, ColorSpaceDeviceRGB);
     gc.restore();
 }
 
@@ -2242,7 +2261,7 @@ void WebFrameImpl::loadJavaScriptURL(const KURL& url)
     if (!result.getString(scriptResult))
         return;
 
-    if (!m_frame->redirectScheduler()->locationChangePending())
+    if (!m_frame->navigationScheduler()->locationChangePending())
         m_frame->loader()->writer()->replaceDocument(scriptResult);
 }
 

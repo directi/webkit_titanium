@@ -48,6 +48,9 @@ namespace WebCore {
 
         bool containsAll(SpaceSplitStringData&);
 
+        void add(const AtomicString&);
+        void remove(const AtomicString&);
+
         size_t size() { ensureVector(); return m_vector.size(); }
         const AtomicString& operator[](size_t i) { ensureVector(); ASSERT(i < size()); return m_vector[i]; }
 
@@ -72,6 +75,8 @@ namespace WebCore {
 
         bool contains(const AtomicString& string) const { return m_data && m_data->contains(string); }
         bool containsAll(const SpaceSplitString& names) const { return !names.m_data || (m_data && m_data->containsAll(*names.m_data)); }
+        void add(const AtomicString&);
+        void remove(const AtomicString&);
 
         size_t size() const { return m_data ? m_data->size() : 0; }
         bool isNull() const { return !m_data; }
@@ -80,11 +85,6 @@ namespace WebCore {
     private:
         OwnPtr<SpaceSplitStringData> m_data;
     };
-
-    inline bool isClassWhitespace(UChar c)
-    {
-        return c == ' ' || c == '\r' || c == '\n' || c == '\t' || c == '\f';
-    }
 
 } // namespace WebCore
 

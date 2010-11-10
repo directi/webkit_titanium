@@ -92,6 +92,32 @@ class CleanPendingCommit(AbstractDeclarativeCommand):
                 self._tool.bugs.obsolete_attachment(patch.id(), message)
 
 
+# FIXME: This should be share more logic with AssignToCommitter and CleanPendingCommit
+class CleanReviewQueue(AbstractDeclarativeCommand):
+    name = "clean-review-queue"
+    help_text = "Clear r? on obsolete patches so they do not appear in the pending-commit list."
+
+    def execute(self, options, args, tool):
+        queue_url = "http://webkit.org/pending-review"
+        # We do this inefficient dance to be more like webkit.org/pending-review
+        # bugs.queries.fetch_bug_ids_from_review_queue() doesn't return
+        # closed bugs, but folks using /pending-review will see them. :(
+        for patch_id in tool.bugs.queries.fetch_attachment_ids_from_review_queue():
+            patch = self._tool.bugs.fetch_attachment(patch_id)
+            if not patch.review() == "?":
+                continue
+            attachment_obsolete_modifier = ""
+            if patch.is_obsolete():
+                attachment_obsolete_modifier = "obsolete "
+            elif patch.bug().is_closed():
+                bug_closed_explanation = "  If you would like this patch reviewed, please attach it to a new bug (or re-open this bug before marking it for review again)."
+            else:
+                # Neither the patch was obsolete or the bug was closed, next patch...
+                continue
+            message = "Cleared review? from %sattachment %s so that this bug does not appear in %s.%s" % (attachment_obsolete_modifier, patch.id(), queue_url, bug_closed_explanation)
+            self._tool.bugs.obsolete_attachment(patch.id(), message)
+
+
 class AssignToCommitter(AbstractDeclarativeCommand):
     name = "assign-to-committer"
     help_text = "Assign bug to whoever attached the most recent r+'d patch"
@@ -152,7 +178,9 @@ class AbstractPatchUploadingCommand(AbstractSequencedCommand):
         # Perfer a bug id passed as an argument over a bug url in the diff (i.e. ChangeLogs).
         bug_id = args and args[0]
         if not bug_id:
-            bug_id = tool.checkout().bug_id_for_this_commit(options.git_commit)
+            changed_files = self._tool.scm().changed_files(options.git_commit)
+            state["changed_files"] = changed_files
+            bug_id = tool.checkout().bug_id_for_this_commit(options.git_commit, changed_files)
         return bug_id
 
     def _prepare_state(self, options, args, tool):
@@ -171,6 +199,7 @@ class Post(AbstractPatchUploadingCommand):
         steps.CheckStyle,
         steps.ConfirmDiff,
         steps.ObsoletePatches,
+        steps.SuggestReviewers,
         steps.PostDiff,
     ]
 
@@ -219,6 +248,7 @@ class Upload(AbstractPatchUploadingCommand):
         steps.EditChangeLog,
         steps.ConfirmDiff,
         steps.ObsoletePatches,
+        steps.SuggestReviewers,
         steps.PostDiff,
     ]
     long_help = """upload uploads the current diff to bugs.webkit.org.

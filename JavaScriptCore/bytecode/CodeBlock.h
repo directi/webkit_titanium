@@ -297,9 +297,11 @@ namespace JSC {
         void printStructure(const char* name, const Instruction*, int operand) const;
 #endif
 
+        bool isStrictMode() const { return m_isStrictMode; }
+
         inline bool isKnownNotImmediate(int index)
         {
-            if (index == m_thisRegister)
+            if (index == m_thisRegister && !m_isStrictMode)
                 return true;
 
             if (isConstantRegisterIndex(index))
@@ -408,6 +410,15 @@ namespace JSC {
             ASSERT(usesArguments());
             return m_argumentsRegister;
         }
+        void setActivationRegister(int activationRegister)
+        {
+            m_activationRegister = activationRegister;
+        }
+        int activationRegister()
+        {
+            ASSERT(needsFullScopeChain());
+            return m_activationRegister;
+        }
         bool usesArguments() const { return m_argumentsRegister != -1; }
 
         CodeType codeType() const { return m_codeType; }
@@ -419,6 +430,8 @@ namespace JSC {
         void addJumpTarget(unsigned jumpTarget) { m_jumpTargets.append(jumpTarget); }
         unsigned jumpTarget(int index) const { return m_jumpTargets[index]; }
         unsigned lastJumpTarget() const { return m_jumpTargets.last(); }
+
+        void createActivation(CallFrame*);
 
 #if ENABLE(INTERPRETER)
         void addPropertyAccessInstruction(unsigned propertyAccessInstruction) { m_propertyAccessInstructions.append(propertyAccessInstruction); }
@@ -548,10 +561,12 @@ namespace JSC {
 
         int m_thisRegister;
         int m_argumentsRegister;
+        int m_activationRegister;
 
         bool m_needsFullScopeChain;
         bool m_usesEval;
         bool m_isNumericCompareFunction;
+        bool m_isStrictMode;
 
         CodeType m_codeType;
 
@@ -663,7 +678,7 @@ namespace JSC {
         // symbol table, so we just pass as a raw pointer with a ref count of 1.  We then manually deref
         // in the destructor.
         FunctionCodeBlock(FunctionExecutable* ownerExecutable, CodeType codeType, JSGlobalObject* globalObject, PassRefPtr<SourceProvider> sourceProvider, unsigned sourceOffset, bool isConstructor)
-            : CodeBlock(ownerExecutable, codeType, globalObject, sourceProvider, sourceOffset, SharedSymbolTable::create().releaseRef(), isConstructor)
+            : CodeBlock(ownerExecutable, codeType, globalObject, sourceProvider, sourceOffset, SharedSymbolTable::create().leakRef(), isConstructor)
         {
         }
         ~FunctionCodeBlock()

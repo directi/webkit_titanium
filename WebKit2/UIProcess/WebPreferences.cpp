@@ -130,6 +130,28 @@ bool WebPreferences::frameFlatteningEnabled() const
     return m_store.frameFlatteningEnabled;
 }
 
+void WebPreferences::setPrivateBrowsingEnabled(bool b)
+{
+    m_store.privateBrowsingEnabled = b;
+    update();
+}
+
+bool WebPreferences::privateBrowsingEnabled() const
+{
+    return m_store.privateBrowsingEnabled;
+}
+
+void WebPreferences::setDeveloperExtrasEnabled(bool b)
+{
+    m_store.developerExtrasEnabled = b;
+    update();
+}
+
+bool WebPreferences::developerExtrasEnabled() const
+{
+    return m_store.developerExtrasEnabled;
+}
+
 void WebPreferences::setPluginsEnabled(bool b)
 {
     m_store.pluginsEnabled = b;
@@ -139,6 +161,17 @@ void WebPreferences::setPluginsEnabled(bool b)
 bool WebPreferences::pluginsEnabled() const
 {
     return m_store.pluginsEnabled;
+}
+
+void WebPreferences::setJavaEnabled(bool b)
+{
+    m_store.javaEnabled = b;
+    update();
+}
+
+bool WebPreferences::javaEnabled() const
+{
+    return m_store.javaEnabled;
 }
 
 void WebPreferences::setFontSmoothingLevel(FontSmoothingLevel level)
@@ -216,6 +249,50 @@ void WebPreferences::setFantasyFontFamily(const String& family)
 const String& WebPreferences::fantasyFontFamily() const
 {
     return m_store.fantasyFontFamily;
+}
+
+void WebPreferences::setMinimumFontSize(uint32_t size)
+{
+    m_store.minimumFontSize = size;
+    update();
+}
+
+uint32_t WebPreferences::minimumFontSize() const
+{
+    return m_store.minimumFontSize;
+}
+
+void WebPreferences::setAcceleratedCompositingEnabled(bool flag)
+{
+    m_store.acceleratedCompositingEnabled = flag;
+    update();
+}
+
+bool WebPreferences::acceleratedCompositingEnabled() const
+{
+    return m_store.acceleratedCompositingEnabled;
+}
+
+void WebPreferences::setCompositingBordersVisible(bool flag)
+{
+    m_store.compositingBordersVisible = flag;
+    update();
+}
+
+bool WebPreferences::compositingBordersVisible() const
+{
+    return m_store.compositingBordersVisible;
+}
+
+void WebPreferences::setCompositingRepaintCountersVisible(bool flag)
+{
+    m_store.compositingRepaintCountersVisible = flag;
+    update();
+}
+
+bool WebPreferences::compositingRepaintCountersVisible() const
+{
+    return m_store.compositingRepaintCountersVisible;
 }
 
 } // namespace WebKit

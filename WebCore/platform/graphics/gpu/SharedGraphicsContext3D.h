@@ -47,6 +47,7 @@ class AffineTransform;
 class Color;
 class GraphicsContext3D;
 class FloatRect;
+class HostWindow;
 class IntSize;
 class SolidFillShader;
 class TexShader;
@@ -55,7 +56,7 @@ typedef HashMap<NativeImagePtr, RefPtr<Texture> > TextureHashMap;
 
 class SharedGraphicsContext3D : public RefCounted<SharedGraphicsContext3D> {
 public:
-    static PassRefPtr<SharedGraphicsContext3D> create(PassOwnPtr<GraphicsContext3D>);
+    static PassRefPtr<SharedGraphicsContext3D> create(HostWindow*);
     ~SharedGraphicsContext3D();
 
     // Functions that delegate directly to GraphicsContext3D, with caching
@@ -99,10 +100,6 @@ public:
 
     bool supportsBGRA();
 
-    // GL_CHROMIUM_copy_texture_to_parent_texture
-    bool supportsCopyTextureToParentTextureCHROMIUM();
-    void copyTextureToParentTextureCHROMIUM(unsigned texture, unsigned parentTexture);
-
     // Creates a texture associated with the given image.  Is owned by this context's
     // TextureHashMap.
     Texture* createTexture(NativeImagePtr, Texture::Format, int width, int height);
@@ -117,14 +114,16 @@ public:
     // the texture.
     PassRefPtr<Texture> createTexture(Texture::Format, int width, int height);
 
+    GraphicsContext3D* graphicsContext3D() const { return m_context.get(); }
+
 private:
-    explicit SharedGraphicsContext3D(PassOwnPtr<GraphicsContext3D> context);
+    SharedGraphicsContext3D(PassRefPtr<GraphicsContext3D>, PassOwnPtr<SolidFillShader>, PassOwnPtr<TexShader>);
 
     // Used to implement removeTexturesFor(), see the comment above.
     static HashSet<SharedGraphicsContext3D*>* allContexts();
     void removeTextureFor(NativeImagePtr);
 
-    OwnPtr<GraphicsContext3D> m_context;
+    RefPtr<GraphicsContext3D> m_context;
 
     unsigned m_quadVertices;
 

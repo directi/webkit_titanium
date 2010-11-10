@@ -1056,14 +1056,17 @@ static bool nodeIsNotBeingEdited(Node* node, Frame* frame)
 
 Cursor EventHandler::selectCursor(const MouseEventWithHitTestResults& event, Scrollbar* scrollbar)
 {
-    // During selection, use an I-beam no matter what we're over.
-    // If you're capturing mouse events for a particular node, don't treat this as a selection.
-    if (m_mousePressed && m_mouseDownMayStartSelect && m_frame->selection()->isCaretOrRange() && !m_capturingMouseEventsNode)
-        return iBeamCursor();
-
     Node* node = event.targetNode();
     RenderObject* renderer = node ? node->renderer() : 0;
     RenderStyle* style = renderer ? renderer->style() : 0;
+
+    bool horizontalText = !style || style->isHorizontalWritingMode();
+    const Cursor& iBeam = horizontalText ? iBeamCursor() : verticalTextCursor();
+
+    // During selection, use an I-beam no matter what we're over.
+    // If you're capturing mouse events for a particular node, don't treat this as a selection.
+    if (m_mousePressed && m_mouseDownMayStartSelect && m_frame->selection()->isCaretOrRange() && !m_capturingMouseEventsNode)
+        return iBeam;
 
     if (renderer && renderer->isFrameSet()) {
         RenderFrameSet* frameSetRenderer = toRenderFrameSet(renderer);
@@ -1078,7 +1081,7 @@ Cursor EventHandler::selectCursor(const MouseEventWithHitTestResults& event, Scr
         for (unsigned i = 0; i < cursors->size(); ++i) {
             const CachedImage* cimage = 0;
             StyleImage* image = (*cursors)[i].image();
-            if (image->isCachedImage())
+            if (image && image->isCachedImage())
                 cimage = static_cast<StyleCachedImage*>(image)->cachedImage();
             if (!cimage)
                 continue;
@@ -1133,7 +1136,7 @@ Cursor EventHandler::selectCursor(const MouseEventWithHitTestResults& event, Scr
             }
         }
         if ((editable || (renderer && renderer->isText() && node->canStartSelection())) && !inResizer && !scrollbar)
-            return iBeamCursor();
+            return iBeam;
         return pointerCursor();
     }
     case CURSOR_CROSS:
@@ -2702,7 +2705,7 @@ void EventHandler::defaultArrowEventHandler(FocusDirection focusDirection, Keybo
     if (!page)
         return;
 
-    if (!page->settings() || !page->settings()->isSpatialNavigationEnabled())
+    if (!isSpatialNavigationEnabled(m_frame))
         return;
 
     // Arrows and other possible directional navigation keys can be used in design

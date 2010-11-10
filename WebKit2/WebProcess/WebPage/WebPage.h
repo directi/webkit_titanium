@@ -28,10 +28,13 @@
 
 #include "APIObject.h"
 #include "DrawingArea.h"
+#include "FindController.h"
+#include "InjectedBundlePageContextMenuClient.h"
 #include "InjectedBundlePageEditorClient.h"
 #include "InjectedBundlePageFormClient.h"
 #include "InjectedBundlePageLoaderClient.h"
 #include "InjectedBundlePageUIClient.h"
+#include "MessageSender.h"
 #include "Plugin.h"
 #include "WebEditCommand.h"
 #include <WebCore/FrameLoaderTypes.h>
@@ -63,24 +66,36 @@ namespace WebCore {
 namespace WebKit {
 
 class DrawingArea;
+class InjectedBundleBackForwardList;
+class PageOverlay;
 class PluginView;
+class WebContextMenu;
+class WebContextMenuItemData;
 class WebEvent;
 class WebFrame;
+class WebInspector;
 class WebKeyboardEvent;
 class WebMouseEvent;
+class WebPopupMenu;
 class WebWheelEvent;
-#if ENABLE(TOUCH_EVENTS)
-class WebTouchEvent;
-#endif
+
 struct WebPageCreationParameters;
 struct WebPreferencesStore;
 
-class WebPage : public APIObject {
+#if ENABLE(TOUCH_EVENTS)
+class WebTouchEvent;
+#endif
+
+class WebPage : public APIObject, public CoreIPC::MessageSender<WebPage> {
 public:
     static const Type APIType = TypeBundlePage;
 
     static PassRefPtr<WebPage> create(uint64_t pageID, const WebPageCreationParameters&);
-    ~WebPage();
+    virtual ~WebPage();
+
+    // Used by MessageSender.
+    CoreIPC::Connection* connection() const;
+    uint64_t destinationID() const { return pageID(); }
 
     void close();
 
@@ -90,7 +105,9 @@ public:
     void setSize(const WebCore::IntSize&);
     const WebCore::IntSize& size() const { return m_viewSize; }
 
+    InjectedBundleBackForwardList* backForwardList();
     DrawingArea* drawingArea() const { return m_drawingArea.get(); }
+    WebInspector* inspector();
 
     // -- Called by the DrawingArea.
     // FIXME: We could genericize these into a DrawingArea client interface. Would that be beneficial?
@@ -98,7 +115,9 @@ public:
     void layoutIfNeeded();
 
     // -- Called from WebCore clients.
+#if !PLATFORM(MAC)
     bool handleEditingKeyboardEvent(WebCore::KeyboardEvent*);
+#endif
     void show();
     String userAgent() const;
     WebCore::IntRect windowResizerRect() const;
@@ -108,15 +127,19 @@ public:
     void removeWebEditCommand(uint64_t);
     bool isInRedo() const { return m_isInRedo; }
 
+    void setActivePopupMenu(WebPopupMenu*);
+
     // -- Called from WebProcess.
     void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
 
     // -- InjectedBundle methods
+    void initializeInjectedBundleContextMenuClient(WKBundlePageContextMenuClient*);
     void initializeInjectedBundleEditorClient(WKBundlePageEditorClient*);
     void initializeInjectedBundleFormClient(WKBundlePageFormClient*);
     void initializeInjectedBundleLoaderClient(WKBundlePageLoaderClient*);
     void initializeInjectedBundleUIClient(WKBundlePageUIClient*);
 
+    InjectedBundlePageContextMenuClient& injectedBundleContextMenuClient() { return m_contextMenuClient; }
     InjectedBundlePageEditorClient& injectedBundleEditorClient() { return m_editorClient; }
     InjectedBundlePageFormClient& injectedBundleFormClient() { return m_formClient; }
     InjectedBundlePageLoaderClient& injectedBundleLoaderClient() { return m_loaderClient; }
@@ -137,6 +160,9 @@ public:
     void setPageZoomFactor(double);
     void setPageAndTextZoomFactors(double pageZoomFactor, double textZoomFactor);
 
+    void scaleWebView(double scale);
+    double viewScaleFactor() const;
+
     void stopLoading();
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -152,11 +178,24 @@ public:
     bool windowIsVisible() const { return m_windowIsVisible; }
     const WebCore::IntRect& windowFrame() const { return m_windowFrame; }
     bool windowIsFocused() const;
+    bool interceptEditingKeyboardEvent(WebCore::KeyboardEvent*, bool);
 #elif PLATFORM(WIN)
     HWND nativeWindow() const { return m_nativeWindow; }
 #endif
 
+    void installPageOverlay(PassRefPtr<PageOverlay>);
+    void uninstallPageOverlay();
+
     static const WebEvent* currentEvent();
+
+    FindController& findController() { return m_findController; }
+
+    void pageDidScroll();
+#if ENABLE(TILED_BACKING_STORE)
+    void pageDidRequestScroll(const WebCore::IntSize& delta);
+#endif
+
+    WebContextMenu* contextMenu();
 
 private:
     WebPage(uint64_t pageID, const WebPageCreationParameters&);
@@ -179,6 +218,7 @@ private:
     void loadURL(const String&);
     void loadURLRequest(const WebCore::ResourceRequest&);
     void loadHTMLString(const String& htmlString, const String& baseURL);
+    void loadAlternateHTMLString(const String& htmlString, const String& baseURL, const String& unreachableURL);
     void loadPlainTextString(const String&);
     void reload(bool reloadFromOrigin);
     void goForward(uint64_t);
@@ -196,12 +236,17 @@ private:
 #if ENABLE(TOUCH_EVENTS)
     void touchEvent(const WebTouchEvent&);
 #endif
-    void runJavaScriptInMainFrame(const String&, uint64_t callbackID);
+
+    void getContentsAsString(uint64_t callbackID);
     void getRenderTreeExternalRepresentation(uint64_t callbackID);
     void getSourceForFrame(uint64_t frameID, uint64_t callbackID);
+    void runJavaScriptInMainFrame(const String&, uint64_t callbackID);
+
     void preferencesDidChange(const WebPreferencesStore&);
     void platformPreferencesDidChange(const WebPreferencesStore&);
-    void didReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction);
+    void updatePreferences(const WebPreferencesStore&);
+
+    void didReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction, uint64_t downloadID);
     void setCustomUserAgent(const String&);
 
 #if PLATFORM(MAC)
@@ -213,8 +258,19 @@ private:
     void reapplyEditCommand(uint64_t commandID);
     void didRemoveEditCommand(uint64_t commandID);
 
+    void findString(const String&, uint32_t findDirection, uint32_t findOptions, uint32_t maxMatchCount);
+    void hideFindUI();
+    void countStringMatches(const String&, bool caseInsensitive, uint32_t maxMatchCount);
+
+    void didChangeSelectedIndexForActivePopupMenu(int32_t newIndex);
+
+#if ENABLE(CONTEXT_MENUS)
+    void didSelectItemFromActiveContextMenu(const WebContextMenuItemData&);
+#endif
+
     OwnPtr<WebCore::Page> m_page;
     RefPtr<WebFrame> m_mainFrame;
+    RefPtr<InjectedBundleBackForwardList> m_backForwardList;
 
     String m_customUserAgent;
 
@@ -222,6 +278,7 @@ private:
     RefPtr<DrawingArea> m_drawingArea;
 
     bool m_isInRedo;
+    bool m_isClosed;
 
 #if PLATFORM(MAC)
     // Whether the containing window is visible or not.
@@ -241,10 +298,20 @@ private:
 
     WebCore::IntSize m_windowResizerSize;
 
+    InjectedBundlePageContextMenuClient m_contextMenuClient;
     InjectedBundlePageEditorClient m_editorClient;
     InjectedBundlePageFormClient m_formClient;
     InjectedBundlePageLoaderClient m_loaderClient;
     InjectedBundlePageUIClient m_uiClient;
+
+    FindController m_findController;
+    RefPtr<PageOverlay> m_pageOverlay;
+
+    OwnPtr<WebInspector> m_inspector;
+
+    RefPtr<WebPopupMenu> m_activePopupMenu;
+
+    RefPtr<WebContextMenu> m_contextMenu;
 
     uint64_t m_pageID;
 };

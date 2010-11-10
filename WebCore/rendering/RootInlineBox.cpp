@@ -46,8 +46,9 @@ RootInlineBox::RootInlineBox(RenderBlock* block)
     , m_lineTop(0)
     , m_lineBottom(0)
     , m_paginationStrut(0)
+    , m_blockLogicalHeight(0)
 {
-    setIsVertical(!block->style()->isVerticalBlockFlow());
+    setIsHorizontal(block->style()->isHorizontalWritingMode());
 }
 
 
@@ -98,7 +99,7 @@ void RootInlineBox::placeEllipsis(const AtomicString& ellipsisStr,  bool ltr, in
     // Create an ellipsis box.
     EllipsisBox* ellipsisBox = new (renderer()->renderArena()) EllipsisBox(renderer(), ellipsisStr, this,
                                                               ellipsisWidth - (markupBox ? markupBox->logicalWidth() : 0), logicalHeight(),
-                                                              y(), !prevRootBox(), isVertical(), markupBox);
+                                                              y(), !prevRootBox(), isHorizontal(), markupBox);
     
     if (!gEllipsisBoxMap)
         gEllipsisBoxMap = new EllipsisBoxMap();
@@ -148,7 +149,7 @@ void RootInlineBox::addHighlightOverflow()
     FloatRect rootRect(0, selectionTop(), logicalWidth(), selectionHeight());
     IntRect inflatedRect = enclosingIntRect(page->chrome()->client()->customHighlightRect(renderer()->node(), renderer()->style()->highlight(), rootRect));
     setInlineDirectionOverflowPositions(leftLayoutOverflow(), rightLayoutOverflow(), min(leftVisualOverflow(), inflatedRect.x()), max(rightVisualOverflow(), inflatedRect.right()));
-    setBlockDirectionOverflowPositions(topLayoutOverflow(), bottomLayoutOverflow(), min(topVisualOverflow(), inflatedRect.y()), max(bottomVisualOverflow(), inflatedRect.bottom()), logicalHeight());
+    setBlockDirectionOverflowPositions(topLayoutOverflow(), bottomLayoutOverflow(), min(topVisualOverflow(), inflatedRect.y()), max(bottomVisualOverflow(), inflatedRect.bottom()));
 }
 
 void RootInlineBox::paintCustomHighlight(PaintInfo& paintInfo, int tx, int ty, const AtomicString& highlightType)
@@ -199,7 +200,7 @@ void RootInlineBox::adjustPosition(int dx, int dy)
     InlineFlowBox::adjustPosition(dx, dy);
     m_lineTop += dy;
     m_lineBottom += dy;
-    m_blockHeight += dy;
+    m_blockLogicalHeight += dy;
 }
 
 void RootInlineBox::childRemoved(InlineBox* box)
@@ -237,35 +238,36 @@ int RootInlineBox::alignBoxesInBlockDirection(int heightOfBlock, GlyphOverflowAn
     int maxHeight = maxAscent + maxDescent;
     int lineTop = heightOfBlock;
     int lineBottom = heightOfBlock;
-    placeBoxesInBlockDirection(heightOfBlock, maxHeight, maxAscent, noQuirksMode, lineTop, lineBottom);
+    bool setLineTop = false;
+    placeBoxesInBlockDirection(heightOfBlock, maxHeight, maxAscent, noQuirksMode, lineTop, lineBottom, setLineTop);
     computeBlockDirectionOverflow(lineTop, lineBottom, noQuirksMode, textBoxDataMap);
     setLineTopBottomPositions(lineTop, lineBottom);
-    
-    heightOfBlock += maxHeight;
-    
-    return heightOfBlock;
+
+    // Detect integer overflow.
+    if (heightOfBlock > numeric_limits<int>::max() - maxHeight)
+        return numeric_limits<int>::max();
+
+    return heightOfBlock + maxHeight;
 }
 
-GapRects RootInlineBox::fillLineSelectionGap(int selTop, int selHeight, RenderBlock* rootBlock, int blockX, int blockY, int tx, int ty,
-                                             const PaintInfo* paintInfo)
+GapRects RootInlineBox::lineSelectionGap(RenderBlock* rootBlock, const IntPoint& rootBlockPhysicalPosition, const IntSize& offsetFromRootBlock, 
+                                         int selTop, int selHeight, const PaintInfo* paintInfo)
 {
     RenderObject::SelectionState lineState = selectionState();
 
     bool leftGap, rightGap;
-    block()->getHorizontalSelectionGapInfo(lineState, leftGap, rightGap);
+    block()->getSelectionGapInfo(lineState, leftGap, rightGap);
 
     GapRects result;
 
     InlineBox* firstBox = firstSelectedBox();
     InlineBox* lastBox = lastSelectedBox();
     if (leftGap)
-        result.uniteLeft(block()->fillLeftSelectionGap(firstBox->parent()->renderer(),
-                                                       firstBox->x(), selTop, selHeight,
-                                                       rootBlock, blockX, blockY, tx, ty, paintInfo));
+        result.uniteLeft(block()->logicalLeftSelectionGap(rootBlock, rootBlockPhysicalPosition, offsetFromRootBlock,
+                                                          firstBox->parent()->renderer(), firstBox->logicalLeft(), selTop, selHeight, paintInfo));
     if (rightGap)
-        result.uniteRight(block()->fillRightSelectionGap(lastBox->parent()->renderer(),
-                                                         lastBox->x() + lastBox->logicalWidth(), selTop, selHeight,
-                                                         rootBlock, blockX, blockY, tx, ty, paintInfo));
+        result.uniteRight(block()->logicalRightSelectionGap(rootBlock, rootBlockPhysicalPosition, offsetFromRootBlock,
+                                                            lastBox->parent()->renderer(), lastBox->logicalRight(), selTop, selHeight, paintInfo));
 
     // When dealing with bidi text, a non-contiguous selection region is possible.
     // e.g. The logical text aaaAAAbbb (capitals denote RTL text and non-capitals LTR) is layed out
@@ -276,15 +278,20 @@ GapRects RootInlineBox::fillLineSelectionGap(int selTop, int selHeight, RenderBl
     // We can see that the |bbb| run is not part of the selection while the runs around it are.
     if (firstBox && firstBox != lastBox) {
         // Now fill in any gaps on the line that occurred between two selected elements.
-        int lastX = firstBox->x() + firstBox->logicalWidth();
+        int lastLogicalLeft = firstBox->logicalRight();
         bool isPreviousBoxSelected = firstBox->selectionState() != RenderObject::SelectionNone;
         for (InlineBox* box = firstBox->nextLeafChild(); box; box = box->nextLeafChild()) {
             if (box->selectionState() != RenderObject::SelectionNone) {
-                if (isPreviousBoxSelected)  // VisibleSelection may be non-contiguous, see comment above.
-                    result.uniteCenter(block()->fillHorizontalSelectionGap(box->parent()->renderer(),
-                                                                           lastX + tx, selTop + ty,
-                                                                           box->x() - lastX, selHeight, paintInfo));
-                lastX = box->x() + box->logicalWidth();
+                IntRect logicalRect(lastLogicalLeft, selTop, box->logicalLeft() - lastLogicalLeft, selHeight);
+                logicalRect.move(renderer()->style()->isHorizontalWritingMode() ? offsetFromRootBlock : IntSize(offsetFromRootBlock.height(), offsetFromRootBlock.width()));
+                IntRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, logicalRect);
+                if (isPreviousBoxSelected && gapRect.width() > 0 && gapRect.height() > 0) {
+                    if (paintInfo && box->parent()->renderer()->style()->visibility() == VISIBLE)
+                        paintInfo->context->fillRect(gapRect, box->parent()->renderer()->selectionBackgroundColor(), box->parent()->renderer()->style()->colorSpace());
+                    // VisibleSelection may be non-contiguous, see comment above.
+                    result.uniteCenter(gapRect);
+                }
+                lastLogicalLeft = box->logicalRight();
             }
             if (box == lastBox)
                 break;
@@ -345,23 +352,45 @@ InlineBox* RootInlineBox::lastSelectedBox()
 int RootInlineBox::selectionTop() const
 {
     int selectionTop = m_lineTop;
-    if (!prevRootBox())
+    if (renderer()->style()->isFlippedLinesWritingMode())
         return selectionTop;
 
-    int prevBottom = prevRootBox()->selectionBottom();
+    int prevBottom = prevRootBox() ? prevRootBox()->selectionBottom() : block()->borderBefore() + block()->paddingBefore();
     if (prevBottom < selectionTop && block()->containsFloats()) {
         // This line has actually been moved further down, probably from a large line-height, but possibly because the
         // line was forced to clear floats.  If so, let's check the offsets, and only be willing to use the previous
-        // line's bottom overflow if the offsets are greater on both sides.
-        int prevLeft = block()->logicalLeftOffsetForLine(prevBottom, !prevRootBox());
-        int prevRight = block()->logicalRightOffsetForLine(prevBottom, !prevRootBox());
-        int newLeft = block()->logicalLeftOffsetForLine(selectionTop, !prevRootBox());
-        int newRight = block()->logicalRightOffsetForLine(selectionTop, !prevRootBox());
+        // line's bottom if the offsets are greater on both sides.
+        int prevLeft = block()->logicalLeftOffsetForLine(prevBottom, false);
+        int prevRight = block()->logicalRightOffsetForLine(prevBottom, false);
+        int newLeft = block()->logicalLeftOffsetForLine(selectionTop, false);
+        int newRight = block()->logicalRightOffsetForLine(selectionTop, false);
         if (prevLeft > newLeft || prevRight < newRight)
             return selectionTop;
     }
 
     return prevBottom;
+}
+
+int RootInlineBox::selectionBottom() const
+{
+    int selectionBottom = m_lineBottom;
+    if (!renderer()->style()->isFlippedLinesWritingMode() || !nextRootBox())
+        return selectionBottom;
+
+    int nextTop = nextRootBox()->selectionTop();
+    if (nextTop > selectionBottom && block()->containsFloats()) {
+        // The next line has actually been moved further over, probably from a large line-height, but possibly because the
+        // line was forced to clear floats.  If so, let's check the offsets, and only be willing to use the next
+        // line's top if the offsets are greater on both sides.
+        int nextLeft = block()->logicalLeftOffsetForLine(nextTop, false);
+        int nextRight = block()->logicalRightOffsetForLine(nextTop, false);
+        int newLeft = block()->logicalLeftOffsetForLine(selectionBottom, false);
+        int newRight = block()->logicalRightOffsetForLine(selectionBottom, false);
+        if (nextLeft > newLeft || nextRight < newRight)
+            return selectionBottom;
+    }
+
+    return nextTop;
 }
 
 RenderBlock* RootInlineBox::block() const
@@ -374,7 +403,7 @@ static bool isEditableLeaf(InlineBox* leaf)
     return leaf && leaf->renderer() && leaf->renderer()->node() && leaf->renderer()->node()->isContentEditable();
 }
 
-InlineBox* RootInlineBox::closestLeafChildForXPos(int x, bool onlyEditableLeaves)
+InlineBox* RootInlineBox::closestLeafChildForLogicalLeftPosition(int leftPosition, bool onlyEditableLeaves)
 {
     InlineBox* firstLeaf = firstLeafChild();
     InlineBox* lastLeaf = lastLeafChild();
@@ -382,13 +411,13 @@ InlineBox* RootInlineBox::closestLeafChildForXPos(int x, bool onlyEditableLeaves
         return firstLeaf;
 
     // Avoid returning a list marker when possible.
-    if (x <= firstLeaf->m_x && !firstLeaf->renderer()->isListMarker() && (!onlyEditableLeaves || isEditableLeaf(firstLeaf)))
-        // The x coordinate is less or equal to left edge of the firstLeaf.
+    if (leftPosition <= firstLeaf->logicalLeft() && !firstLeaf->renderer()->isListMarker() && (!onlyEditableLeaves || isEditableLeaf(firstLeaf)))
+        // The leftPosition coordinate is less or equal to left edge of the firstLeaf.
         // Return it.
         return firstLeaf;
 
-    if (x >= lastLeaf->m_x + lastLeaf->m_logicalWidth && !lastLeaf->renderer()->isListMarker() && (!onlyEditableLeaves || isEditableLeaf(lastLeaf)))
-        // The x coordinate is greater or equal to right edge of the lastLeaf.
+    if (leftPosition >= lastLeaf->logicalRight() && !lastLeaf->renderer()->isListMarker() && (!onlyEditableLeaves || isEditableLeaf(lastLeaf)))
+        // The leftPosition coordinate is greater or equal to right edge of the lastLeaf.
         // Return it.
         return lastLeaf;
 
@@ -396,7 +425,7 @@ InlineBox* RootInlineBox::closestLeafChildForXPos(int x, bool onlyEditableLeaves
     for (InlineBox* leaf = firstLeaf; leaf; leaf = leaf->nextLeafChild()) {
         if (!leaf->renderer()->isListMarker() && (!onlyEditableLeaves || isEditableLeaf(leaf))) {
             closestLeaf = leaf;
-            if (x < leaf->m_x + leaf->m_logicalWidth)
+            if (leftPosition < leaf->logicalRight())
                 // The x coordinate is less than the right edge of the box.
                 // Return it.
                 return leaf;

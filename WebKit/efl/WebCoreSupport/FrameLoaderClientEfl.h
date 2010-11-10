@@ -55,9 +55,6 @@ class FrameLoaderClientEfl : public FrameLoaderClient {
     void setCustomUserAgent(const String &agent);
     const String& customUserAgent() const;
 
-    void setInitLayoutCompleted(bool completed) { m_initLayoutCompleted = completed; }
-    bool getInitLayoutCompleted() { return m_initLayoutCompleted; }
-
     virtual bool hasWebView() const;
     virtual bool hasFrameView() const;
 
@@ -94,7 +91,7 @@ class FrameLoaderClientEfl : public FrameLoaderClient {
     virtual void dispatchDidFinishLoading(DocumentLoader*, unsigned long  identifier);
     virtual void dispatchDidFailLoading(DocumentLoader*, unsigned long  identifier, const ResourceError&);
     virtual bool dispatchDidLoadResourceFromMemoryCache(DocumentLoader*, const ResourceRequest&, const ResourceResponse&, int length);
-    virtual void dispatchDidLoadResourceByXMLHttpRequest(unsigned long identifier, const WebCore::ScriptString& sourceString);
+    virtual void dispatchDidLoadResourceByXMLHttpRequest(unsigned long identifier, const String& sourceString);
 
     virtual void dispatchDidHandleOnloadEvents();
     virtual void dispatchDidReceiveServerRedirectForProvisionalLoad();
@@ -114,7 +111,7 @@ class FrameLoaderClientEfl : public FrameLoaderClient {
     virtual void dispatchDidFirstLayout();
     virtual void dispatchDidFirstVisuallyNonEmptyLayout();
 
-    virtual Frame* dispatchCreatePage();
+    virtual Frame* dispatchCreatePage(const WebCore::NavigationAction&);
     virtual void dispatchShow();
 
     virtual void dispatchDecidePolicyForMIMEType(FramePolicyFunction, const String& MIMEType, const ResourceRequest&);
@@ -138,6 +135,7 @@ class FrameLoaderClientEfl : public FrameLoaderClient {
     virtual PassRefPtr<Frame> createFrame(const KURL& url, const String& name, HTMLFrameOwnerElement* ownerElement,
                                const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight);
     virtual void didTransferChildFrameToNewDocument(Page*);
+    virtual void transferLoadingResourceFromPage(unsigned long, WebCore::DocumentLoader*, const ResourceRequest&, WebCore::Page*);
 
     virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const WTF::Vector<String>&, const WTF::Vector<String>&, const String&, bool);
     virtual void redirectDataToPlugin(Widget* pluginWidget);
@@ -201,6 +199,8 @@ class FrameLoaderClientEfl : public FrameLoaderClient {
     virtual void transitionToCommittedFromCachedFrame(CachedFrame*);
     virtual void transitionToCommittedForNewPage();
 
+    virtual void dispatchDidBecomeFrameset(bool);
+
     virtual bool canCachePage() const;
     virtual void download(ResourceHandle*, const ResourceRequest&, const ResourceRequest&, const ResourceResponse&);
 
@@ -218,8 +218,6 @@ class FrameLoaderClientEfl : public FrameLoaderClient {
     // Plugin view to redirect data to
     PluginView* m_pluginView;
     bool m_hasSentResponseToPlugin;
-
-    bool m_initLayoutCompleted;
 };
 
 }

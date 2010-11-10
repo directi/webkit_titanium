@@ -20,7 +20,6 @@
 #include "config.h"
 #include "Page.h"
 
-#include "DeviceMotionController.h"
 #include "BackForwardController.h"
 #include "BackForwardList.h"
 #include "Base64.h"
@@ -30,6 +29,7 @@
 #include "ContextMenuClient.h"
 #include "ContextMenuController.h"
 #include "DOMWindow.h"
+#include "DeviceMotionController.h"
 #include "DeviceOrientationController.h"
 #include "DragController.h"
 #include "EditorClient.h"
@@ -46,7 +46,6 @@
 #include "HTMLElement.h"
 #include "HistoryItem.h"
 #include "InspectorController.h"
-#include "InspectorTimelineAgent.h"
 #include "Logging.h"
 #include "MediaCanStartListener.h"
 #include "Navigator.h"
@@ -55,6 +54,7 @@
 #include "PluginData.h"
 #include "PluginHalter.h"
 #include "PluginView.h"
+#include "PluginViewBase.h"
 #include "ProgressTracker.h"
 #include "RenderTheme.h"
 #include "RenderWidget.h"
@@ -71,6 +71,10 @@
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringHash.h>
+
+#if ENABLE(ACCELERATED_2D_CANVAS)
+#include "SharedGraphicsContext3D.h"
+#endif
 
 #if ENABLE(DOM_STORAGE)
 #include "StorageArea.h"
@@ -126,20 +130,20 @@ static void networkStateChanged()
 }
 
 Page::Page(const PageClients& pageClients)
-    : m_chrome(new Chrome(this, pageClients.chromeClient))
-    , m_dragCaretController(new SelectionController(0, true))
+    : m_chrome(adoptPtr(new Chrome(this, pageClients.chromeClient)))
+    , m_dragCaretController(adoptPtr(new SelectionController(0, true)))
 #if ENABLE(DRAG_SUPPORT)
-    , m_dragController(new DragController(this, pageClients.dragClient))
+    , m_dragController(adoptPtr(new DragController(this, pageClients.dragClient)))
 #endif
-    , m_focusController(new FocusController(this))
+    , m_focusController(adoptPtr(new FocusController(this)))
 #if ENABLE(CONTEXT_MENUS)
-    , m_contextMenuController(new ContextMenuController(this, pageClients.contextMenuClient))
+    , m_contextMenuController(adoptPtr(new ContextMenuController(this, pageClients.contextMenuClient)))
 #endif
 #if ENABLE(INSPECTOR)
-    , m_inspectorController(new InspectorController(this, pageClients.inspectorClient))
+    , m_inspectorController(adoptPtr(new InspectorController(this, pageClients.inspectorClient)))
 #endif
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
-    , m_geolocationController(new GeolocationController(this, pageClients.geolocationControllerClient))
+    , m_geolocationController(adoptPtr(new GeolocationController(this, pageClients.geolocationControllerClient)))
 #endif
 #if ENABLE(DEVICE_ORIENTATION)
     , m_deviceMotionController(RuntimeEnabledFeatures::deviceMotionEnabled() ? new DeviceMotionController(pageClients.deviceMotionClient) : 0)
@@ -148,9 +152,9 @@ Page::Page(const PageClients& pageClients)
 #if ENABLE(INPUT_SPEECH)
     , m_speechInputClient(pageClients.speechInputClient)
 #endif
-    , m_settings(new Settings(this))
-    , m_progress(new ProgressTracker)
-    , m_backForwardController(new BackForwardController(this, pageClients.backForwardControllerClient))
+    , m_settings(adoptPtr(new Settings(this)))
+    , m_progress(adoptPtr(new ProgressTracker))
+    , m_backForwardController(adoptPtr(new BackForwardController(this, pageClients.backForwardClient)))
     , m_theme(RenderTheme::themeForPage(this))
     , m_editorClient(pageClients.editorClient)
     , m_frameCount(0)
@@ -211,7 +215,7 @@ Page::~Page()
     m_inspectorController->inspectedPageDestroyed();
 #endif
 
-    backForwardList()->close();
+    backForward()->close();
 
 #ifndef NDEBUG
     pageCounter.decrement();
@@ -280,12 +284,12 @@ void Page::setOpenedByDOM()
 
 BackForwardList* Page::backForwardList() const
 {
-    return m_backForwardController->list();
+    return m_backForwardController->client();
 }
 
 bool Page::goBack()
 {
-    HistoryItem* item = backForwardList()->backItem();
+    HistoryItem* item = backForward()->backItem();
     
     if (item) {
         goToItem(item, FrameLoadTypeBack);
@@ -296,7 +300,7 @@ bool Page::goBack()
 
 bool Page::goForward()
 {
-    HistoryItem* item = backForwardList()->forwardItem();
+    HistoryItem* item = backForward()->forwardItem();
     
     if (item) {
         goToItem(item, FrameLoadTypeForward);
@@ -309,9 +313,9 @@ bool Page::canGoBackOrForward(int distance) const
 {
     if (distance == 0)
         return true;
-    if (distance > 0 && distance <= backForwardList()->forwardListCount())
+    if (distance > 0 && distance <= backForward()->forwardCount())
         return true;
-    if (distance < 0 && -distance <= backForwardList()->backListCount())
+    if (distance < 0 && -distance <= backForward()->backCount())
         return true;
     return false;
 }
@@ -321,28 +325,32 @@ void Page::goBackOrForward(int distance)
     if (distance == 0)
         return;
 
-    HistoryItem* item = backForwardList()->itemAtIndex(distance);
+    HistoryItem* item = backForward()->itemAtIndex(distance);
     if (!item) {
         if (distance > 0) {
-            int forwardListCount = backForwardList()->forwardListCount();
-            if (forwardListCount > 0) 
-                item = backForwardList()->itemAtIndex(forwardListCount);
+            if (int forwardCount = backForward()->forwardCount()) 
+                item = backForward()->itemAtIndex(forwardCount);
         } else {
-            int backListCount = backForwardList()->backListCount();
-            if (backListCount > 0)
-                item = backForwardList()->itemAtIndex(-backListCount);
+            if (int backCount = backForward()->backCount())
+                item = backForward()->itemAtIndex(-backCount);
         }
     }
 
-    ASSERT(item); // we should not reach this line with an empty back/forward list
-    if (item)
-        goToItem(item, FrameLoadTypeIndexedBackForward);
+    ASSERT(item);
+    if (!item)
+        return;
+
+    goToItem(item, FrameLoadTypeIndexedBackForward);
 }
 
 void Page::goToItem(HistoryItem* item, FrameLoadType type)
 {
     if (defersLoading())
         return;
+
+    // stopAllLoaders may end up running onload handlers, which could cause further history traversals that may lead to the passed in HistoryItem
+    // being deref()-ed. Make sure we can still use it with HistoryController::goToItem later.
+    RefPtr<HistoryItem> protector(item);
     
     // Abort any current load unless we're navigating the current document to a new state object
     HistoryItem* currentItem = m_mainFrame->loader()->history()->currentItem();
@@ -367,7 +375,7 @@ void Page::goToItem(HistoryItem* item, FrameLoadType type)
 
 int Page::getHistoryLength()
 {
-    return backForwardList()->backListCount() + 1 + backForwardList()->forwardListCount();
+    return backForward()->backCount() + 1 + backForward()->forwardCount();
 }
 
 void Page::setGlobalHistoryItem(HistoryItem* item)
@@ -414,6 +422,15 @@ void Page::scheduleForcedStyleRecalcForAllPages()
     for (HashSet<Page*>::iterator it = allPages->begin(); it != end; ++it)
         for (Frame* frame = (*it)->mainFrame(); frame; frame = frame->tree()->traverseNext())
             frame->document()->scheduleForcedStyleRecalc();
+}
+
+void Page::updateViewportArguments()
+{
+    if (!mainFrame() || !mainFrame()->document() || mainFrame()->document()->viewportArguments() == m_viewportArguments)
+        return;
+
+    m_viewportArguments = mainFrame()->document()->viewportArguments();
+    chrome()->dispatchViewportDataDidChange(m_viewportArguments);
 }
 
 void Page::refreshPlugins(bool reload)
@@ -621,22 +638,17 @@ void Page::userStyleSheetLocationChanged()
     m_didLoadUserStyleSheet = false;
     m_userStyleSheet = String();
     m_userStyleSheetModificationTime = 0;
-    
+
     // Data URLs with base64-encoded UTF-8 style sheets are common. We can process them
     // synchronously and avoid using a loader. 
-    if (url.protocolIs("data") && url.string().startsWith("data:text/css;charset=utf-8;base64,")) {
+    if (url.protocolIsData() && url.string().startsWith("data:text/css;charset=utf-8;base64,")) {
         m_didLoadUserStyleSheet = true;
-        
-        const unsigned prefixLength = 35;
-        Vector<char> encodedData(url.string().length() - prefixLength);
-        for (unsigned i = prefixLength; i < url.string().length(); ++i)
-            encodedData[i - prefixLength] = static_cast<char>(url.string()[i]);
 
         Vector<char> styleSheetAsUTF8;
-        if (base64Decode(encodedData, styleSheetAsUTF8))
+        if (base64Decode(decodeURLEscapeSequences(url.string().substring(35)), styleSheetAsUTF8, IgnoreWhitespace))
             m_userStyleSheet = String::fromUTF8(styleSheetAsUTF8.data(), styleSheetAsUTF8.size());
     }
-    
+
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext()) {
         if (frame->document())
             frame->document()->updatePageUserSheet();
@@ -755,6 +767,18 @@ void Page::setDebugger(JSC::Debugger* debugger)
         frame->script()->attachDebugger(m_debugger);
 }
 
+SharedGraphicsContext3D* Page::sharedGraphicsContext3D()
+{
+#if ENABLE(ACCELERATED_2D_CANVAS)
+    if (!m_sharedGraphicsContext3D)
+        m_sharedGraphicsContext3D = SharedGraphicsContext3D::create(chrome());
+
+    return m_sharedGraphicsContext3D.get();
+#else
+    return 0;
+#endif
+}
+
 #if ENABLE(DOM_STORAGE)
 StorageNamespace* Page::sessionStorage(bool optionalCreate)
 {
@@ -820,13 +844,6 @@ bool Page::javaScriptURLsAreAllowed() const
     return m_javaScriptURLsAreAllowed;
 }
 
-#if ENABLE(INSPECTOR)
-InspectorTimelineAgent* Page::inspectorTimelineAgent() const
-{
-    return m_inspectorController->timelineAgent();
-}
-#endif
-
 #if ENABLE(INPUT_SPEECH)
 SpeechInput* Page::speechInput()
 {
@@ -843,8 +860,7 @@ void Page::privateBrowsingStateChanged()
 
     // Collect the PluginViews in to a vector to ensure that action the plug-in takes
     // from below privateBrowsingStateChanged does not affect their lifetime.
-
-    Vector<RefPtr<PluginView>, 32> pluginViews;
+    Vector<RefPtr<PluginViewBase>, 32> pluginViewBases;
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext()) {
         FrameView* view = frame->view();
         if (!view)
@@ -856,14 +872,13 @@ void Page::privateBrowsingStateChanged()
         HashSet<RefPtr<Widget> >::const_iterator end = children->end();
         for (HashSet<RefPtr<Widget> >::const_iterator it = children->begin(); it != end; ++it) {
             Widget* widget = (*it).get();
-            if (!widget->isPluginView())
-                continue;
-            pluginViews.append(static_cast<PluginView*>(widget));
+            if (widget->isPluginViewBase())
+                pluginViewBases.append(static_cast<PluginViewBase*>(widget));
         }
     }
 
-    for (size_t i = 0; i < pluginViews.size(); i++)
-        pluginViews[i]->privateBrowsingStateChanged(privateBrowsingEnabled);
+    for (size_t i = 0; i < pluginViewBases.size(); ++i)
+        pluginViewBases[i]->privateBrowsingStateChanged(privateBrowsingEnabled);
 }
 
 void Page::pluginAllowedRunTimeChanged()
@@ -896,4 +911,23 @@ void Page::checkFrameCountConsistency() const
     ASSERT(m_frameCount + 1 == frameCount);
 }
 #endif
+
+Page::PageClients::PageClients()
+    : chromeClient(0)
+    , contextMenuClient(0)
+    , editorClient(0)
+    , dragClient(0)
+    , inspectorClient(0)
+    , pluginHalterClient(0)
+    , geolocationControllerClient(0)
+    , deviceMotionClient(0)
+    , deviceOrientationClient(0)
+    , speechInputClient(0)
+{
+}
+
+Page::PageClients::~PageClients()
+{
+}
+
 } // namespace WebCore

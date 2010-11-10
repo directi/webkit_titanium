@@ -29,6 +29,7 @@
 
 #if ENABLE(CONTEXT_MENUS)
 
+#include "BackForwardController.h"
 #include "Chrome.h"
 #include "ContextMenu.h"
 #include "ContextMenuClient.h"
@@ -50,6 +51,7 @@
 #include "HitTestResult.h"
 #include "InspectorController.h"
 #include "MouseEvent.h"
+#include "NavigationAction.h"
 #include "Node.h"
 #include "Page.h"
 #include "RenderLayer.h"
@@ -139,7 +141,7 @@ static void openNewWindow(const KURL& urlToLoad, Frame* frame)
 {
     if (Page* oldPage = frame->page()) {
         WindowFeatures features;
-        if (Page* newPage = oldPage->chrome()->createWindow(frame, FrameLoadRequest(ResourceRequest(urlToLoad, frame->loader()->outgoingReferrer())), features))
+        if (Page* newPage = oldPage->chrome()->createWindow(frame, FrameLoadRequest(ResourceRequest(urlToLoad, frame->loader()->outgoingReferrer())), features, NavigationAction()))
             newPage->chrome()->show();
     }
 }
@@ -221,11 +223,11 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
         break;
     case ContextMenuItemTagGoBack:
         if (Page* page = frame->page())
-            page->goBackOrForward(-1);
+            page->backForward()->goBackOrForward(-1);
         break;
     case ContextMenuItemTagGoForward:
         if (Page* page = frame->page())
-            page->goBackOrForward(1);
+            page->backForward()->goBackOrForward(1);
         break;
     case ContextMenuItemTagStop:
         frame->loader()->stop();

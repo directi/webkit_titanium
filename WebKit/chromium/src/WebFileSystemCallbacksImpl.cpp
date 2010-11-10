@@ -34,6 +34,7 @@
 
 #include "AsyncFileSystemCallbacks.h"
 #include "AsyncFileSystemChromium.h"
+#include "FileMetadata.h"
 #include "ScriptExecutionContext.h"
 #include "WebFileSystemEntry.h"
 #include "WebFileInfo.h"
@@ -45,9 +46,10 @@ using namespace WebCore;
 
 namespace WebKit {
 
-WebFileSystemCallbacksImpl::WebFileSystemCallbacksImpl(PassOwnPtr<AsyncFileSystemCallbacks> callbacks, WebCore::ScriptExecutionContext* context)
+WebFileSystemCallbacksImpl::WebFileSystemCallbacksImpl(PassOwnPtr<AsyncFileSystemCallbacks> callbacks, WebCore::ScriptExecutionContext* context, bool synchronous)
     : m_callbacks(callbacks)
     , m_context(context)
+    , m_synchronous(synchronous)
 {
     ASSERT(m_callbacks);
 }
@@ -62,9 +64,13 @@ void WebFileSystemCallbacksImpl::didSucceed()
     delete this;
 }
 
-void WebFileSystemCallbacksImpl::didReadMetadata(const WebFileInfo& info)
+void WebFileSystemCallbacksImpl::didReadMetadata(const WebFileInfo& webFileInfo)
 {
-    m_callbacks->didReadMetadata(info.modificationTime);
+    FileMetadata fileMetadata;
+    fileMetadata.modificationTime = webFileInfo.modificationTime;
+    fileMetadata.length = webFileInfo.length;
+    fileMetadata.type = static_cast<FileMetadata::Type>(webFileInfo.type);
+    m_callbacks->didReadMetadata(fileMetadata);
     delete this;
 }
 
@@ -79,7 +85,7 @@ void WebFileSystemCallbacksImpl::didReadDirectory(const WebVector<WebFileSystemE
 void WebFileSystemCallbacksImpl::didOpenFileSystem(const WebString& name, const WebString& path)
 {
     if (m_context && m_context->isWorkerContext())
-        m_callbacks->didOpenFileSystem(name, WorkerAsyncFileSystemChromium::create(m_context, path));
+        m_callbacks->didOpenFileSystem(name, WorkerAsyncFileSystemChromium::create(m_context, path, m_synchronous));
     else
         m_callbacks->didOpenFileSystem(name, AsyncFileSystemChromium::create(path));
     delete this;

@@ -38,7 +38,6 @@
 #include "WebDesktopNotificationsDelegate.h"
 #include "WebSecurityOrigin.h"
 #include "WebView.h"
-#pragma warning(push, 0)
 #include <WebCore/BString.h>
 #include <WebCore/Console.h>
 #include <WebCore/ContextMenu.h>
@@ -48,22 +47,22 @@
 #include <WebCore/FrameLoadRequest.h>
 #include <WebCore/FrameView.h>
 #include <WebCore/Geolocation.h>
-#if USE(ACCELERATED_COMPOSITING)
-#include <WebCore/GraphicsLayer.h>
-#endif
 #include <WebCore/HTMLNames.h>
 #include <WebCore/Icon.h>
 #include <WebCore/LocalWindowsContext.h>
 #include <WebCore/LocalizedStrings.h>
+#include <WebCore/NavigationAction.h>
 #include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
 #include <WebCore/SecurityOrigin.h>
 #include <WebCore/PopupMenuWin.h>
 #include <WebCore/SearchPopupMenuWin.h>
 #include <WebCore/WindowFeatures.h>
-#pragma warning(pop)
-
 #include <tchar.h>
+
+#if USE(ACCELERATED_COMPOSITING)
+#include <WebCore/GraphicsLayer.h>
+#endif
 
 using namespace WebCore;
 
@@ -173,6 +172,10 @@ void WebChromeClient::focusedNodeChanged(Node*)
 {
 }
 
+void WebChromeClient::focusedFrameChanged(Frame*)
+{
+}
+
 static COMPtr<IPropertyBag> createWindowFeaturesPropertyBag(const WindowFeatures& features)
 {
     HashMap<String, COMVariant> map;
@@ -195,7 +198,7 @@ static COMPtr<IPropertyBag> createWindowFeaturesPropertyBag(const WindowFeatures
     return COMPtr<IPropertyBag>(AdoptCOM, COMPropertyBag<COMVariant>::adopt(map));
 }
 
-Page* WebChromeClient::createWindow(Frame*, const FrameLoadRequest& frameLoadRequest, const WindowFeatures& features)
+Page* WebChromeClient::createWindow(Frame*, const FrameLoadRequest& frameLoadRequest, const WindowFeatures& features, const NavigationAction&)
 {
     COMPtr<IWebUIDelegate> delegate = uiDelegate();
     if (!delegate)
@@ -593,7 +596,7 @@ void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& database
             HMODULE safariHandle = GetModuleHandle(TEXT("Safari.exe"));
             if (!safariHandle)
                 return;
-            GetModuleFileName(safariHandle, path, ARRAYSIZE(path));
+            GetModuleFileName(safariHandle, path, WTF_ARRAY_LENGTH(path));
             DWORD handle;
             DWORD versionSize = GetFileVersionInfoSize(path, &handle);
             if (!versionSize)

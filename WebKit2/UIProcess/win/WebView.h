@@ -41,23 +41,23 @@ class WebPageNamespace;
 
 class WebView : public APIObject, public PageClient, WebCore::WindowMessageListener {
 public:
-    static PassRefPtr<WebView> create(RECT rect, WebPageNamespace* pageNamespace, HWND hostWindow)
+    static PassRefPtr<WebView> create(RECT rect, WebPageNamespace* pageNamespace, HWND parentWindow)
     {
-        return adoptRef(new WebView(rect, pageNamespace, hostWindow));
+        return adoptRef(new WebView(rect, pageNamespace, parentWindow));
     }
     ~WebView();
 
     RECT rect() const { return m_rect; }
 
     HWND window() const { return m_window; }
-    HWND hostWindow() const { return m_hostWindow; }
-    void setHostWindow(HWND);
+    void setParentWindow(HWND);
     void windowAncestryDidChange();
+    void setOverrideCursor(HCURSOR overrideCursor);
 
     WebPageProxy* page() const { return m_page.get(); }
 
 private:
-    WebView(RECT, WebPageNamespace*, HWND hostWindow);
+    WebView(RECT, WebPageNamespace*, HWND parentWindow);
 
     virtual Type type() const { return TypeView; }
 
@@ -89,15 +89,25 @@ private:
 
     void close();
 
+    void updateNativeCursor();
+
     // PageClient
-    virtual void processDidExit();
-    virtual void processDidRevive();
+    virtual void processDidCrash();
+    virtual void didRelaunchProcess();
     virtual void takeFocus(bool direction);
     virtual void toolTipChanged(const WTF::String&, const WTF::String&);
     virtual void setCursor(const WebCore::Cursor&);
-    virtual void registerEditCommand(PassRefPtr<WebEditCommandProxy>, UndoOrRedo);
+    virtual void setViewportArguments(const WebCore::ViewportArguments&);
+    virtual void registerEditCommand(PassRefPtr<WebEditCommandProxy>, WebPageProxy::UndoOrRedo);
     virtual void clearAllEditCommands();
     virtual void setEditCommandState(const WTF::String&, bool, int);
+    virtual WebCore::FloatRect convertToDeviceSpace(const WebCore::FloatRect&);
+    virtual WebCore::FloatRect convertToUserSpace(const WebCore::FloatRect&);
+    virtual void didNotHandleKeyEvent(const NativeWebKeyboardEvent&);
+    virtual void selectionChanged(bool, bool, bool, bool);
+    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy();
+    virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*);
+    virtual void setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut);
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual void pageDidEnterAcceleratedCompositing();
@@ -111,11 +121,12 @@ private:
 
     RECT m_rect;
     HWND m_window;
-    HWND m_hostWindow;
     HWND m_topLevelParentWindow;
     HWND m_toolTipWindow;
 
     HCURSOR m_lastCursorSet;
+    HCURSOR m_webCoreCursor;
+    HCURSOR m_overrideCursor;
 
     bool m_trackingMouseLeave;
     bool m_isBeingDestroyed;

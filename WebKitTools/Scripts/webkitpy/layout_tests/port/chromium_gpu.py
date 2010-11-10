@@ -66,9 +66,13 @@ def get(**kwargs):
 def _set_gpu_options(options):
     if options:
         if options.accelerated_compositing is None:
-            options.accelerated_composting = True
+            options.accelerated_compositing = True
         if options.accelerated_2d_canvas is None:
             options.accelerated_2d_canvas = True
+        if options.builder_name is not None:
+            options.builder_name = options.builder_name + ' - GPU'
+        if options.use_drt is None:
+            options.use_drt = True
 
 
 def _gpu_overrides(port):
@@ -90,8 +94,12 @@ class ChromiumGpuLinuxPort(chromium_linux.ChromiumLinuxPort):
         chromium_linux.ChromiumLinuxPort.__init__(self, **kwargs)
 
     def baseline_search_path(self):
-        return ([self._webkit_baseline_path('chromium-gpu-linux')] +
+        # Mimic the Linux -> Win expectations fallback in the ordinary Chromium port.
+        return (map(self._webkit_baseline_path, ['chromium-gpu-linux', 'chromium-gpu-win', 'chromium-gpu']) +
                 chromium_linux.ChromiumLinuxPort.baseline_search_path(self))
+
+    def default_child_processes(self):
+        return 1
 
     def path_to_test_expectations_file(self):
         return self.path_from_webkit_base('LayoutTests', 'platform',
@@ -108,8 +116,11 @@ class ChromiumGpuMacPort(chromium_mac.ChromiumMacPort):
         chromium_mac.ChromiumMacPort.__init__(self, **kwargs)
 
     def baseline_search_path(self):
-        return ([self._webkit_baseline_path('chromium-gpu-mac')] +
+        return (map(self._webkit_baseline_path, ['chromium-gpu-mac', 'chromium-gpu']) +
                 chromium_mac.ChromiumMacPort.baseline_search_path(self))
+
+    def default_child_processes(self):
+        return 1
 
     def path_to_test_expectations_file(self):
         return self.path_from_webkit_base('LayoutTests', 'platform',
@@ -126,8 +137,11 @@ class ChromiumGpuWinPort(chromium_win.ChromiumWinPort):
         chromium_win.ChromiumWinPort.__init__(self, **kwargs)
 
     def baseline_search_path(self):
-        return ([self._webkit_baseline_path('chromium-gpu-win')] +
+        return (map(self._webkit_baseline_path, ['chromium-gpu-win', 'chromium-gpu']) +
                 chromium_win.ChromiumWinPort.baseline_search_path(self))
+
+    def default_child_processes(self):
+        return 1
 
     def path_to_test_expectations_file(self):
         return self.path_from_webkit_base('LayoutTests', 'platform',

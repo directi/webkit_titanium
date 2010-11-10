@@ -77,7 +77,7 @@ public:
     // AsyncFileWriterClient
     void didWrite(long long bytes, bool complete);
     void didTruncate();
-    void didFail(ExceptionCode ec);
+    void didFail(FileError::ErrorCode);
 
     // ActiveDOMObject
     virtual bool canSuspend() const;
@@ -97,7 +97,7 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(writeend);
-    
+
 private:
     FileWriter(ScriptExecutionContext*);
 
@@ -113,15 +113,19 @@ private:
 
     void fireEvent(const AtomicString& type);
 
+    void setError(FileError::ErrorCode, ExceptionCode&);
+
     RefPtr<FileError> m_error;
     EventTargetData m_eventTargetData;
     OwnPtr<AsyncFileWriter> m_writer;
     ReadyState m_readyState;
     long long m_position;
     long long m_length;
+    bool m_startedWriting;
     long long m_bytesWritten;
     long long m_bytesToWrite;
     long long m_truncateLength;
+    RefPtr<Blob> m_blobBeingWritten;
 };
 
 } // namespace WebCore

@@ -278,6 +278,7 @@ module core {
         attribute [DontEnum] EventListener onmouseover;
         attribute [DontEnum] EventListener onmouseup;
         attribute [DontEnum] EventListener onmousewheel;
+        attribute [DontEnum] EventListener onreadystatechange;
         attribute [DontEnum] EventListener onscroll;
         attribute [DontEnum] EventListener onselect;
         attribute [DontEnum] EventListener onsubmit;
@@ -297,7 +298,6 @@ module core {
         // attribute [DontEnum] EventListener onplaying;
         // attribute [DontEnum] EventListener onprogress;
         // attribute [DontEnum] EventListener onratechange;
-        // attribute [DontEnum] EventListener onreadystatechange;
         // attribute [DontEnum] EventListener onseeked;
         // attribute [DontEnum] EventListener onseeking;
         // attribute [DontEnum] EventListener onshow;
@@ -322,6 +322,19 @@ module core {
         attribute [DontEnum,Conditional=TOUCH_EVENTS,EnabledAtRuntime] EventListener ontouchend;
         attribute [DontEnum,Conditional=TOUCH_EVENTS,EnabledAtRuntime] EventListener ontouchcancel;
         attribute [DontEnum, Conditional=FULLSCREEN_API] EventListener onwebkitfullscreenchange;
+#endif
+
+#if defined(ENABLE_TOUCH_EVENTS) && ENABLE_TOUCH_EVENTS
+        [ReturnsNew] Touch createTouch(in DOMWindow window,
+                                       in EventTarget target,
+                                       in long identifier,
+                                       in long pageX,
+                                       in long pageY,
+                                       in long ScreenX,
+                                       in long screenY)
+            raises (DOMException);
+        [ReturnsNew] TouchList createTouchList()
+            raises (DOMException);
 #endif
 
 #if defined(LANGUAGE_CPP) && LANGUAGE_CPP

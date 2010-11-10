@@ -42,9 +42,6 @@ namespace WebKit {
 LayerBackedDrawingArea::LayerBackedDrawingArea(DrawingAreaID identifier, WebPage* webPage)
     : DrawingArea(LayerBackedDrawingAreaType, identifier, webPage)
     , m_syncTimer(WebProcess::shared().runLoop(), this, &LayerBackedDrawingArea::syncCompositingLayers)
-#if PLATFORM(MAC) && HAVE(HOSTED_CORE_ANIMATION)
-    , m_remoteLayerRef(0)
-#endif
     , m_attached(false)
     , m_shouldPaint(true)
 {
@@ -53,8 +50,7 @@ LayerBackedDrawingArea::LayerBackedDrawingArea(DrawingAreaID identifier, WebPage
 #ifndef NDEBUG
     m_backingLayer->setName("DrawingArea backing layer");
 #endif
-    m_backingLayer->syncCompositingStateForThisLayerOnly();
-    
+    m_backingLayer->setSize(webPage->size());
     platformInit();
 }
 
@@ -87,11 +83,7 @@ void LayerBackedDrawingArea::scroll(const IntSize& scrollDelta, const IntRect& r
 void LayerBackedDrawingArea::setNeedsDisplay(const IntRect& rect)
 {
     m_backingLayer->setNeedsDisplayInRect(rect);
-    m_backingLayer->syncCompositingStateForThisLayerOnly();
-
-#if PLATFORM(MAC)
-    scheduleUpdateLayoutRunLoopObserver();
-#endif
+    scheduleCompositingLayerSync();
 }
 
 void LayerBackedDrawingArea::display()
@@ -110,13 +102,19 @@ void LayerBackedDrawingArea::setSize(const IntSize& viewSize)
     ASSERT_ARG(viewSize, !viewSize.isEmpty());
 
     m_backingLayer->setSize(viewSize);
-    m_backingLayer->syncCompositingStateForThisLayerOnly();
+    scheduleCompositingLayerSync();
+
+    // Laying out the page can cause the drawing area to change so we keep an extra reference.
+    RefPtr<LayerBackedDrawingArea> protect(this);
     
     m_webPage->setSize(viewSize);
-
-    // Layout if necessary.
     m_webPage->layoutIfNeeded();
 
+    if (m_webPage->drawingArea() != this) {
+        // The drawing area changed, return early.
+        return;
+    }
+    
     WebProcess::shared().connection()->send(DrawingAreaProxyMessage::DidSetSize, m_webPage->pageID(), CoreIPC::In());
 }
 

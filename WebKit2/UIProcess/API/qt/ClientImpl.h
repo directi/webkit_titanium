@@ -20,7 +20,7 @@
 #ifndef DefaultClientCallbacksQt_h
 #define DefaultClientCallbacksQt_h
 
-#include <WebKit2/WKBase.h>
+#include <WebKit2/WKPage.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,11 +29,11 @@ extern "C" {
 // loader client
 void qt_wk_didStartProvisionalLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef, const void* clientInfo);
 void qt_wk_didReceiveServerRedirectForProvisionalLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef, const void* clientInfo);
-void qt_wk_didFailProvisionalLoadWithErrorForFrame(WKPageRef, WKFrameRef, WKTypeRef, const void* clientInfo);
+void qt_wk_didFailProvisionalLoadWithErrorForFrame(WKPageRef, WKFrameRef, WKErrorRef, WKTypeRef, const void* clientInfo);
 void qt_wk_didCommitLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef, const void* clientInfo);
 void qt_wk_didFinishDocumentLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef, const void* clientInfo);
 void qt_wk_didFinishLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef, const void* clientInfo);
-void qt_wk_didFailLoadWithErrorForFrame(WKPageRef, WKFrameRef, WKTypeRef, const void* clientInfo);
+void qt_wk_didFailLoadWithErrorForFrame(WKPageRef, WKFrameRef, WKErrorRef, WKTypeRef, const void* clientInfo);
 void qt_wk_didReceiveTitleForFrame(WKPageRef, WKStringRef title, WKFrameRef, WKTypeRef, const void* clientInfo);
 void qt_wk_didFirstLayoutForFrame(WKPageRef, WKFrameRef, WKTypeRef, const void* clientInfo);
 void qt_wk_didFirstVisuallyNonEmptyLayoutForFrame(WKPageRef, WKFrameRef, WKTypeRef, const void* clientInfo);
@@ -45,7 +45,7 @@ void qt_wk_didBecomeUnresponsive(WKPageRef, const void* clientInfo);
 void qt_wk_didBecomeResponsive(WKPageRef, const void* clientInfo);
 
 // ui client
-WKPageRef qt_wk_createNewPage(WKPageRef page, const void *clientInfo);
+WKPageRef qt_wk_createNewPage(WKPageRef page, WKDictionaryRef features, WKEventModifiers modifiers, WKEventMouseButton mouseButton, const void *clientInfo);
 void qt_wk_showPage(WKPageRef page, const void *clientInfo);
 void qt_wk_close(WKPageRef page, const void *clientInfo);
 void qt_wk_runJavaScriptAlert(WKPageRef page, WKStringRef alertText, WKFrameRef frame, const void* clientInfo);

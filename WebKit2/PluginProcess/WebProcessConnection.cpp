@@ -27,6 +27,7 @@
 
 #include "WebProcessConnection.h"
 
+#include "NPRemoteObjectMap.h"
 #include "PluginControllerProxy.h"
 #include "PluginProcess.h"
 #include "RunLoop.h"
@@ -41,11 +42,15 @@ PassRefPtr<WebProcessConnection> WebProcessConnection::create(CoreIPC::Connectio
 WebProcessConnection::~WebProcessConnection()
 {
     ASSERT(m_pluginControllers.isEmpty());
+    ASSERT(!m_npRemoteObjectMap);
+    ASSERT(!m_connection);
 }
     
 WebProcessConnection::WebProcessConnection(CoreIPC::Connection::Identifier connectionIdentifier)
 {
     m_connection = CoreIPC::Connection::createServerConnection(connectionIdentifier, this, RunLoop::main());
+    m_npRemoteObjectMap = NPRemoteObjectMap::create(m_connection.get());
+
     m_connection->open();
 }
 
@@ -77,9 +82,13 @@ void WebProcessConnection::removePluginControllerProxy(PluginControllerProxy* pl
     if (!m_pluginControllers.isEmpty())
         return;
 
+    // Invalidate our remote object map.
+    m_npRemoteObjectMap->invalidate();
+    m_npRemoteObjectMap = nullptr;
+
     // The last plug-in went away, close this connection.
     m_connection->invalidate();
-    m_connection = 0;
+    m_connection = nullptr;
 
     // This will cause us to be deleted.    
     PluginProcess::shared().removeWebProcessConnection(this);
@@ -98,10 +107,15 @@ void WebProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, Co
 
 CoreIPC::SyncReplyMode WebProcessConnection::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, CoreIPC::ArgumentEncoder* reply)
 {
-    if (!arguments->destinationID())
+    uint64_t destinationID = arguments->destinationID();
+
+    if (!destinationID)
         return didReceiveSyncWebProcessConnectionMessage(connection, messageID, arguments, reply);
-    
-    if (PluginControllerProxy* pluginControllerProxy = m_pluginControllers.get(arguments->destinationID()))
+
+    if (messageID.is<CoreIPC::MessageClassNPObjectMessageReceiver>())
+        return m_npRemoteObjectMap->didReceiveSyncMessage(connection, messageID, arguments, reply);
+
+    if (PluginControllerProxy* pluginControllerProxy = m_pluginControllers.get(destinationID))
         return pluginControllerProxy->didReceiveSyncPluginControllerProxyMessage(connection, messageID, arguments, reply);
 
     return CoreIPC::AutomaticReply;
@@ -131,9 +145,9 @@ void WebProcessConnection::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIP
     // FIXME: Implement.
 }
 
-void WebProcessConnection::createPlugin(uint64_t pluginInstanceID, const Plugin::Parameters& parameters, const String& userAgent, bool& result)
+void WebProcessConnection::createPlugin(uint64_t pluginInstanceID, const Plugin::Parameters& parameters, const String& userAgent, bool isPrivateBrowsingEnabled, bool& result, uint32_t& remoteLayerClientID)
 {
-    OwnPtr<PluginControllerProxy> pluginControllerProxy = PluginControllerProxy::create(this, pluginInstanceID, userAgent);
+    OwnPtr<PluginControllerProxy> pluginControllerProxy = PluginControllerProxy::create(this, pluginInstanceID, userAgent, isPrivateBrowsingEnabled);
 
     PluginControllerProxy* pluginControllerProxyPtr = pluginControllerProxy.get();
 
@@ -144,10 +158,13 @@ void WebProcessConnection::createPlugin(uint64_t pluginInstanceID, const Plugin:
     // Now try to initialize the plug-in.
     result = pluginControllerProxyPtr->initialize(parameters);
 
-    if (!result) {
-        // We failed to initialize, remove the plug-in controller. This could cause us to be deleted.
-        removePluginControllerProxy(pluginControllerProxyPtr);
+    if (result) {
+        remoteLayerClientID = pluginControllerProxyPtr->remoteLayerClientID();
+        return;
     }
+
+    // We failed to initialize, remove the plug-in controller. This could cause us to be deleted.
+    removePluginControllerProxy(pluginControllerProxyPtr);
 }
 
 } // namespace WebKit

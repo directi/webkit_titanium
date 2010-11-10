@@ -37,6 +37,7 @@
 #include "WebPage.h"
 #include "WebPreferencesStore.h"
 #include "WebProcess.h"
+#include <JavaScriptCore/APICast.h>
 #include <JavaScriptCore/JSLock.h>
 #include <WebCore/GCController.h>
 #include <WebCore/JSDOMWindow.h>
@@ -72,7 +73,7 @@ void InjectedBundle::initializeClient(WKBundleClient* client)
 
 void InjectedBundle::postMessage(const String& messageName, APIObject* messageBody)
 {
-    WebProcess::shared().connection()->send(WebContextMessage::PostMessage, 0, CoreIPC::In(messageName, InjectedBundleUserMessageEncoder(messageBody)));
+    WebProcess::shared().connection()->send(WebContextLegacyMessage::PostMessage, 0, CoreIPC::In(messageName, InjectedBundleUserMessageEncoder(messageBody)));
 }
 
 void InjectedBundle::postSynchronousMessage(const String& messageName, APIObject* messageBody, RefPtr<APIObject>& returnData)
@@ -80,10 +81,7 @@ void InjectedBundle::postSynchronousMessage(const String& messageName, APIObject
     RefPtr<APIObject> returnDataTmp;
     InjectedBundleUserMessageDecoder messageDecoder(returnDataTmp);
     
-    bool succeeded = WebProcess::shared().connection()->sendSync(WebContextMessage::PostSynchronousMessage, 0,
-                                                CoreIPC::In(messageName, InjectedBundleUserMessageEncoder(messageBody)),
-                                                CoreIPC::Out(messageDecoder),
-                                                CoreIPC::Connection::NoTimeout);
+    bool succeeded = WebProcess::shared().connection()->sendSync(WebContextLegacyMessage::PostSynchronousMessage, 0, CoreIPC::In(messageName, InjectedBundleUserMessageEncoder(messageBody)), CoreIPC::Out(messageDecoder));
 
     if (!succeeded)
         return;
@@ -187,19 +185,19 @@ size_t InjectedBundle::javaScriptObjectsCount()
 void InjectedBundle::didCreatePage(WebPage* page)
 {
     if (m_client.didCreatePage)
-        m_client.didCreatePage(toRef(this), toRef(page), m_client.clientInfo);
+        m_client.didCreatePage(toAPI(this), toAPI(page), m_client.clientInfo);
 }
 
 void InjectedBundle::willDestroyPage(WebPage* page)
 {
     if (m_client.willDestroyPage)
-        m_client.willDestroyPage(toRef(this), toRef(page), m_client.clientInfo);
+        m_client.willDestroyPage(toAPI(this), toAPI(page), m_client.clientInfo);
 }
 
 void InjectedBundle::didReceiveMessage(const String& messageName, APIObject* messageBody)
 {
     if (m_client.didReceiveMessage)
-        m_client.didReceiveMessage(toRef(this), toRef(messageName.impl()), toRef(messageBody), m_client.clientInfo);
+        m_client.didReceiveMessage(toAPI(this), toAPI(messageName.impl()), toAPI(messageBody), m_client.clientInfo);
 }
 
 void InjectedBundle::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
@@ -218,6 +216,21 @@ void InjectedBundle::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC:
     }
 
     ASSERT_NOT_REACHED();
+}
+
+void InjectedBundle::reportException(JSContextRef context, JSValueRef exception)
+{
+    if (!context || !exception)
+        return;
+
+    JSLock lock(JSC::SilenceAssertionsOnly);
+    JSC::ExecState* execState = toJS(context);
+
+    // Make sure the context has a DOMWindow global object, otherwise this context didn't originate from a Page.
+    if (!toJSDOMWindow(execState->lexicalGlobalObject()))
+        return;
+
+    WebCore::reportException(execState, toJS(execState, exception));
 }
 
 } // namespace WebKit

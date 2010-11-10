@@ -42,6 +42,7 @@
 typedef struct CGImage *CGImageRef;
 class QTMovie;
 class QTMovieVisualContext;
+class QTDecompressionSession;
 
 namespace WebCore {
 
@@ -74,9 +75,12 @@ private:
 
     void load(const String& url);
     void cancelLoad();
+    void loadInternal(const String& url);
+    void resumeLoad();
     
     void play();
     void pause();    
+    void prepareToPlay();
     
     bool paused() const;
     bool seeking() const;
@@ -110,6 +114,8 @@ private:
 
     bool hasClosedCaptions() const;
     void setClosedCaptionsVisible(bool);
+
+    void setPreload(MediaPlayer::Preload);
 
     void updateStates();
     void doSeek();
@@ -167,12 +173,15 @@ private:
 
     void retrieveAndResetMovieTransform();
 
+    virtual float mediaTimeForTimeValue(float) const;
+
     MediaPlayer* m_player;
     RefPtr<QTMovie> m_movie;
 #if USE(ACCELERATED_COMPOSITING)
     RefPtr<WKCACFLayer> m_qtVideoLayer;
     OwnPtr<GraphicsLayer> m_transformLayer;
     OwnPtr<WKCAImageQueue> m_imageQueue;
+    OwnPtr<QTDecompressionSession> m_decompressionSession;
     CGAffineTransform m_movieTransform; 
 #endif
     RefPtr<QTMovieVisualContext> m_visualContext;
@@ -189,6 +198,9 @@ private:
     bool m_isStreaming;
     bool m_visible;
     bool m_newFrameAvailable;
+    bool m_delayingLoad;
+    String m_movieURL;
+    MediaPlayer::Preload m_preload;
 #if DRAW_FRAME_RATE
     double m_frameCountWhilePlaying;
     double m_timeStartedPlaying;

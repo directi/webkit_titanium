@@ -33,19 +33,23 @@ using namespace WebCore;
 
 namespace WebKit {
 
-bool InjectedBundle::load()
+bool InjectedBundle::load(APIObject* initializationUserData)
 {
     m_platformBundle.setFileName(static_cast<QString>(m_path));
-    if (!m_platformBundle.load())
+    if (!m_platformBundle.load()) {
+        qWarning("Error loading the injected bundle: %s", qPrintable(m_platformBundle.errorString()));
         return false;
+    }
 
     WKBundleInitializeFunctionPtr initializeFunction =
             reinterpret_cast<WKBundleInitializeFunctionPtr>(m_platformBundle.resolve("WKBundleInitialize"));
 
-    if (!initializeFunction)
+    if (!initializeFunction) {
+        qWarning("Error resolving WKBundleInitialize: %s", qPrintable(m_platformBundle.errorString()));
         return false;
+    }
 
-    initializeFunction(toRef(this));
+    initializeFunction(toAPI(this), toAPI(initializationUserData));
     return true;
 }
 

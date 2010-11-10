@@ -47,7 +47,8 @@ class InspectorObject;
 class InspectorValue;
 
 enum DebuggerEventType {
-    DOMBreakpointDebuggerEventType,
+    JavaScriptPauseEventType,
+    JavaScriptBreakpointEventType,
     NativeBreakpointDebuggerEventType
 };
 
@@ -66,8 +67,10 @@ public:
     void editScriptSource(const String& sourceID, const String& newContent, bool* success, String* result, RefPtr<InspectorValue>* newCallFrames);
     void getScriptSource(const String& sourceID, String* scriptSource);
 
-    void pause();
+    void schedulePauseOnNextStatement(DebuggerEventType type, PassRefPtr<InspectorValue> data);
+    void cancelPauseOnNextStatement();
     void breakProgram(DebuggerEventType type, PassRefPtr<InspectorValue> data);
+    void pause();
     void resume();
     void stepOverStatement();
     void stepIntoStatement();
@@ -103,6 +106,7 @@ private:
     bool m_breakpointsLoaded;
     static InspectorDebuggerAgent* s_debuggerAgentOnBreakpoint;
     RefPtr<InspectorObject> m_breakProgramDetails;
+    bool m_javaScriptPauseScheduled;
 };
 
 } // namespace WebCore

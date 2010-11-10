@@ -1773,7 +1773,13 @@ bool AccessibilityRenderObject::accessibilityIsIgnored() const
         RenderText* renderText = toRenderText(m_renderer);
         if (m_renderer->isBR() || !renderText->firstTextBox())
             return true;
-        
+
+        // static text beneath TextControls is reported along with the text control text so it's ignored.
+        for (AccessibilityObject* parent = parentObject(); parent; parent = parent->parentObject()) { 
+            if (parent->roleValue() == TextFieldRole)
+                return true;
+        }
+
         // text elements that are just empty whitespace should not be returned
         return renderText->text()->containsOnlyWhitespace();
     }
@@ -1916,35 +1922,22 @@ int AccessibilityRenderObject::textLength() const
     return text().length();
 }
 
-PassRefPtr<Range> AccessibilityRenderObject::ariaSelectedTextDOMRange() const
+PlainTextRange AccessibilityRenderObject::ariaSelectedTextRange() const
 {
     Node* node = m_renderer->node();
     if (!node)
-        return 0;
-    
-    RefPtr<Range> currentSelectionRange = selection().toNormalizedRange();
-    if (!currentSelectionRange)
-        return 0;
+        return PlainTextRange();
     
     ExceptionCode ec = 0;
-    if (!currentSelectionRange->intersectsNode(node, ec))
-        return Range::create(currentSelectionRange->ownerDocument());
+    VisibleSelection visibleSelection = selection();
+    RefPtr<Range> currentSelectionRange = visibleSelection.toNormalizedRange();
+    if (!currentSelectionRange || !currentSelectionRange->intersectsNode(node, ec))
+        return PlainTextRange();
     
-    RefPtr<Range> ariaRange = rangeOfContents(node);
-    Position startPosition, endPosition;
+    int start = indexForVisiblePosition(visibleSelection.start());
+    int end = indexForVisiblePosition(visibleSelection.end());
     
-    // Find intersection of currentSelectionRange and ariaRange
-    if (ariaRange->startOffset() > currentSelectionRange->startOffset())
-        startPosition = ariaRange->startPosition();
-    else
-        startPosition = currentSelectionRange->startPosition();
-    
-    if (ariaRange->endOffset() < currentSelectionRange->endOffset())
-        endPosition = ariaRange->endPosition();
-    else
-        endPosition = currentSelectionRange->endPosition();
-    
-    return Range::create(ariaRange->ownerDocument(), startPosition, endPosition);
+    return PlainTextRange(start, end - start);
 }
 
 String AccessibilityRenderObject::selectedText() const
@@ -1962,10 +1955,7 @@ String AccessibilityRenderObject::selectedText() const
     if (ariaRoleAttribute() == UnknownRole)
         return String();
     
-    RefPtr<Range> ariaRange = ariaSelectedTextDOMRange();
-    if (!ariaRange)
-        return String();
-    return ariaRange->text();
+    return doAXStringForRange(ariaSelectedTextRange());
 }
 
 const AtomicString& AccessibilityRenderObject::accessKey() const
@@ -1999,20 +1989,16 @@ PlainTextRange AccessibilityRenderObject::selectedTextRange() const
     if (ariaRole == UnknownRole)
         return PlainTextRange();
     
-    RefPtr<Range> ariaRange = ariaSelectedTextDOMRange();
-    if (!ariaRange)
-        return PlainTextRange();
-    return PlainTextRange(ariaRange->startOffset(), ariaRange->endOffset());
+    return ariaSelectedTextRange();
 }
 
 void AccessibilityRenderObject::setSelectedTextRange(const PlainTextRange& range)
 {
     if (isNativeTextControl()) {
-        RenderTextControl* textControl = toRenderTextControl(m_renderer);
-        textControl->setSelectionRange(range.start, range.start + range.length);
+        setSelectionRange(m_renderer->node(), range.start, range.start + range.length);
         return;
     }
-    
+
     Document* document = m_renderer->document();
     if (!document)
         return;
@@ -2646,20 +2632,11 @@ PlainTextRange AccessibilityRenderObject::doAXRangeForLine(unsigned lineNumber) 
         if (visiblePos.isNull() || visiblePos == savedVisiblePos)
             return PlainTextRange();
     }
-    
-    // make a caret selection for the marker position, then extend it to the line
-    // NOTE: ignores results of selection.modify because it returns false when
-    // starting at an empty line.  The resulting selection in that case
-    // will be a caret at visiblePos.
-    SelectionController selection;
-    selection.setSelection(VisibleSelection(visiblePos));
-    selection.modify(SelectionController::AlterationExtend, SelectionController::DirectionLeft, LineBoundary);
-    selection.modify(SelectionController::AlterationExtend, SelectionController::DirectionRight, LineBoundary);
-    
-    // calculate the indices for the selection start and end
-    VisiblePosition startPosition = selection.selection().visibleStart();
-    VisiblePosition endPosition = selection.selection().visibleEnd();
-    int index1 = indexForVisiblePosition(startPosition);
+
+    // Get the end of the line based on the starting position.
+    VisiblePosition endPosition = endOfLine(visiblePos);
+
+    int index1 = indexForVisiblePosition(visiblePos);
     int index2 = indexForVisiblePosition(endPosition);
     
     // add one to the end index for a line break not caused by soft line wrap (to match AppKit)
@@ -3097,6 +3074,10 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
     if (m_renderer->isBlockFlow() || (node && node->hasTagName(labelTag)))
         return GroupRole;
     
+    // If the element does not have role, but it has ARIA attributes, accessibility should fallback to exposing it as a group.
+    if (supportsARIAAttributes())
+        return GroupRole;
+    
     return UnknownRole;
 }
 
@@ -3396,6 +3377,7 @@ const AtomicString& AccessibilityRenderObject::ariaLiveRegionStatus() const
         case ApplicationStatusRole:
             return liveRegionStatusPolite;
         case ApplicationTimerRole:
+        case ApplicationMarqueeRole:
             return liveRegionStatusOff;
         default:
             break;

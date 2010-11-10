@@ -32,7 +32,6 @@
 #include "qwebpage.h"
 #include "qwebpage_p.h"
 #include <QtCore/qmetaobject.h>
-#include <QtCore/qsharedpointer.h>
 #include <QtGui/qgraphicsscene.h>
 #include <QtGui/qgraphicsview.h>
 #include <QtGui/qgraphicswidget.h>
@@ -42,15 +41,25 @@
 
 #include <Settings.h>
 
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+#include "texmap/TextureMapperPlatformLayer.h"
+#endif
+
 namespace WebCore {
 
 class PageClientQWidget : public QWebPageClient {
 public:
-    PageClientQWidget(QWidget* view)
-        : view(view)
+    PageClientQWidget(QWidget* newView, QWebPage* newPage)
+        : view(newView)
+        , page(newPage)
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+        , syncTimer(this, &PageClientQWidget::syncLayers)
+        , platformLayerProxy(0)
+#endif
     {
         Q_ASSERT(view);
     }
+    virtual ~PageClientQWidget();
 
     virtual bool isQWidgetClient() const { return true; }
 
@@ -79,14 +88,29 @@ public:
     virtual QRectF windowRect() const;
 
     QWidget* view;
+    QWebPage* page;
+
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+    virtual void setRootGraphicsLayer(TextureMapperPlatformLayer* layer);
+    virtual void markForSync(bool scheduleSync);
+    void syncLayers(Timer<PageClientQWidget>*);
+#endif
+
+    // QGraphicsWebView can render composited layers
+    virtual bool allowsAcceleratedCompositing() const { return true; }
+
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+    Timer<PageClientQWidget> syncTimer;
+    PlatformLayerProxyQt* platformLayerProxy;
+#endif
 };
 
 // the overlay is here for one reason only: to have the scroll-bars and other
 // extra UI elements appear on top of any QGraphicsItems created by CSS compositing layers
-class QGraphicsItemOverlay : public QGraphicsItem {
+class QGraphicsItemOverlay : public QGraphicsObject {
     public:
     QGraphicsItemOverlay(QGraphicsWidget* view, QWebPage* p)
-            :QGraphicsItem(view)
+            :QGraphicsObject(view)
             , q(view)
             , page(p)
     {
@@ -117,13 +141,17 @@ class QGraphicsItemOverlay : public QGraphicsItem {
 
 class PageClientQGraphicsWidget : public QWebPageClient {
 public:
-    PageClientQGraphicsWidget(QGraphicsWebView* v, QWebPage* p)
-        : view(v)
-        , page(p)
+    PageClientQGraphicsWidget(QGraphicsWebView* newView, QWebPage* newPage)
+        : view(newView)
+        , page(newPage)
         , viewResizesToContents(false)
 #if USE(ACCELERATED_COMPOSITING)
+#if USE(TEXTURE_MAPPER)
+        , platformLayerProxy(0)
+#endif
         , shouldSync(false)
 #endif
+        , overlay(0)
     {
        Q_ASSERT(view);
 #if USE(ACCELERATED_COMPOSITING)
@@ -168,9 +196,8 @@ public:
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
-    virtual void setRootGraphicsLayer(QGraphicsItem* layer);
+    virtual void setRootGraphicsLayer(PlatformLayer* layer);
     virtual void markForSync(bool scheduleSync);
-    void updateCompositingScrollPosition();
     void syncLayers();
 
     // QGraphicsWebView can render composited layers
@@ -184,8 +211,11 @@ public:
     bool viewResizesToContents;
 
 #if USE(ACCELERATED_COMPOSITING)
+#if USE(TEXTURE_MAPPER)
+    PlatformLayerProxyQt* platformLayerProxy;
+#else
     QWeakPointer<QGraphicsObject> rootGraphicsLayer;
-
+#endif
     // we have to flush quite often, so we use a meta-method instead of QTimer::singleShot for putting the event in the queue
     QMetaMethod syncMetaMethod;
 
@@ -194,7 +224,7 @@ public:
     bool shouldSync;
 #endif
     // the overlay gets instantiated when the root layer is attached, and get deleted when it's detached
-    QSharedPointer<QGraphicsItemOverlay> overlay;
+    QGraphicsItemOverlay* overlay;
 
     // we need to put the root graphics layer behind the overlay (which contains the scrollbar)
     enum { RootGraphicsLayerZValue, OverlayZValue };

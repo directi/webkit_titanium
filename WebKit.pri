@@ -37,7 +37,7 @@ building-libs {
                     "$${LITERAL_HASH}ifdef WINSCW" \
                         "EPOCHEAPSIZE  0x40000 0x2000000 // Min 256kB, Max 32MB" \
                     "$${LITERAL_HASH}else" \
-                        "EPOCHEAPSIZE  0x40000 0x6000000 // Min 256kB, Max 96MB" \
+                        "EPOCHEAPSIZE  0x40000 0x10000000 // Min 256kB, Max 256MB" \
                     "$${LITERAL_HASH}endif"
                     MMP_RULES += heapSizeRule
                 }
@@ -67,7 +67,9 @@ CONFIG -= warn_on
 *-g++*:QMAKE_CXXFLAGS += -Wall -Wextra -Wreturn-type -fno-strict-aliasing -Wcast-align -Wchar-subscripts -Wformat-security -Wreturn-type -Wno-unused-parameter -Wno-sign-compare -Wno-switch -Wno-switch-enum -Wundef -Wmissing-noreturn -Winit-self
 
 # Treat warnings as errors on x86/Linux/GCC
-linux-g++*:isEqual(QT_ARCH,x86): QMAKE_CXXFLAGS += -Werror
+linux-g++* {
+    isEqual(QT_ARCH,x86_64)|isEqual(QT_ARCH,i386): QMAKE_CXXFLAGS += -Werror
+}
 
 # Enable GNU compiler extensions to the ARM compiler for all Qt ports using RVCT
 symbian|*-armcc {
@@ -89,11 +91,10 @@ symbian|maemo5|maemo6 {
     CONFIG += disable_uitools
     CONFIG += enable_fast_mobile_scrolling
     CONFIG += use_qt_mobile_theme
+    maemo6: CONFIG += include_webinspector
 } else {
     CONFIG += include_webinspector
 }
-
-embedded: CONFIG += enable_fast_mobile_scrolling
 
 ####
 

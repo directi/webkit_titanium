@@ -151,7 +151,7 @@ void RenderMathMLRoot::paint(PaintInfo& info, int tx, int ty)
     
     info.context->setStrokeThickness(gRadicalLineThickness * style()->fontSize());
     info.context->setStrokeStyle(SolidStroke);
-    info.context->setStrokeColor(style()->visitedDependentColor(CSSPropertyColor), DeviceColorSpace);
+    info.context->setStrokeColor(style()->visitedDependentColor(CSSPropertyColor), ColorSpaceDeviceRGB);
     info.context->setLineJoin(MiterJoin);
     info.context->setMiterLimit(style()->fontSize());
     
@@ -190,9 +190,9 @@ void RenderMathMLRoot::paint(PaintInfo& info, int tx, int ty)
     info.context->setLineCap(SquareCap);
     
     Path line;
-    
-    line = line.createLine(bottomLeft, topLeft);
-    
+    line.moveTo(bottomLeft);
+    line.addLineTo(topLeft);
+
     info.context->beginPath();
     info.context->addPath(line);
     info.context->strokePath();
@@ -246,14 +246,14 @@ void RenderMathMLRoot::layout()
     if (rootMarginTop > 0)
         style()->setPaddingTop(Length(rootMarginTop + static_cast<int>(gRootPadding * style()->fontSize()), Fixed));
     
-    setNeedsLayoutAndPrefWidthsRecalc();
-    markContainingBlocksForLayout();
+    setNeedsLayout(true);
+    setPreferredLogicalWidthsDirty(true, false);
     RenderBlock::layout();
 
     indexBox->style()->setBottom(Length(radicalHeight + style()->paddingBottom().value(), Fixed));
 
     // Now that we've potentially changed its position, we need layout the index again.
-    indexBox->setNeedsLayoutAndPrefWidthsRecalc();
+    indexBox->setNeedsLayout(true);
     indexBox->layout();
 }
     

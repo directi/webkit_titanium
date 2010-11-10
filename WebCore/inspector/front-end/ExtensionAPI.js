@@ -123,6 +123,16 @@ Resources.prototype = {
     get: function(id, callback)
     {
         return extensionServer.sendRequest({ command: "getResources", id: id }, callback);
+    },
+
+    getPageTimings: function(callback)
+    {
+        return extensionServer.sendRequest({ command: "getPageTimings" }, callback);
+    },
+
+    getContent: function(ids, callback)
+    {
+        return extensionServer.sendRequest({ command: "getResourceContent", ids: ids }, callback);
     }
 }
 
@@ -187,6 +197,19 @@ PanelImpl.prototype = {
                 callback(new ExtensionSidebarPane(id));
         }
         extensionServer.sendRequest({ command: "createSidebarPane", panel: this._id, id: id, title: title, url: expandURL(url) }, callback && callbackWrapper);
+    },
+
+    createWatchExpressionSidebarPane: function(title, callback)
+    {
+        var id = "watch-sidebar-" + extensionServer.nextObjectId();
+        function callbackWrapper(result)
+        {
+            if (result.isError)
+                callback(result);
+            else
+                callback(new WatchExpressionSidebarPane(id));
+        }
+        extensionServer.sendRequest({ command: "createWatchExpressionSidebarPane", panel: this._id, id: id, title: title }, callback && callbackWrapper);
     }
 }
 
@@ -194,6 +217,7 @@ function Panel(id)
 {
     var impl = new PanelImpl(id);
     this.createSidebarPane = bind(impl.createSidebarPane, impl);
+    this.createWatchExpressionSidebarPane = bind(impl.createWatchExpressionSidebarPane, impl);
     this.onSelectionChanged = new EventSink("panel-objectSelected-" + id);
 }
 
@@ -225,11 +249,38 @@ ExtensionSidebarPaneImpl.prototype = {
     }
 }
 
-function ExtensionSidebarPane(id)
+function ExtensionSidebarPane(id, impl)
 {
-    var impl = new ExtensionSidebarPaneImpl(id);
+    if (!impl)
+        impl = new ExtensionSidebarPaneImpl(id);
     this.setHeight = bind(impl.setHeight, impl);
     this.setExpanded = bind(impl.setExpanded, impl);
+}
+
+function WatchExpressionSidebarPaneImpl(id)
+{
+    ExtensionSidebarPaneImpl.call(this, id);
+}
+
+WatchExpressionSidebarPaneImpl.prototype = {
+    setExpression: function(expression, rootTitle)
+    {
+        extensionServer.sendRequest({ command: "setWatchSidebarContent", id: this._id, expression: expression, rootTitle: rootTitle, evaluateOnPage: true });
+    },
+
+    setObject: function(jsonObject, rootTitle)
+    {
+        extensionServer.sendRequest({ command: "setWatchSidebarContent", id: this._id, expression: jsonObject, rootTitle: rootTitle });
+    }
+}
+
+function WatchExpressionSidebarPane(id)
+{
+    var impl = new WatchExpressionSidebarPaneImpl(id);
+    ExtensionSidebarPane.call(this, id, impl);
+    this.setExpression = bind(impl.setExpression, impl);
+    this.setObject = bind(impl.setObject, impl);
+    this.onUpdated = new EventSink("watch-sidebar-updated-" + id);
 }
 
 function Audits()

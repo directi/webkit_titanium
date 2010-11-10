@@ -32,7 +32,9 @@
 #include <wtf/PassRefPtr.h>
 
 namespace WebCore {
-class IntSize;
+    class FloatRect;
+    class IntSize;
+    struct WindowFeatures;
 }
 
 namespace WebKit {
@@ -47,16 +49,36 @@ public:
     WebUIClient();
     void initialize(const WKPageUIClient*);
 
-    PassRefPtr<WebPageProxy> createNewPage(WebPageProxy*);
+    PassRefPtr<WebPageProxy> createNewPage(WebPageProxy*, const WebCore::WindowFeatures&, WebEvent::Modifiers, WebMouseEvent::Button);
     void showPage(WebPageProxy*);
     void close(WebPageProxy*);
+
     void runJavaScriptAlert(WebPageProxy*, const String&, WebFrameProxy*);
     bool runJavaScriptConfirm(WebPageProxy*, const String&, WebFrameProxy*);
     String runJavaScriptPrompt(WebPageProxy*, const String&, const String&, WebFrameProxy*);
+
     void setStatusText(WebPageProxy*, const String&);
     void mouseDidMoveOverElement(WebPageProxy*, WebEvent::Modifiers, APIObject*);
-    void contentsSizeChanged(WebPageProxy*, const WebCore::IntSize&, WebFrameProxy*);
+
     void didNotHandleKeyEvent(WebPageProxy*, const NativeWebKeyboardEvent&);
+
+    bool toolbarsAreVisible(WebPageProxy*);
+    void setToolbarsAreVisible(WebPageProxy*, bool);
+    bool menuBarIsVisible(WebPageProxy*);
+    void setMenuBarIsVisible(WebPageProxy*, bool);
+    bool statusBarIsVisible(WebPageProxy*);
+    void setStatusBarIsVisible(WebPageProxy*, bool);
+    bool isResizable(WebPageProxy*);
+    void setIsResizable(WebPageProxy*, bool);
+
+    void setWindowFrame(WebPageProxy*, const WebCore::FloatRect&);
+    WebCore::FloatRect windowFrame(WebPageProxy*);
+
+    bool canRunBeforeUnloadConfirmPanel();
+    bool runBeforeUnloadConfirmPanel(WebPageProxy*, const String&, WebFrameProxy*);
+
+    void didDraw(WebPageProxy*);
+    void pageDidScroll(WebPageProxy*);
 
 private:
     WKPageUIClient m_pageUIClient;

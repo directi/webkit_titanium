@@ -171,7 +171,7 @@ static inline Qt::FillRule toQtFillRule(WindRule rule)
 
 class GraphicsContextPlatformPrivate : public Noncopyable {
 public:
-    GraphicsContextPlatformPrivate(QPainter* painter);
+    GraphicsContextPlatformPrivate(QPainter*, const QColor& initialSolidColor);
     ~GraphicsContextPlatformPrivate();
 
     inline QPainter* p() const
@@ -204,6 +204,13 @@ public:
         return shadow.m_type != ContextShadow::NoShadow;
     }
 
+    inline void clearCurrentPath()
+    {
+        if (!currentPath.elementCount())
+            return;
+        currentPath = QPainterPath();
+    }
+
     QRectF clipBoundingRect() const
     {
 #if QT_VERSION >= QT_VERSION_CHECK(4, 8, 0)
@@ -218,42 +225,42 @@ private:
 };
 
 
-GraphicsContextPlatformPrivate::GraphicsContextPlatformPrivate(QPainter* p)
+GraphicsContextPlatformPrivate::GraphicsContextPlatformPrivate(QPainter* p, const QColor& initialSolidColor)
+    : antiAliasingForRectsAndLines(false)
+    , layerCount(0)
+    , solidColor(initialSolidColor)
+    , imageInterpolationQuality(InterpolationDefault)
+    , painter(p)
 {
-    painter = p;
-    layerCount = 0;
+    if (!painter)
+        return;
 
-    solidColor = QBrush(Qt::black);
+    // Use the default the QPainter was constructed with.
+    antiAliasingForRectsAndLines = painter->testRenderHint(QPainter::Antialiasing);
 
-    imageInterpolationQuality = InterpolationDefault;
-
-    if (painter) {
-        // use the default the QPainter was constructed with
-        antiAliasingForRectsAndLines = painter->testRenderHint(QPainter::Antialiasing);
-        // FIXME: Maybe only enable in SVG mode?
-        painter->setRenderHint(QPainter::Antialiasing, true);
-        painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
-    } else
-        antiAliasingForRectsAndLines = false;
+    painter->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform, true);
 }
 
 GraphicsContextPlatformPrivate::~GraphicsContextPlatformPrivate()
 {
 }
 
-GraphicsContext::GraphicsContext(PlatformGraphicsContext* context)
+GraphicsContext::GraphicsContext(PlatformGraphicsContext* painter)
     : m_common(createGraphicsContextPrivate())
-    , m_data(new GraphicsContextPlatformPrivate(context))
+    , m_data(new GraphicsContextPlatformPrivate(painter, fillColor()))
 {
-    setPaintingDisabled(!context);
-    if (context) {
-        // Make sure the context starts in sync with our state.
-        setPlatformFillColor(fillColor(), DeviceColorSpace);
-        setPlatformStrokeColor(strokeColor(), DeviceColorSpace);
+    setPaintingDisabled(!painter);
 
-        // Make sure we start with the correct join mode.
-        setLineJoin(MiterJoin);
-    }
+    if (!painter)
+        return;
+
+    // solidColor is initialized with the fillColor().
+    painter->setBrush(m_data->solidColor);
+
+    QPen pen(painter->pen());
+    pen.setColor(strokeColor());
+    pen.setJoinStyle(toQtLineJoin(MiterJoin));
+    painter->setPen(pen);
 }
 
 GraphicsContext::~GraphicsContext()
@@ -497,16 +504,18 @@ void GraphicsContext::clipConvexPolygon(size_t numPoints, const FloatPoint* poin
     for (size_t i = 1; i < numPoints; ++i)
         path.lineTo(points[i]);
     path.setFillRule(Qt::WindingFill);
-    m_data->p()->setClipPath(path, Qt::IntersectClip);
-}
-
-QPen GraphicsContext::pen()
-{
-    if (paintingDisabled())
-        return QPen();
 
     QPainter* p = m_data->p();
-    return p->pen();
+
+    bool painterWasAntialiased = p->testRenderHint(QPainter::Antialiasing);
+
+    if (painterWasAntialiased != antialiased)
+        p->setRenderHint(QPainter::Antialiasing, antialiased);
+
+    p->setClipPath(path, Qt::IntersectClip);
+
+    if (painterWasAntialiased != antialiased)
+        p->setRenderHint(QPainter::Antialiasing, painterWasAntialiased);
 }
 
 void GraphicsContext::fillPath()
@@ -533,7 +542,7 @@ void GraphicsContext::fillPath()
     } else
         p->fillPath(path, p->brush());
 
-    m_data->currentPath = QPainterPath();
+    m_data->clearCurrentPath();
 }
 
 void GraphicsContext::strokePath()
@@ -566,7 +575,7 @@ void GraphicsContext::strokePath()
         p->strokePath(path, pen);
     } else
         p->strokePath(path, pen);
-    m_data->currentPath = QPainterPath();
+    m_data->clearCurrentPath();
 }
 
 static inline void drawRepeatPattern(QPainter* p, QPixmap* image, const FloatRect& rect, const bool repeatX, const bool repeatY)
@@ -722,19 +731,32 @@ void GraphicsContext::fillRoundedRect(const IntRect& rect, const IntSize& topLef
     if (paintingDisabled() || !color.isValid())
         return;
 
-    Path path = Path::createRoundedRectangle(rect, topLeft, topRight, bottomLeft, bottomRight);
+    Path path;
+    path.addRoundedRect(rect, topLeft, topRight, bottomLeft, bottomRight);
     QPainter* p = m_data->p();
     if (m_data->hasShadow()) {
-        p->translate(m_data->shadow.offset());
-        p->fillPath(path.platformPath(), QColor(m_data->shadow.m_color));
-        p->translate(-m_data->shadow.offset());
+        ContextShadow* shadow = contextShadow();
+
+        if (shadow->m_type != ContextShadow::BlurShadow) {
+            // We do not need any layer for simple shadow.
+            p->translate(m_data->shadow.offset());
+            p->fillPath(path.platformPath(), QColor(m_data->shadow.m_color));
+            p->translate(-m_data->shadow.offset());
+        } else {
+            QPainter* shadowPainter = shadow->beginShadowLayer(p, rect);
+            if (shadowPainter) {
+                shadowPainter->setCompositionMode(QPainter::CompositionMode_Source);
+                shadowPainter->fillPath(path.platformPath(), QColor(m_data->shadow.m_color));
+                shadow->endShadowLayer(p);
+            }
+        }
     }
     p->fillPath(path.platformPath(), QColor(color));
 }
 
 void GraphicsContext::beginPath()
 {
-    m_data->currentPath = QPainterPath();
+    m_data->clearCurrentPath();
 }
 
 void GraphicsContext::addPath(const Path& path)
@@ -777,7 +799,7 @@ void GraphicsContext::clipPath(WindRule clipRule)
     QPainter* p = m_data->p();
     QPainterPath newPath = m_data->currentPath;
     newPath.setFillRule(clipRule == RULE_EVENODD ? Qt::OddEvenFill : Qt::WindingFill);
-    p->setClipPath(newPath);
+    p->setClipPath(newPath, Qt::IntersectClip);
 }
 
 void GraphicsContext::drawFocusRing(const Vector<Path>& paths, int width, int offset, const Color& color)
@@ -835,8 +857,28 @@ void GraphicsContext::drawLineForText(const IntPoint& origin, int width, bool)
     if (paintingDisabled())
         return;
 
+    IntPoint startPoint = origin;
     IntPoint endPoint = origin + IntSize(width, 0);
-    drawLine(origin, endPoint);
+
+    // If paintengine type is X11 to avoid artifacts
+    // like bug https://bugs.webkit.org/show_bug.cgi?id=42248
+#if defined(Q_WS_X11)
+    QPainter* p = m_data->p();
+    if (p->paintEngine()->type() == QPaintEngine::X11) {
+        // If stroke thickness is odd we need decrease Y coordinate by 1 pixel,
+        // because inside method adjustLineToPixelBoundaries(...), which
+        // called from drawLine(...), Y coordinate will be increased by 0.5f
+        // and then inside Qt painting engine will be rounded to next greater
+        // integer value.
+        float strokeWidth = strokeThickness();
+        if (static_cast<int>(strokeWidth) % 2) {
+            startPoint.setY(startPoint.y() - 1);
+            endPoint.setY(endPoint.y() - 1);
+        }
+    }
+#endif // defined(Q_WS_X11)
+
+    drawLine(startPoint, endPoint);
 }
 
 void GraphicsContext::drawLineForTextChecking(const IntPoint&, int, TextCheckingLineStyle)
@@ -1100,14 +1142,6 @@ void GraphicsContext::translate(float x, float y)
     }
 }
 
-IntPoint GraphicsContext::origin()
-{
-    if (paintingDisabled())
-        return IntPoint();
-    const QTransform &transform = m_data->p()->transform();
-    return IntPoint(qRound(transform.dx()), qRound(transform.dy()));
-}
-
 void GraphicsContext::rotate(float radians)
 {
     if (paintingDisabled())
@@ -1154,28 +1188,6 @@ void GraphicsContext::clipOut(const IntRect& rect)
         clipOutRect &= window;
         newClip.addRect(window);
         newClip.addRect(clipOutRect);
-        p->setClipPath(newClip);
-    }
-}
-
-void GraphicsContext::clipOutEllipseInRect(const IntRect& rect)
-{
-    if (paintingDisabled())
-        return;
-
-    QPainter* p = m_data->p();
-    QPainterPath newClip;
-    newClip.setFillRule(Qt::OddEvenFill);
-    if (p->hasClipping()) {
-        newClip.addRect(m_data->clipBoundingRect());
-        newClip.addEllipse(QRect(rect));
-        p->setClipPath(newClip, Qt::IntersectClip);
-    } else {
-        QRect clipOutRect(rect);
-        QRect window(p->window());
-        clipOutRect &= window;
-        newClip.addRect(window);
-        newClip.addEllipse(clipOutRect);
         p->setClipPath(newClip);
     }
 }

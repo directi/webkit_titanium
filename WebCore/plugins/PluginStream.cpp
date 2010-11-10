@@ -31,10 +31,12 @@
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "PluginDebug.h"
+#include "ResourceLoadScheduler.h"
 #include "SharedBuffer.h"
 #include "SubresourceLoader.h"
 #include <StringExtras.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/StringConcatenate.h>
 
 // We use -2 here because some plugins like to return -1 to indicate error
 // and this way we won't clash with them.
@@ -92,12 +94,7 @@ PluginStream::~PluginStream()
 void PluginStream::start()
 {
     ASSERT(!m_loadManually);
-
-    m_loader = NetscapePlugInStreamLoader::create(m_frame, this);
-
-    m_loader->setShouldBufferData(false);
-    m_loader->documentLoader()->addPlugInStreamLoader(m_loader.get());
-    m_loader->load(m_resourceRequest);
+    m_loader = resourceLoadScheduler()->schedulePluginStreamLoad(m_frame, this, m_resourceRequest);
 }
 
 void PluginStream::stop()
@@ -145,8 +142,7 @@ void PluginStream::startStream()
         Vector<UChar> stringBuilder;
         String separator(": ");
 
-        String statusLine = String::format("HTTP %d OK\n", m_resourceResponse.httpStatusCode());
-
+        String statusLine = makeString("HTTP ", String::number(m_resourceResponse.httpStatusCode()), " OK\n");
         stringBuilder.append(statusLine.characters(), statusLine.length());
 
         HTTPHeaderMap::const_iterator end = m_resourceResponse.httpHeaderFields().end();
@@ -413,7 +409,6 @@ void PluginStream::didReceiveResponse(NetscapePlugInStreamLoader* loader, const 
 void PluginStream::didReceiveData(NetscapePlugInStreamLoader* loader, const char* data, int length)
 {
     ASSERT(loader == m_loader);
-    ASSERT(length > 0);
     ASSERT(m_streamState == StreamStarted);
 
     // If the plug-in cancels the stream in deliverData it could be deleted, 

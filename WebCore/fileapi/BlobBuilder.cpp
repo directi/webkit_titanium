@@ -32,77 +32,75 @@
 
 #include "BlobBuilder.h"
 
+#include "ArrayBuffer.h"
 #include "Blob.h"
 #include "ExceptionCode.h"
 #include "File.h"
 #include "LineEnding.h"
 #include "TextEncoding.h"
+#include <wtf/PassRefPtr.h>
+#include <wtf/Vector.h>
 #include <wtf/text/AtomicString.h>
+#include <wtf/text/CString.h>
 
 namespace WebCore {
-
-static CString convertToCString(const String& text, const String& endingType, ExceptionCode& ec)
-{
-    DEFINE_STATIC_LOCAL(AtomicString, transparent, ("transparent"));
-    DEFINE_STATIC_LOCAL(AtomicString, native, ("native"));
-
-    ec = 0;
-
-    if (endingType.isEmpty() || endingType == transparent)
-        return UTF8Encoding().encode(text.characters(), text.length(), EntitiesForUnencodables);
-    if (endingType == native)
-        return normalizeLineEndingsToNative(UTF8Encoding().encode(text.characters(), text.length(), EntitiesForUnencodables));
-
-    ec = SYNTAX_ERR;
-    return CString();
-}
-
-static CString concatenateTwoCStrings(const CString& a, const CString& b)
-{
-    if (a.isNull() && b.isNull())
-        return CString();
-
-    char* q;
-    CString result = CString::newUninitialized(a.length() + b.length(), q);
-    if (a.length())
-        memcpy(q, a.data(), a.length());
-    if (b.length())
-        memcpy(q + a.length(), b.data(), b.length());
-    return result;
-}
 
 BlobBuilder::BlobBuilder()
     : m_size(0)
 {
 }
 
-bool BlobBuilder::append(const String& text, const String& endingType, ExceptionCode& ec)
+Vector<char>& BlobBuilder::getBuffer()
 {
-    CString cstr = convertToCString(text, endingType, ec);
-    if (ec)
-        return false;
+    // If the last item is not a data item, create one. Otherwise, we simply append the new string to the last data item.
+    if (m_items.isEmpty() || m_items[m_items.size() - 1].type != BlobDataItem::Data)
+        m_items.append(BlobDataItem(RawData::create()));
 
-    m_size += cstr.length();
+    return *m_items[m_items.size() - 1].data->mutableData();
+}
 
-    // If the last item is a string, concatenate it with current string.
-    if (!m_items.isEmpty() && m_items[m_items.size() - 1].type == BlobDataItem::Data)
-        m_items[m_items.size() - 1].data = concatenateTwoCStrings(m_items[m_items.size() - 1].data, cstr);
+void BlobBuilder::append(const String& text, const String& endingType, ExceptionCode& ec)
+{
+    bool isEndingTypeTransparent = endingType == "transparent";
+    bool isEndingTypeNative = endingType == "native";
+    if (!endingType.isEmpty() && !isEndingTypeTransparent && !isEndingTypeNative) {
+        ec = SYNTAX_ERR;
+        return;
+    }
+
+    CString utf8Text = UTF8Encoding().encode(text.characters(), text.length(), EntitiesForUnencodables);
+
+    Vector<char>& buffer = getBuffer();
+    size_t oldSize = buffer.size();
+
+    if (isEndingTypeNative)
+        normalizeLineEndingsToNative(utf8Text, buffer);
     else
-        m_items.append(BlobDataItem(cstr));
-    return true;
+        buffer.append(utf8Text.data(), utf8Text.length());
+    m_size += buffer.size() - oldSize;
 }
 
-bool BlobBuilder::append(const String& text, ExceptionCode& ec)
+void BlobBuilder::append(const String& text, ExceptionCode& ec)
 {
-    return append(text, String(), ec);
+    append(text, String(), ec);
 }
 
-bool BlobBuilder::append(PassRefPtr<Blob> blob)
+#if ENABLE(BLOB)
+void BlobBuilder::append(ArrayBuffer* arrayBuffer)
+{
+    Vector<char>& buffer = getBuffer();
+    size_t oldSize = buffer.size();
+    buffer.append(static_cast<const char*>(arrayBuffer->data()), arrayBuffer->byteLength());
+    m_size += buffer.size() - oldSize;
+}
+#endif
+
+void BlobBuilder::append(Blob* blob)
 {
     if (blob->isFile()) {
         // If the blob is file that is not snapshoted, capture the snapshot now.
         // FIXME: This involves synchronous file operation. We need to figure out how to make it asynchronous.
-        File* file = static_cast<File*>(blob.get());
+        File* file = static_cast<File*>(blob);
         long long snapshotSize;
         double snapshotModificationTime;
         file->captureSnapshot(snapshotSize, snapshotModificationTime);
@@ -114,7 +112,6 @@ bool BlobBuilder::append(PassRefPtr<Blob> blob)
         m_size += blobSize;
         m_items.append(BlobDataItem(blob->url(), 0, blobSize));
     }
-    return true;
 }
 
 PassRefPtr<Blob> BlobBuilder::getBlob(const String& contentType)

@@ -46,6 +46,12 @@
 #import <wtf/StdLibExtras.h>
 #import <wtf/Threading.h>
 
+#if PLATFORM(IOS)
+#import <MacErrors.h>
+#else
+#import <CoreServices/CoreServices.h>
+#endif
+
 namespace WebCore {
 
 typedef HashMap<CFReadStreamRef, RefPtr<FormData> > StreamFormDataMap;
@@ -424,7 +430,7 @@ void setHTTPBody(NSMutableURLRequest *request, PassRefPtr<FormData> formData)
                     for (size_t j = 0; j < blobData->items().size(); ++j) {
                         const BlobDataItem& blobItem = blobData->items()[j];
                         if (blobItem.type == BlobDataItem::Data) {
-                            newFormData->appendData(blobItem.data.data() + static_cast<int>(blobItem.offset), static_cast<int>(blobItem.length));
+                            newFormData->appendData(blobItem.data->data() + static_cast<int>(blobItem.offset), static_cast<int>(blobItem.length));
                         } else {
                             ASSERT(blobItem.type == BlobDataItem::File);
                             newFormData->appendFileRange(blobItem.path, blobItem.offset, blobItem.length, blobItem.expectedModificationTime);

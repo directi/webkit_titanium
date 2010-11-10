@@ -36,7 +36,7 @@
 
 #include "EventSource.h"
 
-#include "Cache.h"
+#include "MemoryCache.h"
 #include "DOMWindow.h"
 #include "Event.h"
 #include "EventException.h"
@@ -116,9 +116,6 @@ void EventSource::connect()
     m_loader = ThreadableLoader::create(scriptExecutionContext(), this, request, options);
 
     m_requestInFlight = true;
-
-    if (!scriptExecutionContext()->isWorkerContext())
-        cache()->loader()->nonCacheRequestInFlight(m_url);
 }
 
 void EventSource::endRequest()
@@ -127,9 +124,6 @@ void EventSource::endRequest()
 
     if (!m_failSilently)
         dispatchEvent(Event::create(eventNames().errorEvent, false, false));
-
-    if (!scriptExecutionContext()->isWorkerContext())
-        cache()->loader()->nonCacheRequestComplete(m_url);
 
     if (m_state != CLOSED)
         scheduleReconnect();

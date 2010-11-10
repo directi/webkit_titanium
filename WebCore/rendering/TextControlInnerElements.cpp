@@ -21,9 +21,9 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
- 
+
 #include "config.h"
 #include "TextControlInnerElements.h"
 
@@ -107,21 +107,26 @@ void TextControlInnerElement::attachInnerElement(Node* parent, PassRefPtr<Render
         setRenderer(renderer);
         renderer->setStyle(style);
     }
-    
+
     // Set these explicitly since this normally happens during an attach()
     setAttached();
     setInDocument();
-    
+
     // For elements without a shadow parent, add the node to the DOM normally.
     if (!m_shadowParent) {
         // FIXME: This code seems very wrong.  Why are we magically adding |this| to the DOM here?
         //        We shouldn't be calling parser API methods outside of the parser!
         parent->deprecatedParserAddChild(this);
     }
- 
+
     // Add the renderer to the render tree
     if (renderer)
         parent->renderer()->addChild(renderer);
+}
+
+bool TextControlInnerElement::isSpellCheckingEnabled() const
+{
+    return m_shadowParent && m_shadowParent->isSpellCheckingEnabled();
 }
 
 // ----------------------------
@@ -142,7 +147,11 @@ void TextControlInnerTextElement::defaultEventHandler(Event* event)
     // Then we would add one to the text field's inner div, and we wouldn't need this subclass.
     // Or possibly we could just use a normal event listener.
     if (event->isBeforeTextInsertedEvent() || event->type() == eventNames().webkitEditableContentChangedEvent) {
-        if (Node* shadowAncestor = shadowAncestorNode())
+        Node* shadowAncestor = shadowAncestorNode();
+        // A TextControlInnerTextElement can be its own shadow ancestor if its been detached, but kept alive by an EditCommand.
+        // In this case, an undo/redo can cause events to be sent to the TextControlInnerTextElement.  
+        // To prevent an infinite loop, we must check for this case before sending the event up the chain.
+        if (shadowAncestor && shadowAncestor != this)
             shadowAncestor->defaultEventHandler(event);
     }
     if (event->defaultHandled())
@@ -208,7 +217,7 @@ void SearchFieldCancelButtonElement::detach()
 {
     if (m_capturing) {
         if (Frame* frame = document()->frame())
-            frame->eventHandler()->setCapturingMouseEventsNode(0);      
+            frame->eventHandler()->setCapturingMouseEventsNode(0);
     }
     TextControlInnerElement::detach();
 }
@@ -281,9 +290,9 @@ void SpinButtonElement::defaultEventHandler(Event* event)
     if (!box) {
         if (!event->defaultHandled())
             HTMLDivElement::defaultEventHandler(event);
-        return;        
+        return;
     }
-    
+
     HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowAncestorNode());
     if (input->disabled() || input->isReadOnlyFormControl()) {
         if (!event->defaultHandled())
@@ -431,7 +440,7 @@ void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
     if (event->type() == eventNames().clickEvent) {
         switch (m_state) {
         case Idle:
-            if (speechInput()->startRecognition(m_listenerId, input->renderer()->absoluteBoundingBoxRect()))
+            if (speechInput()->startRecognition(m_listenerId, input->renderer()->absoluteBoundingBoxRect(), input->computeInheritedLanguage(), input->getAttribute(webkitgrammarAttr)))
                 setState(Recording);
             break;
         case Recording:
@@ -471,15 +480,17 @@ void InputFieldSpeechButtonElement::didCompleteRecognition(int)
     setState(Idle);
 }
 
-void InputFieldSpeechButtonElement::setRecognitionResult(int, const String& result)
+void InputFieldSpeechButtonElement::setRecognitionResult(int, const SpeechInputResultArray& results)
 {
+    m_results = results;
+
     HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowAncestorNode());
     // The call to setValue() below dispatches an event, and an event handler in the page might
     // remove the input element from DOM. To make sure it remains valid until we finish our work
     // here, we take a temporary reference.
     RefPtr<HTMLInputElement> holdRef(input);
-    input->setValue(result);
-    input->dispatchFormControlChangeEvent();
+    input->setValue(results.isEmpty() ? "" : results[0]->utterance());
+    input->dispatchWebkitSpeechChangeEvent();
     renderer()->repaint();
 }
 
@@ -487,7 +498,7 @@ void InputFieldSpeechButtonElement::detach()
 {
     if (m_capturing) {
         if (Frame* frame = document()->frame())
-            frame->eventHandler()->setCapturingMouseEventsNode(0);      
+            frame->eventHandler()->setCapturingMouseEventsNode(0);
     }
 
     if (m_state != Idle)

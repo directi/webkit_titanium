@@ -96,6 +96,10 @@
 #include "runtime_object.h"
 #include "runtime_root.h"
 #endif
+#if USE(TEXTURE_MAPPER)
+#include "texmap/TextureMapper.h"
+#include "texmap/TextureMapperPlatformLayer.h"
+#endif
 #include "wtf/HashMap.h"
 #include <QMultiMap>
 #include <qdebug.h>
@@ -230,14 +234,6 @@ void QWebFramePrivate::init(QWebFrame *qframe, QWebFrameData *frameData)
     frame->init();
 }
 
-WebCore::ViewportArguments QWebFramePrivate::viewportArguments()
-{
-    if (!frame || !frame->document())
-        return WebCore::ViewportArguments();
-
-    return frame->document()->viewportArguments();
-}
-
 void QWebFramePrivate::setPage(QWebPage* newPage)
 {
     if (page == newPage)
@@ -299,6 +295,35 @@ void QWebFramePrivate::renderFromTiledBackingStore(GraphicsContext* context, con
 
         painter->restore();
     }
+
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+    renderCompositedLayers(context, IntRect(clip.boundingRect()));
+    renderRelativeCoords(context, (QWebFrame::RenderLayer)(QWebFrame::ScrollBarLayer | QWebFrame::PanIconLayer), clip);
+#endif
+}
+#endif
+
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+void QWebFramePrivate::renderCompositedLayers(GraphicsContext* context, const IntRect& clip)
+{
+    if (!rootGraphicsLayer)
+        return;
+
+    textureMapper->setGraphicsContext(context);
+    textureMapper->setImageInterpolationQuality(context->imageInterpolationQuality());
+    textureMapper->setTextDrawingMode(context->textDrawingMode());
+    QPainter* painter = context->platformContext();
+    FrameView* view = frame->view();
+    painter->save();
+    painter->beginNativePainting();
+    TextureMapperContentLayer::PaintOptions options;
+    options.visibleRect = clip;
+    options.targetRect = view->frameRect();
+    options.viewportSize = view->size();
+    options.opacity = painter->opacity();
+    rootGraphicsLayer->paint(textureMapper.get(), options);
+    painter->endNativePainting();
+    painter->restore();
 }
 #endif
 
@@ -316,19 +341,18 @@ void QWebFramePrivate::renderRelativeCoords(GraphicsContext* context, QWebFrame:
     WebCore::FrameView* view = frame->view();
     view->updateLayoutAndStyleIfNeededRecursive();
 
-    for (int i = 0; i < vector.size(); ++i) {
-        const QRect& clipRect = vector.at(i);
-
-        QRect intersectedRect = clipRect.intersected(view->frameRect());
-
+    if (layer & QWebFrame::ContentsLayer) {
         painter->save();
-        painter->setClipRect(clipRect, Qt::IntersectClip);
+        for (int i = 0; i < vector.size(); ++i) {
+            const QRect& clipRect = vector.at(i);
 
-        int x = view->x();
-        int y = view->y();
+            QRect intersectedRect = clipRect.intersected(view->frameRect());
 
-        if (layer & QWebFrame::ContentsLayer) {
             context->save();
+            painter->setClipRect(clipRect, Qt::IntersectClip);
+
+            int x = view->x();
+            int y = view->y();
 
             int scrollX = view->scrollX();
             int scrollY = view->scrollY();
@@ -344,27 +368,44 @@ void QWebFramePrivate::renderRelativeCoords(GraphicsContext* context, QWebFrame:
 
             context->restore();
         }
+        painter->restore();
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+        renderCompositedLayers(context, IntRect(clip.boundingRect()));
+#endif
+    }
+    if (layer & (QWebFrame::PanIconLayer | QWebFrame::ScrollBarLayer)) {
+        for (int i = 0; i < vector.size(); ++i) {
+            const QRect& clipRect = vector.at(i);
 
-        if (layer & QWebFrame::ScrollBarLayer
-            && !view->scrollbarsSuppressed()
-            && (view->horizontalScrollbar() || view->verticalScrollbar())) {
-            context->save();
+            QRect intersectedRect = clipRect.intersected(view->frameRect());
 
-            QRect rect = intersectedRect;
-            context->translate(x, y);
-            rect.translate(-x, -y);
+            painter->save();
+            painter->setClipRect(clipRect, Qt::IntersectClip);
 
-            view->paintScrollbars(context, rect);
+            int x = view->x();
+            int y = view->y();
 
-            context->restore();
-        }
+            if (layer & QWebFrame::ScrollBarLayer
+                && !view->scrollbarsSuppressed()
+                && (view->horizontalScrollbar() || view->verticalScrollbar())) {
+                context->save();
+
+                QRect rect = intersectedRect;
+                context->translate(x, y);
+                rect.translate(-x, -y);
+
+                view->paintScrollbars(context, rect);
+
+                context->restore();
+            }
 
 #if ENABLE(PAN_SCROLLING)
-        if (layer & QWebFrame::PanIconLayer)
-            view->paintPanScrollIcon(context);
+            if (layer & QWebFrame::PanIconLayer)
+                view->paintPanScrollIcon(context);
 #endif
 
-        painter->restore();
+            painter->restore();
+        }
     }
 }
 
@@ -729,7 +770,7 @@ QIcon QWebFrame::icon() const
 */
 QString QWebFrame::frameName() const
 {
-    return d->frame->tree()->name();
+    return d->frame->tree()->uniqueName();
 }
 
 /*!

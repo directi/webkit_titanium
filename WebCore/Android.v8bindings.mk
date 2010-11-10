@@ -49,8 +49,7 @@ LOCAL_SRC_FILES += \
 	bindings/v8/ScheduledAction.cpp \
 	bindings/v8/ScopedDOMDataStore.cpp \
 	bindings/v8/ScriptArray.cpp \
-	bindings/v8/ScriptCallFrame.cpp \
-	bindings/v8/ScriptCallStack.cpp \
+	bindings/v8/ScriptCallStackFactory.cpp \
 	bindings/v8/ScriptController.cpp \
 	bindings/v8/ScriptEventListener.cpp \
 	bindings/v8/ScriptFunctionCall.cpp \
@@ -115,6 +114,7 @@ LOCAL_SRC_FILES += \
 	bindings/v8/custom/V8EventCustom.cpp \
 	bindings/v8/custom/V8EventSourceConstructor.cpp \
 	bindings/v8/custom/V8FileListCustom.cpp \
+    bindings/v8/custom/V8FileReaderCustom.cpp \
 	bindings/v8/custom/V8GeolocationCustom.cpp \
 	bindings/v8/custom/V8IDBAny.cpp \
 	bindings/v8/custom/V8IDBKey.cpp \
@@ -132,6 +132,7 @@ LOCAL_SRC_FILES += \
 	bindings/v8/custom/V8HTMLInputElementCustom.cpp \
 	bindings/v8/custom/V8HTMLOptionElementConstructor.cpp \
 	bindings/v8/custom/V8HTMLOptionsCollectionCustom.cpp \
+	bindings/v8/custom/V8HTMLOutputElementCustom.cpp \
 	bindings/v8/custom/V8HTMLPlugInElementCustom.cpp \
 	bindings/v8/custom/V8HTMLSelectElementCollectionCustom.cpp \
 	bindings/v8/custom/V8HTMLSelectElementCustom.cpp \

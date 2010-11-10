@@ -29,7 +29,6 @@
 import unittest
 
 from webkitpy.common.net.buildbot import BuildBot, Builder, Build, LayoutTestResults
-
 from webkitpy.thirdparty.BeautifulSoup import BeautifulSoup
 
 
@@ -42,10 +41,8 @@ class BuilderTest(unittest.TestCase):
                 revision=build_number + 1000,
                 is_green=build_number < 4
             )
-            build._layout_test_results = LayoutTestResults(
-                "http://buildbot.example.com/foo", {
-                    LayoutTestResults.fail_key: failure(build_number),
-                })
+            parsed_results = {LayoutTestResults.fail_key: failure(build_number)}
+            build._layout_test_results = LayoutTestResults(parsed_results)
             return build
         self.builder._fetch_build = _mock_fetch_build
 
@@ -114,43 +111,12 @@ class BuilderTest(unittest.TestCase):
             self.assertEqual(self.builder._revision_and_build_for_filename(filename), revision_and_build)
 
 
-class LayoutTestResultsTest(unittest.TestCase):
-    _example_results_html = """
-<html>
-<head>
-<title>Layout Test Results</title>
-</head>
-<body>
-<p>Tests that had stderr output:</p>
-<table>
-<tr>
-<td><a href="/var/lib/buildbot/build/gtk-linux-64-release/build/LayoutTests/accessibility/aria-activedescendant-crash.html">accessibility/aria-activedescendant-crash.html</a></td>
-<td><a href="accessibility/aria-activedescendant-crash-stderr.txt">stderr</a></td>
-</tr>
-<td><a href="/var/lib/buildbot/build/gtk-linux-64-release/build/LayoutTests/http/tests/security/canvas-remote-read-svg-image.html">http/tests/security/canvas-remote-read-svg-image.html</a></td>
-<td><a href="http/tests/security/canvas-remote-read-svg-image-stderr.txt">stderr</a></td>
-</tr>
-</table><p>Tests that had no expected results (probably new):</p>
-<table>
-<tr>
-<td><a href="/var/lib/buildbot/build/gtk-linux-64-release/build/LayoutTests/fast/repaint/no-caret-repaint-in-non-content-editable-element.html">fast/repaint/no-caret-repaint-in-non-content-editable-element.html</a></td>
-<td><a href="fast/repaint/no-caret-repaint-in-non-content-editable-element-actual.txt">result</a></td>
-</tr>
-</table></body>
-</html>
-"""
-
-    _expected_layout_test_results = {
-        'Tests that had stderr output:' : [
-            'accessibility/aria-activedescendant-crash.html'
-        ],
-        'Tests that had no expected results (probably new):' : [
-            'fast/repaint/no-caret-repaint-in-non-content-editable-element.html'
-        ]
-    }
-    def test_parse_layout_test_results(self):
-        results = LayoutTestResults._parse_results_html(self._example_results_html)
-        self.assertEqual(self._expected_layout_test_results, results)
+class BuildTest(unittest.TestCase):
+    def test_layout_test_results(self):
+        build = Build(None, None, None, None)
+        build._fetch_results_html = lambda: None
+        # Test that layout_test_results() returns None if the fetch fails.
+        self.assertEqual(build.layout_test_results(), None)
 
 
 class BuildBotTest(unittest.TestCase):

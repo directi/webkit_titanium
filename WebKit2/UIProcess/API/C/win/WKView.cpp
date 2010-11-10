@@ -32,36 +32,31 @@ using namespace WebKit;
 
 WKTypeID WKViewGetTypeID()
 {
-    return toRef(APIObject::TypeView);
+    return toAPI(APIObject::TypeView);
 }
 
-WKViewRef WKViewCreate(RECT rect, WKPageNamespaceRef pageNamespaceRef, HWND hostWindow)
+WKViewRef WKViewCreate(RECT rect, WKPageNamespaceRef pageNamespaceRef, HWND parentWindow)
 {
-    RefPtr<WebView> view = WebView::create(rect, toWK(pageNamespaceRef), hostWindow);
-    return toRef(view.release().releaseRef());
+    RefPtr<WebView> view = WebView::create(rect, toImpl(pageNamespaceRef), parentWindow);
+    return toAPI(view.release().releaseRef());
 }
 
 HWND WKViewGetWindow(WKViewRef viewRef)
 {
-    return toWK(viewRef)->window();
-}
-
-HWND WKViewGetHostWindow(WKViewRef viewRef)
-{
-    return toWK(viewRef)->hostWindow();
+    return toImpl(viewRef)->window();
 }
 
 WKPageRef WKViewGetPage(WKViewRef viewRef)
 {
-    return toRef(toWK(viewRef)->page());
+    return toAPI(toImpl(viewRef)->page());
 }
 
-void WKViewSetHostWindow(WKViewRef viewRef, HWND hostWindow)
+void WKViewSetParentWindow(WKViewRef viewRef, HWND hostWindow)
 {
-    toWK(viewRef)->setHostWindow(hostWindow);
+    toImpl(viewRef)->setParentWindow(hostWindow);
 }
 
 void WKViewWindowAncestryDidChange(WKViewRef viewRef)
 {
-    toWK(viewRef)->windowAncestryDidChange();
+    toImpl(viewRef)->windowAncestryDidChange();
 }

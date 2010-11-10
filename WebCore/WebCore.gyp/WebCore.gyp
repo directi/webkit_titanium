@@ -134,6 +134,7 @@
       '../loader',
       '../loader/appcache',
       '../loader/archive',
+      '../loader/cache',
       '../loader/icon',
       '../mathml',
       '../notifications',
@@ -158,6 +159,7 @@
       '../platform/image-decoders/png',
       '../platform/image-decoders/skia',
       '../platform/image-decoders/xbm',
+      '../platform/image-decoders/webp',
       '../platform/image-encoders/skia',
       '../platform/mock',
       '../platform/network',
@@ -176,6 +178,7 @@
       '../svg/animation',
       '../svg/graphics',
       '../svg/graphics/filters',
+      '../svg/properties',
       '../websockets',
       '../workers',
       '../xml',
@@ -718,10 +721,12 @@
         '../../JavaScriptCore/JavaScriptCore.gyp/JavaScriptCore.gyp:wtf',
         '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
         '<(chromium_src_dir)/skia/skia.gyp:skia',
+        '<(chromium_src_dir)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
         '<(chromium_src_dir)/third_party/libjpeg/libjpeg.gyp:libjpeg',
         '<(chromium_src_dir)/third_party/libpng/libpng.gyp:libpng',
         '<(chromium_src_dir)/third_party/libxml/libxml.gyp:libxml',
         '<(chromium_src_dir)/third_party/libxslt/libxslt.gyp:libxslt',
+        '<(chromium_src_dir)/third_party/libwebp/libwebp.gyp:libwebp',
         '<(chromium_src_dir)/third_party/npapi/npapi.gyp:npapi',
         '<(chromium_src_dir)/third_party/sqlite/sqlite.gyp:sqlite',
       ],
@@ -828,7 +833,9 @@
         '../../JavaScriptCore/JavaScriptCore.gyp/JavaScriptCore.gyp:wtf',
         '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
         '<(chromium_src_dir)/skia/skia.gyp:skia',
+        '<(chromium_src_dir)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
         '<(chromium_src_dir)/third_party/libjpeg/libjpeg.gyp:libjpeg',
+        '<(chromium_src_dir)/third_party/libwebp/libwebp.gyp:libwebp',
         '<(chromium_src_dir)/third_party/libpng/libpng.gyp:libpng',
         '<(chromium_src_dir)/third_party/libxml/libxml.gyp:libxml',
         '<(chromium_src_dir)/third_party/libxslt/libxslt.gyp:libxslt',
@@ -843,7 +850,9 @@
         '../../JavaScriptCore/JavaScriptCore.gyp/JavaScriptCore.gyp:wtf',
         '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
         '<(chromium_src_dir)/skia/skia.gyp:skia',
+        '<(chromium_src_dir)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
         '<(chromium_src_dir)/third_party/libjpeg/libjpeg.gyp:libjpeg',
+        '<(chromium_src_dir)/third_party/libwebp/libwebp.gyp:libwebp',
         '<(chromium_src_dir)/third_party/libpng/libpng.gyp:libpng',
         '<(chromium_src_dir)/third_party/libxml/libxml.gyp:libxml',
         '<(chromium_src_dir)/third_party/libxslt/libxslt.gyp:libxslt',
@@ -1072,7 +1081,6 @@
             ['include', 'platform/graphics/chromium/FontCacheLinux\\.cpp$'],
             ['include', 'platform/graphics/chromium/FontLinux\\.cpp$'],
             ['include', 'platform/graphics/chromium/FontPlatformDataLinux\\.cpp$'],
-            ['include', 'platform/graphics/chromium/GlyphPageTreeNodeLinux\\.cpp$'],
             ['include', 'platform/graphics/chromium/SimpleFontDataLinux\\.cpp$'],
           ],
         }],
@@ -1160,22 +1168,14 @@
             # platform/graphics/chromium, included by regex above, instead.
             ['exclude', 'platform/graphics/chromium/ImageChromium\\.cpp$'],
 
-            # The Mac uses ImageSourceCG.cpp from platform/graphics/cg, included
-            # by regex above, instead.
-            ['exclude', 'platform/graphics/ImageSource\\.cpp$'],
+            # The Mac does not use ImageSourceCG.cpp from platform/graphics/cg
+            # even though it is included by regex above.
+            ['exclude', 'platform/graphics/cg/ImageSourceCG\\.cpp$'],
+            ['exclude', 'platform/graphics/cg/PDFDocumentImage\\.cpp$'],
 
-            # Skia image-decoders are also not used on mac.  CoreGraphics
-            # is used directly instead.
-            ['exclude', 'platform/image-decoders/ImageDecoder\\.h$'],
-            ['exclude', 'platform/image-decoders/bmp/BMPImageDecoder\\.(cpp|h)$'],
-            ['exclude', 'platform/image-decoders/bmp/BMPImageReader\\.(cpp|h)$'],
-            ['exclude', 'platform/image-decoders/gif/GIFImageDecoder\\.(cpp|h)$'],
-            ['exclude', 'platform/image-decoders/gif/GIFImageReader\\.(cpp|h)$'],
-            ['exclude', 'platform/image-decoders/ico/ICOImageDecoder\\.(cpp|h)$'],
-            ['exclude', 'platform/image-decoders/jpeg/JPEGImageDecoder\\.(cpp|h)$'],
-            ['exclude', 'platform/image-decoders/png/PNGImageDecoder\\.(cpp|h)$'],
+            # ImageDecoderSkia is not used on mac.  ImageDecoderCG is used instead.
             ['exclude', 'platform/image-decoders/skia/ImageDecoderSkia\\.cpp$'],
-            ['exclude', 'platform/image-decoders/xbm/XBMImageDecoder\\.(cpp|h)$'],
+            ['include', 'platform/image-decoders/cg/ImageDecoderCG\\.cpp$'],
 
             # Again, Skia is not used on Mac.
             ['exclude', 'platform/chromium/DragImageChromiumSkia\\.cpp$'],
@@ -1200,6 +1200,15 @@
         ['OS=="win"', {
           'sources/': [
             ['exclude', 'Posix\\.cpp$'],
+
+            # The Chromium Win currently uses GlyphPageTreeNodeChromiumWin.cpp from
+            # platform/graphics/chromium, included by regex above, instead.
+            ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$']
+          ],
+        }],
+        ['"ENABLE_CLIENT_BASED_GEOLOCATION=1" in feature_defines', {
+          'sources/': [
+            ['exclude', '/GeolocationService.*$'],
           ],
         }],
       ],
@@ -1278,7 +1287,6 @@
         # be nice to provide more explicit comments.  Some of these do actually
         # compile.
         ['exclude', 'dom/StaticStringList\\.cpp$'],
-        ['exclude', 'loader/icon/IconFetcher\\.cpp$'],
         ['exclude', 'loader/UserStyleSheetLoader\\.cpp$'],
 
         # We use a multi-process version from the WebKit API.

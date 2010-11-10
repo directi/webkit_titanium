@@ -45,7 +45,8 @@ typedef enum {
 
 typedef enum {
     WebKitEditingMacBehavior,
-    WebKitEditingWinBehavior
+    WebKitEditingWinBehavior,
+    WebKitEditingUnixBehavior
 } WebKitEditingBehavior;
 
 extern NSString *WebPreferencesChangedNotification;
@@ -130,6 +131,9 @@ extern NSString *WebPreferencesRemovedNotification;
 - (BOOL)isFrameFlatteningEnabled;
 - (void)setFrameFlatteningEnabled:(BOOL)flag;
 
+- (BOOL)isSpatialNavigationEnabled;
+- (void)setSpatialNavigationEnabled:(BOOL)flag;
+
 // zero means do AutoScale
 - (float)PDFScaleFactor;
 - (void)setPDFScaleFactor:(float)scale;
@@ -189,9 +193,6 @@ extern NSString *WebPreferencesRemovedNotification;
 
 - (BOOL)paginateDuringLayoutEnabled;
 - (void)setPaginateDuringLayoutEnabled:(BOOL)flag;
-
-- (BOOL)usesProxiedOpenPanel;
-- (void)setUsesProxiedOpenPanel:(BOOL)enabled;
 
 - (BOOL)memoryInfoEnabled;
 - (void)setMemoryInfoEnabled:(BOOL)enabled;

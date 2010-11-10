@@ -45,10 +45,19 @@ struct WebPreferencesStore {
     bool javaScriptEnabled;
     bool loadsImagesAutomatically;
     bool pluginsEnabled;
+    bool javaEnabled;
     bool offlineWebApplicationCacheEnabled;
     bool localStorageEnabled;
     bool xssAuditorEnabled;
     bool frameFlatteningEnabled;
+
+    bool acceleratedCompositingEnabled;
+    bool compositingBordersVisible;
+    bool compositingRepaintCountersVisible;
+
+    bool privateBrowsingEnabled;
+
+    bool developerExtrasEnabled;
 
     uint32_t fontSmoothingLevel;
 

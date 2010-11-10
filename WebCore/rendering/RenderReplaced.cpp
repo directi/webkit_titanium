@@ -57,13 +57,6 @@ RenderReplaced::~RenderReplaced()
 {
 }
 
-void RenderReplaced::setStyle(PassRefPtr<RenderStyle> newStyle)
-{
-    if (newStyle->blockFlow() != TopToBottomBlockFlow)
-        newStyle->setBlockFlow(TopToBottomBlockFlow);
-    RenderBox::setStyle(newStyle);
-}
-
 void RenderReplaced::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
     RenderBox::styleDidChange(diff, oldStyle);
@@ -88,8 +81,7 @@ void RenderReplaced::layout()
     m_overflow.clear();
     addShadowOverflow();
     
-    repainter.repaintAfterLayout();    
-
+    repainter.repaintAfterLayout();
     setNeedsLayout(false);
 }
  
@@ -207,54 +199,54 @@ static inline bool lengthIsSpecified(Length length)
     return lengthType == Fixed || lengthType == Percent;
 }
 
-int RenderReplaced::computeReplacedWidth(bool includeMaxWidth) const
+int RenderReplaced::computeReplacedLogicalWidth(bool includeMaxWidth) const
 {
-    int width;
+    int logicalWidth;
     if (lengthIsSpecified(style()->width()))
-        width = computeReplacedWidthUsing(style()->width());
+        logicalWidth = computeReplacedLogicalWidthUsing(style()->logicalWidth());
     else if (m_hasIntrinsicSize)
-        width = calcAspectRatioWidth();
+        logicalWidth = calcAspectRatioLogicalWidth();
     else
-        width = intrinsicSize().width();
+        logicalWidth = intrinsicLogicalWidth();
 
-    int minW = computeReplacedWidthUsing(style()->minWidth());
-    int maxW = !includeMaxWidth || style()->maxWidth().isUndefined() ? width : computeReplacedWidthUsing(style()->maxWidth());
+    int minLogicalWidth = computeReplacedLogicalWidthUsing(style()->logicalMinWidth());
+    int maxLogicalWidth = !includeMaxWidth || style()->logicalMaxWidth().isUndefined() ? logicalWidth : computeReplacedLogicalWidthUsing(style()->logicalMaxWidth());
 
-    return max(minW, min(width, maxW));
+    return max(minLogicalWidth, min(logicalWidth, maxLogicalWidth));
 }
 
-int RenderReplaced::computeReplacedHeight() const
+int RenderReplaced::computeReplacedLogicalHeight() const
 {
-    int height;
-    if (lengthIsSpecified(style()->height()))
-        height = computeReplacedHeightUsing(style()->height());
+    int logicalHeight;
+    if (lengthIsSpecified(style()->logicalHeight()))
+        logicalHeight = computeReplacedLogicalHeightUsing(style()->logicalHeight());
     else if (m_hasIntrinsicSize)
-        height = calcAspectRatioHeight();
+        logicalHeight = calcAspectRatioLogicalHeight();
     else
-        height = intrinsicSize().height();
+        logicalHeight = intrinsicLogicalHeight();
 
-    int minH = computeReplacedHeightUsing(style()->minHeight());
-    int maxH = style()->maxHeight().isUndefined() ? height : computeReplacedHeightUsing(style()->maxHeight());
+    int minLogicalHeight = computeReplacedLogicalHeightUsing(style()->logicalMinHeight());
+    int maxLogicalHeight = style()->logicalMaxHeight().isUndefined() ? logicalHeight : computeReplacedLogicalHeightUsing(style()->logicalMaxHeight());
 
-    return max(minH, min(height, maxH));
+    return max(minLogicalHeight, min(logicalHeight, maxLogicalHeight));
 }
 
-int RenderReplaced::calcAspectRatioWidth() const
+int RenderReplaced::calcAspectRatioLogicalWidth() const
 {
-    int intrinsicWidth = intrinsicSize().width();
-    int intrinsicHeight = intrinsicSize().height();
+    int intrinsicWidth = intrinsicLogicalWidth();
+    int intrinsicHeight = intrinsicLogicalHeight();
     if (!intrinsicHeight)
         return 0;
-    return RenderBox::computeReplacedHeight() * intrinsicWidth / intrinsicHeight;
+    return RenderBox::computeReplacedLogicalHeight() * intrinsicWidth / intrinsicHeight;
 }
 
-int RenderReplaced::calcAspectRatioHeight() const
+int RenderReplaced::calcAspectRatioLogicalHeight() const
 {
-    int intrinsicWidth = intrinsicSize().width();
-    int intrinsicHeight = intrinsicSize().height();
+    int intrinsicWidth = intrinsicLogicalWidth();
+    int intrinsicHeight = intrinsicLogicalHeight();
     if (!intrinsicWidth)
         return 0;
-    return RenderBox::computeReplacedWidth() * intrinsicHeight / intrinsicWidth;
+    return RenderBox::computeReplacedLogicalWidth() * intrinsicHeight / intrinsicWidth;
 }
 
 void RenderReplaced::computePreferredLogicalWidths()
@@ -262,7 +254,7 @@ void RenderReplaced::computePreferredLogicalWidths()
     ASSERT(preferredLogicalWidthsDirty());
 
     int borderAndPadding = borderAndPaddingWidth();
-    m_maxPreferredLogicalWidth = computeReplacedWidth(false) + borderAndPadding;
+    m_maxPreferredLogicalWidth = computeReplacedLogicalWidth(false) + borderAndPadding;
 
     if (style()->maxWidth().isFixed() && style()->maxWidth().value() != undefinedLength)
         m_maxPreferredLogicalWidth = min(m_maxPreferredLogicalWidth, style()->maxWidth().value() + (style()->boxSizing() == CONTENT_BOX ? borderAndPadding : 0));
@@ -275,16 +267,6 @@ void RenderReplaced::computePreferredLogicalWidths()
         m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth;
 
     setPreferredLogicalWidthsDirty(false);
-}
-
-int RenderReplaced::lineHeight(bool, bool) const
-{
-    return height() + marginTop() + marginBottom();
-}
-
-int RenderReplaced::baselinePosition(bool, bool) const
-{
-    return height() + marginTop() + marginBottom();
 }
 
 unsigned RenderReplaced::caretMaxRenderedOffset() const
@@ -302,17 +284,20 @@ VisiblePosition RenderReplaced::positionForPoint(const IntPoint& point)
 
     RootInlineBox* root = box->root();
 
-    int top = root->lineTop();
-    int bottom = root->nextRootBox() ? root->nextRootBox()->lineTop() : root->lineBottom();
+    int top = root->selectionTop();
+    int bottom = root->selectionBottom();
 
-    if (point.y() + y() < top)
+    int blockDirectionPosition = box->isHorizontal() ? point.y() + y() : point.x() + x();
+    int lineDirectionPosition = box->isHorizontal() ? point.x() + x() : point.y() + y();
+
+    if (blockDirectionPosition < top)
         return createVisiblePosition(caretMinOffset(), DOWNSTREAM); // coordinates are above
     
-    if (point.y() + y() >= bottom)
+    if (blockDirectionPosition >= bottom)
         return createVisiblePosition(caretMaxOffset(), DOWNSTREAM); // coordinates are below
     
     if (node()) {
-        if (point.x() <= width() / 2)
+        if (lineDirectionPosition <= box->logicalLeft() + (box->logicalWidth() / 2))
             return createVisiblePosition(0, DOWNSTREAM);
         return createVisiblePosition(1, DOWNSTREAM);
     }
@@ -344,25 +329,22 @@ IntRect RenderReplaced::localSelectionRect(bool checkWhetherSelected) const
     if (!m_inlineBoxWrapper)
         // We're a block-level replaced element.  Just return our own dimensions.
         return IntRect(0, 0, width(), height());
-
-    RenderBlock* cb =  containingBlock();
-    if (!cb)
-        return IntRect();
     
     RootInlineBox* root = m_inlineBoxWrapper->root();
-    return IntRect(0, root->selectionTop() - y(), width(), root->selectionHeight());
+    int newLogicalTop = root->block()->style()->isFlippedBlocksWritingMode() ? m_inlineBoxWrapper->logicalBottom() - root->selectionBottom() : root->selectionTop() - m_inlineBoxWrapper->logicalTop();
+    if (root->block()->style()->isHorizontalWritingMode())
+        return IntRect(0, newLogicalTop, width(), root->selectionHeight());
+    return IntRect(newLogicalTop, 0, root->selectionHeight(), height());
 }
 
 void RenderReplaced::setSelectionState(SelectionState s)
 {
-    RenderBox::setSelectionState(s);
+    RenderBox::setSelectionState(s); // The selection state for our containing block hierarchy is updated by the base class call.
     if (m_inlineBoxWrapper) {
         RootInlineBox* line = m_inlineBoxWrapper->root();
         if (line)
             line->setHasSelectedChildren(isSelected());
     }
-    
-    containingBlock()->setSelectionState(s);
 }
 
 bool RenderReplaced::isSelected() const

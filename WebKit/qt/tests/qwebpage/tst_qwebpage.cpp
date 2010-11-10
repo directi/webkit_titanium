@@ -41,6 +41,7 @@
 #include <qwebpage.h>
 #include <qwebsecurityorigin.h>
 #include <qwebview.h>
+#include <qimagewriter.h>
 
 class EventSpy : public QObject, public QList<QEvent::Type>
 {
@@ -76,7 +77,6 @@ private slots:
     void cleanupTestCase();
 
     void acceptNavigationRequest();
-    void infiniteLoopJS();
     void geolocationRequestJS();
     void loadFinished();
     void acceptNavigationRequestWithNewWindow();
@@ -126,6 +126,8 @@ private slots:
     void showModalDialog();
     void testStopScheduledPageRefresh();
     void findText();
+    void supportedContentType();
+    void infiniteLoopJS();
     
 private:
     QWebView* m_view;
@@ -247,6 +249,12 @@ void tst_QWebPage::infiniteLoopJS()
 
 void tst_QWebPage::geolocationRequestJS()
 {
+    /*
+      This test is disabled because it can only succeed if ENABLE(GEOLOCATION) is true.
+      The code needs to be updated when the API of requestPermissionFromUser is updated.
+    */
+    QSKIP("Test disabled as long as geolocation is disabled from the build.", SkipSingle);
+
     JSTestPage* newPage = new JSTestPage(m_view);
     connect(newPage, SIGNAL(requestPermissionFromUser(QWebFrame*, QWebPage::PermissionDomain)), 
             newPage, SLOT(requestPermission(QWebFrame*, QWebPage::PermissionDomain)));
@@ -277,9 +285,9 @@ void tst_QWebPage::loadFinished()
     QSignalSpy spyLoadStarted(m_view, SIGNAL(loadStarted()));
     QSignalSpy spyLoadFinished(m_view, SIGNAL(loadFinished(bool)));
 
-    m_view->setHtml(QString("data:text/html,<frameset cols=\"25%,75%\"><frame src=\"data:text/html,"
-                            "<head><meta http-equiv='refresh' content='1'></head>foo \">"
-                            "<frame src=\"data:text/html,bar\"></frameset>"), QUrl());
+    m_view->page()->mainFrame()->load(QUrl("data:text/html,<frameset cols=\"25%,75%\"><frame src=\"data:text/html,"
+                                           "<head><meta http-equiv='refresh' content='1'></head>foo \">"
+                                           "<frame src=\"data:text/html,bar\"></frameset>"));
     QTRY_COMPARE(spyLoadFinished.count(), 1);
 
     QTRY_VERIFY(spyLoadStarted.count() > 1);
@@ -287,8 +295,8 @@ void tst_QWebPage::loadFinished()
 
     spyLoadFinished.clear();
 
-    m_view->setHtml(QString("data:text/html,<frameset cols=\"25%,75%\"><frame src=\"data:text/html,"
-                            "foo \"><frame src=\"data:text/html,bar\"></frameset>"), QUrl());
+    m_view->page()->mainFrame()->load(QUrl("data:text/html,<frameset cols=\"25%,75%\"><frame src=\"data:text/html,"
+                                           "foo \"><frame src=\"data:text/html,bar\"></frameset>"));
     QTRY_COMPARE(spyLoadFinished.count(), 1);
     QCOMPARE(spyLoadFinished.count(), 1);
 }
@@ -1508,11 +1516,6 @@ void tst_QWebPage::inputMethods()
     QString selectionValue = variant.value<QString>();
     QCOMPARE(selectionValue, QString("eb"));
 
-    //Cancel current composition first
-    inputAttributes << QInputMethodEvent::Attribute(QInputMethodEvent::Selection, 0, 0, QVariant());
-    QInputMethodEvent eventSelection2("",inputAttributes);
-    page->event(&eventSelection2);
-
     //Set selection with negative length
     inputAttributes << QInputMethodEvent::Attribute(QInputMethodEvent::Selection, 6, -5, QVariant());
     QInputMethodEvent eventSelection3("",inputAttributes);
@@ -1879,7 +1882,8 @@ public:
     {
         ErrorPageExtensionReturn* errorPage = static_cast<ErrorPageExtensionReturn*>(output);
 
-        errorPage->content = "data:text/html,error";
+        errorPage->contentType = "text/html";
+        errorPage->content = "error";
         return true;
     }
 };
@@ -1896,7 +1900,7 @@ void tst_QWebPage::errorPageExtension()
 
     page->mainFrame()->setUrl(QUrl("http://non.existent/url"));
     QTRY_COMPARE(spyLoadFinished.count(), 2);
-    QCOMPARE(page->mainFrame()->toPlainText(), QString("data:text/html,error"));
+    QCOMPARE(page->mainFrame()->toPlainText(), QString("error"));
     QCOMPARE(page->history()->count(), 2);
     QCOMPARE(page->history()->currentItem().url(), QUrl("http://non.existent/url"));
     QCOMPARE(page->history()->canGoBack(), true);
@@ -1923,14 +1927,15 @@ void tst_QWebPage::errorPageExtensionInIFrames()
     ErrorPage* page = new ErrorPage;
     m_view->setPage(page);
 
-    m_view->setHtml(QString("data:text/html,"
-                            "<h1>h1</h1>"
-                            "<iframe src='data:text/html,<p/>p'></iframe>"
-                            "<iframe src='non-existent.html'></iframe>"));
+    m_view->page()->mainFrame()->load(QUrl(
+        "data:text/html,"
+        "<h1>h1</h1>"
+        "<iframe src='data:text/html,<p/>p'></iframe>"
+        "<iframe src='http://non.existent/url'></iframe>"));
     QSignalSpy spyLoadFinished(m_view, SIGNAL(loadFinished(bool)));
     QTRY_COMPARE(spyLoadFinished.count(), 1);
 
-    QCOMPARE(page->mainFrame()->childFrames()[1]->toPlainText(), QString("data:text/html,error"));
+    QCOMPARE(page->mainFrame()->childFrames()[1]->toPlainText(), QString("error"));
 
     m_view->setPage(0);
 }
@@ -1944,7 +1949,7 @@ void tst_QWebPage::errorPageExtensionInFrameset()
 
     QSignalSpy spyLoadFinished(m_view, SIGNAL(loadFinished(bool)));
     QTRY_COMPARE(spyLoadFinished.count(), 1);
-    QCOMPARE(page->mainFrame()->childFrames()[1]->toPlainText(), QString("data:text/html,error"));
+    QCOMPARE(page->mainFrame()->childFrames()[1]->toPlainText(), QString("error"));
 
     m_view->setPage(0);
 }
@@ -2195,6 +2200,81 @@ void tst_QWebPage::findText()
         m_page->findText("");
         QVERIFY(m_page->selectedText().isEmpty());
     }
+}
+
+struct ImageExtensionMap {
+    const char* extension;
+    const char* mimeType;
+};
+
+static const ImageExtensionMap extensionMap[] = {
+    { "bmp", "image/bmp" },
+    { "css", "text/css" },
+    { "gif", "image/gif" },
+    { "html", "text/html" },
+    { "htm", "text/html" },
+    { "ico", "image/x-icon" },
+    { "jpeg", "image/jpeg" },
+    { "jpg", "image/jpeg" },
+    { "js", "application/x-javascript" },
+    { "mng", "video/x-mng" },
+    { "pbm", "image/x-portable-bitmap" },
+    { "pgm", "image/x-portable-graymap" },
+    { "pdf", "application/pdf" },
+    { "png", "image/png" },
+    { "ppm", "image/x-portable-pixmap" },
+    { "rss", "application/rss+xml" },
+    { "svg", "image/svg+xml" },
+    { "text", "text/plain" },
+    { "tif", "image/tiff" },
+    { "tiff", "image/tiff" },
+    { "txt", "text/plain" },
+    { "xbm", "image/x-xbitmap" },
+    { "xml", "text/xml" },
+    { "xpm", "image/x-xpm" },
+    { "xsl", "text/xsl" },
+    { "xhtml", "application/xhtml+xml" },
+    { "wml", "text/vnd.wap.wml" },
+    { "wmlc", "application/vnd.wap.wmlc" },
+    { 0, 0 }
+};
+
+static QString getMimeTypeForExtension(const QString &ext)
+{
+    const ImageExtensionMap *e = extensionMap;
+    while (e->extension) {
+        if (ext.compare(QLatin1String(e->extension), Qt::CaseInsensitive) == 0)
+            return QLatin1String(e->mimeType);
+        ++e;
+    }
+
+    return QString();
+}
+
+void tst_QWebPage::supportedContentType()
+{
+   QStringList contentTypes;
+
+   // Add supported non image types...
+   contentTypes << "text/html" << "text/xml" << "text/xsl" << "text/plain" << "text/"
+                << "application/xml" << "application/xhtml+xml" << "application/vnd.wap.xhtml+xml"
+                << "application/rss+xml" << "application/atom+xml" << "application/json";
+
+   // Add supported image types...
+   Q_FOREACH(const QByteArray& imageType, QImageWriter::supportedImageFormats()) {
+      const QString mimeType = getMimeTypeForExtension(imageType);
+      if (!mimeType.isEmpty())
+          contentTypes << mimeType;
+   }
+
+   // Get the mime types supported by webkit...
+   const QStringList supportedContentTypes = m_page->supportedContentTypes();
+
+   Q_FOREACH(const QString& mimeType, contentTypes)
+      QVERIFY2(supportedContentTypes.contains(mimeType), QString("'%1' is not a supported content type!").arg(mimeType).toLatin1());
+      
+   Q_FOREACH(const QString& mimeType, contentTypes)
+      QVERIFY2(m_page->supportsContentType(mimeType), QString("Cannot handle content types '%1'!").arg(mimeType).toLatin1());
 }
 
 QTEST_MAIN(tst_QWebPage)

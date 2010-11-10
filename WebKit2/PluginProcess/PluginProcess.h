@@ -28,7 +28,7 @@
 
 #if ENABLE(PLUGIN_PROCESS)
 
-#include "Connection.h"
+#include "ChildProcess.h"
 #include "RunLoop.h"
 #include <wtf/Forward.h>
 
@@ -36,8 +36,9 @@ namespace WebKit {
 
 class NetscapePluginModule;
 class WebProcessConnection;
+struct PluginProcessCreationParameters;
         
-class PluginProcess : Noncopyable, CoreIPC::Connection::Client {
+class PluginProcess : ChildProcess {
 public:
     static PluginProcess& shared();
 
@@ -45,6 +46,10 @@ public:
     void removeWebProcessConnection(WebProcessConnection* webProcessConnection);
 
     NetscapePluginModule* netscapePluginModule() const { return m_pluginModule.get(); }
+
+#if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
+    mach_port_t compositingRenderServerPort() const { return m_compositingRenderServerPort; }
+#endif
 
 private:
     PluginProcess();
@@ -57,7 +62,7 @@ private:
 
     // Message handlers.
     void didReceivePluginProcessMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void initialize(const String& pluginPath);
+    void initialize(const PluginProcessCreationParameters&);
     void createWebProcessConnection();
     
     void shutdownTimerFired();
@@ -73,6 +78,12 @@ private:
     
     // A timer used for the shutdown timeout.
     RunLoop::Timer<PluginProcess> m_shutdownTimer;
+
+#if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
+    // The Mach port used for accelerated compositing.
+    mach_port_t m_compositingRenderServerPort;
+#endif
+    
 };
 
 } // namespace WebKit

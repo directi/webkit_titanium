@@ -25,7 +25,7 @@
 #include "CString.h"
 #include "Font.h"
 #include "OwnPtrCairo.h"
-#include "PlatformRefPtrCairo.h"
+#include "RefPtrCairo.h"
 #include "SimpleFontData.h"
 #include <cairo-ft.h>
 #include <cairo.h>
@@ -41,33 +41,63 @@ void FontCache::platformInit()
         ASSERT_NOT_REACHED();
 }
 
-const SimpleFontData* FontCache::getFontDataForCharacters(const Font& font, const UChar* characters, int length)
+FcPattern* createFontConfigPatternForCharacters(const UChar* characters, int length)
 {
-    FcResult fresult;
-    FontPlatformData* prim = const_cast<FontPlatformData*>(&font.primaryFont()->platformData());
+    FcPattern* pattern = FcPatternCreate();
 
-    // FIXME: This should not happen, apparently. We are null-checking
-    // for now just to avoid crashing.
-    if (!prim || !prim->m_pattern)
+    FcCharSet* fontConfigCharSet = FcCharSetCreate();
+    for (int i = 0; i < length; ++i) {
+        if (U16_IS_SURROGATE(characters[i]) && U16_IS_SURROGATE_LEAD(characters[i])
+                && i != length - 1 && U16_IS_TRAIL(characters[i + 1])) {
+            FcCharSetAddChar(fontConfigCharSet, U16_GET_SUPPLEMENTARY(characters[i], characters[i+1]));
+            i++;
+        } else
+            FcCharSetAddChar(fontConfigCharSet, characters[i]);
+    }
+    FcPatternAddCharSet(pattern, FC_CHARSET, fontConfigCharSet);
+    FcCharSetDestroy(fontConfigCharSet);
+
+    FcPatternAddBool(pattern, FC_SCALABLE, FcTrue);
+    FcConfigSubstitute(0, pattern, FcMatchPattern);
+    FcDefaultSubstitute(pattern);
+    return pattern;
+}
+
+FcPattern* findBestFontGivenFallbacks(const FontPlatformData& fontData, FcPattern* pattern)
+{
+    if (!fontData.m_pattern)
         return 0;
 
-    if (!prim->m_fallbacks)
-        prim->m_fallbacks = FcFontSort(0, prim->m_pattern.get(), FcTrue, 0, &fresult);
-
-    FcFontSet* fs = prim->m_fallbacks;
-
-    for (int i = 0; i < fs->nfont; i++) {
-        PlatformRefPtr<FcPattern> fin = adoptPlatformRef(FcFontRenderPrepare(0, prim->m_pattern.get(), fs->fonts[i]));
-        cairo_font_face_t* fontFace = cairo_ft_font_face_create_for_pattern(fin.get());
-        FontPlatformData alternateFont(fontFace, font.fontDescription().computedPixelSize(), false, false);
-        cairo_font_face_destroy(fontFace);
-        alternateFont.m_pattern = fin;
-        SimpleFontData* sfd = getCachedFontData(&alternateFont);
-        if (sfd->containsCharacters(characters, length))
-            return sfd;
+    if (!fontData.m_fallbacks) {
+        FcResult fontConfigResult;
+        fontData.m_fallbacks = FcFontSort(0, fontData.m_pattern.get(), FcTrue, 0, &fontConfigResult);
     }
 
-    return 0;
+    if (!fontData.m_fallbacks)
+        return 0;
+
+    FcFontSet* sets[] = { fontData.m_fallbacks };
+    FcResult fontConfigResult;
+    return FcFontSetMatch(0, sets, 1, pattern, &fontConfigResult);
+}
+
+const SimpleFontData* FontCache::getFontDataForCharacters(const Font& font, const UChar* characters, int length)
+{
+    RefPtr<FcPattern> pattern = adoptRef(createFontConfigPatternForCharacters(characters, length));
+    const FontPlatformData& fontData = font.primaryFont()->platformData();
+
+    RefPtr<FcPattern> fallbackPattern = adoptRef(findBestFontGivenFallbacks(fontData, pattern.get()));
+    if (fallbackPattern) {
+        FontPlatformData alternateFontData(fallbackPattern.get(), font.fontDescription());
+        return getCachedFontData(&alternateFontData);
+    }
+
+    FcResult fontConfigResult;
+    RefPtr<FcPattern> resultPattern = adoptRef(FcFontMatch(0, pattern.get(), &fontConfigResult));
+    if (!resultPattern)
+        return 0;
+    FontPlatformData alternateFontData(resultPattern.get(), font.fontDescription());
+    return getCachedFontData(&alternateFontData);
 }
 
 SimpleFontData* FontCache::getSimilarFontPlatformData(const Font& font)
@@ -87,12 +117,12 @@ void FontCache::getTraitsInFamily(const AtomicString& familyName, Vector<unsigne
 {
 }
 
-static CString getFamilyNameStringFromFontDescriptionAndFamily(const FontDescription& fontDescription, const AtomicString& family)
+static String getFamilyNameStringFromFontDescriptionAndFamily(const FontDescription& fontDescription, const AtomicString& family)
 {
     // If we're creating a fallback font (e.g. "-webkit-monospace"), convert the name into
     // the fallback name (like "monospace") that fontconfig understands.
     if (family.length() && !family.startsWith("-webkit-"))
-        return family.string().utf8();
+        return family.string();
 
     switch (fontDescription.genericFamily()) {
     case FontDescription::StandardFamily:
@@ -112,23 +142,14 @@ static CString getFamilyNameStringFromFontDescriptionAndFamily(const FontDescrip
     }
 }
 
-
-static bool isFallbackFontAllowed(const CString& familyName)
-{
-    return !strcasecmp(familyName.data(), "sans")
-           || !strcasecmp(familyName.data(), "sans-serif")
-           || !strcasecmp(familyName.data(), "serif")
-           || !strcasecmp(familyName.data(), "monospace");
-}
-
 FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family)
 {
     // The CSS font matching algorithm (http://www.w3.org/TR/css3-fonts/#font-matching-algorithm)
     // says that we must find an exact match for font family, slant (italic or oblique can be used)
     // and font weight (we only match bold/non-bold here).
-    PlatformRefPtr<FcPattern> pattern = adoptPlatformRef(FcPatternCreate());
-    CString familyNameString = getFamilyNameStringFromFontDescriptionAndFamily(fontDescription, family);
-    if (!FcPatternAddString(pattern.get(), FC_FAMILY, reinterpret_cast<const FcChar8*>(familyNameString.data())))
+    RefPtr<FcPattern> pattern = adoptRef(FcPatternCreate());
+    String familyNameString(getFamilyNameStringFromFontDescriptionAndFamily(fontDescription, family));
+    if (!FcPatternAddString(pattern.get(), FC_FAMILY, reinterpret_cast<const FcChar8*>(familyNameString.utf8().data())))
         return 0;
 
     bool italic = fontDescription.italic();
@@ -140,53 +161,39 @@ FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontD
     if (!FcPatternAddDouble(pattern.get(), FC_PIXEL_SIZE, fontDescription.computedPixelSize()))
         return 0;
 
-    // The following comment and strategy are originally from Skia (src/ports/SkFontHost_fontconfig.cpp):
-    // Font matching:
-    // CSS often specifies a fallback list of families:
-    //    font-family: a, b, c, serif;
-    // However, fontconfig will always do its best to find *a* font when asked
-    // for something so we need a way to tell if the match which it has found is
-    // "good enough" for us. Otherwise, we can return null which gets piped up
-    // and lets WebKit know to try the next CSS family name. However, fontconfig
-    // configs allow substitutions (mapping "Arial -> Helvetica" etc) and we
-    // wish to support that.
-    //
-    // Thus, if a specific family is requested we set @family_requested. Then we
-    // record two strings: the family name after config processing and the
-    // family name after resolving. If the two are equal, it's a good match.
-    //
-    // So consider the case where a user has mapped Arial to Helvetica in their
-    // config.
-    //    requested family: "Arial"
-    //    post_config_family: "Helvetica"
-    //    post_match_family: "Helvetica"
-    //      -> good match
-    //
-    // and for a missing font:
-    //    requested family: "Monaco"
-    //    post_config_family: "Monaco"
-    //    post_match_family: "Times New Roman"
-    //      -> BAD match
-    //
+    // The strategy is originally from Skia (src/ports/SkFontHost_fontconfig.cpp):
+
+    // Allow Fontconfig to do pre-match substitution. Unless we are accessing a "fallback"
+    // family like "sans," this is the only time we allow Fontconfig to substitute one
+    // family name for another (i.e. if the fonts are aliased to each other).
     FcConfigSubstitute(0, pattern.get(), FcMatchPattern);
     FcDefaultSubstitute(pattern.get());
 
-    FcChar8* familyNameAfterConfiguration;
-    FcPatternGetString(pattern.get(), FC_FAMILY, 0, &familyNameAfterConfiguration);
+    FcChar8* fontConfigFamilyNameAfterConfiguration;
+    FcPatternGetString(pattern.get(), FC_FAMILY, 0, &fontConfigFamilyNameAfterConfiguration);
+    String familyNameAfterConfiguration = String::fromUTF8(reinterpret_cast<char*>(fontConfigFamilyNameAfterConfiguration));
 
     FcResult fontConfigResult;
-    PlatformRefPtr<FcPattern> resultPattern = adoptPlatformRef(FcFontMatch(0, pattern.get(), &fontConfigResult));
+    RefPtr<FcPattern> resultPattern = adoptRef(FcFontMatch(0, pattern.get(), &fontConfigResult));
     if (!resultPattern) // No match.
         return 0;
 
-    // Properly handle the situation where Fontconfig gives us a font that has a different family than we requested.
-    FcChar8* familyNameAfterMatching;
-    FcPatternGetString(resultPattern.get(), FC_FAMILY, 0, &familyNameAfterMatching);
-    if (strcasecmp(reinterpret_cast<char*>(familyNameAfterConfiguration),
-            reinterpret_cast<char*>(familyNameAfterMatching)) && !isFallbackFontAllowed(familyNameString))
-        return 0;
+    FcChar8* fontConfigFamilyNameAfterMatching;
+    FcPatternGetString(resultPattern.get(), FC_FAMILY, 0, &fontConfigFamilyNameAfterMatching);
+    String familyNameAfterMatching = String::fromUTF8(reinterpret_cast<char*>(fontConfigFamilyNameAfterMatching));
+    if (equalIgnoringCase(familyNameAfterConfiguration, familyNameAfterMatching))
+        return new FontPlatformData(resultPattern.get(), fontDescription);
 
-    return new FontPlatformData(resultPattern.get(), fontDescription);
+    // If Fontconfig gave use a different font family than the one we requested, we should ignore it
+    // and allow WebCore to give us the next font on the CSS fallback list. The only exception is if
+    // this family name is a commonly used generic family.
+    if (equalIgnoringCase(familyNameString, "sans") || equalIgnoringCase(familyNameString, "sans-serif")
+        || equalIgnoringCase(familyNameString, "serif") || equalIgnoringCase(familyNameString, "monospace")
+        || equalIgnoringCase(familyNameString, "fantasy") || equalIgnoringCase(familyNameString, "cursive"))
+        return new FontPlatformData(resultPattern.get(), fontDescription);
+
+    // Fontconfig did not return a good match.
+    return 0;
 }
 
 }

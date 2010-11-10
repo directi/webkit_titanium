@@ -187,9 +187,7 @@ public:
     virtual HRESULT STDMETHODCALLTYPE pendingFrameUnloadEventCount( 
         /* [retval][out] */ UINT* result);
 
-    virtual HRESULT STDMETHODCALLTYPE fetchApplicationIcon( 
-        /* [in] */ IWebIconFetcherDelegate *delegate,
-        /* [retval][out] */ IWebIconFetcher **result);
+    virtual HRESULT STDMETHODCALLTYPE unused2();
     
     virtual HRESULT STDMETHODCALLTYPE setInPrintingMode( 
         /* [in] */ BOOL value,
@@ -274,6 +272,11 @@ public:
     virtual HRESULT STDMETHODCALLTYPE visibleContentRect(RECT*);
 
     virtual HRESULT STDMETHODCALLTYPE layerTreeAsText(BSTR*);
+
+    virtual HRESULT STDMETHODCALLTYPE hasSpellingMarker(
+        /* [in] */ UINT from,
+        /* [in] */ UINT length,
+        /* [retval][out] */ BOOL *result);
 
     // IWebDocumentText
     virtual HRESULT STDMETHODCALLTYPE supportsTextEncoding( 
@@ -373,6 +376,7 @@ public:
     WebCore::KURL url() const;
 
     WebView* webView() const;
+    void setWebView(WebView*);
 
     COMPtr<IAccessible> accessible() const;
 

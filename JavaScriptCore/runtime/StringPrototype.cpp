@@ -136,7 +136,7 @@ StringPrototype::StringPrototype(ExecState* exec, JSGlobalObject* globalObject, 
 {
     putAnonymousValue(0, globalObject);
     // The constructor will be added later, after StringConstructor has been built
-    putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 0), DontDelete | ReadOnly | DontEnum);
+    putDirectWithoutTransition(exec->propertyNames().length, jsNumber(0), DontDelete | ReadOnly | DontEnum);
 }
 
 bool StringPrototype::getOwnPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
@@ -206,7 +206,8 @@ static NEVER_INLINE UString substituteBackreferencesSlow(const UString& replacem
             substitutedReplacement.append(replacement.characters() + offset, i - offset);
         i += 1 + advance;
         offset = i + 1;
-        substitutedReplacement.append(source.characters() + backrefStart, backrefLength);
+        if (backrefStart >= 0)
+            substitutedReplacement.append(source.characters() + backrefStart, backrefLength);
     } while ((i = replacement.find('$', i + 1)) != notFound);
 
     if (replacement.length() - offset)
@@ -275,12 +276,16 @@ static ALWAYS_INLINE JSValue jsSpliceSubstringsWithSeparators(ExecState* exec, J
     int bufferPos = 0;
     for (int i = 0; i < maxCount; i++) {
         if (i < rangeCount) {
-            StringImpl::copyChars(buffer + bufferPos, source.characters() + substringRanges[i].position, substringRanges[i].length);
-            bufferPos += substringRanges[i].length;
+            if (int srcLen = substringRanges[i].length) {
+                StringImpl::copyChars(buffer + bufferPos, source.characters() + substringRanges[i].position, srcLen);
+                bufferPos += srcLen;
+            }
         }
         if (i < separatorCount) {
-            StringImpl::copyChars(buffer + bufferPos, separators[i].characters(), separators[i].length());
-            bufferPos += separators[i].length();
+            if (int sepLen = separators[i].length()) {
+                StringImpl::copyChars(buffer + bufferPos, separators[i].characters(), sepLen);
+                bufferPos += sepLen;
+            }
         }
     }
 
@@ -302,6 +307,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
 
     if (pattern.inherits(&RegExpObject::info)) {
         const UString& source = sourceVal->value(exec);
+        unsigned sourceLen = source.length();
         if (exec->hadException())
             return JSValue::encode(JSValue());
         RegExp* reg = asRegExpObject(pattern)->regExp();
@@ -320,7 +326,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
             // reg->numSubpatterns() + 1 for pattern args, + 2 for match start and sourceValue
             int argCount = reg->numSubpatterns() + 1 + 2;
             JSFunction* func = asFunction(replacement);
-            CachedCall cachedCall(exec, func, argCount, exec->exceptionSlot());
+            CachedCall cachedCall(exec, func, argCount);
             if (exec->hadException())
                 return JSValue::encode(jsNull());
             while (true) {
@@ -330,7 +336,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
                 regExpConstructor->performMatch(reg, source, startPosition, matchIndex, matchLen, &ovector);
                 if (matchIndex < 0)
                     break;
-                
+
                 sourceRanges.append(StringRange(lastIndex, matchIndex - lastIndex));
 
                 int completeMatchStart = ovector[0];
@@ -345,9 +351,9 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
                         cachedCall.setArgument(i, jsSubstring(exec, source, matchStart, matchLen));
                 }
 
-                cachedCall.setArgument(i++, jsNumber(exec, completeMatchStart));
+                cachedCall.setArgument(i++, jsNumber(completeMatchStart));
                 cachedCall.setArgument(i++, sourceVal);
-                
+
                 cachedCall.setThis(exec->globalThisValue());
                 JSValue result = cachedCall.call();
                 if (LIKELY(result.isString()))
@@ -363,10 +369,10 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
                 // special case of empty match
                 if (matchLen == 0) {
                     startPosition++;
-                    if (startPosition > source.length())
+                    if (startPosition > sourceLen)
                         break;
                 }
-            }            
+            }
         } else {
             do {
                 int matchIndex;
@@ -376,30 +382,39 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
                 if (matchIndex < 0)
                     break;
 
-                sourceRanges.append(StringRange(lastIndex, matchIndex - lastIndex));
-
                 if (callType != CallTypeNone) {
+                    sourceRanges.append(StringRange(lastIndex, matchIndex - lastIndex));
+
                     int completeMatchStart = ovector[0];
                     MarkedArgumentBuffer args;
 
                     for (unsigned i = 0; i < reg->numSubpatterns() + 1; ++i) {
                         int matchStart = ovector[i * 2];
                         int matchLen = ovector[i * 2 + 1] - matchStart;
-
+ 
                         if (matchStart < 0)
                             args.append(jsUndefined());
                         else
                             args.append(jsSubstring(exec, source, matchStart, matchLen));
                     }
 
-                    args.append(jsNumber(exec, completeMatchStart));
+                    args.append(jsNumber(completeMatchStart));
                     args.append(sourceVal);
 
                     replacements.append(call(exec, replacement, callType, callData, exec->globalThisValue(), args).toString(exec));
                     if (exec->hadException())
                         break;
-                } else
-                    replacements.append(substituteBackreferences(replacementString, source, ovector, reg));
+                } else {
+                    int replLen = replacementString.length();
+                    if (lastIndex < matchIndex || replLen) {
+                        sourceRanges.append(StringRange(lastIndex, matchIndex - lastIndex));
+ 
+                        if (replLen)
+                            replacements.append(substituteBackreferences(replacementString, source, ovector, reg));
+                        else
+                            replacements.append(UString());
+                    }
+                }
 
                 lastIndex = matchIndex + matchLen;
                 startPosition = lastIndex;
@@ -407,7 +422,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
                 // special case of empty match
                 if (matchLen == 0) {
                     startPosition++;
-                    if (startPosition > source.length())
+                    if (startPosition > sourceLen)
                         break;
                 }
             } while (global);
@@ -416,8 +431,8 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
         if (!lastIndex && replacements.isEmpty())
             return JSValue::encode(sourceVal);
 
-        if (static_cast<unsigned>(lastIndex) < source.length())
-            sourceRanges.append(StringRange(lastIndex, source.length() - lastIndex));
+        if (static_cast<unsigned>(lastIndex) < sourceLen)
+            sourceRanges.append(StringRange(lastIndex, sourceLen - lastIndex));
 
         return JSValue::encode(jsSpliceSubstringsWithSeparators(exec, sourceVal, source, sourceRanges.data(), sourceRanges.size(), replacements.data(), replacements.size()));
     }
@@ -439,7 +454,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
     if (callType != CallTypeNone) {
         MarkedArgumentBuffer args;
         args.append(jsSubstring(exec, source, matchPos, matchLen));
-        args.append(jsNumber(exec, matchPos));
+        args.append(jsNumber(matchPos));
         args.append(sourceVal);
 
         replacementString = call(exec, replacement, callType, callData, exec->globalThisValue(), args).toString(exec);
@@ -495,13 +510,13 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncCharCodeAt(ExecState* exec)
     if (a0.isUInt32()) {
         uint32_t i = a0.asUInt32();
         if (i < len)
-            return JSValue::encode(jsNumber(exec, s.characters()[i]));
-        return JSValue::encode(jsNaN(exec));
+            return JSValue::encode(jsNumber(s.characters()[i]));
+        return JSValue::encode(jsNaN());
     }
     double dpos = a0.toInteger(exec);
     if (dpos >= 0 && dpos < len)
-        return JSValue::encode(jsNumber(exec, s[static_cast<int>(dpos)]));
-    return JSValue::encode(jsNaN(exec));
+        return JSValue::encode(jsNumber(s[static_cast<int>(dpos)]));
+    return JSValue::encode(jsNaN());
 }
 
 EncodedJSValue JSC_HOST_CALL stringProtoFuncConcat(ExecState* exec)
@@ -545,8 +560,8 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncIndexOf(ExecState* exec)
 
     size_t result = s.find(u2, pos);
     if (result == notFound)
-        return JSValue::encode(jsNumber(exec, -1));
-    return JSValue::encode(jsNumber(exec, result));
+        return JSValue::encode(jsNumber(-1));
+    return JSValue::encode(jsNumber(result));
 }
 
 EncodedJSValue JSC_HOST_CALL stringProtoFuncLastIndexOf(ExecState* exec)
@@ -574,8 +589,8 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncLastIndexOf(ExecState* exec)
 
     size_t result = s.reverseFind(u2, static_cast<unsigned>(dpos));
     if (result == notFound)
-        return JSValue::encode(jsNumber(exec, -1));
-    return JSValue::encode(jsNumber(exec, result));
+        return JSValue::encode(jsNumber(-1));
+    return JSValue::encode(jsNumber(result));
 }
 
 EncodedJSValue JSC_HOST_CALL stringProtoFuncMatch(ExecState* exec)
@@ -657,7 +672,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSearch(ExecState* exec)
     int pos;
     int matchLength = 0;
     regExpConstructor->performMatch(reg.get(), u, 0, pos, matchLength);
-    return JSValue::encode(jsNumber(exec, pos));
+    return JSValue::encode(jsNumber(pos));
 }
 
 EncodedJSValue JSC_HOST_CALL stringProtoFuncSlice(ExecState* exec)
@@ -894,7 +909,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncToUpperCase(ExecState* exec)
 EncodedJSValue JSC_HOST_CALL stringProtoFuncLocaleCompare(ExecState* exec)
 {
     if (exec->argumentCount() < 1)
-      return JSValue::encode(jsNumber(exec, 0));
+      return JSValue::encode(jsNumber(0));
 
     JSValue thisValue = exec->hostThisValue();
     if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
@@ -902,7 +917,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncLocaleCompare(ExecState* exec)
 
     UString s = thisValue.toThisString(exec);
     JSValue a0 = exec->argument(0);
-    return JSValue::encode(jsNumber(exec, localeCompare(s, a0.toString(exec))));
+    return JSValue::encode(jsNumber(localeCompare(s, a0.toString(exec))));
 }
 
 EncodedJSValue JSC_HOST_CALL stringProtoFuncBig(ExecState* exec)

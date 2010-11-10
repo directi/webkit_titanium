@@ -239,7 +239,7 @@ Frame* SubframeLoader::loadOrRedirectSubframe(HTMLFrameOwnerElement* ownerElemen
 {
     Frame* frame = ownerElement->contentFrame();
     if (frame)
-        frame->redirectScheduler()->scheduleLocationChange(url.string(), m_frame->loader()->outgoingReferrer(), lockHistory, lockBackForwardList, m_frame->loader()->isProcessingUserGesture());
+        frame->navigationScheduler()->scheduleLocationChange(url.string(), m_frame->loader()->outgoingReferrer(), lockHistory, lockBackForwardList);
     else
         frame = loadSubframe(ownerElement, url, frameName, m_frame->loader()->outgoingReferrer());
     return frame;
@@ -366,8 +366,8 @@ bool SubframeLoader::loadPlugin(HTMLPlugInImageElement* pluginElement, const KUR
 
     renderer->setWidget(widget);
     m_containsPlugins = true;
-
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+ 
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO) || ENABLE(3D_PLUGIN)
     pluginElement->setNeedsStyleRecalc(SyntheticStyleChange);
 #endif
     return true;

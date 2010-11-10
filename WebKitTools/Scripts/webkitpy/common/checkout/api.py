@@ -32,6 +32,7 @@ import StringIO
 from webkitpy.common.checkout.changelog import ChangeLog
 from webkitpy.common.checkout.commitinfo import CommitInfo
 from webkitpy.common.checkout.scm import CommitMessage
+from webkitpy.common.memoized import memoized
 from webkitpy.common.net.bugzilla import parse_bug_id
 from webkitpy.common.system.executive import Executive, run_command, ScriptError
 from webkitpy.common.system.deprecated_logging import log
@@ -59,6 +60,7 @@ class Checkout(object):
         changed_files = self._scm.changed_files_for_revision(revision)
         return [self._latest_entry_for_changelog_at_revision(path, revision) for path in changed_files if self._is_path_to_changelog(path)]
 
+    @memoized
     def commit_info_for_revision(self, revision):
         committer_email = self._scm.committer_email_for_revision(revision)
         changelog_entries = self.changelog_entries_for_revision(revision)
@@ -83,16 +85,23 @@ class Checkout(object):
     def bug_id_for_revision(self, revision):
         return self.commit_info_for_revision(revision).bug_id()
 
-    def modified_changelogs(self, git_commit):
+    def _modified_files_matching_predicate(self, git_commit, predicate, changed_files=None):
         # SCM returns paths relative to scm.checkout_root
         # Callers (especially those using the ChangeLog class) may
         # expect absolute paths, so this method returns absolute paths.
-        changed_files = self._scm.changed_files(git_commit)
+        if not changed_files:
+            changed_files = self._scm.changed_files(git_commit)
         absolute_paths = [os.path.join(self._scm.checkout_root, path) for path in changed_files]
-        return [path for path in absolute_paths if self._is_path_to_changelog(path)]
+        return [path for path in absolute_paths if predicate(path)]
 
-    def commit_message_for_this_commit(self, git_commit):
-        changelog_paths = self.modified_changelogs(git_commit)
+    def modified_changelogs(self, git_commit, changed_files=None):
+        return self._modified_files_matching_predicate(git_commit, self._is_path_to_changelog, changed_files=changed_files)
+
+    def modified_non_changelogs(self, git_commit, changed_files=None):
+        return self._modified_files_matching_predicate(git_commit, lambda path: not self._is_path_to_changelog(path), changed_files=changed_files)
+
+    def commit_message_for_this_commit(self, git_commit, changed_files=None):
+        changelog_paths = self.modified_changelogs(git_commit, changed_files)
         if not len(changelog_paths):
             raise ScriptError(message="Found no modified ChangeLogs, cannot create a commit message.\n"
                               "All changes require a ChangeLog.  See:\n"
@@ -109,9 +118,20 @@ class Checkout(object):
         # FIXME: We should sort and label the ChangeLog messages like commit-log-editor does.
         return CommitMessage("".join(changelog_messages).splitlines())
 
-    def bug_id_for_this_commit(self, git_commit):
+    def recent_commit_infos_for_files(self, paths):
+        revisions = set(sum(map(self._scm.revisions_changing_file, paths), []))
+        return set(map(self.commit_info_for_revision, revisions))
+
+    def suggested_reviewers(self, git_commit, changed_files=None):
+        changed_files = self.modified_non_changelogs(git_commit, changed_files)
+        commit_infos = self.recent_commit_infos_for_files(changed_files)
+        reviewers = [commit_info.reviewer() for commit_info in commit_infos if commit_info.reviewer()]
+        reviewers.extend([commit_info.author() for commit_info in commit_infos if commit_info.author() and commit_info.author().can_review])
+        return sorted(set(reviewers))
+
+    def bug_id_for_this_commit(self, git_commit, changed_files=None):
         try:
-            return parse_bug_id(self.commit_message_for_this_commit(git_commit).message())
+            return parse_bug_id(self.commit_message_for_this_commit(git_commit, changed_files).message())
         except ScriptError, e:
             pass # We might not have ChangeLogs.
 

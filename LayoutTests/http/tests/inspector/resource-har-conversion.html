@@ -9,14 +9,32 @@ var test = function()
 {
     function getHAR(id)
     {
-        return new WebInspector.HAREntry(WebInspector.resources[id]).build();
+        return new WebInspector.HAREntry(WebInspector.networkResources[id]).build();
     }
 
-    InspectorTest.enableResourceTracking(function() {
+    function addCookieHeadersToResource(resource)
+    {
+        resource.requestHeaders = {
+            "Cookie": "a=b; $Path=/path; $Domain=example.com; a1=b1\nc1=d1"
+        };
+        resource.responseHeaders = {
+            "Set-Cookie": "x=y; Path=/path; Domain=example.com; Discard; httpOnly; Secure; Version=1\nx1=y1\nz2=y2"
+        };
+    }
+
+    function findResourceByURL(url)
+    {
+        for (var id in WebInspector.networkResources) {
+            if (url.test(WebInspector.networkResources[id].url))
+                return WebInspector.networkResources[id];
+        }
+    }
+
+    InspectorTest.reloadPageIfNeeded(function() {
         InjectedScriptAccess.getDefault().evaluate("doXHR()", "console", function() {
-            var resources = Object.keys(WebInspector.resources).map(getHAR).sort(InspectorTest.resourceURLComparer);
+            addCookieHeadersToResource(findResourceByURL(/inspector-test2\.js$/));
+            var resources = Object.keys(WebInspector.networkResources).map(getHAR).sort(InspectorTest.resourceURLComparer);
             InspectorTest.addObject(resources, InspectorTest.HARNondeterministicPropertiesWithSize);
-            InspectorTest.disableResourceTracking();
             InspectorTest.completeTest();
         });
     });

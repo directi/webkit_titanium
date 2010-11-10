@@ -31,6 +31,18 @@
 #include <wtf/text/CString.h>
 #include <windows.h>
 
+#if OS(WINCE)
+#ifndef MFS_DISABLED
+#define MFS_DISABLED MF_GRAYED
+#endif
+#ifndef MIIM_FTYPE
+#define MIIM_FTYPE MIIM_TYPE
+#endif
+#ifndef MIIM_STRING
+#define MIIM_STRING 0
+#endif
+#endif
+
 namespace WebCore {
 
 ContextMenuItem::ContextMenuItem(LPMENUITEMINFO item)
@@ -81,6 +93,16 @@ ContextMenuItem::ContextMenuItem(ContextMenuItemType type, ContextMenuAction act
     String t = title;
     m_platformDescription->cch = t.length();
     m_platformDescription->dwTypeData = wcsdup(t.charactersWithNullTermination());
+}
+
+ContextMenuItem::ContextMenuItem(ContextMenuItemType, ContextMenuAction, const String&, bool, bool)
+{
+    // FIXME: Implement
+}
+
+ContextMenuItem::ContextMenuItem(ContextMenuAction, const String&, bool, bool, Vector<ContextMenuItem>&)
+{
+    // FIXME: Implement
 }
 
 ContextMenuItem::~ContextMenuItem()
@@ -160,6 +182,11 @@ void ContextMenuItem::setSubMenu(ContextMenu* subMenu)
     m_platformDescription->hSubMenu = subMenu->releasePlatformDescription();
 }
 
+void ContextMenuItem::setSubMenu(Vector<ContextMenuItem>&)
+{
+    // FIXME: Implement
+}
+
 void ContextMenuItem::setChecked(bool checked)
 {
     m_platformDescription->fMask |= MIIM_STATE;
@@ -170,6 +197,12 @@ void ContextMenuItem::setChecked(bool checked)
         m_platformDescription->fState &= ~MFS_CHECKED;
         m_platformDescription->fState |= MFS_UNCHECKED;
     }
+}
+
+bool ContextMenuItem::checked() const
+{
+    // FIXME - Implement
+    return false;
 }
 
 void ContextMenuItem::setEnabled(bool enabled)

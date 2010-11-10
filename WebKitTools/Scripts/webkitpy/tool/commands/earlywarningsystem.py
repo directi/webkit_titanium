@@ -48,11 +48,9 @@ class AbstractEarlyWarningSystem(AbstractReviewQueue):
             self.run_webkit_patch([
                 "build",
                 self.port.flag(),
-                "--build",
                 "--build-style=%s" % self._build_style,
                 "--force-clean",
-                "--no-update",
-                "--quiet"])
+                "--no-update"])
             return True
         except ScriptError, e:
             failure_log = self._log_from_script_error_for_upload(e)
@@ -82,6 +80,14 @@ class AbstractEarlyWarningSystem(AbstractReviewQueue):
             raise
 
     def review_patch(self, patch):
+        if patch.is_obsolete():
+            self._did_error(patch, "%s does not process obsolete patches." % self.name)
+            return False
+
+        if patch.bug().is_closed():
+            self._did_error(patch, "%s does not process patches on closed bugs." % self.name)
+            return False
+
         if not self._build(patch, first_run=True):
             if not self._can_build():
                 return False
@@ -149,10 +155,6 @@ class ChromiumWindowsEWS(AbstractChromiumEWS):
     name = "cr-win-ews"
 
 
-class ChromiumMacEWS(AbstractChromiumEWS):
-    name = "cr-mac-ews"
-
-
 # For platforms that we can't run inside a VM (like Mac OS X), we require
 # patches to be uploaded by committers, who are generally trustworthy folk. :)
 class AbstractCommitterOnlyEWS(AbstractEarlyWarningSystem):
@@ -165,6 +167,14 @@ class AbstractCommitterOnlyEWS(AbstractEarlyWarningSystem):
             self._did_error(patch, "%s cannot process patches from non-committers :(" % self.name)
             return False
         return AbstractEarlyWarningSystem.process_work_item(self, patch)
+
+
+# FIXME: Inheriting from AbstractCommitterOnlyEWS is kinda a hack, but it
+# happens to work because AbstractChromiumEWS and AbstractCommitterOnlyEWS
+# provide disjoint sets of functionality, and Python is otherwise smart
+# enough to handle the diamond inheritance.
+class ChromiumMacEWS(AbstractChromiumEWS, AbstractCommitterOnlyEWS):
+    name = "cr-mac-ews"
 
 
 class MacEWS(AbstractCommitterOnlyEWS):

@@ -64,7 +64,6 @@
 #include "ResourceHandleInternal.h"
 #include "ResourceHandle.h"
 #include "ScriptController.h"
-#include "ScriptString.h"
 #include "Settings.h"
 #include "QWebPageClient.h"
 #include "ViewportArguments.h"
@@ -105,6 +104,13 @@ static QString drtDescriptionSuitableForTestResult(WebCore::Frame* _frame)
             return QString::fromLatin1("frame \"%1\"").arg(name);
         return QLatin1String("frame (anonymous)");
     }
+}
+
+static QString drtPrintFrameUserGestureStatus(WebCore::Frame* frame)
+{
+    if (frame->loader()->isProcessingUserGesture())
+        return QString::fromLatin1("Frame with user gesture \"%1\"").arg(QLatin1String("true"));
+    return QString::fromLatin1("Frame with user gesture \"%1\"").arg(QLatin1String("false"));
 }
 
 static QString drtDescriptionSuitableForTestResult(const WebCore::KURL& _url)
@@ -160,6 +166,7 @@ namespace WebCore
 {
 
 bool FrameLoaderClientQt::dumpFrameLoaderCallbacks = false;
+bool FrameLoaderClientQt::dumpUserGestureInFrameLoaderCallbacks = false;
 bool FrameLoaderClientQt::dumpResourceLoadCallbacks = false;
 bool FrameLoaderClientQt::sendRequestReturnsNullOnRedirect = false;
 bool FrameLoaderClientQt::sendRequestReturnsNull = false;
@@ -275,6 +282,9 @@ void FrameLoaderClientQt::transitionToCommittedForNewPage()
                         vScrollbar, vLock);
 }
 
+void FrameLoaderClientQt::dispatchDidBecomeFrameset(bool)
+{
+}
 
 void FrameLoaderClientQt::makeRepresentation(DocumentLoader*)
 {
@@ -315,7 +325,6 @@ void FrameLoaderClientQt::dispatchDidHandleOnloadEvents()
     // don't need this one
     if (dumpFrameLoaderCallbacks)
         printf("%s - didHandleOnloadEventsForFrame\n", qPrintable(drtDescriptionSuitableForTestResult(m_frame)));
-
 }
 
 
@@ -374,7 +383,7 @@ void FrameLoaderClientQt::dispatchDidPushStateWithinPage()
 {
     if (dumpFrameLoaderCallbacks)
         printf("%s - dispatchDidPushStateWithinPage\n", qPrintable(drtDescriptionSuitableForTestResult(m_frame)));
-        
+
     notImplemented();
 }
 
@@ -382,7 +391,7 @@ void FrameLoaderClientQt::dispatchDidReplaceStateWithinPage()
 {
     if (dumpFrameLoaderCallbacks)
         printf("%s - dispatchDidReplaceStateWithinPage\n", qPrintable(drtDescriptionSuitableForTestResult(m_frame)));
-        
+
     notImplemented();
 }
 
@@ -390,7 +399,7 @@ void FrameLoaderClientQt::dispatchDidPopStateWithinPage()
 {
     if (dumpFrameLoaderCallbacks)
         printf("%s - dispatchDidPopStateWithinPage\n", qPrintable(drtDescriptionSuitableForTestResult(m_frame)));
-        
+
     notImplemented();
 }
 
@@ -403,6 +412,9 @@ void FrameLoaderClientQt::dispatchDidStartProvisionalLoad()
 {
     if (dumpFrameLoaderCallbacks)
         printf("%s - didStartProvisionalLoadForFrame\n", qPrintable(drtDescriptionSuitableForTestResult(m_frame)));
+
+    if (dumpUserGestureInFrameLoaderCallbacks)
+        printf("%s - in didStartProvisionalLoadForFrame\n", qPrintable(drtPrintFrameUserGestureStatus(m_frame)));
 
     if (m_webFrame)
         emit m_webFrame->provisionalLoad();
@@ -1103,7 +1115,7 @@ void FrameLoaderClientQt::dispatchDidFailLoad(const WebCore::ResourceError& erro
         callErrorPageExtension(error);
 }
 
-WebCore::Frame* FrameLoaderClientQt::dispatchCreatePage()
+WebCore::Frame* FrameLoaderClientQt::dispatchCreatePage(const WebCore::NavigationAction&)
 {
     if (!m_webFrame)
         return 0;
@@ -1261,6 +1273,10 @@ void FrameLoaderClientQt::didTransferChildFrameToNewDocument(Page*)
         if (m_webFrame->parent() != qobject_cast<QObject*>(parent))
             m_webFrame->setParent(parent);
     }
+}
+
+void FrameLoaderClientQt::transferLoadingResourceFromPage(unsigned long, DocumentLoader*, const ResourceRequest&, Page*)
+{
 }
 
 ObjectContentType FrameLoaderClientQt::objectContentType(const KURL& url, const String& _mimeType)
@@ -1505,6 +1521,7 @@ PassRefPtr<Widget> FrameLoaderClientQt::createPlugin(const IntSize& pluginSize, 
     else { // NPAPI Plugins
         Vector<String> params = paramNames;
         Vector<String> values = paramValues;
+#if !OS(SYMBIAN)
         if (mimeType == "application/x-shockwave-flash") {
             QWebPageClient* client = m_webFrame->page()->d->client;
             const bool isQWebView = client && qobject_cast<QWidget*>(client->pluginParent());
@@ -1530,6 +1547,7 @@ PassRefPtr<Widget> FrameLoaderClientQt::createPlugin(const IntSize& pluginSize, 
             }
 #endif
         }
+#endif
 
         RefPtr<PluginView> pluginView = PluginView::create(m_frame, pluginSize, element, url,
             params, values, mimeType, loadManually);

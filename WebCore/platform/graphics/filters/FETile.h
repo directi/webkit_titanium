@@ -35,10 +35,12 @@ public:
     virtual void apply(Filter*);
     virtual void dump();
 
+    virtual void determineAbsolutePaintRect(Filter*) { setAbsolutePaintRect(maxEffectRect()); }
+
+    virtual FilterEffectType filterEffectType() const { return FilterEffectTypeTile; }
+
     virtual TextStream& externalRepresentation(TextStream&, int indention) const;
 
-    virtual FloatRect determineFilterPrimitiveSubregion(Filter*);
-    
 private:
     FETile();
 };

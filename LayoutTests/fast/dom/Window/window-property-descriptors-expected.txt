@@ -38,6 +38,7 @@ PASS typeof Object.getOwnPropertyDescriptor(window, 'Counter') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'DOMException') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'DOMImplementation') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'DOMParser') is 'object'
+PASS typeof Object.getOwnPropertyDescriptor(window, 'DOMSettableTokenList') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'DOMStringList') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'DOMStringMap') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'DOMTokenList') is 'object'
@@ -104,6 +105,7 @@ PASS typeof Object.getOwnPropertyDescriptor(window, 'HTMLOListElement') is 'obje
 PASS typeof Object.getOwnPropertyDescriptor(window, 'HTMLObjectElement') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'HTMLOptGroupElement') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'HTMLOptionElement') is 'object'
+PASS typeof Object.getOwnPropertyDescriptor(window, 'HTMLOutputElement') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'HTMLParagraphElement') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'HTMLParamElement') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'HTMLPreElement') is 'object'
@@ -333,6 +335,7 @@ PASS typeof Object.getOwnPropertyDescriptor(window, 'areArraysEqual') is 'object
 PASS typeof Object.getOwnPropertyDescriptor(window, 'clientInformation') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'closed') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'console') is 'object'
+PASS typeof Object.getOwnPropertyDescriptor(window, 'constructor') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'crypto') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'debug') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'decodeURI') is 'object'
@@ -459,6 +462,7 @@ PASS typeof Object.getOwnPropertyDescriptor(window, 'scrollbars') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'self') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'sessionStorage') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'shouldBe') is 'object'
+PASS typeof Object.getOwnPropertyDescriptor(window, 'shouldBeDefined') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'shouldBeEqualToString') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'shouldBeFalse') is 'object'
 PASS typeof Object.getOwnPropertyDescriptor(window, 'shouldBeGreaterThanOrEqual') is 'object'
@@ -497,7 +501,6 @@ PASS Object.getOwnPropertyDescriptor(window, 'clearInterval') is undefined.
 PASS Object.getOwnPropertyDescriptor(window, 'clearTimeout') is undefined.
 PASS Object.getOwnPropertyDescriptor(window, 'close') is undefined.
 PASS Object.getOwnPropertyDescriptor(window, 'confirm') is undefined.
-PASS Object.getOwnPropertyDescriptor(window, 'constructor') is undefined.
 PASS Object.getOwnPropertyDescriptor(window, 'dispatchEvent') is undefined.
 PASS Object.getOwnPropertyDescriptor(window, 'find') is undefined.
 PASS Object.getOwnPropertyDescriptor(window, 'focus') is undefined.

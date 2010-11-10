@@ -93,12 +93,12 @@ namespace WebCore {
         Editor* editor() const;
         EventHandler* eventHandler() const;
         FrameLoader* loader() const;
-        RedirectScheduler* redirectScheduler() const;
+        NavigationScheduler* navigationScheduler() const;
         SelectionController* selection() const;
         FrameTree* tree() const;
         AnimationController* animation() const;
         ScriptController* script();
-
+        
         RenderView* contentRenderer() const; // Root of the render tree for the document contained in this frame.
         RenderPart* ownerRenderer() const; // Renderer for the element that contains this frame.
 
@@ -143,6 +143,9 @@ namespace WebCore {
         void setTextZoomFactor(float factor);
         float textZoomFactor() const { return m_textZoomFactor; }
         void setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor);
+
+        void scalePage(float scale);
+        float pageScaleFactor() const { return m_pageScaleFactor; }
 
 #if ENABLE(ORIENTATION_EVENTS)
         // Orientation is the interface orientation in degrees. Some examples are:
@@ -194,7 +197,7 @@ namespace WebCore {
         Page* m_page;
         mutable FrameTree m_treeNode;
         mutable FrameLoader m_loader;
-        mutable RedirectScheduler m_redirectScheduler;
+        mutable NavigationScheduler m_navigationScheduler;
 
         mutable RefPtr<DOMWindow> m_domWindow;
         HashSet<DOMWindow*> m_liveFormerWindows;
@@ -214,6 +217,8 @@ namespace WebCore {
 
         float m_pageZoomFactor;
         float m_textZoomFactor;
+
+        float m_pageScaleFactor;
 
 #if ENABLE(ORIENTATION_EVENTS)
         int m_orientation;
@@ -237,6 +242,7 @@ namespace WebCore {
         virtual void tiledBackingStorePaintEnd(const Vector<IntRect>& paintedArea);
         virtual IntRect tiledBackingStoreContentsRect();
         virtual IntRect tiledBackingStoreVisibleRect();
+        virtual Color tiledBackingStoreBackgroundColor() const;
 
         OwnPtr<TiledBackingStore> m_tiledBackingStore;
 #endif
@@ -252,9 +258,9 @@ namespace WebCore {
         return &m_loader;
     }
 
-    inline RedirectScheduler* Frame::redirectScheduler() const
+    inline NavigationScheduler* Frame::navigationScheduler() const
     {
-        return &m_redirectScheduler;
+        return &m_navigationScheduler;
     }
 
     inline FrameView* Frame::view() const

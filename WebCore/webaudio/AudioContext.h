@@ -1,29 +1,25 @@
 /*
- * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2010, Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- *
  * 1.  Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
+ *    notice, this list of conditions and the following disclaimer.
  * 2.  Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
- *     its contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL APPLE OR ITS CONTRIBUTORS BE LIABLE FOR ANY
+ * DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS BE LIABLE FOR ANY
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef AudioContext_h
@@ -32,6 +28,8 @@
 #include "ActiveDOMObject.h"
 #include "AudioBus.h"
 #include "AudioDestinationNode.h"
+#include "HRTFDatabaseLoader.h"
+#include <wtf/HashSet.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -110,6 +108,9 @@ public:
     // When a source node has no more processing to do (has finished playing), then it tells the context to dereference it.
     void notifyNodeFinishedProcessing(AudioNode*);
 
+    // Called at the start of each render quantum.
+    void handlePreRenderTasks();
+
     // Called at the end of each render quantum.
     void handlePostRenderTasks();
 
@@ -135,7 +136,7 @@ public:
     
     void setAudioThread(ThreadIdentifier thread) { m_audioThread = thread; } // FIXME: check either not initialized or the same
     ThreadIdentifier audioThread() const { return m_audioThread; }
-    bool isAudioThread();
+    bool isAudioThread() const;
 
     // Returns true only after the audio thread has been started and then shutdown.
     bool isAudioThreadFinished() { return m_isAudioThreadFinished; }
@@ -150,7 +151,7 @@ public:
     void unlock();
 
     // Returns true if this thread owns the context's lock.
-    bool isGraphOwner();
+    bool isGraphOwner() const;
 
     class AutoLocker {
     public:
@@ -176,6 +177,10 @@ public:
 
     // In the audio thread at the start of each render cycle, we'll call handleDeferredFinishDerefs().
     void handleDeferredFinishDerefs();
+
+    // Only accessed when the graph lock is held.
+    void markAudioNodeInputDirty(AudioNodeInput*);
+    void markAudioNodeOutputDirty(AudioNodeOutput*);
     
 private:
     AudioContext(Document*);
@@ -217,6 +222,12 @@ private:
     Vector<AudioNode*> m_nodesToDelete;
 
     Vector<RefPtr<CachedAudio> > m_cachedAudioReferences;
+    
+    // Only accessed when the graph lock is held.
+    HashSet<AudioNodeInput*> m_dirtyAudioNodeInputs;
+    HashSet<AudioNodeOutput*> m_dirtyAudioNodeOutputs;
+    void handleDirtyAudioNodeInputs();
+    void handleDirtyAudioNodeOutputs();
 
     OwnPtr<AudioBus> m_temporaryMonoBus;
     OwnPtr<AudioBus> m_temporaryStereoBus;
@@ -241,6 +252,9 @@ private:
 
     // Only accessed in the audio thread.
     Vector<RefInfo> m_deferredFinishDerefList;
+    
+    // HRTF Database loader
+    RefPtr<HRTFDatabaseLoader> m_hrtfDatabaseLoader;
 };
 
 } // WebCore

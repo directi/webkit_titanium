@@ -44,25 +44,9 @@ class MockQueueEngine(object):
         pass
 
 
-class MockPatch():
-    def id(self):
-        return 197
-
-    def bug_id(self):
-        return 142
-
-    def is_rollout(self):
-        return False
-
-
 class QueuesTest(unittest.TestCase):
-    # Ids match patch1 in mocktool.py
-    mock_work_item = Attachment({
-        "id": 197,
-        "bug_id": 142,
-        "name": "Patch",
-        "attacher_email": "adam@example.com",
-    }, None)
+    # This is _patch1 in mocktool.py
+    mock_work_item = MockTool().bugs.fetch_attachment(197)
 
     def assert_outputs(self, func, func_name, args, expected_stdout, expected_stderr, expected_exceptions):
         exception = None
@@ -80,13 +64,18 @@ class QueuesTest(unittest.TestCase):
         string_replacements = {"name": name, 'checkout_dir': checkout_dir}
         return "CAUTION: %(name)s will discard all local changes in \"%(checkout_dir)s\"\nRunning WebKit %(name)s.\nMOCK: update_status: %(name)s Starting Queue\n" % string_replacements
 
-    def assert_queue_outputs(self, queue, args=None, work_item=None, expected_stdout=None, expected_stderr=None, expected_exceptions=None, options=Mock(), tool=MockTool()):
+    def assert_queue_outputs(self, queue, args=None, work_item=None, expected_stdout=None, expected_stderr=None, expected_exceptions=None, options=None, tool=None):
+        if not tool:
+            tool = MockTool()
         if not expected_stdout:
             expected_stdout = {}
         if not expected_stderr:
             expected_stderr = {}
         if not args:
             args = []
+        if not options:
+            options = Mock()
+            options.port = None
         if not work_item:
             work_item = self.mock_work_item
         tool.user.prompt = lambda message: "yes"
@@ -103,4 +92,4 @@ class QueuesTest(unittest.TestCase):
         self.assert_outputs(queue.handle_unexpected_error, "handle_unexpected_error", [work_item, "Mock error message"], expected_stdout, expected_stderr, expected_exceptions)
         # Should we have a different function for testing StepSequenceErrorHandlers?
         if isinstance(queue, StepSequenceErrorHandler):
-            self.assert_outputs(queue.handle_script_error, "handle_script_error", [tool, {"patch": MockPatch()}, ScriptError(message="ScriptError error message", script_args="MockErrorCommand")], expected_stdout, expected_stderr, expected_exceptions)
+            self.assert_outputs(queue.handle_script_error, "handle_script_error", [tool, {"patch": self.mock_work_item}, ScriptError(message="ScriptError error message", script_args="MockErrorCommand")], expected_stdout, expected_stderr, expected_exceptions)

@@ -59,6 +59,8 @@ WebInspector.SourceView.prototype = {
     hide: function()
     {
         this.sourceFrame.visible = false;
+        if (!this._frameNeedsSetup)
+            this.sourceFrame.clearLineHighlight();
         WebInspector.View.prototype.hide.call(this);
         if (this.localSourceFrame)
             this.localSourceFrame.visible = false;
@@ -71,6 +73,7 @@ WebInspector.SourceView.prototype = {
             this.sourceFrame.resize();
         if (this.localSourceFrame)
             this.localSourceFrame.resize();
+        WebInspector.ResourceView.prototype.resize.call(this);
     },
 
     setupSourceFrameIfNeeded: function()
@@ -81,7 +84,7 @@ WebInspector.SourceView.prototype = {
         this.attach();
 
         delete this._frameNeedsSetup;
-        WebInspector.getResourceContent(this.resource.identifier, this._contentLoaded.bind(this));
+        this.resource.requestContent(this._contentLoaded.bind(this));
     },
 
     hasContentTab: function()

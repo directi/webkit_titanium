@@ -36,13 +36,13 @@
 #include "KURL.h"
 #include "MediaPlayerPrivateTaskTimer.h"
 #include "QTCFDictionary.h"
+#include "QTDecompressionSession.h"
 #include "QTMovie.h"
 #include "QTMovieTask.h"
 #include "QTMovieVisualContext.h"
 #include "ScrollView.h"
 #include "Settings.h"
 #include "SoftLinking.h"
-#include "StringBuilder.h"
 #include "TimeRanges.h"
 #include "Timer.h"
 #include <AssertMacros.h>
@@ -53,6 +53,7 @@
 #include <wtf/MainThread.h>
 #include <wtf/MathExtras.h>
 #include <wtf/StdLibExtras.h>
+#include <wtf/text/StringBuilder.h>
 #include <wtf/text/StringHash.h>
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -174,6 +175,8 @@ MediaPlayerPrivateQuickTimeVisualContext::MediaPlayerPrivateQuickTimeVisualConte
     , m_movieTransform(CGAffineTransformIdentity)
 #endif
     , m_visualContextClient(new MediaPlayerPrivateQuickTimeVisualContext::VisualContextClient(this))
+    , m_delayingLoad(false)
+    , m_preload(MediaPlayer::Auto)
 {
 }
 
@@ -241,7 +244,7 @@ static void addCookieParam(StringBuilder& cookieBuilder, const String& name, con
     // Add parameter name, and value if there is one.
     cookieBuilder.append(name);
     if (!value.isEmpty()) {
-        cookieBuilder.append("=");
+        cookieBuilder.append('=');
         cookieBuilder.append(value);
     }
 }
@@ -275,7 +278,7 @@ void MediaPlayerPrivateQuickTimeVisualContext::setUpCookiesForQuickTime(const St
             addCookieParam(cookieBuilder, "expires", rfc2616DateStringFromTime(cookie.expires));
         if (cookie.httpOnly) 
             addCookieParam(cookieBuilder, "httpOnly", String());
-        cookieBuilder.append(";");
+        cookieBuilder.append(';');
 
         String cookieURL;
         if (!cookie.domain.isEmpty()) {
@@ -316,7 +319,27 @@ static void disableComponentsOnce()
         QTMovie::disableComponent(componentsToDisable[i]);
 }
 
+void MediaPlayerPrivateQuickTimeVisualContext::resumeLoad()
+{
+    m_delayingLoad = false;
+
+    if (!m_movieURL.isEmpty())
+        loadInternal(m_movieURL);
+}
+
 void MediaPlayerPrivateQuickTimeVisualContext::load(const String& url)
+{
+    m_movieURL = url;
+
+    if (m_preload == MediaPlayer::None) {
+        m_delayingLoad = true;
+        return;
+    }
+
+    loadInternal(url);
+}
+
+void MediaPlayerPrivateQuickTimeVisualContext::loadInternal(const String& url)
 {
     if (!QTMovie::initializeQuickTime()) {
         // FIXME: is this the right error to return?
@@ -345,6 +368,12 @@ void MediaPlayerPrivateQuickTimeVisualContext::load(const String& url)
     m_movie = adoptRef(new QTMovie(m_movieClient.get()));
     m_movie->load(url.characters(), url.length(), m_player->preservesPitch());
     m_movie->setVolume(m_player->volume());
+}
+
+void MediaPlayerPrivateQuickTimeVisualContext::prepareToPlay()
+{
+    if (!m_movie || m_delayingLoad)
+        resumeLoad();
 }
 
 void MediaPlayerPrivateQuickTimeVisualContext::play()
@@ -700,12 +729,24 @@ void MediaPlayerPrivateQuickTimeVisualContext::paint(GraphicsContext* p, const I
     if (currentMode == MediaRenderingSoftwareRenderer && !m_visualContext)
         return;
 
-#if USE(ACCELERATED_COMPOSITING)
-    if (m_qtVideoLayer)
-        return;
-#endif
     QTPixelBuffer buffer = m_visualContext->imageForTime(0);
     if (buffer.pixelBufferRef()) {
+#if USE(ACCELERATED_COMPOSITING)
+        if (m_qtVideoLayer) {
+            // We are probably being asked to render the video into a canvas, but 
+            // there's a good chance the QTPixelBuffer is not ARGB and thus can't be
+            // drawn using CG.  If so, fire up an ICMDecompressionSession and convert 
+            // the current frame into something which can be rendered by CG.
+            if (!buffer.pixelFormatIs32ARGB() && !buffer.pixelFormatIs32BGRA()) {
+                // The decompression session will only decompress a specific pixelFormat 
+                // at a specific width and height; if these differ, the session must be
+                // recreated with the new parameters.
+                if (!m_decompressionSession || !m_decompressionSession->canDecompress(buffer))
+                    m_decompressionSession = QTDecompressionSession::create(buffer.pixelFormatType(), buffer.width(), buffer.height());
+                buffer = m_decompressionSession->decompress(buffer);
+            }
+        }
+#endif
         CGImageRef image = CreateCGImageFromPixelBuffer(buffer);
         
         CGContextRef context = p->platformContext();
@@ -1005,6 +1046,23 @@ bool MediaPlayerPrivateQuickTimeVisualContext::hasSingleSecurityOrigin() const
     return true;
 }
 
+void MediaPlayerPrivateQuickTimeVisualContext::setPreload(MediaPlayer::Preload preload)
+{
+    m_preload = preload;
+    if (m_delayingLoad && m_preload != MediaPlayer::None)
+        resumeLoad();
+}
+
+float MediaPlayerPrivateQuickTimeVisualContext::mediaTimeForTimeValue(float timeValue) const
+{
+    long timeScale;
+    if (m_readyState < MediaPlayer::HaveMetadata || !(timeScale = m_movie->timeScale()))
+        return timeValue;
+
+    long mediaTimeValue = static_cast<long>(timeValue * timeScale);
+    return static_cast<float>(mediaTimeValue) / timeScale;
+}
+
 MediaPlayerPrivateQuickTimeVisualContext::MediaRenderingMode MediaPlayerPrivateQuickTimeVisualContext::currentRenderingMode() const
 {
     if (!m_movie)
@@ -1054,7 +1112,7 @@ void MediaPlayerPrivateQuickTimeVisualContext::setUpVideoRendering()
         m_player->mediaPlayerClient()->mediaPlayerRenderingModeChanged(m_player);
 #endif
 
-    QTMovieVisualContext::Type contextType = requiredDllsAvailable() && preferredMode == MediaRenderingMovieLayer ? QTMovieVisualContext::ConfigureForCAImageQueue : QTMovieVisualContext::ConfigureForCGImage;
+    QTPixelBuffer::Type contextType = requiredDllsAvailable() && preferredMode == MediaRenderingMovieLayer ? QTPixelBuffer::ConfigureForCAImageQueue : QTPixelBuffer::ConfigureForCGImage;
     m_visualContext = QTMovieVisualContext::create(m_visualContextClient.get(), contextType);
     m_visualContext->setMovie(m_movie.get());
 }

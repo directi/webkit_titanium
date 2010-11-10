@@ -23,7 +23,7 @@
 #include "HitTestResult.h"
 #include "InlineFlowBox.h"
 #include "RenderArena.h"
-#include "RenderBox.h"
+#include "RenderBlock.h"
 #include "RootInlineBox.h"
 
 using namespace std;
@@ -95,14 +95,14 @@ int InlineBox::logicalHeight() const
     if (renderer()->isText())
         return m_isText ? renderer()->style(m_firstLine)->font().height() : 0;
     if (renderer()->isBox() && parent())
-        return toRenderBox(m_renderer)->height();
+        return isHorizontal() ? toRenderBox(m_renderer)->height() : toRenderBox(m_renderer)->width();
 
     ASSERT(isInlineFlowBox());
     RenderBoxModelObject* flowObject = boxModelObject();
     const Font& font = renderer()->style(m_firstLine)->font();
     int result = font.height();
     if (parent())
-        result += flowObject->borderAndPaddingHeight();
+        result += flowObject->borderAndPaddingLogicalHeight();
     return result;
 }
 
@@ -164,22 +164,26 @@ void InlineBox::paint(PaintInfo& paintInfo, int tx, int ty)
     if (!paintInfo.shouldPaintWithinRoot(renderer()) || (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection))
         return;
 
+    IntPoint childPoint = IntPoint(tx, ty);
+    if (parent()->renderer()->style()->isFlippedBlocksWritingMode()) // Faster than calling containingBlock().
+        childPoint = renderer()->containingBlock()->flipForWritingMode(toRenderBox(renderer()), childPoint, RenderBox::ParentToChildFlippingAdjustment);
+    
     // Paint all phases of replaced elements atomically, as though the replaced element established its
     // own stacking context.  (See Appendix E.2, section 6.4 on inline block/table elements in the CSS2.1
     // specification.)
     bool preservePhase = paintInfo.phase == PaintPhaseSelection || paintInfo.phase == PaintPhaseTextClip;
     PaintInfo info(paintInfo);
     info.phase = preservePhase ? paintInfo.phase : PaintPhaseBlockBackground;
-    renderer()->paint(info, tx, ty);
+    renderer()->paint(info, childPoint.x(), childPoint.y());
     if (!preservePhase) {
         info.phase = PaintPhaseChildBlockBackgrounds;
-        renderer()->paint(info, tx, ty);
+        renderer()->paint(info, childPoint.x(), childPoint.y());
         info.phase = PaintPhaseFloat;
-        renderer()->paint(info, tx, ty);
+        renderer()->paint(info, childPoint.x(), childPoint.y());
         info.phase = PaintPhaseForeground;
-        renderer()->paint(info, tx, ty);
+        renderer()->paint(info, childPoint.x(), childPoint.y());
         info.phase = PaintPhaseOutline;
-        renderer()->paint(info, tx, ty);
+        renderer()->paint(info, childPoint.x(), childPoint.y());
     }
 }
 
@@ -277,6 +281,31 @@ int InlineBox::placeEllipsisBox(bool, int, int, int, bool&)
 {
     // Use -1 to mean "we didn't set the position."
     return -1;
+}
+
+IntPoint InlineBox::locationIncludingFlipping()
+{
+    if (!renderer()->style()->isFlippedBlocksWritingMode())
+        return IntPoint(x(), y());
+    RenderBlock* block = root()->block();
+    if (block->style()->isHorizontalWritingMode())
+        return IntPoint(x(), block->height() - height() - y());
+    else
+        return IntPoint(block->width() - width() - x(), y());
+}
+
+void InlineBox::flipForWritingMode(IntRect& rect)
+{
+    if (!renderer()->style()->isFlippedBlocksWritingMode())
+        return;
+    root()->block()->flipForWritingMode(rect);
+}
+
+IntPoint InlineBox::flipForWritingMode(const IntPoint& point)
+{
+    if (!renderer()->style()->isFlippedBlocksWritingMode())
+        return point;
+    return root()->block()->flipForWritingMode(point);
 }
 
 } // namespace WebCore

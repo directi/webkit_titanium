@@ -23,7 +23,7 @@
  *    2) in one case at least: OS-X-specific performance bug workarounds
  *    3) the special trick to catch us using new or delete without including "config.h"
  * The project should be able to build without this header, although we rarely test that.
- */
+ */ 
 
 /* Things that need to be defined globally should go into "config.h". */
 
@@ -63,19 +63,6 @@
 #include <pthread.h>
 #endif
 #endif // defined(WIN32) || defined(_WIN32)
-
-#if defined(ANDROID)
-#ifdef __cplusplus
-// Must come before include of algorithm.
-#define PREFIX_FOR_WEBCORE 1
-#define EXPORT __attribute__((visibility("default")))
-#endif
-// Android uses a single set of include directories when building WebKit and
-// JavaScriptCore. Since WebCore/ is included before JavaScriptCore/, Android
-// includes JavaScriptCore/config.h explicitly here to make sure it gets picked
-// up.
-#include <JavaScriptCore/config.h>
-#endif
 
 #if !defined(BUILDING_BREWMP__)
 #include <sys/types.h>

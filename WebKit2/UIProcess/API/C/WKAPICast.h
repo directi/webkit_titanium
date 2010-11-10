@@ -26,18 +26,23 @@
 #ifndef WKAPICast_h
 #define WKAPICast_h
 
-#include "WKSharedAPICast.h"
+#include "CacheModel.h"
+#include "FindOptions.h"
+#include "WKContext.h"
 #include "WKPage.h"
+#include "WKSharedAPICast.h"
 #include <WebCore/FrameLoaderTypes.h>
 
 namespace WebKit {
 
+class DownloadProxy;
 class WebBackForwardList;
 class WebBackForwardListItem;
 class WebContext;
 class WebFormSubmissionListenerProxy;
 class WebFramePolicyListenerProxy;
 class WebFrameProxy;
+class WebInspectorProxy;
 class WebNavigationData;
 class WebPageNamespace;
 class WebPageProxy;
@@ -46,9 +51,11 @@ class WebPreferences;
 WK_ADD_API_MAPPING(WKBackForwardListItemRef, WebBackForwardListItem)
 WK_ADD_API_MAPPING(WKBackForwardListRef, WebBackForwardList)
 WK_ADD_API_MAPPING(WKContextRef, WebContext)
+WK_ADD_API_MAPPING(WKDownloadRef, DownloadProxy)
 WK_ADD_API_MAPPING(WKFormSubmissionListenerRef, WebFormSubmissionListenerProxy)
 WK_ADD_API_MAPPING(WKFramePolicyListenerRef, WebFramePolicyListenerProxy)
 WK_ADD_API_MAPPING(WKFrameRef, WebFrameProxy)
+WK_ADD_API_MAPPING(WKInspectorRef, WebInspectorProxy)
 WK_ADD_API_MAPPING(WKNavigationDataRef, WebNavigationData)
 WK_ADD_API_MAPPING(WKPageNamespaceRef, WebPageNamespace)
 WK_ADD_API_MAPPING(WKPageRef, WebPageProxy)
@@ -56,7 +63,7 @@ WK_ADD_API_MAPPING(WKPreferencesRef, WebPreferences)
 
 /* Enum conversions */
 
-inline WKFrameNavigationType toRef(WebCore::NavigationType type)
+inline WKFrameNavigationType toAPI(WebCore::NavigationType type)
 {
     WKFrameNavigationType wkType = kWKFrameNavigationTypeOther;
 
@@ -82,6 +89,64 @@ inline WKFrameNavigationType toRef(WebCore::NavigationType type)
     }
     
     return wkType;
+}
+
+inline CacheModel toCacheModel(WKCacheModel wkCacheModel)
+{
+    switch (wkCacheModel) {
+    case kWKCacheModelDocumentViewer:
+        return CacheModelDocumentViewer;
+    case kWKCacheModelDocumentBrowser:
+        return CacheModelDocumentBrowser;
+    case kWKCacheModelPrimaryWebBrowser:
+        return CacheModelPrimaryWebBrowser;
+    }
+
+    ASSERT_NOT_REACHED();
+    return CacheModelDocumentViewer;
+}
+
+inline WKCacheModel toAPI(CacheModel cacheModel)
+{
+    switch (cacheModel) {
+    case CacheModelDocumentViewer:
+        return kWKCacheModelDocumentViewer;
+    case CacheModelDocumentBrowser:
+        return kWKCacheModelDocumentBrowser;
+    case CacheModelPrimaryWebBrowser:
+        return kWKCacheModelPrimaryWebBrowser;
+    }
+    
+    return kWKCacheModelDocumentViewer;
+}
+
+inline FindDirection toFindDirection(WKFindDirection wkFindDirection)
+{
+    switch (wkFindDirection) {
+    case kWKFindDirectionForward:
+        return FindDirectionForward;
+    case kWKFindDirectionBackward:
+        return FindDirectionBackward;
+    }
+
+    ASSERT_NOT_REACHED();
+    return FindDirectionForward;
+}
+
+inline FindOptions toFindOptions(WKFindOptions wkFindOptions)
+{
+    unsigned findOptions = 0;
+
+    if (wkFindOptions & kWKFindOptionsCaseInsensitive)
+        findOptions |= FindOptionsCaseInsensitive;
+    if (wkFindOptions & kWKFindOptionsWrapAround)
+        findOptions |= FindOptionsWrapAround;
+    if (wkFindOptions & kWKFindOptionsShowOverlay)
+        findOptions |= FindOptionsShowOverlay;
+    if (wkFindOptions & kWKFindOptionsShowFindIndicator)
+        findOptions |= FindOptionsShowFindIndicator;
+
+    return static_cast<FindOptions>(findOptions);
 }
 
 } // namespace WebKit

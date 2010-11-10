@@ -50,41 +50,44 @@ public:
     void setWidth(int width) { m_frameRect.setWidth(width); }
     void setHeight(int height) { m_frameRect.setHeight(height); }
 
-    int logicalLeft() const { return style()->isVerticalBlockFlow() ? x() : y(); }
-    int logicalTop() const { return style()->isVerticalBlockFlow() ? y() : x(); }
-    int logicalWidth() const { return style()->isVerticalBlockFlow() ? width() : height(); }
-    int logicalHeight() const { return style()->isVerticalBlockFlow() ? height() : width(); }
+    int logicalLeft() const { return style()->isHorizontalWritingMode() ? x() : y(); }
+    int logicalRight() const { return logicalLeft() + logicalWidth(); }
+    int logicalTop() const { return style()->isHorizontalWritingMode() ? y() : x(); }
+    int logicalBottom() const { return logicalTop() + logicalHeight(); }
+    int logicalWidth() const { return style()->isHorizontalWritingMode() ? width() : height(); }
+    int logicalHeight() const { return style()->isHorizontalWritingMode() ? height() : width(); }
+
     void setLogicalLeft(int left)
     {
-        if (style()->isVerticalBlockFlow())
+        if (style()->isHorizontalWritingMode())
             setX(left);
         else
             setY(left);
     }
     void setLogicalTop(int top)
     {
-        if (style()->isVerticalBlockFlow())
+        if (style()->isHorizontalWritingMode())
             setY(top);
         else
             setX(top);
     }
     void setLogicalWidth(int size)
     {
-        if (style()->isVerticalBlockFlow())
+        if (style()->isHorizontalWritingMode())
             setWidth(size);
         else
             setHeight(size);
     }
     void setLogicalHeight(int size)
     {
-        if (style()->isVerticalBlockFlow())
+        if (style()->isHorizontalWritingMode())
             setHeight(size);
         else
             setWidth(size);
     }
     void setLogicalLocation(int left, int top)
     {
-        if (style()->isVerticalBlockFlow())
+        if (style()->isHorizontalWritingMode())
             setLocation(left, top);
         else
             setLocation(top, left);
@@ -102,6 +105,9 @@ public:
 
     IntRect frameRect() const { return m_frameRect; }
     void setFrameRect(const IntRect& rect) { m_frameRect = rect; }
+
+    IntRect transformedFrameRect() const;
+    IntRect applyLayerTransformToRect(const IntRect&) const;
 
     IntRect borderBoxRect() const { return IntRect(0, 0, width(), height()); }
     virtual IntRect borderBoundingBox() const { return borderBoxRect(); } 
@@ -127,19 +133,23 @@ public:
     int bottomVisibleOverflow() const { return hasOverflowClip() ? bottomVisualOverflow() : std::max(bottomLayoutOverflow(), bottomVisualOverflow()); }
     int leftVisibleOverflow() const { return hasOverflowClip() ? leftVisualOverflow() : std::min(leftLayoutOverflow(), leftVisualOverflow()); }
     int rightVisibleOverflow() const { return hasOverflowClip() ? rightVisualOverflow() :  std::max(rightLayoutOverflow(), rightVisualOverflow()); }
-    
+
     IntRect layoutOverflowRect() const { return m_overflow ? m_overflow->layoutOverflowRect() : borderBoxRect(); }
     int topLayoutOverflow() const { return m_overflow? m_overflow->topLayoutOverflow() : 0; }
     int bottomLayoutOverflow() const { return m_overflow ? m_overflow->bottomLayoutOverflow() : height(); }
     int leftLayoutOverflow() const { return m_overflow ? m_overflow->leftLayoutOverflow() : 0; }
     int rightLayoutOverflow() const { return m_overflow ? m_overflow->rightLayoutOverflow() : width(); }
+    int logicalLeftLayoutOverflow() const { return style()->isHorizontalWritingMode() ? leftLayoutOverflow() : topLayoutOverflow(); }
+    int logicalRightLayoutOverflow() const { return style()->isHorizontalWritingMode() ? rightLayoutOverflow() : bottomLayoutOverflow(); }
     
     IntRect visualOverflowRect() const { return m_overflow ? m_overflow->visualOverflowRect() : borderBoxRect(); }
     int topVisualOverflow() const { return m_overflow? m_overflow->topVisualOverflow() : 0; }
     int bottomVisualOverflow() const { return m_overflow ? m_overflow->bottomVisualOverflow() : height(); }
     int leftVisualOverflow() const { return m_overflow ? m_overflow->leftVisualOverflow() : 0; }
     int rightVisualOverflow() const { return m_overflow ? m_overflow->rightVisualOverflow() : width(); }
-
+    int logicalLeftVisualOverflow() const { return style()->isHorizontalWritingMode() ? leftVisualOverflow() : topVisualOverflow(); }
+    int logicalRightVisualOverflow() const { return style()->isHorizontalWritingMode() ? rightVisualOverflow() : bottomVisualOverflow(); }
+    
     void addLayoutOverflow(const IntRect&);
     void addVisualOverflow(const IntRect&);
     
@@ -148,10 +158,13 @@ public:
     void addOverflowFromChild(RenderBox* child, const IntSize& delta);
     void clearLayoutOverflow();
 
+    void blockDirectionOverflow(bool isLineHorizontal, int& logicalTopLayoutOverflow, int& logicalBottomLayoutOverflow,
+                                int& logicalTopVisualOverflow, int& logicalBottomVisualOverflow);
+
     int contentWidth() const { return clientWidth() - paddingLeft() - paddingRight(); }
     int contentHeight() const { return clientHeight() - paddingTop() - paddingBottom(); }
-    int contentLogicalWidth() const { return style()->isVerticalBlockFlow() ? contentWidth() : contentHeight(); }
-    int contentLogicalHeight() const { return style()->isVerticalBlockFlow() ? contentHeight() : contentWidth(); }
+    int contentLogicalWidth() const { return style()->isHorizontalWritingMode() ? contentWidth() : contentHeight(); }
+    int contentLogicalHeight() const { return style()->isHorizontalWritingMode() ? contentHeight() : contentWidth(); }
 
     // IE extensions. Used to calculate offsetWidth/Height.  Overridden by inlines (RenderFlow)
     // to return the remaining width on a given line (and the height of a single line).
@@ -202,24 +215,8 @@ public:
     // methods.
     enum MarginSign { PositiveMargin, NegativeMargin };
     virtual bool isSelfCollapsingBlock() const { return false; }
-    int collapsedMarginBefore() const
-    {
-        return maxMarginBefore(PositiveMargin) - maxMarginBefore(NegativeMargin);
-    }
-    int collapsedMarginAfter() const
-    { 
-        return maxMarginAfter(PositiveMargin) - maxMarginAfter(NegativeMargin);
-}
-    virtual int maxMarginBefore(MarginSign sign) const
-    { 
-        int beforeMargin = marginBefore();
-        return (sign == PositiveMargin) ? std::max(0, beforeMargin) : -std::min(0, beforeMargin);
-    }
-    virtual int maxMarginAfter(MarginSign sign) const
-    {
-        int afterMargin = marginAfter();
-        return (sign == PositiveMargin) ? std::max(0, afterMargin) : -std::min(0, afterMargin);
-    }
+    virtual int collapsedMarginBefore() const { return marginBefore(); }
+    virtual int collapsedMarginAfter() const { return marginAfter(); }
 
     virtual void absoluteRects(Vector<IntRect>&, int tx, int ty);
     virtual void absoluteQuads(Vector<FloatQuad>&);
@@ -271,9 +268,11 @@ public:
     void setInlineBoxWrapper(InlineBox* boxWrapper) { m_inlineBoxWrapper = boxWrapper; }
     void deleteLineBoxWrapper();
 
-    virtual int lowestPosition(bool includeOverflowInterior = true, bool includeSelf = true) const;
-    virtual int rightmostPosition(bool includeOverflowInterior = true, bool includeSelf = true) const;
-    virtual int leftmostPosition(bool includeOverflowInterior = true, bool includeSelf = true) const;
+    enum ApplyTransform { IncludeTransform, ExcludeTransform };
+    virtual int topmostPosition(bool includeOverflowInterior = true, bool includeSelf = true, ApplyTransform = IncludeTransform) const;
+    virtual int lowestPosition(bool includeOverflowInterior = true, bool includeSelf = true,  ApplyTransform = IncludeTransform) const;
+    virtual int rightmostPosition(bool includeOverflowInterior = true, bool includeSelf = true, ApplyTransform = IncludeTransform) const;
+    virtual int leftmostPosition(bool includeOverflowInterior = true, bool includeSelf = true, ApplyTransform = IncludeTransform) const;
 
     virtual IntRect clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer);
     virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, IntRect&, bool fixed = false);
@@ -288,10 +287,12 @@ public:
 
     bool stretchesToViewport() const
     {
-        return document()->inQuirksMode() && style()->logicalHeight().isAuto() && !isFloatingOrPositioned() && (isRoot() || isBody()) && !isBlockFlowRoot();
+        return document()->inQuirksMode() && style()->logicalHeight().isAuto() && !isFloatingOrPositioned() && (isRoot() || isBody());
     }
 
     virtual IntSize intrinsicSize() const { return IntSize(); }
+    int intrinsicLogicalWidth() const { return style()->isHorizontalWritingMode() ? intrinsicSize().width() : intrinsicSize().height(); }
+    int intrinsicLogicalHeight() const { return style()->isHorizontalWritingMode() ? intrinsicSize().height() : intrinsicSize().width(); }
 
     // Whether or not the element shrinks to its intrinsic width (rather than filling the width
     // of a containing block).  HTML4 buttons, <select>s, <input>s, legends, and floating/compact elements do this.
@@ -300,11 +301,11 @@ public:
 
     int computeLogicalWidthUsing(LogicalWidthType, int availableLogicalWidth);
     int computeLogicalHeightUsing(const Length& height);
-    int computeReplacedWidthUsing(Length width) const;
-    int computeReplacedHeightUsing(Length height) const;
+    int computeReplacedLogicalWidthUsing(Length width) const;
+    int computeReplacedLogicalHeightUsing(Length height) const;
 
-    virtual int computeReplacedWidth(bool includeMaxWidth = true) const;
-    virtual int computeReplacedHeight() const;
+    virtual int computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
+    virtual int computeReplacedLogicalHeight() const;
 
     int computePercentageLogicalHeight(const Length& height);
 
@@ -315,12 +316,12 @@ public:
     
     // There are a few cases where we need to refer specifically to the available physical width and available physical height.
     // Relative positioning is one of those cases, since left/top offsets are physical.
-    int availableWidth() const { return style()->isVerticalBlockFlow() ? availableLogicalWidth() : availableLogicalHeight(); }
-    int availableHeight() const { return style()->isVerticalBlockFlow() ? availableLogicalHeight() : availableLogicalWidth(); }
+    int availableWidth() const { return style()->isHorizontalWritingMode() ? availableLogicalWidth() : availableLogicalHeight(); }
+    int availableHeight() const { return style()->isHorizontalWritingMode() ? availableLogicalHeight() : availableLogicalWidth(); }
 
     virtual int verticalScrollbarWidth() const;
     int horizontalScrollbarHeight() const;
-    int scrollbarLogicalHeight() const { return style()->isVerticalBlockFlow() ? horizontalScrollbarHeight() : verticalScrollbarWidth(); }
+    int scrollbarLogicalHeight() const { return style()->isHorizontalWritingMode() ? horizontalScrollbarHeight() : verticalScrollbarWidth(); }
     virtual bool scroll(ScrollDirection, ScrollGranularity, float multiplier = 1, Node** stopNode = 0);
     bool canBeScrolledAndHasScrollableArea() const;
     virtual bool canBeProgramaticallyScrolled(bool) const;
@@ -372,9 +373,20 @@ public:
     bool shrinkToAvoidFloats() const;
     virtual bool avoidsFloats() const;
 
-    virtual void markDescendantBlocksAndLinesForLayout(bool inLayout = true);
+    virtual void markForPaginationRelayoutIfNeeded() { }
+
+    bool isWritingModeRoot() const { return !parent() || parent()->style()->writingMode() != style()->writingMode(); }
     
-    bool isBlockFlowRoot() const { return !parent() || parent()->style()->blockFlow() != style()->blockFlow(); }
+    virtual int lineHeight(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
+    virtual int baselinePosition(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
+
+    enum FlippingAdjustment { ChildToParentFlippingAdjustment, ParentToChildFlippingAdjustment };
+    IntPoint flipForWritingMode(RenderBox* child, const IntPoint&, FlippingAdjustment);
+    int flipForWritingMode(int position);
+    IntPoint flipForWritingMode(const IntPoint&);
+    IntSize flipForWritingMode(const IntSize&);
+    void flipForWritingMode(IntRect&);
+    IntSize locationOffsetIncludingFlipping();
 
 protected:
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle);

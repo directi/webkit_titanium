@@ -274,6 +274,8 @@ FloatRect Path::strokeBoundingRect(StrokeStyleApplier* applier)
 
 bool Path::contains(const FloatPoint& point, WindRule rule) const
 {
+    if (!isfinite(point.x()) || !isfinite(point.y()))
+        return false;
     cairo_t* cr = platformPath()->context();
     cairo_fill_rule_t cur = cairo_get_fill_rule(cr);
     cairo_set_fill_rule(cr, rule == RULE_EVENODD ? CAIRO_FILL_RULE_EVEN_ODD : CAIRO_FILL_RULE_WINDING);
@@ -335,42 +337,6 @@ void Path::transform(const AffineTransform& trans)
     cairo_matrix_t c_matrix = cairo_matrix_t(trans);
     cairo_matrix_invert(&c_matrix);
     cairo_transform(cr, &c_matrix);
-}
-
-String Path::debugString() const
-{
-    if (isEmpty())
-        return String();
-
-    String pathString;
-    OwnPtr<cairo_path_t> path(cairo_copy_path(platformPath()->context()));
-    cairo_path_data_t* data;
-
-    for (int i = 0; i < path->num_data; i += path->data[i].header.length) {
-        data = &path->data[i];
-        switch (data->header.type) {
-        case CAIRO_PATH_MOVE_TO:
-            if (i < (path->num_data - path->data[i].header.length))
-                pathString += String::format("M%.2f,%.2f ",
-                                      data[1].point.x, data[1].point.y);
-            break;
-        case CAIRO_PATH_LINE_TO:
-            pathString += String::format("L%.2f,%.2f ",
-                                      data[1].point.x, data[1].point.y);
-            break;
-        case CAIRO_PATH_CURVE_TO:
-            pathString += String::format("C%.2f,%.2f,%.2f,%.2f,%.2f,%.2f ",
-                                      data[1].point.x, data[1].point.y,
-                                      data[2].point.x, data[2].point.y,
-                                      data[3].point.x, data[3].point.y);
-            break;
-        case CAIRO_PATH_CLOSE_PATH:
-            pathString += "Z ";
-            break;
-        }
-    }
-
-    return pathString.simplifyWhiteSpace();
 }
 
 } // namespace WebCore

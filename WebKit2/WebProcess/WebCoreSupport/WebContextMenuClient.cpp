@@ -25,6 +25,10 @@
 
 #include "WebContextMenuClient.h"
 
+#include "WebContextMenuItemData.h"
+#include "WebPage.h"
+#include <WebCore/ContextMenu.h>
+
 #define DISABLE_NOT_IMPLEMENTED_WARNINGS 1
 #include "NotImplemented.h"
 
@@ -37,10 +41,14 @@ void WebContextMenuClient::contextMenuDestroyed()
     delete this;
 }
 
-PlatformMenuDescription WebContextMenuClient::getCustomMenuFromDefaultItems(ContextMenu*)
+PlatformMenuDescription WebContextMenuClient::getCustomMenuFromDefaultItems(ContextMenu* menu)
 {
-    notImplemented();
-    return 0;
+    Vector<WebContextMenuItemData> newMenu;
+    if (!m_page->injectedBundleContextMenuClient().getCustomMenuFromDefaultItems(m_page, menu, newMenu))
+        return menu->platformDescription();
+    
+    Vector<ContextMenuItem> coreItemVector = coreItems(newMenu);
+    return platformMenuDescription(coreItemVector);
 }
 
 void WebContextMenuClient::contextMenuItemSelected(ContextMenuItem*, const ContextMenu*)

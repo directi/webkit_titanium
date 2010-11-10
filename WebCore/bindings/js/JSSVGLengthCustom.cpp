@@ -22,28 +22,66 @@
 #if ENABLE(SVG)
 #include "JSSVGLength.h"
 
+#include <runtime/Error.h>
+#include "SVGAnimatedProperty.h"
+#include "SVGException.h"
+
 using namespace JSC;
 
 namespace WebCore {
 
 JSValue JSSVGLength::value(ExecState* exec) const
 {
-    JSSVGPODTypeWrapper<SVGLength>* imp = impl();
-    SVGElement* context = JSSVGContextCache::svgContextForDOMObject(const_cast<JSSVGLength*>(this));
+    SVGLength& podImp = impl()->propertyReference();
+    ExceptionCode ec = 0;
+    float value = podImp.value(impl()->contextElement(), ec);
+    if (ec) {
+        setDOMException(exec, ec);
+        return jsUndefined();
+    }
 
-    SVGLength podImp(*imp);
-    return jsNumber(exec, podImp.value(context));
+    return jsNumber(value);
+}
+
+void JSSVGLength::setValue(ExecState* exec, JSValue value)
+{
+    if (!value.isUndefinedOrNull() && !value.isNumber() && !value.isBoolean()) {
+        throwVMTypeError(exec);
+        return;
+    }
+
+    SVGLength& podImp = impl()->propertyReference();
+
+    ExceptionCode ec = 0;
+    podImp.setValue(value.toFloat(exec), impl()->contextElement(), ec);
+    if (ec) {
+        setDOMException(exec, ec);
+        return;
+    }
+
+    impl()->commitChange();
 }
 
 JSValue JSSVGLength::convertToSpecifiedUnits(ExecState* exec)
 {
-    JSSVGPODTypeWrapper<SVGLength>* imp = impl();
-    SVGElement* context = JSSVGContextCache::svgContextForDOMObject(this);
+    SVGLength& podImp = impl()->propertyReference();
 
-    SVGLength podImp(*imp);
-    podImp.convertToSpecifiedUnits(exec->argument(0).toInt32(exec), context);
+    // Mimic the behaviour of RequiresAllArguments=Raise.
+    if (exec->argumentCount() < 1)
+        return throwError(exec, createSyntaxError(exec, "Not enough arguments"));
 
-    imp->commitChange(podImp, this);
+    unsigned short unitType = exec->argument(0).toUInt32(exec);
+    if (exec->hadException())
+        return jsUndefined();
+
+    ExceptionCode ec = 0;
+    podImp.convertToSpecifiedUnits(unitType, impl()->contextElement(), ec);
+    if (ec) {
+        setDOMException(exec, ec);
+        return jsUndefined();
+    }
+
+    impl()->commitChange();
     return jsUndefined();
 }
 

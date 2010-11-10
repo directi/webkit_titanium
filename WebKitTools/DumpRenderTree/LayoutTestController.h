@@ -94,7 +94,7 @@ public:
     void setMockDeviceOrientation(bool canProvideAlpha, double alpha, bool canProvideBeta, double beta, bool canProvideGamma, double gamma);
     void setMockGeolocationError(int code, JSStringRef message);
     void setMockGeolocationPosition(double latitude, double longitude, double accuracy);
-    void setMockSpeechInputResult(JSStringRef result);
+    void setMockSpeechInputResult(JSStringRef result, JSStringRef language);
     void setPersistentUserStyleSheetLocation(JSStringRef path);
     void setPluginsEnabled(bool flag);
     void setPopupBlockingEnabled(bool flag);
@@ -154,6 +154,9 @@ public:
 
     bool dumpFrameLoadCallbacks() const { return m_dumpFrameLoadCallbacks; }
     void setDumpFrameLoadCallbacks(bool dumpFrameLoadCallbacks) { m_dumpFrameLoadCallbacks = dumpFrameLoadCallbacks; }
+    
+    bool dumpUserGestureInFrameLoadCallbacks() const { return m_dumpUserGestureInFrameLoadCallbacks; }
+    void setDumpUserGestureInFrameLoadCallbacks(bool dumpUserGestureInFrameLoadCallbacks) { m_dumpUserGestureInFrameLoadCallbacks = dumpUserGestureInFrameLoadCallbacks; }    
 
     bool dumpHistoryDelegateCallbacks() const { return m_dumpHistoryDelegateCallbacks; }
     void setDumpHistoryDelegateCallbacks(bool dumpHistoryDelegateCallbacks) { m_dumpHistoryDelegateCallbacks = dumpHistoryDelegateCallbacks; }
@@ -279,6 +282,8 @@ public:
 
     void abortModal();
 
+    bool hasSpellingMarker(int from, int length);
+
     // The following API test functions should probably be moved to platform-specific 
     // unit tests outside of DRT once they exist.
     void apiTestNewWindowDataLoadBaseURL(JSStringRef utf8Data, JSStringRef baseURL);
@@ -309,6 +314,7 @@ private:
     bool m_dumpDatabaseCallbacks;
     bool m_dumpEditingCallbacks;
     bool m_dumpFrameLoadCallbacks;
+    bool m_dumpUserGestureInFrameLoadCallbacks;
     bool m_dumpHistoryDelegateCallbacks;
     bool m_dumpResourceLoadCallbacks;
     bool m_dumpResourceResponseMIMETypes;

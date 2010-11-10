@@ -45,7 +45,7 @@
 #include "HTMLFrameSetElement.h"
 #include "HTMLNames.h"
 #include "HTMLPlugInImageElement.h"
-#include "InspectorTimelineAgent.h"
+#include "InspectorInstrumentation.h"
 #include "OverflowEvent.h"
 #include "RenderEmbeddedObject.h"
 #include "RenderLayer.h"
@@ -349,6 +349,16 @@ void FrameView::setMarginHeight(int h)
     m_margins.setHeight(h);
 }
 
+bool FrameView::delegatesScrolling()
+{
+    ASSERT(m_frame);
+
+    if (parent())
+        return false;
+
+    return m_frame->settings() && m_frame->settings()->shouldDelegateScrolling();
+}
+
 bool FrameView::avoidScrollbarCreation()
 {
     ASSERT(m_frame);
@@ -378,9 +388,9 @@ void FrameView::updateCanHaveScrollbars()
     ScrollbarMode vMode;
     scrollbarModes(hMode, vMode);
     if (hMode == ScrollbarAlwaysOff && vMode == ScrollbarAlwaysOff)
-        m_canHaveScrollbars = false;
+        setCanHaveScrollbars(false);
     else
-        m_canHaveScrollbars = true;
+        setCanHaveScrollbars(true);
 }
 
 PassRefPtr<Scrollbar> FrameView::createScrollbar(ScrollbarOrientation orientation)
@@ -477,6 +487,56 @@ void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, S
     m_viewportRenderer = o;
 }
 
+void FrameView::calculateScrollbarModesForLayout(ScrollbarMode& hMode, ScrollbarMode& vMode)
+{
+    if (m_canHaveScrollbars) {
+        hMode = ScrollbarAuto;
+        vMode = ScrollbarAuto;
+    } else {
+        hMode = ScrollbarAlwaysOff;
+        vMode = ScrollbarAlwaysOff;
+    }
+    
+    if (!m_layoutRoot) {
+        Document* document = m_frame->document();
+        Node* documentElement = document->documentElement();
+        RenderObject* rootRenderer = documentElement ? documentElement->renderer() : 0;
+        Node* body = document->body();
+        if (body && body->renderer()) {
+            if (body->hasTagName(framesetTag) && m_frame->settings() && !m_frame->settings()->frameFlatteningEnabled()) {
+                body->renderer()->setChildNeedsLayout(true);
+                vMode = ScrollbarAlwaysOff;
+                hMode = ScrollbarAlwaysOff;
+            } else if (body->hasTagName(bodyTag)) {
+                // It's sufficient to just check the X overflow,
+                // since it's illegal to have visible in only one direction.
+                RenderObject* o = rootRenderer->style()->overflowX() == OVISIBLE && document->documentElement()->hasTagName(htmlTag) ? body->renderer() : rootRenderer;
+                applyOverflowToViewport(o, hMode, vMode);
+            }
+        } else if (rootRenderer) {
+#if ENABLE(SVG)
+            if (documentElement->isSVGElement()) {
+                if (!m_firstLayout && (m_size.width() != layoutWidth() || m_size.height() != layoutHeight()))
+                    rootRenderer->setChildNeedsLayout(true);
+            } else
+                applyOverflowToViewport(rootRenderer, hMode, vMode);
+#else
+            applyOverflowToViewport(rootRenderer, hMode, vMode);
+#endif
+        }
+#ifdef INSTRUMENT_LAYOUT_SCHEDULING
+        if (m_firstLayout && !document->ownerElement())
+            printf("Elapsed time before first layout: %d\n", document->elapsedTime());
+#endif
+    }
+    
+    HTMLFrameOwnerElement* owner = m_frame->ownerElement();
+    if (owner && (owner->scrollingMode() == ScrollbarAlwaysOff)) {
+        hMode = ScrollbarAlwaysOff;
+        vMode = ScrollbarAlwaysOff;
+    }     
+}
+    
 #if USE(ACCELERATED_COMPOSITING)
 void FrameView::updateCompositingLayers()
 {
@@ -507,6 +567,37 @@ bool FrameView::hasCompositedContent() const
     return false;
 }
 
+bool FrameView::hasCompositedContentIncludingDescendants() const
+{
+#if USE(ACCELERATED_COMPOSITING)
+    for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext(m_frame.get())) {
+        RenderView* renderView = frame->contentRenderer();
+        RenderLayerCompositor* compositor = renderView ? renderView->compositor() : 0;
+        if (compositor) {
+            if (compositor->inCompositingMode())
+                return true;
+
+            if (!RenderLayerCompositor::allowsIndependentlyCompositedIFrames(this))
+                break;
+        }
+    }
+#endif
+    return false;
+}
+
+bool FrameView::hasCompositingAncestor() const
+{
+#if USE(ACCELERATED_COMPOSITING)
+    for (Frame* frame = m_frame->tree()->parent(); frame; frame = frame->tree()->parent()) {
+        if (FrameView* view = frame->view()) {
+            if (view->hasCompositedContent())
+                return true;
+        }
+    }
+#endif
+    return false;
+}
+
 // Sometimes (for plug-ins) we need to eagerly go into compositing mode.
 void FrameView::enterCompositingMode()
 {
@@ -523,10 +614,15 @@ bool FrameView::isEnclosedInCompositingLayer() const
 {
 #if USE(ACCELERATED_COMPOSITING)
     RenderObject* frameOwnerRenderer = m_frame->ownerRenderer();
-    return frameOwnerRenderer && frameOwnerRenderer->containerForRepaint();
-#else
-    return false;
+    if (frameOwnerRenderer && frameOwnerRenderer->containerForRepaint())
+        return true;
+
+    if (Frame* parentFrame = m_frame->tree()->parent()) {
+        if (FrameView* parentView = parentFrame->view())
+            return parentView->isEnclosedInCompositingLayer();
+    }
 #endif
+    return false;
 }
 
 bool FrameView::syncCompositingStateRecursive()
@@ -617,10 +713,7 @@ void FrameView::layout(bool allowSubtree)
     if (isPainting())
         return;
 
-#if ENABLE(INSPECTOR)    
-    if (InspectorTimelineAgent* timelineAgent = inspectorTimelineAgent())
-        timelineAgent->willLayout();
-#endif
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willLayout(m_frame.get());
 
     if (!allowSubtree && m_layoutRoot) {
         m_layoutRoot->markContainingBlocksForLayout(false);
@@ -669,47 +762,8 @@ void FrameView::layout(bool allowSubtree)
 
     ScrollbarMode hMode;
     ScrollbarMode vMode;
-    if (m_canHaveScrollbars) {
-        hMode = ScrollbarAuto;
-        vMode = ScrollbarAuto;
-    } else {
-        hMode = ScrollbarAlwaysOff;
-        vMode = ScrollbarAlwaysOff;
-    }
-
-    if (!subtree) {
-        Node* documentElement = document->documentElement();
-        RenderObject* rootRenderer = documentElement ? documentElement->renderer() : 0;
-        Node* body = document->body();
-        if (body && body->renderer()) {
-            if (body->hasTagName(framesetTag) && m_frame->settings() && !m_frame->settings()->frameFlatteningEnabled()) {
-                body->renderer()->setChildNeedsLayout(true);
-                vMode = ScrollbarAlwaysOff;
-                hMode = ScrollbarAlwaysOff;
-            } else if (body->hasTagName(bodyTag)) {
-                if (!m_firstLayout && m_size.height() != layoutHeight() && body->renderer()->enclosingBox()->stretchesToViewport())
-                    body->renderer()->setChildNeedsLayout(true);
-                // It's sufficient to just check the X overflow,
-                // since it's illegal to have visible in only one direction.
-                RenderObject* o = rootRenderer->style()->overflowX() == OVISIBLE && document->documentElement()->hasTagName(htmlTag) ? body->renderer() : rootRenderer;
-                applyOverflowToViewport(o, hMode, vMode);
-            }
-        } else if (rootRenderer) {
-#if ENABLE(SVG)
-            if (documentElement->isSVGElement()) {
-                if (!m_firstLayout && (m_size.width() != layoutWidth() || m_size.height() != layoutHeight()))
-                    rootRenderer->setChildNeedsLayout(true);
-            } else
-                applyOverflowToViewport(rootRenderer, hMode, vMode);
-#else
-            applyOverflowToViewport(rootRenderer, hMode, vMode);
-#endif
-        }
-#ifdef INSTRUMENT_LAYOUT_SCHEDULING
-        if (m_firstLayout && !document->ownerElement())
-            printf("Elapsed time before first layout: %d\n", document->elapsedTime());
-#endif
-    }
+    
+    calculateScrollbarModesForLayout(hMode, vMode);
 
     m_doFullRepaint = !subtree && (m_firstLayout || toRenderView(root)->printing());
 
@@ -744,8 +798,17 @@ void FrameView::layout(bool allowSubtree)
 
         m_size = IntSize(layoutWidth(), layoutHeight());
 
-        if (oldSize != m_size)
+        if (oldSize != m_size) {
             m_doFullRepaint = true;
+            if (!m_firstLayout) {
+                RenderBox* rootRenderer = document->documentElement() ? document->documentElement()->renderBox() : 0;
+                RenderBox* bodyRenderer = rootRenderer && document->body() ? document->body()->renderBox() : 0;
+                if (bodyRenderer && bodyRenderer->stretchesToViewport())
+                    bodyRenderer->setChildNeedsLayout(true);
+                else if (rootRenderer && rootRenderer->stretchesToViewport())
+                    rootRenderer->setChildNeedsLayout(true);
+            }
+        }
     }
 
     RenderLayer* layer = root->enclosingLayer();
@@ -809,7 +872,7 @@ void FrameView::layout(bool allowSubtree)
 
     ASSERT(!root->needsLayout());
 
-    setCanBlitOnScroll(!useSlowRepaints());
+    updateCanBlitOnScrollRecursively();
 
     if (document->hasListenerType(Document::OVERFLOWCHANGED_LISTENER))
         updateOverflowStatus(layoutWidth() < contentsWidth(),
@@ -840,10 +903,7 @@ void FrameView::layout(bool allowSubtree)
         ASSERT(m_enqueueEvents);
     }
 
-#if ENABLE(INSPECTOR)
-    if (InspectorTimelineAgent* timelineAgent = inspectorTimelineAgent())
-        timelineAgent->didLayout();
-#endif
+    InspectorInstrumentation::didLayout(cookie);
 
     m_nestedLayoutCount--;
 }
@@ -893,24 +953,48 @@ void FrameView::adjustMediaTypeForPrinting(bool printing)
 
 bool FrameView::useSlowRepaints() const
 {
-    return m_useSlowRepaints || m_slowRepaintObjectCount > 0 || (platformWidget() && m_fixedObjectCount > 0) || m_isOverlapped || !m_contentIsOpaque;
+    if (m_useSlowRepaints || m_slowRepaintObjectCount > 0 || (platformWidget() && m_fixedObjectCount > 0) || m_isOverlapped || !m_contentIsOpaque)
+        return true;
+
+    if (Frame* parentFrame = m_frame->tree()->parent()) {
+        if (FrameView* parentView = parentFrame->view())
+            return parentView->useSlowRepaints();
+    }
+
+    return false;
 }
 
 bool FrameView::useSlowRepaintsIfNotOverlapped() const
 {
-    return m_useSlowRepaints || m_slowRepaintObjectCount > 0 || (platformWidget() && m_fixedObjectCount > 0) || !m_contentIsOpaque;
+    if (m_useSlowRepaints || m_slowRepaintObjectCount > 0 || (platformWidget() && m_fixedObjectCount > 0) || !m_contentIsOpaque)
+        return true;
+
+    if (Frame* parentFrame = m_frame->tree()->parent()) {
+        if (FrameView* parentView = parentFrame->view())
+            return parentView->useSlowRepaintsIfNotOverlapped();
+    }
+
+    return false;
+}
+
+void FrameView::updateCanBlitOnScrollRecursively()
+{
+    for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext(m_frame.get())) {
+        if (FrameView* view = frame->view())
+            view->setCanBlitOnScroll(!view->useSlowRepaints());
+    }
 }
 
 void FrameView::setUseSlowRepaints()
 {
     m_useSlowRepaints = true;
-    setCanBlitOnScroll(false);
+    updateCanBlitOnScrollRecursively();
 }
 
 void FrameView::addSlowRepaintObject()
 {
     if (!m_slowRepaintObjectCount)
-        setCanBlitOnScroll(false);
+        updateCanBlitOnScrollRecursively();
     m_slowRepaintObjectCount++;
 }
 
@@ -919,13 +1003,13 @@ void FrameView::removeSlowRepaintObject()
     ASSERT(m_slowRepaintObjectCount > 0);
     m_slowRepaintObjectCount--;
     if (!m_slowRepaintObjectCount)
-        setCanBlitOnScroll(!useSlowRepaints());
+        updateCanBlitOnScrollRecursively();
 }
 
 void FrameView::addFixedObject()
 {
     if (!m_fixedObjectCount && platformWidget())
-        setCanBlitOnScroll(false);
+        updateCanBlitOnScrollRecursively();
     ++m_fixedObjectCount;
 }
 
@@ -934,7 +1018,7 @@ void FrameView::removeFixedObject()
     ASSERT(m_fixedObjectCount > 0);
     --m_fixedObjectCount;
     if (!m_fixedObjectCount)
-        setCanBlitOnScroll(!useSlowRepaints());
+        updateCanBlitOnScrollRecursively();
 }
 
 bool FrameView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect)
@@ -993,6 +1077,23 @@ bool FrameView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRect
     return false;
 }
 
+void FrameView::scrollContentsSlowPath(const IntRect& updateRect)
+{
+#if USE(ACCELERATED_COMPOSITING)
+    if (RenderPart* frameRenderer = m_frame->ownerRenderer()) {
+        if (frameRenderer->containerForRepaint()) {
+            IntRect rect(frameRenderer->borderLeft() + frameRenderer->paddingLeft(),
+                         frameRenderer->borderTop() + frameRenderer->paddingTop(),
+                         visibleWidth(), visibleHeight());
+            frameRenderer->repaintRectangle(rect);
+            return;
+        }
+    }
+#endif
+
+    ScrollView::scrollContentsSlowPath(updateRect);
+}
+
 // Note that this gets called at painting time.
 void FrameView::setIsOverlapped(bool isOverlapped)
 {
@@ -1000,12 +1101,12 @@ void FrameView::setIsOverlapped(bool isOverlapped)
         return;
 
     m_isOverlapped = isOverlapped;
-    setCanBlitOnScroll(!useSlowRepaints());
+    updateCanBlitOnScrollRecursively();
     
 #if USE(ACCELERATED_COMPOSITING)
-    // Overlap can affect compositing tests, so if it changes, we need to trigger
-    // a layer update in the parent document.
-    if (hasCompositedContent()) {
+    if (hasCompositedContentIncludingDescendants()) {
+        // Overlap can affect compositing tests, so if it changes, we need to trigger
+        // a layer update in the parent document.
         if (Frame* parentFrame = m_frame->tree()->parent()) {
             if (RenderView* parentView = parentFrame->contentRenderer()) {
                 RenderLayerCompositor* compositor = parentView->compositor();
@@ -1013,8 +1114,35 @@ void FrameView::setIsOverlapped(bool isOverlapped)
                 compositor->scheduleCompositingLayerUpdate();
             }
         }
+
+        if (RenderLayerCompositor::allowsIndependentlyCompositedIFrames(this)) {
+            // We also need to trigger reevaluation for this and all descendant frames,
+            // since a frame uses compositing if any ancestor is compositing.
+            for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext(m_frame.get())) {
+                if (RenderView* view = frame->contentRenderer()) {
+                    RenderLayerCompositor* compositor = view->compositor();
+                    compositor->setCompositingLayersNeedRebuild();
+                    compositor->scheduleCompositingLayerUpdate();
+                }
+            }
+        }
     }
-#endif    
+#endif
+}
+
+bool FrameView::isOverlappedIncludingAncestors() const
+{
+    if (isOverlapped())
+        return true;
+
+    if (Frame* parentFrame = m_frame->tree()->parent()) {
+        if (FrameView* parentView = parentFrame->view()) {
+            if (parentView->isOverlapped())
+                return true;
+        }
+    }
+
+    return false;
 }
 
 void FrameView::setContentIsOpaque(bool contentIsOpaque)
@@ -1023,7 +1151,7 @@ void FrameView::setContentIsOpaque(bool contentIsOpaque)
         return;
 
     m_contentIsOpaque = contentIsOpaque;
-    setCanBlitOnScroll(!useSlowRepaints());
+    updateCanBlitOnScrollRecursively();
 }
 
 void FrameView::restoreScrollbar()
@@ -1490,12 +1618,10 @@ void FrameView::setBaseBackgroundColor(Color bc)
 void FrameView::updateBackgroundRecursively(const Color& backgroundColor, bool transparent)
 {
     for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext(m_frame.get())) {
-        FrameView* view = frame->view();
-        if (!view)
-            continue;
-
-        view->setTransparent(transparent);
-        view->setBaseBackgroundColor(backgroundColor);
+        if (FrameView* view = frame->view()) {
+            view->setTransparent(transparent);
+            view->setBaseBackgroundColor(backgroundColor);
+        }
     }
 }
 
@@ -1932,10 +2058,7 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
     if (!frame())
         return;
 
-#if ENABLE(INSPECTOR)
-    if (InspectorTimelineAgent* timelineAgent = inspectorTimelineAgent())
-        timelineAgent->willPaint(rect);
-#endif
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willPaint(m_frame.get(), rect);
 
     Document* document = frame()->document();
 
@@ -1955,7 +2078,7 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
         fillWithRed = true;
     
     if (fillWithRed)
-        p->fillRect(rect, Color(0xFF, 0, 0), DeviceColorSpace);
+        p->fillRect(rect, Color(0xFF, 0, 0), ColorSpaceDeviceRGB);
 #endif
 
     bool isTopLevelPainter = !sCurrentPaintTimeStamp;
@@ -2009,10 +2132,7 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
     if (isTopLevelPainter)
         sCurrentPaintTimeStamp = 0;
 
-#if ENABLE(INSPECTOR)
-    if (InspectorTimelineAgent* timelineAgent = inspectorTimelineAgent())
-        timelineAgent->didPaint();
-#endif
+    InspectorInstrumentation::didPaint(cookie);
 }
 
 void FrameView::setPaintBehavior(PaintBehavior behavior)

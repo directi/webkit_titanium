@@ -24,11 +24,6 @@ function doit()
 
 function frontend_runTest(testController)
 {
-    if (!WebInspector.panels.resources.resourceTrackingEnabled) {
-        WebInspector.panels.resources._toggleResourceTracking();
-        return "refreshing";
-    }
-
     testController.waitUntilDone();
     frontend_expandDOMSubtree(WebInspector.domAgent.document);
     testController.runAfterPendingDispatches(function() {
@@ -37,9 +32,9 @@ function frontend_runTest(testController)
             var matchedCSSRules = styles.matchedCSSRules;
             for (var i = 0; i < matchedCSSRules.length; ++i) {
                 var rule = matchedCSSRules[i];
-                InspectorBackend.getStyleSourceData(rule.style.id, frontend_styleDataReceived.bind(null, testController, rule, false));
+                InspectorBackend.getStyleSourceData(rule.style.styleId, frontend_styleDataReceived.bind(null, testController, rule, false));
             }
-            InspectorBackend.getStyleSourceData(styles.inlineStyle.id, frontend_styleDataReceived.bind(null, testController, styles.inlineStyle, true));
+            InspectorBackend.getStyleSourceData(styles.inlineStyle.styleId, frontend_styleDataReceived.bind(null, testController, styles.inlineStyle, true));
         }
         InspectorBackend.getStyles(WebInspector.domAgent.document.body.id, true, stylesCallback.bind(null, testController));
     });

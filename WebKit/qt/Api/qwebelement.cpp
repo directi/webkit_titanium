@@ -26,6 +26,7 @@
 #include "CSSRule.h"
 #include "CSSRuleList.h"
 #include "CSSStyleRule.h"
+#include "CSSStyleSelector.h"
 #include "Document.h"
 #include "DocumentFragment.h"
 #include "FrameView.h"
@@ -310,6 +311,11 @@ void QWebElement::setOuterXml(const QString &markup)
 
     \note This is currently implemented for (X)HTML elements only.
 
+    \note The format of the markup returned will obey the namespace of the
+    document containing the element. This means the return value will obey XML
+    formatting rules, such as self-closing tags, only if the document is
+    'text/xhtml+xml'.
+
     \sa setOuterXml(), setInnerXml(), toInnerXml()
 */
 QString QWebElement::toOuterXml() const
@@ -343,6 +349,11 @@ void QWebElement::setInnerXml(const QString &markup)
     Returns the XML content between the element's start and end tags.
 
     \note This is currently implemented for (X)HTML elements only.
+
+    \note The format of the markup returned will obey the namespace of the
+    document containing the element. This means the return value will obey XML
+    formatting rules, such as self-closing tags, only if the document is
+    'text/xhtml+xml'.
 
     \sa setInnerXml(), setOuterXml(), toOuterXml()
 */
@@ -852,8 +863,8 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
         // by importance and inheritance order. This include external CSS
         // declarations, as well as embedded and inline style declarations.
 
-        DOMWindow* domWindow = m_element->document()->frame()->domWindow();
-        if (RefPtr<CSSRuleList> rules = domWindow->getMatchedCSSRules(m_element, "")) {
+        Document* doc = m_element->document();
+        if (RefPtr<CSSRuleList> rules = doc->styleSelector()->styleRulesForElement(m_element, /*authorOnly*/ true)) {
             for (int i = rules->length(); i > 0; --i) {
                 CSSStyleRule* rule = static_cast<CSSStyleRule*>(rules->item(i - 1));
 

@@ -39,186 +39,243 @@ using namespace WebKit;
 
 WKTypeID WKPageGetTypeID()
 {
-    return toRef(WebPageProxy::APIType);
+    return toAPI(WebPageProxy::APIType);
 }
 
 WKPageNamespaceRef WKPageGetPageNamespace(WKPageRef pageRef)
 {
-    return toRef(toWK(pageRef)->pageNamespace());
+    return toAPI(toImpl(pageRef)->pageNamespace());
 }
 
 void WKPageLoadURL(WKPageRef pageRef, WKURLRef URLRef)
 {
-    toWK(pageRef)->loadURL(toWK(URLRef)->string());
+    toImpl(pageRef)->loadURL(toImpl(URLRef)->string());
 }
 
 void WKPageLoadURLRequest(WKPageRef pageRef, WKURLRequestRef urlRequestRef)
 {
-    toWK(pageRef)->loadURLRequest(toWK(urlRequestRef));    
+    toImpl(pageRef)->loadURLRequest(toImpl(urlRequestRef));    
 }
 
 void WKPageLoadHTMLString(WKPageRef pageRef, WKStringRef htmlStringRef, WKURLRef baseURLRef)
 {
-    toWK(pageRef)->loadHTMLString(toWTFString(htmlStringRef), toWTFString(baseURLRef));    
+    toImpl(pageRef)->loadHTMLString(toWTFString(htmlStringRef), toWTFString(baseURLRef));
+}
+
+void WKPageLoadAlternateHTMLString(WKPageRef pageRef, WKStringRef htmlStringRef, WKURLRef baseURLRef, WKURLRef unreachableURLRef)
+{
+    toImpl(pageRef)->loadAlternateHTMLString(toWTFString(htmlStringRef), toWTFString(baseURLRef), toWTFString(unreachableURLRef));
 }
 
 void WKPageLoadPlainTextString(WKPageRef pageRef, WKStringRef plainTextStringRef)
 {
-    toWK(pageRef)->loadPlainTextString(toWTFString(plainTextStringRef));    
+    toImpl(pageRef)->loadPlainTextString(toWTFString(plainTextStringRef));    
 }
 
 void WKPageStopLoading(WKPageRef pageRef)
 {
-    toWK(pageRef)->stopLoading();
+    toImpl(pageRef)->stopLoading();
 }
 
 void WKPageReload(WKPageRef pageRef)
 {
-    toWK(pageRef)->reload(false);
+    toImpl(pageRef)->reload(false);
 }
 
 void WKPageReloadFromOrigin(WKPageRef pageRef)
 {
-    toWK(pageRef)->reload(true);
+    toImpl(pageRef)->reload(true);
 }
 
 bool WKPageTryClose(WKPageRef pageRef)
 {
-    return toWK(pageRef)->tryClose();
+    return toImpl(pageRef)->tryClose();
 }
 
 void WKPageClose(WKPageRef pageRef)
 {
-    toWK(pageRef)->close();
+    toImpl(pageRef)->close();
 }
 
 bool WKPageIsClosed(WKPageRef pageRef)
 {
-    return toWK(pageRef)->isClosed();
+    return toImpl(pageRef)->isClosed();
 }
 
 void WKPageGoForward(WKPageRef pageRef)
 {
-    toWK(pageRef)->goForward();
+    toImpl(pageRef)->goForward();
 }
 
 bool WKPageCanGoForward(WKPageRef pageRef)
 {
-    return toWK(pageRef)->canGoForward();
+    return toImpl(pageRef)->canGoForward();
 }
 
 void WKPageGoBack(WKPageRef pageRef)
 {
-    toWK(pageRef)->goBack();
+    toImpl(pageRef)->goBack();
 }
 
 bool WKPageCanGoBack(WKPageRef pageRef)
 {
-    return toWK(pageRef)->canGoBack();
+    return toImpl(pageRef)->canGoBack();
 }
 
 void WKPageGoToBackForwardListItem(WKPageRef pageRef, WKBackForwardListItemRef itemRef)
 {
-    toWK(pageRef)->goToBackForwardItem(toWK(itemRef));
+    toImpl(pageRef)->goToBackForwardItem(toImpl(itemRef));
 }
 
 WKBackForwardListRef WKPageGetBackForwardList(WKPageRef pageRef)
 {
-    return toRef(toWK(pageRef)->backForwardList());
+    return toAPI(toImpl(pageRef)->backForwardList());
 }
 
 WKStringRef WKPageCopyTitle(WKPageRef pageRef)
 {
-    return toCopiedRef(toWK(pageRef)->pageTitle());
+    return toCopiedAPI(toImpl(pageRef)->pageTitle());
 }
 
 WKFrameRef WKPageGetMainFrame(WKPageRef pageRef)
 {
-    return toRef(toWK(pageRef)->mainFrame());
+    return toAPI(toImpl(pageRef)->mainFrame());
+}
+
+WKFrameRef WKPageGetFocusedFrame(WKPageRef pageRef)
+{
+    return toAPI(toImpl(pageRef)->focusedFrame());
+}
+
+WKInspectorRef WKPageGetInspector(WKPageRef pageRef)
+{
+    return toAPI(toImpl(pageRef)->inspector());
 }
 
 double WKPageGetEstimatedProgress(WKPageRef pageRef)
 {
-    return toWK(pageRef)->estimatedProgress();
+    return toImpl(pageRef)->estimatedProgress();
+}
+
+WKStringRef WKPageCopyCustomUserAgent(WKPageRef pageRef)
+{
+    return toCopiedAPI(toImpl(pageRef)->customUserAgent());
 }
 
 void WKPageSetCustomUserAgent(WKPageRef pageRef, WKStringRef userAgentRef)
 {
-    toWK(pageRef)->setCustomUserAgent(toWK(userAgentRef)->string());
+    toImpl(pageRef)->setCustomUserAgent(toImpl(userAgentRef)->string());
 }
 
 void WKPageTerminate(WKPageRef pageRef)
 {
-    toWK(pageRef)->terminateProcess();
+    toImpl(pageRef)->terminateProcess();
 }
 
-WKDataRef WKPageCopySessionState(WKPageRef pageRef)
+WKStringRef WKPageGetSessionHistoryURLValueType()
 {
-    RefPtr<WebData> state = toWK(pageRef)->sessionState();
-    return toRef(state.release().releaseRef());
+    static WebString* sessionHistoryURLValueType = WebString::create("SessionHistoryURL").releaseRef();
+    return toAPI(sessionHistoryURLValueType);
+}
+
+WKDataRef WKPageCopySessionState(WKPageRef pageRef, void *context, WKPageSessionStateFilterCallback filter)
+{
+    return toAPI(toImpl(pageRef)->sessionStateData(filter, context).releaseRef());
 }
 
 void WKPageRestoreFromSessionState(WKPageRef pageRef, WKDataRef sessionStateData)
 {
-    toWK(pageRef)->restoreFromSessionState(toWK(sessionStateData));
+    toImpl(pageRef)->restoreFromSessionStateData(toImpl(sessionStateData));
 }
 
 double WKPageGetTextZoomFactor(WKPageRef pageRef)
 {
-    return toWK(pageRef)->textZoomFactor();
+    return toImpl(pageRef)->textZoomFactor();
 }
 
 void WKPageSetTextZoomFactor(WKPageRef pageRef, double zoomFactor)
 {
-    toWK(pageRef)->setTextZoomFactor(zoomFactor);
+    toImpl(pageRef)->setTextZoomFactor(zoomFactor);
 }
 
 double WKPageGetPageZoomFactor(WKPageRef pageRef)
 {
-    return toWK(pageRef)->pageZoomFactor();
+    return toImpl(pageRef)->pageZoomFactor();
 }
 
 void WKPageSetPageZoomFactor(WKPageRef pageRef, double zoomFactor)
 {
-    toWK(pageRef)->setPageZoomFactor(zoomFactor);
+    toImpl(pageRef)->setPageZoomFactor(zoomFactor);
 }
 
 void WKPageSetPageAndTextZoomFactors(WKPageRef pageRef, double pageZoomFactor, double textZoomFactor)
 {
-    toWK(pageRef)->setPageAndTextZoomFactors(pageZoomFactor, textZoomFactor);
+    toImpl(pageRef)->setPageAndTextZoomFactors(pageZoomFactor, textZoomFactor);
+}
+
+void WKPageScaleWebView(WKPageRef pageRef, double scale)
+{
+    toImpl(pageRef)->scaleWebView(scale);
+}
+
+double WKPageGetViewScaleFactor(WKPageRef pageRef)
+{
+    return toImpl(pageRef)->viewScaleFactor();
+}
+
+void WKPageFindString(WKPageRef pageRef, WKStringRef string, WKFindDirection findDirection, WKFindOptions findOptions, unsigned maxMatchCount)
+{
+    toImpl(pageRef)->findString(toImpl(string)->string(), toFindDirection(findDirection), toFindOptions(findOptions), maxMatchCount);
+}
+
+void WKPageHideFindUI(WKPageRef pageRef)
+{
+    toImpl(pageRef)->hideFindUI();
+}
+
+void WKPageCountStringMatches(WKPageRef pageRef, WKStringRef string, bool caseInsensitive, unsigned maxMatchCount)
+{
+    toImpl(pageRef)->countStringMatches(toImpl(string)->string(), caseInsensitive, maxMatchCount);
 }
 
 void WKPageSetPageLoaderClient(WKPageRef pageRef, const WKPageLoaderClient* wkClient)
 {
     if (wkClient && wkClient->version)
         return;
-    toWK(pageRef)->initializeLoaderClient(wkClient);
+    toImpl(pageRef)->initializeLoaderClient(wkClient);
 }
 
 void WKPageSetPagePolicyClient(WKPageRef pageRef, const WKPagePolicyClient* wkClient)
 {
     if (wkClient && wkClient->version)
         return;
-    toWK(pageRef)->initializePolicyClient(wkClient);
+    toImpl(pageRef)->initializePolicyClient(wkClient);
 }
 
 void WKPageSetPageFormClient(WKPageRef pageRef, const WKPageFormClient* wkClient)
 {
     if (wkClient && wkClient->version)
         return;
-    toWK(pageRef)->initializeFormClient(wkClient);
+    toImpl(pageRef)->initializeFormClient(wkClient);
 }
 
-void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClient * wkClient)
+void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClient* wkClient)
 {
     if (wkClient && wkClient->version)
         return;
-    toWK(pageRef)->initializeUIClient(wkClient);
+    toImpl(pageRef)->initializeUIClient(wkClient);
+}
+
+void WKPageSetPageFindClient(WKPageRef pageRef, const WKPageFindClient* wkClient)
+{
+    if (wkClient && wkClient->version)
+        return;
+    toImpl(pageRef)->initializeFindClient(wkClient);
 }
 
 void WKPageRunJavaScriptInMainFrame(WKPageRef pageRef, WKStringRef scriptRef, void* context, WKPageRunJavaScriptFunction callback)
 {
-    toWK(pageRef)->runJavaScriptInMainFrame(toWK(scriptRef)->string(), ScriptReturnValueCallback::create(context, callback));
+    toImpl(pageRef)->runJavaScriptInMainFrame(toImpl(scriptRef)->string(), ScriptReturnValueCallback::create(context, callback));
 }
 
 #ifdef __BLOCKS__
@@ -237,7 +294,7 @@ void WKPageRunJavaScriptInMainFrame_b(WKPageRef pageRef, WKStringRef scriptRef, 
 
 void WKPageRenderTreeExternalRepresentation(WKPageRef pageRef, void* context, WKPageRenderTreeExternalRepresentationFunction callback)
 {
-    toWK(pageRef)->getRenderTreeExternalRepresentation(RenderTreeExternalRepresentationCallback::create(context, callback));
+    toImpl(pageRef)->getRenderTreeExternalRepresentation(RenderTreeExternalRepresentationCallback::create(context, callback));
 }
 
 #ifdef __BLOCKS__
@@ -254,9 +311,9 @@ void WKPageRenderTreeExternalRepresentation_b(WKPageRef pageRef, WKPageRenderTre
 }
 #endif
 
-void WKPageGetSourceForFrame(WKPageRef pageRef, WKFrameRef frameRef, void *context, WKPageGetSourceForFrameFunction callback)
+void WKPageGetSourceForFrame(WKPageRef pageRef, WKFrameRef frameRef, void* context, WKPageGetSourceForFrameFunction callback)
 {
-    toWK(pageRef)->getSourceForFrame(toWK(frameRef), FrameSourceCallback::create(context, callback));
+    toImpl(pageRef)->getSourceForFrame(toImpl(frameRef), FrameSourceCallback::create(context, callback));
 }
 
 #ifdef __BLOCKS__
@@ -270,5 +327,24 @@ static void callGetSourceForFrameBlockBlockAndDispose(WKStringRef resultValue, W
 void WKPageGetSourceForFrame_b(WKPageRef pageRef, WKFrameRef frameRef, WKPageGetSourceForFrameBlock block)
 {
     WKPageGetSourceForFrame(pageRef, frameRef, Block_copy(block), callGetSourceForFrameBlockBlockAndDispose);
+}
+#endif
+
+void WKPageGetContentsAsString(WKPageRef pageRef, void* context, WKPageGetContentsAsStringFunction callback)
+{
+    toImpl(pageRef)->getContentsAsString(ContentsAsStringCallback::create(context, callback));
+}
+
+#ifdef __BLOCKS__
+static void callContentsAsStringBlockBlockAndDispose(WKStringRef resultValue, WKErrorRef error, void* context)
+{
+    WKPageGetContentsAsStringBlock block = (WKPageGetContentsAsStringBlock)context;
+    block(resultValue, error);
+    Block_release(block);
+}
+
+void WKPageGetContentsAsString_b(WKPageRef pageRef, WKPageGetSourceForFrameBlock block)
+{
+    WKPageGetContentsAsString(pageRef, Block_copy(block), callContentsAsStringBlockBlockAndDispose);
 }
 #endif

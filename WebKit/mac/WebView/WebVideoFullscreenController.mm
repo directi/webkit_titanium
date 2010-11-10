@@ -31,6 +31,7 @@
 #import "WebVideoFullscreenHUDWindowController.h"
 #import "WebWindowAnimation.h"
 #import <IOKit/pwr_mgt/IOPMLib.h>
+#import <OSServices/Power.h>
 #import <QTKit/QTKit.h>
 #import <WebCore/HTMLMediaElement.h>
 #import <WebCore/SoftLinking.h>
@@ -43,6 +44,7 @@ SOFT_LINK_CLASS(QTKit, QTMovieLayer)
 SOFT_LINK_POINTER(QTKit, QTMovieRateDidChangeNotification, NSString *)
 
 #define QTMovieRateDidChangeNotification getQTMovieRateDidChangeNotification()
+static const NSTimeInterval tickleTimerInterval = 1.0;
 
 @interface WebVideoFullscreenWindow : NSWindow
 #if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_TIGER)
@@ -82,6 +84,9 @@ SOFT_LINK_POINTER(QTKit, QTMovieRateDidChangeNotification, NSString *)
 {
     ASSERT(!_backgroundFullscreenWindow);
     ASSERT(!_fadeAnimation);
+    [_tickleTimer invalidate];
+    [_tickleTimer release];
+    _tickleTimer = nil;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [super dealloc];
 }
@@ -241,7 +246,6 @@ static NSWindow *createBackgroundFullscreenWindow(NSRect frame, int level)
     [window setOpaque:YES];
     [window setBackgroundColor:[NSColor blackColor]];
     [window setLevel:level];
-    [window setHidesOnDeactivate:YES];
     [window setReleasedWhenClosed:NO];
     return window;
 }
@@ -378,6 +382,25 @@ static NSWindow *createBackgroundFullscreenWindow(NSRect frame, int level)
         _idleSystemSleepAssertion = kIOPMNullAssertionID;
     }
 }
+
+- (void)_enableTickleTimer
+{
+    [_tickleTimer invalidate];
+    [_tickleTimer release];
+    _tickleTimer = [[NSTimer scheduledTimerWithTimeInterval:tickleTimerInterval target:self selector:@selector(_tickleTimerFired) userInfo:nil repeats:YES] retain];
+}
+
+- (void)_disableTickleTimer
+{
+    [_tickleTimer invalidate];
+    [_tickleTimer release];
+    _tickleTimer = nil;
+}
+
+- (void)_tickleTimerFired
+{
+    UpdateSystemActivity(OverallAct);
+}
 #endif
 
 - (void)updatePowerAssertions
@@ -390,9 +413,11 @@ static NSWindow *createBackgroundFullscreenWindow(NSRect frame, int level)
     if (rate && !_isEndingFullscreen) {
         [self _disableIdleSystemSleep];
         [self _disableIdleDisplaySleep];
+        [self _enableTickleTimer];
     } else {
         [self _enableIdleSystemSleep];
         [self _enableIdleDisplaySleep];
+        [self _disableTickleTimer];
     }
 #endif
 }
@@ -449,7 +474,6 @@ static NSWindow *createBackgroundFullscreenWindow(NSRect frame, int level)
         return nil;
     [self setOpaque:NO];
     [self setBackgroundColor:[NSColor clearColor]];
-    [self setHidesOnDeactivate:YES];
     [self setIgnoresMouseEvents:NO];
     [self setAcceptsMouseMovedEvents:YES];
     return self;

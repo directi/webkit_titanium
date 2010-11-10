@@ -2,7 +2,7 @@ AC_PREREQ(2.59)
 
 m4_define([webkit_major_version], [1])
 m4_define([webkit_minor_version], [3])
-m4_define([webkit_micro_version], [4])
+m4_define([webkit_micro_version], [6])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
@@ -35,7 +35,7 @@ AC_CONFIG_SRCDIR([WebCore/config.h])
 
 dnl # Libtool library version, not to confuse with API version
 dnl # see http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-LIBWEBKITGTK_VERSION=2:0:2
+LIBWEBKITGTK_VERSION=3:1:3
 AC_SUBST([LIBWEBKITGTK_VERSION])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects tar-ustar])
@@ -199,7 +199,7 @@ case "$with_gtk" in
           GAIL_PC_NAME=gail
           GAIL_REQUIRED_VERSION=1.8
           ;;
-     3.0) GTK_REQUIRED_VERSION=2.90
+     3.0) GTK_REQUIRED_VERSION=2.91
           GTK_API_VERSION=3.0
           WEBKITGTK_API_MAJOR_VERSION=3
           WEBKITGTK_API_MINOR_VERSION=0
@@ -735,6 +735,17 @@ if test "$enable_opcode_stats" = "yes"; then
   AC_DEFINE([ENABLE_OPCODE_STATS], [1], [Define to enable Opcode statistics])
 fi
 
+# Link prefetch
+AC_MSG_CHECKING([whether to enable link prefetch support])
+AC_ARG_ENABLE([link-prefetch],
+  [AS_HELP_STRING([--enable-link-prefetch], [Enable Link prefetch support (default: disabled)])],
+  [],[enable_link_prefetch=no])
+AC_MSG_RESULT([$enable_link_prefetch])
+
+if test "$enable_link_prefetch" = "yes"; then 
+  AC_DEFINE([ENABLE_LINK_PREFETCH], [1], [Define to enable link prefetch support])
+fi
+
 # GObject Introspection
 AC_MSG_CHECKING([whether to enable GObject introspection support])
 AC_ARG_ENABLE([introspection],
@@ -938,7 +949,6 @@ AM_CONDITIONAL([ENABLE_FILTERS],[test "$enable_filters" = "yes"])
 AM_CONDITIONAL([ENABLE_GEOLOCATION], [test "$enable_geolocation" = "yes"])
 AM_CONDITIONAL([ENABLE_MATHML], [test "$enable_mathml" = "yes"])
 AM_CONDITIONAL([ENABLE_RUBY],[test "$enable_ruby" = "yes"])
-AM_CONDITIONAL([ENABLE_SANDBOX],[test "$enable_sandbox" = "yes"])
 AM_CONDITIONAL([ENABLE_VIDEO],[test "$enable_video" = "yes"])
 AM_CONDITIONAL([ENABLE_NOTIFICATIONS],[test "$enable_notifications" = "yes"])
 AM_CONDITIONAL([ENABLE_ORIENTATION_EVENTS],[test "$enable_orientation_events" = "yes"])
@@ -1012,6 +1022,7 @@ Features:
  HTML5 video element support                              : $enable_video
  Icon database support                                    : $enable_icon_database
  Image resizer support                                    : $enable_image_resizer
+ Link prefetch support                                    : $enable_link_prefetch
  Opcode stats                                             : $enable_opcode_stats
  SharedWorkers support                                    : $enable_shared_workers
  Speech input support                                     : $enable_input_speech
@@ -1028,6 +1039,7 @@ Features:
  XHTML-MP support                                         : $enable_xhtmlmp
  XPATH support                                            : $enable_xpath
  XSLT support                                             : $enable_xslt
+
 GTK+ configuration:
  GTK+ version                                             : $with_gtk
  GDK target                                               : $with_target

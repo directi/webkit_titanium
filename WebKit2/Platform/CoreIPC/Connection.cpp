@@ -51,6 +51,7 @@ Connection::Connection(Identifier identifier, bool isServer, Client* client, Run
     , m_isConnected(false)
     , m_connectionQueue("com.apple.CoreIPC.ReceiveQueue")
     , m_clientRunLoop(clientRunLoop)
+    , m_shouldWaitForSyncReplies(true)
 {
     ASSERT(m_client);
 
@@ -165,21 +166,40 @@ PassOwnPtr<ArgumentDecoder> Connection::sendSyncMessage(MessageID messageID, uin
     
     // Push the pending sync reply information on our stack.
     {
-        MutexLocker locker(m_waitForSyncReplyMutex);
+        MutexLocker locker(m_syncReplyStateMutex);
+        if (!m_shouldWaitForSyncReplies)
+            return 0;
+
         m_pendingSyncReplies.append(PendingSyncReply(syncRequestID));
     }
     
     // First send the message.
     sendMessage(messageID, encoder);
     
-    // Then wait for a reply.
+    // Then wait for a reply. Waiting for a reply could involve dispatching incoming sync messages, so
+    // keep an extra reference to the connection here in case it's invalidated.
+    RefPtr<Connection> protect(this);
     OwnPtr<ArgumentDecoder> reply = waitForSyncReply(syncRequestID, timeout);
 
     // Finally, pop the pending sync reply information.
     {
-        MutexLocker locker(m_waitForSyncReplyMutex);
+        MutexLocker locker(m_syncReplyStateMutex);
         ASSERT(m_pendingSyncReplies.last().syncRequestID == syncRequestID);
         m_pendingSyncReplies.removeLast();
+
+        if (m_pendingSyncReplies.isEmpty()) {
+            // This was the bottom-most sendSyncMessage call in the stack. If we have any pending incoming
+            // sync messages, they need to be dispatched.
+            if (!m_syncMessagesReceivedWhileWaitingForSyncReply.isEmpty()) {
+                // Add the messages.
+                MutexLocker locker(m_incomingMessagesLock);
+                m_incomingMessages.append(m_syncMessagesReceivedWhileWaitingForSyncReply);
+                m_syncMessagesReceivedWhileWaitingForSyncReply.clear();
+
+                // Schedule for the messages to be sent.
+                m_clientRunLoop->scheduleWork(WorkItem::create(this, &Connection::dispatchMessages));
+            }
+        }
     }
     
     return reply.release();
@@ -191,20 +211,40 @@ PassOwnPtr<ArgumentDecoder> Connection::waitForSyncReply(uint64_t syncRequestID,
 
     bool timedOut = false;
     while (!timedOut) {
-        MutexLocker locker(m_waitForSyncReplyMutex);
+        {
+            MutexLocker locker(m_syncReplyStateMutex);
 
-        // First, check if there is a sync reply at the top of the stack.
-        ASSERT(!m_pendingSyncReplies.isEmpty());
+            // First, check if we have any incoming sync messages that we need to process.
+            Vector<IncomingMessage> syncMessagesReceivedWhileWaitingForSyncReply;
+            m_syncMessagesReceivedWhileWaitingForSyncReply.swap(syncMessagesReceivedWhileWaitingForSyncReply);
+
+            if (!syncMessagesReceivedWhileWaitingForSyncReply.isEmpty()) {
+                // Make sure to unlock the mutex here because we're calling out to client code which could in turn send
+                // another sync message and we don't want that to deadlock.
+                m_syncReplyStateMutex.unlock();
+                
+                for (size_t i = 0; i < syncMessagesReceivedWhileWaitingForSyncReply.size(); ++i) {
+                    IncomingMessage& message = syncMessagesReceivedWhileWaitingForSyncReply[i];
+                    OwnPtr<ArgumentDecoder> arguments = message.releaseArguments();
+
+                    dispatchSyncMessage(message.messageID(), arguments.get());
+                }
+                m_syncReplyStateMutex.lock();
+            }
+
+            // Second, check if there is a sync reply at the top of the stack.
+            ASSERT(!m_pendingSyncReplies.isEmpty());
             
-        PendingSyncReply& pendingSyncReply = m_pendingSyncReplies.last();
-        ASSERT(pendingSyncReply.syncRequestID == syncRequestID);
+            PendingSyncReply& pendingSyncReply = m_pendingSyncReplies.last();
+            ASSERT(pendingSyncReply.syncRequestID == syncRequestID);
             
-        // We found the sync reply, return it.
-        if (pendingSyncReply.didReceiveReply)
-            return pendingSyncReply.releaseReplyDecoder();
+            // We found the sync reply, or the connection was closed.
+            if (pendingSyncReply.didReceiveReply || !m_shouldWaitForSyncReplies)
+                return pendingSyncReply.releaseReplyDecoder();
+        }
 
         // We didn't find a sync reply yet, keep waiting.
-        timedOut = !m_waitForSyncReplyCondition.timedWait(m_waitForSyncReplyMutex, absoluteTime);
+        timedOut = !m_waitForSyncReplySemaphore.wait(absoluteTime);
     }
 
     // We timed out.
@@ -215,7 +255,7 @@ void Connection::processIncomingMessage(MessageID messageID, PassOwnPtr<Argument
 {
     // Check if this is a sync reply.
     if (messageID == MessageID(CoreIPCMessage::SyncMessageReply)) {
-        MutexLocker locker(m_waitForSyncReplyMutex);
+        MutexLocker locker(m_syncReplyStateMutex);
         ASSERT(!m_pendingSyncReplies.isEmpty());
 
         PendingSyncReply& pendingSyncReply = m_pendingSyncReplies.last();
@@ -224,10 +264,24 @@ void Connection::processIncomingMessage(MessageID messageID, PassOwnPtr<Argument
         pendingSyncReply.replyDecoder = arguments.leakPtr();
         pendingSyncReply.didReceiveReply = true;
 
-        m_waitForSyncReplyCondition.signal();
+        m_waitForSyncReplySemaphore.signal();
         return;
     }
-    
+
+    // Check if this is a sync message. If it is, and we're waiting for a sync reply this message
+    // needs to be dispatched. If we don't we'll end up with a deadlock where both sync message senders are
+    // stuck waiting for a reply.
+    if (messageID.isSync()) {
+        MutexLocker locker(m_syncReplyStateMutex);
+        if (!m_pendingSyncReplies.isEmpty()) {
+            m_syncMessagesReceivedWhileWaitingForSyncReply.append(IncomingMessage(messageID, arguments));
+
+            // The message has been added, now wake up the client thread.
+            m_waitForSyncReplySemaphore.signal();
+            return;
+        }
+    }
+        
     // Check if we're waiting for this message.
     {
         MutexLocker locker(m_waitForMessageMutex);
@@ -251,7 +305,19 @@ void Connection::connectionDidClose()
 {
     // The connection is now invalid.
     platformInvalidate();
-    
+
+    {
+        MutexLocker locker(m_syncReplyStateMutex);
+
+        ASSERT(m_shouldWaitForSyncReplies);
+        m_shouldWaitForSyncReplies = false;
+
+        if (!m_pendingSyncReplies.isEmpty())
+            m_waitForSyncReplySemaphore.signal();
+    }
+
+    m_client->didCloseOnConnectionWorkQueue(&m_connectionQueue, this);
+
     m_clientRunLoop->scheduleWork(WorkItem::create(this, &Connection::dispatchConnectionDidClose));
 }
 
@@ -296,6 +362,38 @@ void Connection::sendOutgoingMessages()
     }
 }
 
+void Connection::dispatchSyncMessage(MessageID messageID, ArgumentDecoder* arguments)
+{
+    ASSERT(messageID.isSync());
+
+    // Decode the sync request ID.
+    uint64_t syncRequestID = 0;
+
+    if (!arguments->decodeUInt64(syncRequestID) || !syncRequestID) {
+        // We received an invalid sync message.
+        arguments->markInvalid();
+        return;
+    }
+
+    // Create our reply encoder.
+    ArgumentEncoder* replyEncoder = new ArgumentEncoder(syncRequestID);
+    
+    // Hand off both the decoder and encoder to the client..
+    SyncReplyMode syncReplyMode = m_client->didReceiveSyncMessage(this, messageID, arguments, replyEncoder);
+
+    // FIXME: If the message was invalid, we should send back a SyncMessageError.
+    ASSERT(!arguments->isInvalid());
+
+    if (syncReplyMode == ManualReply) {
+        // The client will take ownership of the reply encoder and send it at some point in the future.
+        // We won't do anything here.
+        return;
+    }
+
+    // Send the reply.
+    sendSyncReply(replyEncoder);
+}
+
 void Connection::dispatchMessages()
 {
     Vector<IncomingMessage> incomingMessages;
@@ -314,32 +412,9 @@ void Connection::dispatchMessages()
         IncomingMessage& message = incomingMessages[i];
         OwnPtr<ArgumentDecoder> arguments = message.releaseArguments();
 
-        if (message.messageID().isSync()) {
-            // Decode the sync request ID.
-            uint64_t syncRequestID = 0;
-
-            if (!arguments->decodeUInt64(syncRequestID)) {
-                // FIXME: Handle this case.
-                ASSERT_NOT_REACHED();
-            }
-
-            // Create our reply encoder.
-            ArgumentEncoder* replyEncoder = new ArgumentEncoder(syncRequestID);
-            
-            // Hand off both the decoder and encoder to the client..
-            SyncReplyMode syncReplyMode = m_client->didReceiveSyncMessage(this, message.messageID(), arguments.get(), replyEncoder);
-            
-            // FIXME: If the message was invalid, we should send back a SyncMessageError.
-            ASSERT(!arguments->isInvalid());
-
-            if (syncReplyMode == AutomaticReply) {
-                // Send the reply.
-                sendSyncReply(replyEncoder);
-            } else {
-                // The client will take ownership of the reply encoder and send it at some point in the future.
-                // We won't do anything here.
-            }
-        } else
+        if (message.messageID().isSync())
+            dispatchSyncMessage(message.messageID(), arguments.get());
+        else
             m_client->didReceiveMessage(this, message.messageID(), arguments.get());
 
         if (arguments->isInvalid())

@@ -30,10 +30,13 @@
 """Unit tests for rebaseline_chromium_webkit_tests.py."""
 
 import os
+import sys
 import unittest
 
+from webkitpy.tool import mocktool
 from webkitpy.layout_tests import port
 from webkitpy.layout_tests import rebaseline_chromium_webkit_tests
+from webkitpy.common.system.executive import Executive, ScriptError
 
 
 class MockPort(object):
@@ -42,11 +45,6 @@ class MockPort(object):
 
     def check_image_diff(self, override_step, logging):
         return self.image_diff_exists
-
-
-class MockOptions(object):
-    def __init__(self):
-        self.configuration = None
 
 
 def get_mock_get(config_expectations):
@@ -61,7 +59,8 @@ class TestGetHostPortObject(unittest.TestCase):
         # that Image diff is (or isn't) present in the two configs.
         port.get = get_mock_get({'Release': release_present,
                                  'Debug': debug_present})
-        options = MockOptions()
+        options = mocktool.MockOptions(configuration=None,
+                                       html_directory=None)
         port_obj = rebaseline_chromium_webkit_tests.get_host_port_object(
             options)
         if valid_port_obj:
@@ -87,13 +86,23 @@ class TestGetHostPortObject(unittest.TestCase):
 
 class TestRebaseliner(unittest.TestCase):
     def make_rebaseliner(self):
-        options = MockOptions()
+        options = mocktool.MockOptions(configuration=None,
+                                       html_directory=None)
         host_port_obj = port.get('test', options)
         target_options = options
         target_port_obj = port.get('test', target_options)
         platform = 'test'
         return rebaseline_chromium_webkit_tests.Rebaseliner(
             host_port_obj, target_port_obj, platform, options)
+
+    def test_parse_options(self):
+        (options, target_options) = rebaseline_chromium_webkit_tests.parse_options([])
+        self.assertTrue(target_options.chromium)
+        self.assertEqual(options.tolerance, 0)
+
+        (options, target_options) = rebaseline_chromium_webkit_tests.parse_options(['--target-platform', 'qt'])
+        self.assertFalse(hasattr(target_options, 'chromium'))
+        self.assertEqual(options.tolerance, 0)
 
     def test_noop(self):
         # this method tests that was can at least instantiate an object, even
@@ -110,13 +119,39 @@ class TestRebaseliner(unittest.TestCase):
                                                      is_image=False))
 
     def test_diff_baselines_png(self):
-        return
         rebaseliner = self.make_rebaseliner()
         image = rebaseliner._port.expected_image(
             os.path.join(rebaseliner._port.layout_tests_dir(),
                          'passes/image.html'))
         self.assertFalse(rebaseliner._diff_baselines(image, image,
                                                      is_image=True))
+
+
+class TestHtmlGenerator(unittest.TestCase):
+    def make_generator(self, tests):
+        return rebaseline_chromium_webkit_tests.HtmlGenerator(
+            target_port=None,
+            options=mocktool.MockOptions(configuration=None,
+                                         html_directory='/tmp'),
+            platforms=['mac'],
+            rebaselining_tests=tests,
+            executive=Executive())
+
+    def test_generate_baseline_links(self):
+        orig_platform = sys.platform
+        orig_exists = os.path.exists
+
+        try:
+            sys.platform = 'darwin'
+            os.path.exists = lambda x: True
+            generator = self.make_generator(["foo.txt"])
+            links = generator._generate_baseline_links("foo", ".txt", "mac")
+            expected_links = '<td align=center><a href="file:///tmp/foo-expected-mac-old.txt">foo-expected.txt</a></td><td align=center><a href="file:///tmp/foo-expected-mac-new.txt">foo-expected.txt</a></td><td align=center><a href="file:///tmp/foo-expected-mac-diff.txt">Diff</a></td>'
+            self.assertEqual(links, expected_links)
+        finally:
+            sys.platform = orig_platform
+            os.path.exists = orig_exists
+
 
 if __name__ == '__main__':
     unittest.main()

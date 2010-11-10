@@ -39,11 +39,12 @@
 #include "FrameView.h"
 #include "Geolocation.h"
 #if USE(ACCELERATED_COMPOSITING)
-#include "GraphicsLayerQt.h"
+#include "GraphicsLayer.h"
 #endif
 #include "GeolocationPermissionClientQt.h"
 #include "HitTestResult.h"
 #include "Icon.h"
+#include "NavigationAction.h"
 #include "NetworkingContext.h"
 #include "NotImplemented.h"
 #include "NotificationPresenterClientQt.h"
@@ -164,12 +165,15 @@ void ChromeClientQt::takeFocus(FocusDirection)
 }
 
 
-void ChromeClientQt::focusedNodeChanged(WebCore::Node*)
+void ChromeClientQt::focusedNodeChanged(Node*)
 {
 }
 
+void ChromeClientQt::focusedFrameChanged(Frame*)
+{
+}
 
-Page* ChromeClientQt::createWindow(Frame*, const FrameLoadRequest& request, const WindowFeatures& features)
+Page* ChromeClientQt::createWindow(Frame*, const FrameLoadRequest& request, const WindowFeatures& features, const NavigationAction&)
 {
     QWebPage* newPage = m_webPage->createWindow(features.dialog ? QWebPage::WebModalDialog : QWebPage::WebBrowserWindow);
     if (!newPage)
@@ -411,6 +415,13 @@ void ChromeClientQt::scroll(const IntSize& delta, const IntRect& scrollViewRect,
     emit m_webPage->scrollRequested(delta.width(), delta.height(), scrollViewRect);
 }
 
+#if ENABLE(TILED_BACKING_STORE)
+void ChromeClientQt::delegatedScrollRequested(const IntSize& delta)
+{
+    emit m_webPage->scrollRequested(delta.width(), delta.height(), QRect(QPoint(0, 0), m_webPage->viewportSize()));
+}
+#endif
+
 IntRect ChromeClientQt::windowToScreen(const IntRect& rect) const
 {
     QWebPageClient* pageClient = platformPageClient();
@@ -566,7 +577,7 @@ void ChromeClientQt::setCursor(const Cursor& cursor)
         return;
     pageClient->setCursor(*cursor.platformCursor());
 #else
-    UNUSED_PARAM(cursor)
+    UNUSED_PARAM(cursor);
 #endif
 }
 
@@ -590,7 +601,7 @@ void ChromeClientQt::cancelGeolocationPermissionRequestForFrame(Frame* frame, Ge
 void ChromeClientQt::attachRootGraphicsLayer(Frame* frame, GraphicsLayer* graphicsLayer)
 {
     if (platformPageClient())
-        platformPageClient()->setRootGraphicsLayer(graphicsLayer ? graphicsLayer->nativeLayer() : 0);
+        platformPageClient()->setRootGraphicsLayer(graphicsLayer ? graphicsLayer->platformLayer() : 0);
 }
 
 void ChromeClientQt::setNeedsOneShotDrawingSynchronization()
@@ -642,7 +653,7 @@ QWebSelectMethod* ChromeClientQt::createSelectPopup() const
 #endif
 }
 
-void ChromeClientQt::didReceiveViewportArguments(Frame* frame, const ViewportArguments& arguments) const
+void ChromeClientQt::dispatchViewportDataDidChange(const ViewportArguments&) const
 {
     emit m_webPage->viewportChangeRequested();
 }

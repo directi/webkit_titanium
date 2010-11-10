@@ -36,11 +36,11 @@ from webkitpy.tool.bot.commitqueuetask import *
 from webkitpy.tool.mocktool import MockTool
 
 
-class MockCommitQueue:
+class MockCommitQueue(CommitQueueTaskDelegate):
     def __init__(self, error_plan):
         self._error_plan = error_plan
 
-    def run_webkit_patch(self, command):
+    def run_command(self, command):
         log("run_webkit_patch: %s" % command)
         if self._error_plan:
             error = self._error_plan.pop(0)
@@ -56,23 +56,32 @@ class MockCommitQueue:
             failure_message, script_error, patch.id()))
         return 3947
 
+    def refetch_patch(self, patch):
+        return patch
+
+    def layout_test_results(self):
+        return None
+
+    def report_flaky_tests(self, patch, flaky_tests):
+        log("report_flaky_tests: patch='%s' flaky_tests='%s'" % (patch.id(), flaky_tests))
+
 
 class CommitQueueTaskTest(unittest.TestCase):
     def _run_through_task(self, commit_queue, expected_stderr, expected_exception=None):
         tool = MockTool(log_executive=True)
         patch = tool.bugs.fetch_attachment(197)
-        task = CommitQueueTask(tool, commit_queue, patch)
+        task = CommitQueueTask(commit_queue, patch)
         OutputCapture().assert_outputs(self, task.run, expected_stderr=expected_stderr, expected_exception=expected_exception)
 
     def test_success_case(self):
         commit_queue = MockCommitQueue([])
-        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', '--quiet', 197]
+        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', 197]
 command_passed: success_message='Applied patch' patch='197'
-run_webkit_patch: ['build', '--no-clean', '--no-update', '--build', '--build-style=both', '--quiet']
+run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='197'
-run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--quiet', '--non-interactive']
+run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_passed: success_message='Passed tests' patch='197'
-run_webkit_patch: ['land-attachment', '--force-clean', '--ignore-builders', '--quiet', '--non-interactive', '--parent-command=commit-queue', 197]
+run_webkit_patch: ['land-attachment', '--force-clean', '--ignore-builders', '--non-interactive', '--parent-command=commit-queue', 197]
 command_passed: success_message='Landed patch' patch='197'
 """
         self._run_through_task(commit_queue, expected_stderr)
@@ -81,7 +90,7 @@ command_passed: success_message='Landed patch' patch='197'
         commit_queue = MockCommitQueue([
             ScriptError("MOCK apply failure"),
         ])
-        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', '--quiet', 197]
+        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', 197]
 command_failed: failure_message='Patch does not apply' script_error='MOCK apply failure' patch='197'
 """
         self._run_through_task(commit_queue, expected_stderr, ScriptError)
@@ -91,11 +100,11 @@ command_failed: failure_message='Patch does not apply' script_error='MOCK apply 
             None,
             ScriptError("MOCK build failure"),
         ])
-        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', '--quiet', 197]
+        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', 197]
 command_passed: success_message='Applied patch' patch='197'
-run_webkit_patch: ['build', '--no-clean', '--no-update', '--build', '--build-style=both', '--quiet']
+run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_failed: failure_message='Patch does not build' script_error='MOCK build failure' patch='197'
-run_webkit_patch: ['build', '--force-clean', '--no-update', '--build', '--build-style=both', '--quiet']
+run_webkit_patch: ['build', '--force-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Able to build without patch' patch='197'
 """
         self._run_through_task(commit_queue, expected_stderr, ScriptError)
@@ -106,11 +115,11 @@ command_passed: success_message='Able to build without patch' patch='197'
             ScriptError("MOCK build failure"),
             ScriptError("MOCK clean build failure"),
         ])
-        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', '--quiet', 197]
+        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', 197]
 command_passed: success_message='Applied patch' patch='197'
-run_webkit_patch: ['build', '--no-clean', '--no-update', '--build', '--build-style=both', '--quiet']
+run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_failed: failure_message='Patch does not build' script_error='MOCK build failure' patch='197'
-run_webkit_patch: ['build', '--force-clean', '--no-update', '--build', '--build-style=both', '--quiet']
+run_webkit_patch: ['build', '--force-clean', '--no-update', '--build-style=both']
 command_failed: failure_message='Unable to build without patch' script_error='MOCK clean build failure' patch='197'
 """
         self._run_through_task(commit_queue, expected_stderr)
@@ -121,15 +130,16 @@ command_failed: failure_message='Unable to build without patch' script_error='MO
             None,
             ScriptError("MOCK tests failure"),
         ])
-        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', '--quiet', 197]
+        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', 197]
 command_passed: success_message='Applied patch' patch='197'
-run_webkit_patch: ['build', '--no-clean', '--no-update', '--build', '--build-style=both', '--quiet']
+run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='197'
-run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--quiet', '--non-interactive']
+run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK tests failure' patch='197'
-run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--quiet', '--non-interactive']
+run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_passed: success_message='Passed tests' patch='197'
-run_webkit_patch: ['land-attachment', '--force-clean', '--ignore-builders', '--quiet', '--non-interactive', '--parent-command=commit-queue', 197]
+report_flaky_tests: patch='197' flaky_tests='None'
+run_webkit_patch: ['land-attachment', '--force-clean', '--ignore-builders', '--non-interactive', '--parent-command=commit-queue', 197]
 command_passed: success_message='Landed patch' patch='197'
 """
         self._run_through_task(commit_queue, expected_stderr)
@@ -141,15 +151,15 @@ command_passed: success_message='Landed patch' patch='197'
             ScriptError("MOCK test failure"),
             ScriptError("MOCK test failure again"),
         ])
-        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', '--quiet', 197]
+        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', 197]
 command_passed: success_message='Applied patch' patch='197'
-run_webkit_patch: ['build', '--no-clean', '--no-update', '--build', '--build-style=both', '--quiet']
+run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='197'
-run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--quiet', '--non-interactive']
+run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure' patch='197'
-run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--quiet', '--non-interactive']
+run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure again' patch='197'
-run_webkit_patch: ['build-and-test', '--force-clean', '--no-update', '--build', '--test', '--quiet', '--non-interactive']
+run_webkit_patch: ['build-and-test', '--force-clean', '--no-update', '--build', '--test', '--non-interactive']
 command_passed: success_message='Able to pass tests without patch' patch='197'
 """
         self._run_through_task(commit_queue, expected_stderr, ScriptError)
@@ -162,15 +172,15 @@ command_passed: success_message='Able to pass tests without patch' patch='197'
             ScriptError("MOCK test failure again"),
             ScriptError("MOCK clean test failure"),
         ])
-        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', '--quiet', 197]
+        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', 197]
 command_passed: success_message='Applied patch' patch='197'
-run_webkit_patch: ['build', '--no-clean', '--no-update', '--build', '--build-style=both', '--quiet']
+run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='197'
-run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--quiet', '--non-interactive']
+run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure' patch='197'
-run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--quiet', '--non-interactive']
+run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure again' patch='197'
-run_webkit_patch: ['build-and-test', '--force-clean', '--no-update', '--build', '--test', '--quiet', '--non-interactive']
+run_webkit_patch: ['build-and-test', '--force-clean', '--no-update', '--build', '--test', '--non-interactive']
 command_failed: failure_message='Unable to pass tests without patch (tree is red?)' script_error='MOCK clean test failure' patch='197'
 """
         self._run_through_task(commit_queue, expected_stderr)
@@ -182,13 +192,13 @@ command_failed: failure_message='Unable to pass tests without patch (tree is red
             None,
             ScriptError("MOCK land failure"),
         ])
-        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', '--quiet', 197]
+        expected_stderr = """run_webkit_patch: ['apply-attachment', '--force-clean', '--non-interactive', 197]
 command_passed: success_message='Applied patch' patch='197'
-run_webkit_patch: ['build', '--no-clean', '--no-update', '--build', '--build-style=both', '--quiet']
+run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='197'
-run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--quiet', '--non-interactive']
+run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_passed: success_message='Passed tests' patch='197'
-run_webkit_patch: ['land-attachment', '--force-clean', '--ignore-builders', '--quiet', '--non-interactive', '--parent-command=commit-queue', 197]
+run_webkit_patch: ['land-attachment', '--force-clean', '--ignore-builders', '--non-interactive', '--parent-command=commit-queue', 197]
 command_failed: failure_message='Unable to land patch' script_error='MOCK land failure' patch='197'
 """
         self._run_through_task(commit_queue, expected_stderr, ScriptError)

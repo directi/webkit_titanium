@@ -136,7 +136,7 @@ void ResourceLoadNotifier::dispatchDidReceiveResponse(DocumentLoader* loader, un
 
 #if ENABLE(INSPECTOR)
     if (Page* page = m_frame->page())
-        page->inspectorController()->didReceiveResponse(identifier, r);
+        page->inspectorController()->didReceiveResponse(identifier, loader, r);
 #endif
 }
 
@@ -158,6 +158,14 @@ void ResourceLoadNotifier::dispatchDidFinishLoading(DocumentLoader* loader, unsi
     if (Page* page = m_frame->page())
         page->inspectorController()->didFinishLoading(identifier, finishTime);
 #endif
+}
+
+void ResourceLoadNotifier::dispatchTransferLoadingResourceFromPage(unsigned long identifier, DocumentLoader* loader, const ResourceRequest& request, Page* oldPage)
+{
+    ASSERT(oldPage != m_frame->page());
+    m_frame->loader()->client()->transferLoadingResourceFromPage(identifier, loader, request, oldPage);
+
+    oldPage->progress()->completeProgress(identifier);
 }
 
 void ResourceLoadNotifier::sendRemainingDelegateMessages(DocumentLoader* loader, unsigned long identifier, const ResourceResponse& response, int length, const ResourceError& error)

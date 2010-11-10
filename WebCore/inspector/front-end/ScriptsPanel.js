@@ -134,10 +134,9 @@ WebInspector.ScriptsPanel = function()
     this.sidebarPanes.jsBreakpoints = WebInspector.createJSBreakpointsSidebarPane();
     if (Preferences.nativeInstrumentationEnabled) {
         this.sidebarPanes.domBreakpoints = WebInspector.createDOMBreakpointsSidebarPane();
-        this.sidebarPanes.domBreakpoints.expanded = true;
         this.sidebarPanes.xhrBreakpoints = WebInspector.createXHRBreakpointsSidebarPane();
-        this.sidebarPanes.xhrBreakpoints.expanded = true;
     }
+    this.sidebarPanes.eventListenerBreakpoints = new WebInspector.EventListenerBreakpointsSidebarPane();
 
     this.sidebarPanes.workers = new WebInspector.WorkersSidebarPane();
 
@@ -242,7 +241,7 @@ WebInspector.ScriptsPanel.prototype = {
         var script = new WebInspector.Script(sourceID, sourceURL, source, startingLine, errorLine, errorMessage, scriptWorldType);
         this._sourceIDMap[sourceID] = script;
 
-        var resource = WebInspector.resourceURLMap[sourceURL];
+        var resource = WebInspector.resourceForURL(sourceURL);
         if (resource) {
             if (resource.finished) {
                 // Resource is finished, bind the script right away.
@@ -290,7 +289,7 @@ WebInspector.ScriptsPanel.prototype = {
 
         var sourceFrame;
         if (breakpoint.url) {
-            var resource = WebInspector.resourceURLMap[breakpoint.url];
+            var resource = WebInspector.resourceForURL(breakpoint.url);
             if (resource && resource.finished)
                 sourceFrame = this._sourceFrameForScriptOrResource(resource);
         }
@@ -377,7 +376,7 @@ WebInspector.ScriptsPanel.prototype = {
         InjectedScriptAccess.get(callFrame.worldId).evaluateInCallFrame(callFrame.id, code, objectGroup, evalCallback);
     },
 
-    debuggerPaused: function(details)
+    debuggerPaused: function(callFrames)
     {
         WebInspector.breakpointManager.removeOneTimeBreakpoint();
         this._paused = true;
@@ -386,11 +385,8 @@ WebInspector.ScriptsPanel.prototype = {
 
         this._updateDebuggerButtons();
 
-        this.sidebarPanes.callstack.update(details.callFrames, this._sourceIDMap);
-        this.sidebarPanes.callstack.selectedCallFrame = details.callFrames[0];
-
-        if ("eventType" in details)
-            this.sidebarPanes.callstack.updateStatus(details.eventType, details.eventData);
+        this.sidebarPanes.callstack.update(callFrames, this._sourceIDMap);
+        this.sidebarPanes.callstack.selectedCallFrame = callFrames[0];
 
         WebInspector.currentPanel = this;
         window.focus();
@@ -439,13 +435,7 @@ WebInspector.ScriptsPanel.prototype = {
         delete this.currentQuery;
         this.searchCanceled();
 
-        if (!this._debuggerEnabled) {
-            this._paused = false;
-            this._waitingToPause = false;
-            this._stepping = false;
-        }
-
-        this._clearInterface();
+        this.debuggerResumed();
 
         this._backForwardList = [];
         this._currentBackForwardIndex = -1;
@@ -473,6 +463,7 @@ WebInspector.ScriptsPanel.prototype = {
                 this.sidebarPanes.domBreakpoints.reset();
                 this.sidebarPanes.xhrBreakpoints.reset();
             }
+            this.sidebarPanes.eventListenerBreakpoints.reset();
             this.sidebarPanes.workers.reset();
         }
     },
@@ -579,9 +570,22 @@ WebInspector.ScriptsPanel.prototype = {
     _sourceFrameForScriptOrResource: function(scriptOrResource)
     {
         if (scriptOrResource instanceof WebInspector.Resource)
-            return WebInspector.panels.resources.sourceFrameForResource(scriptOrResource);
+            return this._sourceFrameForResource(scriptOrResource);
         if (scriptOrResource instanceof WebInspector.Script)
             return this.sourceFrameForScript(scriptOrResource);
+    },
+
+    _sourceFrameForResource: function(resource)
+    {
+        var view = WebInspector.ResourceManager.resourceViewForResource(resource);
+        if (!view)
+            return null;
+
+        if (!view.setupSourceFrameIfNeeded)
+            return null;
+
+        view.setupSourceFrameIfNeeded();
+        return view.sourceFrame;
     },
 
     _showScriptOrResource: function(scriptOrResource, options)
@@ -594,9 +598,7 @@ WebInspector.ScriptsPanel.prototype = {
 
         var view;
         if (scriptOrResource instanceof WebInspector.Resource) {
-            if (!WebInspector.panels.resources)
-                return null;
-            view = WebInspector.panels.resources.resourceViewForResource(scriptOrResource);
+            view = WebInspector.ResourceManager.resourceViewForResource(scriptOrResource);
             view.headersVisible = false;
         } else if (scriptOrResource instanceof WebInspector.Script)
             view = this.scriptViewForScript(scriptOrResource);
@@ -606,7 +608,7 @@ WebInspector.ScriptsPanel.prototype = {
 
         var url = scriptOrResource.url || scriptOrResource.sourceURL;
         if (url && !options.initialLoad)
-            WebInspector.applicationSettings.lastViewedScriptFile = url;
+            WebInspector.settings.lastViewedScriptFile = url;
 
         if (!options.fromBackForwardAction) {
             var oldIndex = this._currentBackForwardIndex;
@@ -700,16 +702,22 @@ WebInspector.ScriptsPanel.prototype = {
         else
             script.filesSelectOption = option;
 
-        // Call _showScriptOrResource if the option we just appended ended up being selected.
-        // This will happen for the first item added to the menu.
-        if (select.options[select.selectedIndex] === option)
+        if (select.options[select.selectedIndex] === option) {
+            // Call _showScriptOrResource if the option we just appended ended up being selected.
+            // This will happen for the first item added to the menu.
             this._showScriptOrResource(option.representedObject, {initialLoad: true});
-        else {
-            // if not first item, check to see if this was the last viewed
+        } else {
+            // If not first item, check to see if this was the last viewed
             var url = option.representedObject.url || option.representedObject.sourceURL;
-            var lastURL = WebInspector.applicationSettings.lastViewedScriptFile;
-            if (url && url === lastURL)
-                this._showScriptOrResource(option.representedObject, {initialLoad: true});
+            var lastURL = WebInspector.settings.lastViewedScriptFile;
+            if (url && url === lastURL) {
+                // For resources containing multiple <script> tags, we first report them separately and
+                // then glue them all together. They all share url and there is no need to show them all one
+                // by one.
+                var isResource = !!option.representedObject.url;
+                if (isResource || !this.visibleView || !this.visibleView.script || this.visibleView.script.sourceURL !== url)
+                    this._showScriptOrResource(option.representedObject, {initialLoad: true});
+            }
         }
 
         if (script.worldType === WebInspector.Script.WorldType.EXTENSIONS_WORLD)

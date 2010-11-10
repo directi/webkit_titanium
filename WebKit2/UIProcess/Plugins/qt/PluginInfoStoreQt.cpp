@@ -52,6 +52,11 @@ Vector<String> PluginInfoStore::pluginPathsInDirectory(const String& directory)
     return result;
 }
 
+Vector<String> PluginInfoStore::individualPluginPaths()
+{
+    return Vector<String>();
+}
+
 bool PluginInfoStore::getPluginInfo(const String& pluginPath, Plugin& plugin)
 {
     // We are loading the plugin here since it does not seem to be a standardized way to
@@ -67,11 +72,12 @@ bool PluginInfoStore::getPluginInfo(const String& pluginPath, Plugin& plugin)
 
     const MIMEToDescriptionsMap& descriptions = package->mimeToDescriptions();
     const MIMEToExtensionsMap& extensions = package->mimeToExtensions();
-    Vector<MimeClassInfo> mimes(descriptions.size());
     MIMEToDescriptionsMap::const_iterator descEnd = descriptions.end();
+    plugin.info.mimes.reserveCapacity(descriptions.size());
     unsigned i = 0;
     for (MIMEToDescriptionsMap::const_iterator it = descriptions.begin(); it != descEnd; ++it) {
-        MimeClassInfo& mime = mimes[i++];
+        plugin.info.mimes.uncheckedAppend(MimeClassInfo());
+        MimeClassInfo& mime = plugin.info.mimes[i++];
         mime.type = it->first;
         mime.desc = it->second;
         MIMEToExtensionsMap::const_iterator extensionIt = extensions.find(it->first);
@@ -83,7 +89,7 @@ bool PluginInfoStore::getPluginInfo(const String& pluginPath, Plugin& plugin)
     return true;
 }
 
-bool PluginInfoStore::shouldUsePlugin(const Plugin& plugin, const Vector<Plugin>& loadedPlugins)
+bool PluginInfoStore::shouldUsePlugin(const Plugin& plugin)
 {
     // We do not do any black-listing presently.
     return true;

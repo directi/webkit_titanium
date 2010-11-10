@@ -34,6 +34,7 @@
 
 namespace WebKit {
 
+class NPRemoteObjectMap;
 class PluginControllerProxy;
     
 // A connection from a plug-in process to a web process.
@@ -44,6 +45,8 @@ public:
     virtual ~WebProcessConnection();
 
     CoreIPC::Connection* connection() const { return m_connection.get(); }
+
+    NPRemoteObjectMap* npRemoteObjectMap() const { return m_npRemoteObjectMap.get(); }
 
 private:
     WebProcessConnection(CoreIPC::Connection::Identifier);
@@ -61,13 +64,13 @@ private:
 
     // Message handlers.
     CoreIPC::SyncReplyMode didReceiveSyncWebProcessConnectionMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
-    void createPlugin(uint64_t pluginInstanceID, const Plugin::Parameters&, const String& userAgent, bool& result);
+    void createPlugin(uint64_t pluginInstanceID, const Plugin::Parameters&, const String& userAgent, bool isPrivateBrowsingEnabled, bool& result, uint32_t& remoteLayerClientID);
     void destroyPlugin(uint64_t pluginInstanceID);
 
     RefPtr<CoreIPC::Connection> m_connection;
 
     HashMap<uint64_t, PluginControllerProxy*> m_pluginControllers;
-
+    RefPtr<NPRemoteObjectMap> m_npRemoteObjectMap;
 };
 
 } // namespace WebKit

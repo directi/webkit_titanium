@@ -114,6 +114,7 @@ DOM_CLASSES = \
     DOMApplicationCache \
     DOMCoreException \
     DOMFileSystem \
+    DOMFileSystemSync \
     DOMFormData \
     DOMImplementation \
     DOMMimeType \
@@ -124,6 +125,7 @@ DOM_CLASSES = \
     DOMSelection \
     DOMStringList \
     DOMStringMap \
+    DOMSettableTokenList \
     DOMTokenList \
     DOMWindow \
     Database \
@@ -132,7 +134,9 @@ DOM_CLASSES = \
     DeviceMotionEvent \
     DeviceOrientationEvent \
     DirectoryEntry \
+    DirectoryEntrySync \
     DirectoryReader \
+    DirectoryReaderSync \
     Document \
     DocumentFragment \
     DocumentType \
@@ -142,7 +146,9 @@ DOM_CLASSES = \
     EntityReference \
     EntriesCallback \
     Entry \
+    EntrySync \
     EntryArray \
+    EntryArraySync \
     EntryCallback \
     ErrorCallback \
     ErrorEvent \
@@ -154,6 +160,7 @@ DOM_CLASSES = \
     File \
     FileCallback \
     FileEntry \
+    FileEntrySync \
     FileException \
     FileError \
     FileList \
@@ -161,6 +168,7 @@ DOM_CLASSES = \
     FileReaderSync \
     FileWriter \
     FileWriterCallback \
+    FileWriterSync \
     FileSystemCallback \
     Flags \
     Geolocation \
@@ -220,6 +228,7 @@ DOM_CLASSES = \
     HTMLOptGroupElement \
     HTMLOptionElement \
     HTMLOptionsCollection \
+    HTMLOutputElement \
     HTMLParagraphElement \
     HTMLParamElement \
     HTMLPreElement \
@@ -322,7 +331,6 @@ DOM_CLASSES = \
     SVGAnimatedNumber \
     SVGAnimatedNumberList \
     SVGAnimatedPathData \
-    SVGAnimatedPoints \
     SVGAnimatedPreserveAspectRatio \
     SVGAnimatedRect \
     SVGAnimatedString \

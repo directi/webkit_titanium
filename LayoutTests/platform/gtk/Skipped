@@ -25,7 +25,6 @@
 # fast/dom/Window/window-screen-properties.html
 # fast/dom/null-document-location-href-put-crash.html
 # fast/dom/null-document-location-put-crash.html
-# fast/js/navigator-mimeTypes-length.html
 # media/video-currentTime-set.html
 # media/video-seek-past-end-playing.html
 # transitions/zero-duration-with-non-zero-delay-end.html
@@ -93,6 +92,10 @@ accessibility/textarea-selected-text-range.html
 accessibility/th-as-title-ui.html
 accessibility/transformed-element.html
 accessibility/visible-elements.html
+accessibility/iframe-bastardization.html
+accessibility/aria-presentational-role.html
+accessibility/aria-checkbox-checked.html
+
 #   Tests generating new results
 accessibility/aria-describedby-on-input.html
 accessibility/aria-labelledby-on-input.html
@@ -117,9 +120,7 @@ accessibility/table-one-cell.html
 accessibility/table-sections.html
 accessibility/table-with-aria-role.html
 accessibility/table-with-rules.html
-# Tests *crashing*
-# https://bugs.webkit.org/show_bug.cgi?id=30123
-accessibility/iframe-bastardization.html
+accessibility/aria-list-and-listitem.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=36146 - GTK: AX: implement press in DRT 
 accessibility/label-element-press.html
@@ -616,48 +617,10 @@ css2.1/t170602-bdr-conflct-w-99-d.html
 
 # Tests in editing/ directory
 #   Tests failing
-editing/deleting/5546763.html
-editing/deleting/delete-all-text-in-text-field-assertion.html
-editing/deleting/delete-ligature-001.html
-editing/deleting/delete-ligature-002.html
-editing/deleting/delete-ligature-003.html
-editing/deleting/pruning-after-merge-1.html
-editing/deleting/skip-virama-001.html
 editing/inserting/5994480-2.html
-editing/inserting/insert-thai-characters-001.html
-editing/inserting/space-after-removeformat.html
-editing/pasteboard/4744008.html
-editing/pasteboard/5368833.html
-editing/pasteboard/5780697-2.html
-editing/pasteboard/copy-in-password-field.html
-editing/pasteboard/file-input-files-access.html
-editing/pasteboard/paste-into-anchor-text.html
-editing/pasteboard/paste-plaintext-user-select-none.html
-editing/pasteboard/paste-table-002.html
-editing/pasteboard/paste-text-013.html
-editing/selection/after-line-break.html
-editing/selection/anchor-focus1.html
-editing/selection/anchor-focus2.html
-editing/selection/anchor-focus3.html
-editing/selection/click-before-and-after-table.html
-editing/selection/click-in-margins-inside-editable-div.html
-editing/selection/click-in-padding-with-multiple-line-boxes.html
 editing/selection/doubleclick-whitespace.html
-editing/selection/extend-selection-bidi.html
-editing/selection/getRangeAt.html
-# home-end.html and extended-selection.html have some potential breakage, commenting for now: https://bugs.webkit.org/show_bug.cgi?id=30208
-editing/selection/home-end.html
-editing/selection/legal-positions.html
-editing/selection/move-begin-end.html
-editing/selection/removeAllRanges.html
-editing/selection/select-all-textarea.html
-editing/selection/skip-non-editable-1.html
-editing/selection/skip-non-editable-2.html
-editing/selection/toString-1.html
-editing/selection/toString.html
-editing/style/apply-through-end-of-document.html
-editing/style/remove-underline-from-stylesheet.html
 editing/text-iterator/basic-iteration.html
+
 #   Tests generating new results
 editing/deleting/4845371.html
 editing/deleting/5144139-2.html
@@ -744,8 +707,6 @@ editing/deleting/whitespace-pre-1.html
 editing/input/emacs-ctrl-o.html
 editing/inserting/4278698.html
 editing/inserting/4960120-1.html
-editing/inserting/5607069-2.html
-editing/inserting/5607069-3.html
 editing/inserting/before-after-input-element.html
 editing/inserting/editable-html-element.html
 editing/inserting/editing-empty-divs.html
@@ -1015,9 +976,11 @@ editing/selection/unrendered-space.html
 editing/selection/word-granularity.html
 editing/spelling/inline_spelling_markers.html
 editing/spelling/spellcheck-attribute.html
-editing/spelling/spelling-contenteditable.html
-editing/spelling/spelling-textarea.html
+editing/spelling/spelling-hasspellingmarker.html
 editing/spelling/spelling-backspace-between-lines.html
+editing/spelling/spelling-linebreak.html
+editing/spelling/spelling-attribute-change.html
+editing/spelling/spelling-attribute-at-child.html
 editing/style/5065910.html
 editing/style/apple-style-editable-mix.html
 editing/style/block-style-001.html
@@ -1068,26 +1031,16 @@ editing/unsupported-content/table-type-before.html
 # Tests in fast/ directory
 #   Tests failing
 fast/canvas/canvas-bg-zoom.html
-fast/canvas/canvas-empty-image-pattern.html
 fast/canvas/canvas-getImageData.html
 fast/canvas/canvas-gradient-addStop-error.html
-fast/canvas/canvas-transform-identity.html
-fast/canvas/canvas-transform-infinity.html
-fast/canvas/canvas-transform-multiply.html
-fast/canvas/canvas-transform-nan.html
-fast/canvas/canvas-transform-non-invertible.html
-fast/canvas/canvas-transform-skewed.html
 fast/canvas/canvas-zoom.html
-fast/canvas/pointInPath.html
 fast/css/css1_forward_compatible_parsing.html
 fast/css/invalid-percentage-property.html
 fast/css/text-align.html
 fast/css/getComputedStyle/computed-style-without-renderer.html
-fast/css/getComputedStyle/computed-style.html
 fast/dom/client-width-height-quirks.html
 fast/dom/client-width-height.html
 fast/dom/cssTarget-crash.html
-fast/dom/frame-loading-via-document-write.html
 fast/dom/DeviceMotion
 fast/dom/DeviceOrientation
 fast/dom/Geolocation/callback-exception.html
@@ -1114,75 +1067,36 @@ fast/dom/null-document-location-href-put-crash.html
 fast/dom/null-document-location-put-crash.html
 fast/dom/null-document-location-replace-crash.html
 fast/dom/object-embed-plugin-scripting.html
-fast/dom/object-plugin-hides-properties.html
 fast/dom/tabindex-clamp.html
 fast/dom/Document/CaretRangeFromPoint/hittest-relative-to-viewport.html
-fast/dom/HTMLDocument/hasFocus.html
-fast/dom/SelectorAPI/resig-SelectorsAPI-test.xhtml
 fast/dom/Window/new-window-opener.html
 fast/dom/Window/webkitConvertPoint.html
 fast/dom/Window/window-onFocus.html
 fast/dom/Window/window-properties-device-orientation.html
 fast/dom/Window/window-resize-and-move-arguments.html
 fast/dom/Window/window-resize.html
-fast/dom/Window/window-xy-properties.html
 fast/dynamic/paused-event-dispatch.html
 fast/encoding/char-decoding-mac.html
 fast/encoding/char-decoding.html
 fast/encoding/idn-security.html
 fast/encoding/mailto-always-utf-8.html
-fast/events/attempt-scroll-with-no-scrollbars.html
-fast/events/autoscroll-in-textfield.html
-fast/events/autoscroll-nonscrollable-iframe-in-scrollable-div.html
-fast/events/autoscroll-with-non-scrollable-parent.html
 fast/events/blur-focus-window-should-blur-focus-element.html
 fast/events/frame-tab-focus.html
 fast/events/js-keyboard-event-creation.html
 fast/events/mouseup-from-button2.html
 fast/events/offsetX-offsetY.html
-fast/events/onchange-passwordfield.html
-fast/events/onchange-searchfield.html
-fast/events/onchange-textfield.html
-fast/events/onsearch-enter.html
-fast/events/onunload-clears-onbeforeunload.html
-fast/events/onunload-not-on-body.html
-fast/events/onunload.html
 fast/events/option-tab.html
-fast/events/pageshow-pagehide-on-back-cached-with-frames.html
 fast/events/pointer-events-2.html
 fast/events/popup-blocking-click-in-iframe.html
 fast/events/scrollbar-double-click.html
-fast/events/stop-load-in-unload-handler-using-document-write.html
-fast/events/stop-load-in-unload-handler-using-window-stop.html
-fast/events/tabindex-focus-blur-all.html
-fast/events/tabindex-focus-chain.html
-fast/forms/button-state-restore.html
-fast/forms/focus2.html
-fast/forms/focus-control-to-page.html
-fast/forms/focus-selection-input.html
-fast/forms/focus-selection-textarea.html
 fast/forms/get-file-upload.html
-fast/forms/input-file-re-render.html
 fast/forms/legend-access-key.html
+fast/forms/listbox-hit-test-zoomed.html
 fast/forms/listbox-onchange.html
-fast/forms/onchange-enter-submit.html
-fast/forms/onselect-textarea.html
-fast/forms/onselect-textfield.html
+fast/forms/listbox-selection-2.html
 fast/forms/option-mouseevents.html
-fast/forms/password-doubleclick-selection.html
-fast/forms/plaintext-mode-1.html
-fast/forms/search-hidden-cancel-button.html
-fast/forms/select-dirty-parent-pref-widths.html
 fast/forms/select-double-onchange.html
-fast/forms/search-styled.html
 fast/forms/select-script-onchange.html
-fast/forms/text-control-intrinsic-widths.html
-fast/forms/textarea-paste-newline.html
-fast/forms/textarea-placeholder-pseudo-style.html
-fast/forms/textarea-placeholder-set-attribute.html
-fast/forms/textarea-placeholder-set-value.html
-fast/forms/textfield-onchange-deletion.html
-fast/history/history_reload.html
 fast/history/window-open.html
 fast/html/tab-order.html
 fast/loader/main-document-url-for-non-http-loads.html
@@ -1206,11 +1120,8 @@ fast/selectors/lang-vs-xml-lang.html
 fast/text/international/danda-space.html
 fast/text/international/thai-baht-space.html
 fast/text/international/thai-offsetForPosition-inside-character.html
-fast/text/offsetForPosition-cluster-at-zero.html
 fast/backgrounds/background-clip-text.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=30562
-fast/text/zero-width-characters.html
+fast/overflow/scrollbar-restored.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=30508
 # All these tests fail because WebKit does not work correctly with
@@ -1302,6 +1213,7 @@ fast/block/float/avoidance-percent-width-strict.html
 fast/block/float/br-with-clear-2.html
 fast/block/float/br-with-clear.html
 fast/block/float/clamped-right-float.html
+fast/block/float/clear-element-too-wide-for-containing-block.html
 fast/block/float/dynamic-unfloat-pref-width.html
 fast/block/float/editable-text-overlapping-float.html
 fast/block/float/float-avoidance.html
@@ -1327,7 +1239,6 @@ fast/block/float/overlapping-floats-with-overflow-hidden.html
 fast/block/float/relative-painted-twice.html
 fast/block/float/shrink-to-fit-width.html
 fast/block/float/table-relayout.html
-fast/block/float/tableshifting.html
 fast/block/float/vertical-move-relayout.html
 fast/block/float/width-update-after-clear.html
 fast/block/margin-collapse/001.html
@@ -1948,167 +1859,6 @@ fast/flexbox/024.html
 fast/flexbox/025.html
 fast/flexbox/026.html
 fast/flexbox/flex-hang.html
-fast/forms/001.html
-fast/forms/002.html
-fast/forms/003.html
-fast/forms/004.html
-fast/forms/005.html
-fast/forms/006.html
-fast/forms/007.html
-fast/forms/HTMLOptionElement_label01.html
-fast/forms/HTMLOptionElement_label02.html
-fast/forms/HTMLOptionElement_label03.html
-fast/forms/HTMLOptionElement_label04.html
-fast/forms/HTMLOptionElement_label05.html
-fast/forms/HTMLOptionElement_label06.html
-fast/forms/HTMLOptionElement_label07.html
-fast/forms/basic-textareas.html
-fast/forms/blankbuttons.html
-fast/forms/button-align.html
-fast/forms/button-cannot-be-nested.html
-fast/forms/button-default-title.html
-fast/forms/button-generated-content.html
-fast/forms/button-inner-block-reuse.html
-fast/forms/button-positioned.html
-fast/forms/button-sizes.html
-fast/forms/button-submit.html
-fast/forms/button-table-styles.html
-fast/forms/button-text-transform.html
-fast/forms/button-white-space.html
-fast/forms/caret-rtl.html
-fast/forms/checkbox-radio-onchange.html
-fast/forms/control-clip-overflow.html
-fast/forms/control-clip.html
-fast/forms/control-restrict-line-height.html
-fast/forms/disabled-select-change-index.html
-fast/forms/encoding-test.html
-fast/forms/fieldset-align.html
-fast/forms/fieldset-with-float.html
-fast/forms/file-input-direction.html
-fast/forms/file-input-disabled.html
-fast/forms/float-before-fieldset.html
-fast/forms/floating-textfield-relayout.html
-fast/forms/form-added-to-table.html
-fast/forms/form-element-geometry.html
-fast/forms/form-hides-table.html
-fast/forms/form-in-malformed-markup.html
-fast/forms/formmove2.html
-fast/forms/formmove3.html
-fast/forms/formmove.html
-fast/forms/hidden-input-file.html
-fast/forms/hidden-listbox.html
-fast/forms/image-border.html
-fast/forms/indeterminate.html
-fast/forms/input-align-image.html
-fast/forms/input-align.html
-fast/forms/input-appearance-bkcolor.html
-fast/forms/input-appearance-default-bkcolor.html
-fast/forms/input-appearance-disabled.html
-fast/forms/input-appearance-focus.html
-fast/forms/input-appearance-height.html
-fast/forms/input-appearance-preventDefault.html
-fast/forms/input-appearance-readonly.html
-fast/forms/input-appearance-selection.html
-fast/forms/input-appearance-visibility.html
-fast/forms/input-appearance-width.html
-fast/forms/input-baseline.html
-fast/forms/input-disabled-color.html
-fast/forms/input-double-click-selection-gap-bug.html
-fast/forms/input-field-text-truncated.html
-fast/forms/input-first-letter.html
-fast/forms/input-no-renderer.html
-fast/forms/input-paste-undo.html
-fast/forms/input-readonly-autoscroll.html
-fast/forms/input-readonly-dimmed.html
-fast/forms/input-readonly-empty.html
-fast/forms/input-selectedoption.html
-fast/forms/input-spaces.html
-fast/forms/input-table.html
-fast/forms/input-text-click-inside.html
-fast/forms/input-text-click-outside.html
-fast/forms/input-text-double-click.html
-fast/forms/input-text-maxlength.html
-fast/forms/input-text-option-delete.html
-fast/forms/input-text-paste-maxlength.html
-fast/forms/input-text-scroll-left-on-blur.html
-fast/forms/input-text-self-emptying-click.html
-fast/forms/input-text-word-wrap.html
-fast/forms/input-type-change2.html
-fast/forms/input-type-change.html
-fast/forms/input-type-text-min-width.html
-fast/forms/input-value.html
-fast/forms/input-width.html
-fast/forms/isindex-placeholder.html
-fast/forms/linebox-overflow-in-textarea-padding.html
-fast/forms/listbox-clip.html
-fast/forms/listbox-deselect-scroll.html
-fast/forms/listbox-hit-test-zoomed.html
-fast/forms/listbox-scrollbar-incremental-load.html
-fast/forms/listbox-selection-2.html
-fast/forms/listbox-width-change.html
-fast/forms/menulist-clip.html
-fast/forms/menulist-deselect-update.html
-fast/forms/menulist-narrow-width.html
-fast/forms/menulist-no-overflow.html
-fast/forms/menulist-option-wrap.html
-fast/forms/menulist-restrict-line-height.html
-fast/forms/menulist-separator-painting.html
-fast/forms/menulist-width-change.html
-fast/forms/minWidthPercent.html
-fast/forms/negativeLineHeight.html
-fast/forms/option-index.html
-fast/forms/option-script.html
-fast/forms/option-strip-whitespace.html
-fast/forms/option-text-clip.html
-fast/forms/password-placeholder-text-security.html
-fast/forms/password-placeholder.html
-fast/forms/placeholder-pseudo-style.html
-fast/forms/placeholder-set-attribute.html
-fast/forms/placeholder-set-value.html
-fast/forms/plaintext-mode-2.html
-fast/forms/preserveFormDuringResidualStyle.html
-fast/forms/radio-attr-order.html
-fast/forms/radio-nested-labels.html
-fast/forms/radio_checked.html
-fast/forms/radio_checked_dynamic.html
-fast/forms/search-cancel-button-style-sharing.html
-fast/forms/search-display-none-cancel-button.html
-fast/forms/search-placeholder-value-changed.html
-fast/forms/search-rtl.html
-fast/forms/search-transformed.html
-fast/forms/search-zoomed.html
-fast/forms/searchfield-heights.html
-fast/forms/select-align.html
-fast/forms/select-baseline.html
-fast/forms/select-block-background.html
-fast/forms/select-change-listbox-size.html
-fast/forms/select-change-listbox-to-popup.html
-fast/forms/select-change-popup-to-listbox.html
-fast/forms/select-disabled-appearance.html
-fast/forms/select-display-none-style-resolve.html
-fast/forms/select-empty-option-height.html
-fast/forms/select-initial-position.html
-fast/forms/select-item-background-clip.html
-fast/forms/select-list-box-with-height.html
-fast/forms/select-selected.html
-fast/forms/select-size.html
-fast/forms/select-style.html
-fast/forms/select-visual-hebrew.html
-fast/forms/select-writing-direction-natural.html
-fast/forms/stuff-on-my-optgroup.html
-fast/forms/tabbing-input-iframe.html
-fast/forms/targeted-frame-submission.html
-fast/forms/textAreaLineHeight.html
-fast/forms/textarea-align.html
-fast/forms/textarea-rows-cols.html
-fast/forms/textarea-scroll-height.html
-fast/forms/textarea-scrollbar.html
-fast/forms/textarea-scrolled-type.html
-fast/forms/textarea-setinnerhtml.html
-fast/forms/textarea-width.html
-fast/forms/textfield-outline.html
-fast/forms/textfield-overflow.html
-fast/forms/visual-hebrew-text-field.html
 fast/gradients/background-clipped.html
 fast/gradients/border-image-gradient-sides-and-corners.html
 fast/gradients/border-image-gradient.html
@@ -2208,7 +1958,6 @@ fast/invalid/table-inside-stray-table-content.html
 fast/invalid/table-residual-style-crash.html
 fast/invalid/td-inside-object.html
 fast/js/exception-linenums-in-html-3.html
-fast/js/navigator-mimeTypes-length.html
 fast/js/missing-style-end-tag-js.html
 fast/layers/add-layer-with-nested-stacking.html
 fast/layers/inline-dirty-z-order-lists.html
@@ -2988,15 +2737,6 @@ fast/xsl/xslt-missing-namespace-in-xslt.xml
 fast/xsl/xslt-relative-path.xml
 fast/xsl/xslt_unicode.xml
 
-# Tests in fonts/ directory
-#   Tests generating new results
-fonts/cursive.html
-fonts/default.html
-fonts/fantasy.html
-fonts/monospace.html
-fonts/sans-serif.html
-fonts/serif.html
-
 # Tests in http/ directory
 #   Tests failing
 http/tests/appcache/crash-when-navigating-away-then-back.html
@@ -3008,40 +2748,18 @@ http/tests/appcache/offline-access.html
 http/tests/appcache/origin-quota.html
 http/tests/appcache/resource-redirect-2.html
 http/tests/cookies/double-quoted-value-with-semi-colon.html
-http/tests/history/redirect-200-refresh-2-seconds.pl
-http/tests/history/redirect-js-document-location-0-seconds.html
-http/tests/history/redirect-js-document-location-2-seconds.html
-http/tests/history/redirect-js-document-location-before-load.html
-http/tests/history/redirect-js-form-submit-0-seconds.html
-http/tests/history/redirect-js-form-submit-2-seconds.html
-http/tests/history/redirect-js-form-submit-before-load.html
-http/tests/history/redirect-js-location-0-seconds.html
-http/tests/history/redirect-js-location-2-seconds.html
-http/tests/history/redirect-js-location-assign-0-seconds.html
-http/tests/history/redirect-js-location-assign-2-seconds.html
-http/tests/history/redirect-js-location-assign-before-load.html
-http/tests/history/redirect-js-location-before-load.html
-http/tests/history/redirect-js-location-href-0-seconds.html
-http/tests/history/redirect-js-location-href-2-seconds.html
-http/tests/history/redirect-js-location-href-before-load.html
-http/tests/history/redirect-meta-refresh-2-seconds.html
 http/tests/incremental/slow-utf8-text.pl
 http/tests/loading/bad-scheme-subframe.html
 http/tests/loading/bad-server-subframe.html
 # Needed to cover the fix for <rdar://problem/6727495>
 http/tests/loading/deleted-host-in-resource-load-delegate-callback.html
-http/tests/loading/empty-subframe.html
 http/tests/loading/gmail-assert-on-load.html
 http/tests/loading/preload-img-test.html
 http/tests/loading/redirect-with-no-location-crash.html
-http/tests/loading/slow-parsing-subframe.html
 http/tests/loading/text-content-type-with-binary-extension.html
 http/tests/local/blob/send-data-blob.html
 http/tests/local/blob/send-hybrid-blob.html
 http/tests/local/blob/send-sliced-data-blob.html
-http/tests/local/formdata/send-form-data.html
-http/tests/local/formdata/send-form-data-with-sliced-file.html
-http/tests/local/formdata/upload-events.html
 # File API is not supported yet
 fast/files
 http/tests/media/video-play-stall-seek.html
@@ -3052,6 +2770,7 @@ http/tests/mime/standard-mode-loads-stylesheet-with-text-css-and-invalid-type.ht
 http/tests/misc/acid3.html
 http/tests/misc/isindex-formdata.html
 http/tests/misc/policy-delegate-called-twice.html
+http/tests/misc/prefetch-purpose.html
 http/tests/misc/redirect-to-external-url.html
 http/tests/misc/slow-preload-cancel.html
 http/tests/misc/window-dot-stop.html
@@ -3163,8 +2882,6 @@ media/media-fullscreen-not-in-document.html
 # Requires media engine closed caption support
 media/media-captions.html
 
-# https://bugs.webkit.org/show_bug.cgi?id=33541 - Need platform specific results
-media/video-poster-scale.html
 
 # Test specific to QuickTime media engine
 media/video-does-not-loop.html
@@ -3218,6 +2935,9 @@ svg/custom/use-setAttribute-crash.svg
 # may fail here due to debug output limitations.
 # https://bugs.webkit.org/show_bug.cgi?id=25645
 svg/custom/pattern-excessive-malloc.svg
+
+# https://bugs.webkit.org/show_bug.cgi?id=49065
+svg/animations/animate-path-nested-transforms.html
 
 #   Tests generating new results
 svg/W3C-SVG-1.1/animate-elem-02-t.svg
@@ -4897,9 +4617,6 @@ webarchive/test-xml-stylesheet.xml
 
 # Tests that failed because we don't have an eventSender implementation
 editing/input/scroll-viewport-page-up-down.html
-fast/events/popup-when-select-change.html
-fast/events/tab-focus-anchor.html
-http/tests/misc/slow-loading-mask.html
 http/tests/plugins/plugin-document-has-focus.html
 
 # Tests that require editing callbacks (and possibly Glib DOM bindings)
@@ -4962,6 +4679,44 @@ editing/execCommand/switch-list-type.html
 editing/execCommand/unlink.html
 editing/selection/4947387.html
 editing/selection/5195166-2.html
+editing/selection/legal-positions.html
+editing/deleting/5546763.html
+editing/deleting/delete-all-text-in-text-field-assertion.html
+editing/deleting/delete-ligature-001.html
+editing/deleting/delete-ligature-002.html
+editing/deleting/delete-ligature-003.html
+editing/deleting/pruning-after-merge-1.html
+editing/deleting/skip-virama-001.html
+editing/inserting/insert-thai-characters-001.html
+editing/inserting/space-after-removeformat.html
+editing/pasteboard/4744008.html
+editing/pasteboard/5368833.html
+editing/pasteboard/copy-in-password-field.html
+editing/pasteboard/paste-into-anchor-text.html
+editing/pasteboard/paste-plaintext-user-select-none.html
+editing/pasteboard/paste-table-002.html
+editing/pasteboard/paste-text-013.html
+editing/selection/after-line-break.html
+editing/selection/anchor-focus1.html
+editing/selection/anchor-focus2.html
+editing/selection/anchor-focus3.html
+editing/selection/click-before-and-after-table.html
+editing/selection/extend-selection-bidi.html
+editing/selection/getRangeAt.html
+editing/selection/move-begin-end.html
+editing/selection/removeAllRanges.html
+editing/selection/select-all-textarea.html
+editing/selection/skip-non-editable-1.html
+editing/selection/skip-non-editable-2.html
+editing/selection/toString-1.html
+editing/selection/toString.html
+editing/style/remove-underline-from-stylesheet.html
+editing/pasteboard/drop-link.html
+editing/style/typing-style-003.html
+editing/style/style-3690704-fix.html
+editing/pasteboard/paste-table-001.html
+fast/forms/focus-selection-input.html
+fast/forms/focus-selection-textarea.html
 
 # Requires expected results that we don't have atm
 editing/inserting/break-blockquote-after-delete.html
@@ -4979,11 +4734,6 @@ fast/css/rem-dynamic-scaling.html
 fast/css/rem-units-on-root.html
 fast/css/text-rendering.html
 fast/dom/HTMLTableColElement/resize-table-using-col-width.html
-fast/forms/basic-buttons.html
-fast/forms/basic-inputs.html
-fast/forms/menulist-style-color.html
-fast/forms/search-vertical-alignment.html
-fast/forms/text-style-color.html
 fast/overflow/overflow-with-local-background-attachment.html
 fast/overflow/position-fixed-transform-clipping.html
 fast/repaint/background-generated.html
@@ -5016,18 +4766,6 @@ svg/filters/subRegion-in-userSpace.svg
 # ------------------
 # Tests with bugs attached : Enable these tests again once these bugs are fixed.
 # ------------------
-
-# Height not honored for <input> and <button> elements.
-# See Bug #33936 - https://bugs.webkit.org/show_bug.cgi?id=33936
-fast/css/button-height.html
-
-# See Bug #27638 - https://bugs.webkit.org/show_bug.cgi?id=27638
-fast/dom/Window/window-screen-properties.html
-fast/forms/textarea-metrics.html
-# These two tests seem to fail on and off, skip them for now
-transitions/change-values-during-transition.html
-transitions/zero-duration-with-non-zero-delay-end.html
-
 # See Bug #27905 - http://bugs.webkit.org/show_bug.cgi?id=27905
 # Missing resource load callback ability in DRT
 http/tests/loading/redirect-methods.html
@@ -5036,7 +4774,8 @@ http/tests/misc/favicon-loads-with-images-disabled.html
 # See Bug #28668 - https://bugs.webkit.org/show_bug.cgi?id=28668
 http/tests/appcache/auth.html
 
-# This port doesn't support isolated worlds yet.
+# New test infrastructure required -- need isolated worlds
+# See https://bugs.webkit.org/show_bug.cgi?id=31508
 http/tests/security/isolatedWorld
 
 # Missing DRT ability return a null request for willSendRequest redirect calls
@@ -5050,23 +4789,8 @@ http/tests/xmlhttprequest/logout.html
 http/tests/xmlhttprequest/re-login-async.html
 http/tests/xmlhttprequest/re-login.html
 
-# https://bugs.webkit.org/show_bug.cgi?id=28088 -- document.activeElement does not work
-editing/selection/find-in-text-control.html
-
 # https://bugs.webkit.org/show_bug.cgi?id=30577
 editing/selection/move-left-right.html
-
-# Missing DRT ability to override 'standard' preferences.
-editing/selection/doubleclick-beside-cr-span.html
-fast/dom/Window/timer-resume-on-navigation-back.html
-fast/loader/input-element-page-cache-crash.html
-loader/go-back-to-different-window-size.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=30583
-fast/forms/textarea-appearance-wrap.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=30584
-svg/custom/font-face-not-in-document.svg
 
 # Probably related to https://bugs.webkit.org/show_bug.cgi?id=27637
 http/tests/security/mixedContent/insecure-plugin-in-iframe.html
@@ -5130,6 +4854,7 @@ fast/dom/Window/slow-unload-handler-only-frame-is-stopped.html
 http/tests/globalhistory
 
 # Ruby tests
+fast/ruby/ruby-beforeafter.html
 fast/ruby/ruby-empty-rt.html
 fast/ruby/ruby-inline-table.html
 fast/ruby/ruby-length.html
@@ -5153,14 +4878,6 @@ fast/css/color-correction-backgrounds-and-text.html
 fast/css/color-correction-on-backgrounds.html
 fast/css/color-correction-on-text.html
 fast/css/color-correction.html
-
-# New tests failing
-accessibility/aria-list-and-listitem.html
-accessibility/aria-presentational-role.html
-accessibility/aria-checkbox-checked.html
-accessibility/dimensions-include-descendants.html
-fast/overflow/line-clamp.html
-fast/overflow/scrollbar-restored.html
 fast/css/color-correction-on-box-shadow.html
 fast/css/color-correction-on-text-shadow.html
 
@@ -5174,10 +4891,6 @@ plugins/document-open.html
 # Tests failing once in a while
 fast/events/overflow-events.html
 http/tests/xmlhttprequest/interactive-state.html
-
-# New test infrastructure required
-# See https://bugs.webkit.org/show_bug.cgi?id=31508
-http/tests/security/isolatedWorld/didClearWindowObject.html
 
 # Need to add functionality to DumpRenderTree to handle error pages
 fast/history/back-forward-reset-after-error-handling.html
@@ -5251,16 +4964,13 @@ scrollbars/scrollbar-middleclick-nopaste.html
 # Relies on WebKit API [WebView _loadBackForwardListFromOtherView:]
 fast/loader/crash-copying-backforwardlist.html
 
-# Skip frame flattening tests until it can be tested by this DRT (bug 32717)
-# https://bugs.webkit.org/show_bug.cgi?id=38650
-fast/frames/flattening/
-fast/events/spatial-navigation/snav-iframe-flattening-simple.html
+# Spatial Navigation
+# https://bugs.webkit.org/show_bug.cgi?id=49056
+fast/events/spatial-navigation/snav-input.html
+fast/events/spatial-navigation/snav-textarea.html
 
 # Implement LayoutTestController::callShouldCloseOnWebView()
 fast/events/onbeforeunload-focused-iframe.html
-
-# Crashes on release/debug bots, see https://bugs.webkit.org/show_bug.cgi?id=35080
-fast/css/font-face-opentype.html
 
 # Crashes on debug bots, see https://bugs.webkit.org/show_bug.cgi?id=35085
 plugins/iframe-shims.html
@@ -5309,6 +5019,7 @@ fast/events/platform-wheelevent-in-scrolling-div.html
 fast/events/continuous-platform-wheelevent-in-scrolling-div.html
 
 # meter element is not supported
+# http://bugs.webkit.org/show_bug.cgi?id=48713
 fast/dom/HTMLMeterElement/meter-element.html
 fast/dom/HTMLMeterElement/set-meter-properties.html
 fast/dom/HTMLMeterElement/meter-appearances-capacity.html
@@ -5317,6 +5028,7 @@ fast/dom/HTMLMeterElement/meter-optimums.html
 fast/dom/HTMLMeterElement/meter-percent-size.html
 fast/dom/HTMLMeterElement/meter-styles.html
 fast/dom/HTMLMeterElement/meter-styles-changing-pseudo.html
+fast/dom/HTMLMeterElement/meter-element-with-child-crash.html
 
 # Needs mock support, and build slave Geolocation service
 # See https://bugs.webkit.org/show_bug.cgi?id=36053
@@ -5476,24 +5188,27 @@ http/tests/workers/text-encoding.html
 # https://bugs.webkit.org/show_bug.cgi?id=31302
 fast/css/font-face-woff.html 
 
-# https://bugs.webkit.org/show_bug.cgi?id=38956
-http/tests/xmlhttprequest/basic-auth-default.html
-
 # https://bugs.webkit.org/show_bug.cgi?id=40049
 http/tests/inspector/resource-har-conversion.html
 http/tests/inspector/resource-parameters.html
 
-# Some results are one pixel off on the 64-bit bot
+# Some results are one pixel off on the 64-bit bot or
+# have other rounding errors.
 # https://bugs.webkit.org/show_bug.cgi?id=39022
 css1/box_properties/acid_test.html
 fast/css/zoom-body-scroll.html
 svg/custom/svg-fonts-with-no-element-reference.html
 svg/filters/parent-children-with-same-filter.svg
 svg/overflow/overflow-on-inner-svg-element.svg
-mathml/presentation/sub.xhtml
-mathml/presentation/sup.xhtml
-mathml/presentation/tables.xhtml
 svg/custom/recursive-filter.svg
+fast/repaint/moving-shadow-on-container.html
+fast/repaint/moving-shadow-on-path.html
+svg/css/composite-shadow-example.html
+svg/css/composite-shadow-with-opacity.html
+svg/css/stars-with-shadow.html
+svg/custom/gradient-with-1d-boundingbox.svg
+svg/custom/relative-sized-inner-svg.xhtml
+svg/custom/relative-sized-use-without-attributes-on-symbol.xhtml
 
 # New test needs enhanced frameloader delegate logging in DRT
 # Discussed in https://bugs.webkit.org/show_bug.cgi?id=38928
@@ -5506,6 +5221,7 @@ accessibility/aria-controls-with-tabs.html
 # Need to dump context menu items on eventSender.contextClick(true).
 # https://bugs.webkit.org/show_bug.cgi?id=39102
 editing/spelling/context-menu-suggestions.html
+editing/selection/context-menu-on-text.html
 
 # IndexedDB is not yet enabled.
 storage/indexeddb
@@ -5600,17 +5316,12 @@ canvas/philip/tests/2d.composite.uncovered.pattern.destination-in.html
 canvas/philip/tests/2d.composite.uncovered.pattern.source-in.html
 canvas/philip/tests/2d.composite.uncovered.pattern.source-out.html
 canvas/philip/tests/2d.drawImage.broken.html
-canvas/philip/tests/2d.drawImage.incomplete.html
 canvas/philip/tests/2d.drawImage.null.html
-canvas/philip/tests/2d.fillStyle.parse.current.basic.html
-canvas/philip/tests/2d.fillStyle.parse.current.changed.html
-canvas/philip/tests/2d.fillStyle.parse.current.removed.html
 canvas/philip/tests/2d.fillStyle.parse.system.html
 canvas/philip/tests/2d.gradient.radial.cone.front.html
 canvas/philip/tests/2d.gradient.radial.cone.top.html
 canvas/philip/tests/2d.gradient.radial.inside2.html
 canvas/philip/tests/2d.gradient.radial.inside3.html
-canvas/philip/tests/2d.gradient.radial.negative.html
 canvas/philip/tests/2d.gradient.radial.outside1.html
 canvas/philip/tests/2d.imageData.create1.type.html
 canvas/philip/tests/2d.imageData.create2.type.html
@@ -5626,8 +5337,6 @@ canvas/philip/tests/2d.path.clip.empty.html
 canvas/philip/tests/2d.path.rect.winding.html
 canvas/philip/tests/2d.pattern.image.broken.html
 canvas/philip/tests/2d.pattern.image.incomplete.html
-canvas/philip/tests/2d.pattern.image.null.html
-canvas/philip/tests/2d.pattern.image.undefined.html
 canvas/philip/tests/2d.shadow.enable.blur.html
 canvas/philip/tests/2d.shadow.enable.x.html
 canvas/philip/tests/2d.shadow.enable.y.html
@@ -5658,16 +5367,8 @@ canvas/philip/tests/type.prototype.html
 
 # These tests are failing for us, but not for Mac. This likely
 # indicates platform specific problems.
-canvas/philip/tests/2d.shadow.canvas.alpha.html
-canvas/philip/tests/2d.shadow.canvas.basic.html
-canvas/philip/tests/2d.shadow.canvas.transparent.2.html
-canvas/philip/tests/2d.shadow.image.alpha.html
-canvas/philip/tests/2d.shadow.image.basic.html
-canvas/philip/tests/2d.shadow.image.scale.html
-canvas/philip/tests/2d.shadow.image.transparent.2.html
 canvas/philip/tests/2d.shadow.transform.2.html
 canvas/philip/tests/2d.drawImage.floatsource.html
-canvas/philip/tests/2d.drawImage.negativedir.html
 canvas/philip/tests/2d.drawImage.self.2.html
 canvas/philip/tests/2d.gradient.radial.cone.behind.html
 canvas/philip/tests/2d.gradient.radial.cone.beside.html
@@ -5681,7 +5382,6 @@ canvas/philip/tests/2d.path.arc.zeroradius.html
 canvas/philip/tests/2d.path.arcTo.collinear.2.html
 canvas/philip/tests/2d.path.arcTo.collinear.3.html
 canvas/philip/tests/2d.path.closePath.nextpoint.html
-canvas/philip/tests/2d.path.isPointInPath.nonfinite.html
 canvas/philip/tests/2d.path.rect.selfintersect.html
 canvas/philip/tests/2d.path.rect.zero.6.html
 canvas/philip/tests/2d.pattern.paint.repeatx.coord1.html
@@ -5690,10 +5390,30 @@ canvas/philip/tests/2d.pattern.paint.repeaty.coord1.html
 canvas/philip/tests/2d.pattern.paint.repeaty.outside.html
 canvas/philip/tests/toDataURL.jpeg.quality.basic.html
 
+# Failing tests after sync with Philip Taylor's upstream tests
+canvas/philip/tests/2d.drawImage.image.incomplete.omitted.html
+canvas/philip/tests/2d.fillStyle.parse.invalid.rgba-6.html
+canvas/philip/tests/2d.fillStyle.parse.rgb-eof.html
+canvas/philip/tests/2d.fillStyle.parse.rgba-eof.html
+canvas/philip/tests/2d.imageData.put.wrongtype.html
+canvas/philip/tests/2d.pattern.image.incomplete.empty.html
+canvas/philip/tests/2d.pattern.image.incomplete.omitted.html
+canvas/philip/tests/security.drawImage.canvas.html
+canvas/philip/tests/security.drawImage.image.html
+canvas/philip/tests/security.pattern.canvas.fillStyle.html
+canvas/philip/tests/security.pattern.canvas.strokeStyle.html
+canvas/philip/tests/security.reset.html
+canvas/philip/tests/security.pattern.canvas.timing.html
+canvas/philip/tests/security.pattern.create.html
+canvas/philip/tests/security.pattern.cross.html
+canvas/philip/tests/security.pattern.image.fillStyle.html
+canvas/philip/tests/security.pattern.image.strokeStyle.html
+
 # Setting CSS properties such as padding and margin does not work properly
 # on form elements: https://bugs.webkit.org/show_bug.cgi?id=40855
 fast/forms/basic-selects.html
 fast/forms/basic-textareas-quirks.html
+fast/forms/textarea-metrics.html
 
 # Fake italics do not work: https://bugs.webkit.org/show_bug.cgi?id=40856
 fast/text/fake-italic.html
@@ -5765,6 +5485,7 @@ fast/dom/navigation-type-navigate.html
 fast/dom/navigation-type-reload.html
 fast/dom/webtiming.html
 fast/dom/webtiming-navigate-within-document.html
+fast/dom/webtiming-document-open.html
 http/tests/misc/webtiming-one-redirect.php
 http/tests/misc/webtiming-two-redirects.php
 
@@ -5782,13 +5503,16 @@ html5lib/runner.html
 
 #Tests failing because beginDragWithFiles is unimplemented
 editing/pasteboard/file-drag-to-editable.html
-http/tests/local/send-dragged-file.html
-http/tests/local/send-sliced-dragged-file.html
+editing/pasteboard/file-input-files-access.html
 editing/pasteboard/files-during-page-drags.html
+fast/dom/Window/window-postmessage-clone-frames.html
+fast/dom/Window/window-postmessage-clone.html
 fast/events/drag-to-navigate.html
 fast/events/prevent-drag-to-navigate.html
-fast/dom/Window/window-postmessage-clone.html
-fast/dom/Window/window-postmessage-clone-frames.html
+fast/forms/input-file-re-render.html
+http/tests/local/formdata
+http/tests/local/send-dragged-file.html
+http/tests/local/send-sliced-dragged-file.html
 http/tests/security/clipboard/clipboard-file-access.html
 
 # Still failing, looks like a bug in the EventSender drag-and-drop
@@ -5813,12 +5537,7 @@ http/tests/security/dataTransfer-set-data-file-url.html
 fast/events/ondragenter.html
 editing/pasteboard/smart-drag-drop.html
 editing/selection/drag-start-event-client-x-y.html
-
-# Tests that require editing delegate dumps.
-editing/pasteboard/drop-link.html
-editing/style/typing-style-003.html
-editing/style/style-3690704-fix.html
-editing/pasteboard/paste-table-001.html
+editing/selection/doubleclick-beside-cr-span.html
 
 # Flaky due to JSC debugger issue.
 # https://bugs.webkit.org/show_bug.cgi?id=43034
@@ -5914,10 +5633,6 @@ fullscreen/
 # https://bugs.webkit.org/show_bug.cgi?id=44932
 canvas/philip/tests/2d.path.isPointInPath.edge.html
 
-# The version of GLib on the Debug bots appears to be
-# broken ATM causing most websocket tests to fail.
-websocket/tests
-
 # viewport meta tag support
 fast/viewport
 
@@ -5929,6 +5644,40 @@ fast/filesystem
 
 # LayoutTestController::nodesFromRect is not supported.
 fast/dom/nodesFromRect-basic.html
+fast/dom/nodesFromRect-links-and-text.html
+fast/dom/nodesFromRect-inner-documents.html
 
 #  https://bugs.webkit.org/show_bug.cgi?id=46644
 fast/text/large-text-composed-char-dos.html
+
+# LayoutTestController::addUserScript not implemented for gtk
+plugins/plugin-document-load-prevented-userscript.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=46942
+http/tests/websocket/tests/bad-sub-protocol-control-chars.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=47244
+editing/pasteboard/dataTransfer-setData-getData.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=47564
+platform/gtk/accessibility/aria-table-hierarchy.html
+
+# Requires WebP support.
+fast/images/webp-image-decoding.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=47832
+http/tests/inspector/console-xhr-logging.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=47727
+mathml/presentation
+
+# This test passes locally, but does not pass on the bots. Perhaps
+# it is an issue with the version of Cairo on the bots.
+# https://bugs.webkit.org/show_bug.cgi?id=49052
+fast/canvas/pointInPath.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=49177
+fast/events/scroll-after-click-on-tab-index.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=49179
+animations/stop-animation-on-suspend.html

@@ -6,6 +6,7 @@
 # Copyright (C) 2006 Apple Computer, Inc.
 # Copyright (C) 2007, 2008, 2009 Google Inc.
 # Copyright (C) 2009 Cameron McCormack <cam@mcc.id.au>
+# Copyright (C) Research In Motion Limited 2010. All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Library General Public
@@ -87,6 +88,7 @@ sub finish
 }
 
 # Workaround for V8 bindings difference where RGBColor is not a POD type.
+# FIXME: This method will go away once all SVG animated properties are converted to the new scheme.
 sub IsPodType
 {
     my $type = shift;
@@ -128,22 +130,13 @@ sub GenerateModule
     $module = $dataNode->module;
 }
 
-sub AvoidInclusionOfType
-{
-    my $type = shift;
-
-    # Special case: SVGRect.h / SVGPoint.h / SVGNumber.h / SVGMatrix.h do not exist.
-    return 1 if $type eq "SVGRect" or $type eq "SVGPoint" or $type eq "SVGNumber" or $type eq "SVGMatrix";
-    return 0;
-}
-
 sub AddIncludesForType
 {
     my $type = $codeGenerator->StripModule(shift);
 
     # When we're finished with the one-file-per-class
     # reorganization, we won't need these special cases.
-    if (!$codeGenerator->IsPrimitiveType($type) and !AvoidInclusionOfType($type) and $type ne "Date") {
+    if (!$codeGenerator->IsPrimitiveType($type) and !$codeGenerator->AvoidInclusionOfType($type) and $type ne "Date") {
         # default, include the same named file
         $implIncludes{GetV8HeaderName(${type})} = 1;
 
@@ -179,6 +172,8 @@ sub AddIncludesForType
 sub AddIncludesForSVGAnimatedType
 {
     my $type = shift;
+    return if $codeGenerator->IsSVGNewStyleAnimatedType($type);
+
     $type =~ s/SVGAnimated//;
 
     if ($type eq "Point" or $type eq "Rect") {
@@ -187,7 +182,7 @@ sub AddIncludesForSVGAnimatedType
         $implIncludes{"PlatformString.h"} = 1;
     }
 
-    $implIncludes{"SVGAnimatedTemplate.h"} = 1;
+    $implIncludes{"DeprecatedSVGAnimatedTemplate.h"} = 1;
 }
 
 # If the node has a [Conditional=XXX] attribute, returns an "ENABLE(XXX)" string for use in an #if.
@@ -208,6 +203,35 @@ sub GenerateConditionalString
     }
 }
 
+sub GetSVGPropertyTypes
+{
+    my $implType = shift;
+
+    my $svgPropertyType;
+    my $svgListPropertyType;
+    my $svgNativeType;
+
+    return ($svgPropertyType, $svgListPropertyType, $svgNativeType) if not $implType =~ /SVG/;
+
+    $svgNativeType = $codeGenerator->GetSVGTypeNeedingTearOff($implType);
+    return ($svgPropertyType, $svgListPropertyType, $svgNativeType) if not $svgNativeType;
+
+    # Append space to avoid compilation errors when using  PassRefPtr<$svgNativeType>
+    $svgNativeType = "$svgNativeType ";
+
+    my $svgWrappedNativeType = $codeGenerator->GetSVGWrappedTypeNeedingTearOff($implType);
+    if ($svgNativeType =~ /SVGPropertyTearOff/) {
+        $svgPropertyType = $svgWrappedNativeType;
+        $implIncludes{"SVGAnimatedPropertyTearOff.h"} = 1;
+    } elsif ($svgNativeType =~ /SVGListPropertyTearOff/ or $svgNativeType =~ /SVGStaticListPropertyTearOff/) {
+        $svgListPropertyType = $svgWrappedNativeType;
+        $implIncludes{"SVGAnimatedListPropertyTearOff.h"} = 1;
+    }
+
+    $svgPropertyType = "SVGPoint" if $svgPropertyType eq "FloatPoint";
+    return ($svgPropertyType, $svgListPropertyType, $svgNativeType);
+}
+
 sub GenerateHeader
 {
     my $object = shift;
@@ -225,8 +249,6 @@ sub GenerateHeader
 
     # - Add default header template
     push(@headerContent, GenerateHeaderContentHeader($dataNode));
-
-    # Get correct pass/store types respecting PODType flag
     my $podType = $dataNode->extendedAttributes->{"PODType"};
 
     my %headerInclues = ();
@@ -234,8 +256,11 @@ sub GenerateHeader
     $headerIncludes{"wtf/text/StringHash.h"} = 1;
     $headerIncludes{"WrapperTypeInfo.h"} = 1;
     $headerIncludes{"V8DOMWrapper.h"} = 1;
+
     my $headerClassInclude = GetHeaderClassInclude($implClassName);
     $headerIncludes{$headerClassInclude} = 1 if $headerClassInclude ne "";
+
+    my ($svgPropertyType, $svgListPropertyType, $svgNativeType) = GetSVGPropertyTypes($implClassName);
 
     foreach my $headerInclude (sort keys(%headerIncludes)) {
         push(@headerContent, "#include \"${headerInclude}\"\n");
@@ -245,16 +270,19 @@ sub GenerateHeader
     push(@headerContent, "#include <wtf/HashMap.h>\n");
     
     push(@headerContent, "\nnamespace WebCore {\n");
-    if ($podType) {
-        push(@headerContent, "\ntemplate<typename PODType> class V8SVGPODTypeWrapper;\n");
+    push(@headerContent, "\ntemplate<typename PODType> class V8SVGPODTypeWrapper;\n") if $podType;
+    push(@headerContent, "\ntemplate<typename PropertyType> class SVGPropertyTearOff;\n") if $svgPropertyType;
+    if ($svgListPropertyType) {
+        if ($svgListPropertyType =~ /SVGStaticListPropertyTearOff/) {
+            push(@headerContent, "\ntemplate<typename PropertyType> class SVGStaticListPropertyTearOff;\n");
+        } else {
+            push(@headerContent, "\ntemplate<typename PropertyType> class SVGListPropertyTearOff;\n");
+        }
     }
+    push(@headerContent, "\nclass FloatRect;\n") if $svgPropertyType && $svgPropertyType eq "FloatRect";
     push(@headerContent, "\nclass $className {\n");
 
-    my $nativeType = GetNativeTypeForConversions($interfaceName);
-    if ($podType) {
-        $nativeType = "V8SVGPODTypeWrapper<${nativeType} >";
-    }
-
+    my $nativeType = GetNativeTypeForConversions($dataNode, $interfaceName);
     my $domMapFunction = GetDomMapFunction($dataNode, $interfaceName);
     my $forceNewObjectParameter = IsDOMNodeType($interfaceName) ? ", bool forceNewObject = false" : "";
     my $forceNewObjectInput = IsDOMNodeType($interfaceName) ? ", bool forceNewObject" : "";
@@ -449,8 +477,8 @@ sub GetHeaderClassInclude
     if ($className =~ /SVGPathSeg/) {
         $className =~ s/Abs|Rel//;
     }
-    return "" if (AvoidInclusionOfType($className));
-    return "SVGAnimatedTemplate.h" if ($codeGenerator->IsSVGAnimatedType($className));
+    return "" if ($codeGenerator->AvoidInclusionOfType($className));
+    return "DeprecatedSVGAnimatedTemplate.h" if $codeGenerator->IsSVGAnimatedType($className) and !$codeGenerator->IsSVGNewStyleAnimatedType($className); 
     return "${className}.h";
 }
 
@@ -496,7 +524,7 @@ sub GenerateHeaderNamedAndIndexedPropertyAccessors
         $hasCustomDeleterr = 0;
         $hasEnumerator = 0;
     }
-    if ($interfaceName eq "HTMLSelectElement" || $interfaceName eq "HTMLAppletElement" || $interfaceName eq "HTMLEmbedElement" || $interfaceName eq "HTMLObjectElement") {
+    if ($interfaceName eq "HTMLAppletElement" || $interfaceName eq "HTMLEmbedElement" || $interfaceName eq "HTMLObjectElement") {
         $hasCustomNamedGetter = 1;
     }
     if ($interfaceName eq "HTMLDocument") {
@@ -693,18 +721,13 @@ sub GenerateNormalAttrGetter
         $skipContext = 1;
     }
 
-    # Special case: SVGSVGEelement::viewport is read-only
-    if (($implClassName eq "SVGSVGElement") and ($attrName eq "viewport")) {
-        $attrIsPodType = 0;
-        $skipContext = 1;
-    }
-
     # Special case for SVGColor
     if (($implClassName eq "SVGColor") and ($attrName eq "rgbColor")) {
         $attrIsPodType = 0;
     }
 
-    my $getterStringUsesImp = $implClassName ne "float";
+    my $getterStringUsesImp = $implClassName ne "SVGNumber";
+    my $svgNativeType = $codeGenerator->GetSVGTypeNeedingTearOff($implClassName);
 
     # Getter
     my $conditionalString = GenerateConditionalString($attribute->signature);
@@ -726,7 +749,23 @@ END
     $implClassName* imp = &impInstance;
 END
         }
-
+    } elsif ($svgNativeType) {
+        my $svgWrappedNativeType = $codeGenerator->GetSVGWrappedTypeNeedingTearOff($implClassName);
+        if ($svgWrappedNativeType =~ /List$/) {
+            push(@implContentDecls, <<END);
+    $svgNativeType* imp = V8${implClassName}::toNative(info.Holder());
+END
+        } else {
+            push(@implContentDecls, <<END);
+    $svgNativeType* wrapper = V8${implClassName}::toNative(info.Holder());
+    $svgWrappedNativeType& impInstance = wrapper->propertyReference();
+END
+            if ($getterStringUsesImp) {
+                push(@implContentDecls, <<END);
+    $svgWrappedNativeType* imp = &impInstance;
+END
+            }
+        }
     } elsif ($attrExt->{"v8OnProto"} || $attrExt->{"V8DisallowShadowing"}) {
         if ($interfaceName eq "DOMWindow") {
             push(@implContentDecls, <<END);
@@ -883,7 +922,33 @@ END
         }
     }
 
-    if ($attrIsPodType) {
+    if ($codeGenerator->IsSVGNewStyleAnimatedType($implClassName) and $codeGenerator->IsSVGTypeNeedingTearOff($attrType)) {
+        $implIncludes{"V8$attrType.h"} = 1;
+        my $svgNativeType = $codeGenerator->GetSVGTypeNeedingTearOff($attrType);
+        # Convert from abstract SVGProperty to real type, so the right toJS() method can be invoked.
+        push(@implContentDecls, "    return toV8(static_cast<$svgNativeType*>($result));\n");
+    } elsif ($codeGenerator->IsSVGTypeNeedingTearOff($attrType) and not $implClassName =~ /List$/) {
+        $implIncludes{"V8$attrType.h"} = 1;
+        $implIncludes{"SVGPropertyTearOff.h"} = 1;
+        my $tearOffType = $codeGenerator->GetSVGTypeNeedingTearOff($attrType);
+        if ($codeGenerator->IsSVGTypeWithWritablePropertiesNeedingTearOff($attrType) and not defined $attribute->signature->extendedAttributes->{"Immutable"}) {
+            $tearOffType =~ s/SVGPropertyTearOff</SVGStaticPropertyTearOff<$implClassName, /;
+            $implIncludes{"SVGStaticPropertyTearOff.h"} = 1;
+
+            my $getter = $result;
+            $getter =~ s/imp->//;
+            $getter =~ s/\(\)//;
+            my $updater = "update" . $codeGenerator->WK_ucfirst($getter);
+            push(@implContentDecls, "    return toV8(WTF::getPtr(${tearOffType}::create(imp, $result, &${implClassName}::$updater)));\n");
+        } elsif ($tearOffType =~ /SVGStaticListPropertyTearOff/) {
+            my $extraImp = "GetOwnerElementForType<$implClassName, IsDerivedFromSVGElement<$implClassName>::value>::ownerElement(imp), ";
+            push(@implContentDecls, "    return toV8(WTF::getPtr(${tearOffType}::create($extraImp$result)));\n");
+        } elsif ($tearOffType =~ /SVGPointList/) {
+            push(@implContentDecls, "    return toV8(WTF::getPtr($result));\n");
+        } else {
+            push(@implContentDecls, "    return toV8(WTF::getPtr(${tearOffType}::create($result)));\n");
+        }
+    } elsif ($attrIsPodType) {
         $implIncludes{"V8${attrType}.h"} = 1;
         push(@implContentDecls, "    return toV8(wrapper.release().get());\n");
     } else {
@@ -911,7 +976,35 @@ sub GenerateNormalAttrSetter
     push(@implContentDecls, "static void ${attrName}AttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)\n{\n");
     push(@implContentDecls, "    INC_STATS(\"DOM.$implClassName.$attrName._set\");\n");
 
+    # For functions with "StrictTypeChecking", if an input parameter's type does not match the signature,
+    # a TypeError is thrown instead of casting to null.
+    if ($attribute->signature->extendedAttributes->{"StrictTypeChecking"}) {
+        my $argType = GetTypeFromSignature($attribute->signature);
+        if (IsWrapperType($argType)) {
+            push(@implContentDecls, "    if (!isUndefinedOrNull(value) && !V8${argType}::HasInstance(value)) {\n");
+            push(@implContentDecls, "        V8Proxy::throwTypeError();\n");
+            push(@implContentDecls, "        return;\n");
+            push(@implContentDecls, "    }\n");
+        } elsif ($codeGenerator->IsStringType($argType)) {
+            push(@implContentDecls, "    if (!isUndefinedOrNull(value) && !value->IsString() && !value->IsObject()) {\n");
+            push(@implContentDecls, "        V8Proxy::throwTypeError();\n");
+            push(@implContentDecls, "        return;\n");
+            push(@implContentDecls, "    }\n");
+        } elsif ($codeGenerator->IsNumericType($argType)) {
+            push(@implContentDecls, "    if (!isUndefinedOrNull(value) && !value->IsNumber() && !value->IsBoolean()) {\n");
+            push(@implContentDecls, "        V8Proxy::throwTypeError();\n");
+            push(@implContentDecls, "        return;\n");
+            push(@implContentDecls, "    }\n");
+        } elsif ($argType eq "boolean") {
+            push(@implContentDecls, "    if (!isUndefinedOrNull(value) && !value->IsBoolean()) {\n");
+            push(@implContentDecls, "        V8Proxy::throwTypeError();\n");
+            push(@implContentDecls, "        return;\n");
+            push(@implContentDecls, "    }\n");
+        }
+    }
+
     my $isPodType = IsPodType($implClassName);
+    my $svgNativeType = $codeGenerator->GetSVGTypeNeedingTearOff($implClassName);
 
     if ($isPodType) {
         $implClassName = GetNativeType($implClassName);
@@ -919,7 +1012,19 @@ sub GenerateNormalAttrSetter
         push(@implContentDecls, "    V8SVGPODTypeWrapper<$implClassName>* wrapper = V8SVGPODTypeWrapper<$implClassName>::toNative(info.Holder());\n");
         push(@implContentDecls, "    $implClassName impInstance = *wrapper;\n");
         push(@implContentDecls, "    $implClassName* imp = &impInstance;\n");
-
+    } elsif ($svgNativeType) {
+        my $svgWrappedNativeType = $codeGenerator->GetSVGWrappedTypeNeedingTearOff($implClassName);
+        if ($svgWrappedNativeType =~ /List$/) {
+            push(@implContentDecls, <<END);
+    $svgNativeType* imp = V8${implClassName}::toNative(info.Holder());
+END
+        } else {
+            push(@implContentDecls, <<END);
+    $svgNativeType* wrapper = V8${implClassName}::toNative(info.Holder());
+    $svgWrappedNativeType& impInstance = wrapper->propertyReference();
+    $svgWrappedNativeType* imp = &impInstance;
+END
+        }
     } elsif ($attrExt->{"v8OnProto"}) {
       if ($interfaceName eq "DOMWindow") {
         push(@implContentDecls, <<END);
@@ -984,7 +1089,7 @@ END
         push(@implContentDecls, "    ExceptionCode ec = 0;\n");
     }
 
-    if ($implClassName eq "float") {
+    if ($implClassName eq "SVGNumber") {
         push(@implContentDecls, "    *imp = $result;\n");
     } else {
         if ($attribute->signature->type eq "EventListener") {
@@ -1013,6 +1118,13 @@ END
 
     if ($isPodType) {
         push(@implContentDecls, "    wrapper->commitChange(*imp, V8Proxy::svgContext(wrapper));\n");
+    } elsif ($svgNativeType) {
+        if ($useExceptions) {
+            push(@implContentDecls, "    if (!ec)\n");
+            push(@implContentDecls, "        wrapper->commitChange();\n");
+        } else {
+            push(@implContentDecls, "    wrapper->commitChange();\n");
+        }
     } elsif (IsSVGTypeNeedingContextParameter($implClassName)) {
         $implIncludes{"SVGElement.h"} = 1;
 
@@ -1024,7 +1136,7 @@ END
         push(@implContentDecls, "    if (SVGElement* context = V8Proxy::svgContext($currentObject))\n");
         push(@implContentDecls, "        context->svgAttributeChanged(imp->associatedAttributeName());\n");
     }
-
+    
     push(@implContentDecls, "    return;\n");
     push(@implContentDecls, "}\n\n");  # end of setter
     push(@implContentDecls, "#endif // ${conditionalString}\n\n") if $conditionalString;
@@ -1213,11 +1325,23 @@ END
         }
     }
 
+    my ($svgPropertyType, $svgListPropertyType, $svgNativeType) = GetSVGPropertyTypes($implClassName);
+
     if (IsPodType($implClassName)) {
         my $nativeClassName = GetNativeType($implClassName);
         push(@implContentDecls, "    V8SVGPODTypeWrapper<$nativeClassName>* impWrapper = V8SVGPODTypeWrapper<$nativeClassName>::toNative(args.Holder());\n");
         push(@implContentDecls, "    $nativeClassName impInstance = *impWrapper;\n");
         push(@implContentDecls, "    $nativeClassName* imp = &impInstance;\n");
+    } elsif ($svgNativeType) {
+        my $nativeClassName = GetNativeType($implClassName); 
+        if ($implClassName =~ /List$/) {
+            push(@implContentDecls, "    $nativeClassName imp = V8${svgListPropertyType}::toNative(args.Holder());\n");
+        } else {
+            my $svgWrappedNativeType = $codeGenerator->GetSVGWrappedTypeNeedingTearOff($implClassName);
+            push(@implContentDecls, "    $nativeClassName wrapper = V8${svgPropertyType}::toNative(args.Holder());\n");
+            push(@implContentDecls, "    $svgWrappedNativeType& impInstance = wrapper->propertyReference();\n");
+            push(@implContentDecls, "    $svgWrappedNativeType* imp = &impInstance;\n");
+        }
     } elsif (!$function->signature->extendedAttributes->{"ClassMethod"}) {
         push(@implContentDecls, <<END);
     ${implClassName}* imp = V8${implClassName}::toNative(args.Holder());
@@ -1255,11 +1379,15 @@ END
 
     if ($function->signature->extendedAttributes->{"CustomArgumentHandling"}) {
         push(@implContentDecls, <<END);
-    OwnPtr<ScriptCallStack> callStack(ScriptCallStack::create(args, $numParameters));
+    OwnPtr<ScriptArguments> scriptArguments(createScriptArguments(args, $numParameters));
+    size_t maxStackSize = imp->shouldCaptureFullStackTrace() ? ScriptCallStack::maxCallStackSizeToCapture : 1;
+    OwnPtr<ScriptCallStack> callStack(createScriptCallStack(maxStackSize));
     if (!callStack)
         return v8::Undefined();
 END
+        $implIncludes{"ScriptArguments.h"} = 1;
         $implIncludes{"ScriptCallStack.h"} = 1;
+        $implIncludes{"ScriptCallStackFactory.h"} = 1;
     }
     if ($function->signature->extendedAttributes->{"SVGCheckSecurityDocument"}) {
         push(@implContentDecls, <<END);
@@ -1335,6 +1463,11 @@ END
                     push(@implContentDecls, "    }\n");
                 } elsif ($codeGenerator->IsStringType($argType)) {
                     push(@implContentDecls, "    if (args.Length() > $paramIndex && !isUndefinedOrNull($argValue) && !${argValue}->IsString() && !${argValue}->IsObject()) {\n");
+                    push(@implContentDecls, "        V8Proxy::throwTypeError();\n");
+                    push(@implContentDecls, "        return notHandledByInterceptor();\n");
+                    push(@implContentDecls, "    }\n");
+                } elsif ($codeGenerator->IsNumericType($argType)) {
+                    push(@implContentDecls, "    if (args.Length() > $paramIndex && !isUndefinedOrNull($argValue) && !${argValue}->IsNumber() && !${argValue}->IsBoolean()) {\n");
                     push(@implContentDecls, "        V8Proxy::throwTypeError();\n");
                     push(@implContentDecls, "        return notHandledByInterceptor();\n");
                     push(@implContentDecls, "    }\n");
@@ -1609,7 +1742,7 @@ sub GenerateImplementationNamedPropertyGetter
         $hasCustomGetter = 0;
     }
 
-    my $hasGetter = $dataNode->extendedAttributes->{"HasNameGetter"} || $hasCustomGetter || $namedPropertyGetter;
+    my $hasGetter = $dataNode->extendedAttributes->{"HasNameGetter"} || $hasCustomGetter;
     if (!$hasGetter) {
         return;
     }
@@ -2130,10 +2263,7 @@ END
 END
     }
 
-    my $nativeType = GetNativeTypeForConversions($interfaceName);
-    if ($dataNode->extendedAttributes->{"PODType"}) {
-        $nativeType = "V8SVGPODTypeWrapper<${nativeType}>";
-    }
+    my $nativeType = GetNativeTypeForConversions($dataNode, $interfaceName);
     push(@implContent, <<END);
 
     // Custom toString template
@@ -2538,7 +2668,7 @@ sub GetDomMapFunction
     return "getDOMSVGElementInstanceMap()" if $type eq "SVGElementInstance";
     return "getDOMNodeMap()" if ($dataNode && IsNodeSubType($dataNode));
     # Only use getDOMSVGObjectWithContextMap() for non-node svg objects
-    return "getDOMSVGObjectWithContextMap()" if $type =~ /SVG/;
+    return "getDOMSVGObjectWithContextMap()" if $type =~ /SVG/ and $type ne "SVGLength" and $type ne "SVGLengthList" and not $codeGenerator->IsSVGNewStyleAnimatedType($type);
     return "" if $type eq "DOMImplementation";
     return "getActiveDOMObjectMap()" if IsActiveDomType($type);
     return "getDOMObjectMap()";
@@ -2555,16 +2685,20 @@ sub IsActiveDomType
     return 1 if $type eq "Worker";
     return 1 if $type eq "SharedWorker";
     return 1 if $type eq "IDBRequest";
+    return 1 if $type eq "FileReader";
+    return 1 if $type eq "FileWriter";
+    return 1 if $type eq "FileWriterSync";
     return 0;
 }
 
 sub GetNativeTypeForConversions
 {
+    my $dataNode = shift;
     my $type = shift;
-    return "FloatRect" if $type eq "SVGRect";
-    return "FloatPoint" if $type eq "SVGPoint";
-    return "AffineTransform" if $type eq "SVGMatrix";
-    return "float" if $type eq "SVGNumber";
+
+    $type = "AffineTransform" if $type eq "SVGMatrix";
+    $type = "V8SVGPODTypeWrapper<$type>" if $dataNode->extendedAttributes->{"PODType"};
+    $type = $codeGenerator->GetSVGTypeNeedingTearOff($type) if $codeGenerator->IsSVGTypeNeedingTearOff($type); 
     return $type;
 }
 
@@ -2581,6 +2715,9 @@ sub GenerateFunctionCallString()
     my $returnsPodType = IsPodType($returnType);
     my $nativeReturnType = GetNativeType($returnType, 0);
     my $result = "";
+
+    my $isSVGTearOffType = ($codeGenerator->IsSVGTypeNeedingTearOff($returnType) and not $implClassName =~ /List$/);
+    $nativeReturnType = $codeGenerator->GetSVGWrappedTypeNeedingTearOff($returnType) if $isSVGTearOffType;
 
     # Special case: SVG matrix transform methods should not mutate
     # the matrix but return a copy
@@ -2658,6 +2795,12 @@ sub GenerateFunctionCallString()
 
         if ($parameter->type eq "NodeFilter" || $parameter->type eq "XPathNSResolver") {
             $functionString .= "$paramName.get()";
+        } elsif ($codeGenerator->IsSVGTypeNeedingTearOff($parameter->type) and not $implClassName =~ /List$/) {
+            $functionString .= "$paramName->propertyReference()";
+            $result .= $indent . "if (!$paramName) {\n";
+            $result .= $indent . "    V8Proxy::setDOMException(WebCore::TYPE_MISMATCH_ERR);\n";
+            $result .= $indent . "    return v8::Handle<v8::Value>();\n";
+            $result .= $indent . "}\n";
         } else {
             $functionString .= $paramName;
         }
@@ -2666,8 +2809,8 @@ sub GenerateFunctionCallString()
 
     if ($function->signature->extendedAttributes->{"CustomArgumentHandling"}) {
         $functionString .= ", " if $index;
-        $functionString .= "callStack.get()";
-        $index++;
+        $functionString .= "scriptArguments.release(), callStack.release()";
+        $index += 2;
     }
 
     if ($function->signature->extendedAttributes->{"NeedsUserGestureCheck"}) {
@@ -2723,6 +2866,14 @@ sub GenerateFunctionCallString()
         $return = "wrapper";
     }
 
+    if ($isSVGTearOffType) {
+        $implIncludes{"V8$returnType.h"} = 1;
+        $implIncludes{"SVGPropertyTearOff.h"} = 1;
+        my $svgNativeType = $codeGenerator->GetSVGTypeNeedingTearOff($returnType);
+        $result .= $indent . "return toV8(WTF::getPtr(${svgNativeType}::create($return)));\n";
+        return $result;
+    }
+
     my $generatedSVGContextRetrieval = 0;
     # If the return type needs an SVG context, output it
     if (IsSVGTypeNeedingContextParameter($returnType)) {
@@ -2748,6 +2899,8 @@ sub GenerateFunctionCallString()
         }
 
         $result .= $indent . "impWrapper->commitChange(impInstance, context);\n";
+    } elsif ($codeGenerator->IsSVGTypeNeedingTearOff($implClassName) and not $implClassName =~ /List$/) {
+        $result .= $indent . "wrapper->commitChange();\n";
     }
 
     if ($returnsPodType) {
@@ -2812,7 +2965,6 @@ sub IsRefPtrType
     return 0 if $type eq "unsigned";
     return 0 if $type eq "unsigned long";
     return 0 if $type eq "unsigned short";
-    return 0 if $type eq "SVGAnimatedPoints";
 
     return 1;
 }
@@ -2821,6 +2973,15 @@ sub GetNativeType
 {
     my $type = shift;
     my $isParameter = shift;
+
+    my $svgNativeType = $codeGenerator->GetSVGTypeNeedingTearOff($type);
+    if ($svgNativeType) {
+        if ($svgNativeType =~ /List$/) {
+            return "${svgNativeType}*";
+        } else {
+            return "RefPtr<${svgNativeType} >";
+        }
+    }
 
     if ($type eq "float" or $type eq "double") {
         return $type;
@@ -2836,14 +2997,8 @@ sub GetNativeType
     return "bool" if $type eq "boolean";
     return "String" if $type eq "DOMString";
     return "Range::CompareHow" if $type eq "CompareHow";
-    return "FloatRect" if $type eq "SVGRect";
-    return "FloatPoint" if $type eq "SVGPoint";
     return "AffineTransform" if $type eq "SVGMatrix";
     return "SVGTransform" if $type eq "SVGTransform";
-    return "SVGLength" if $type eq "SVGLength";
-    return "SVGAngle" if $type eq "SVGAngle";
-    return "float" if $type eq "SVGNumber";
-    return "SVGPreserveAspectRatio" if $type eq "SVGPreserveAspectRatio";
     return "SVGPaint::SVGPaintType" if $type eq "SVGPaintType";
     return "DOMTimeStamp" if $type eq "DOMTimeStamp";
     return "unsigned" if $type eq "unsigned int";
@@ -2893,12 +3048,7 @@ sub BasicTypeCanFailConversion
     my $signature = shift;
     my $type = GetTypeFromSignature($signature);
 
-    return 1 if $type eq "SVGAngle";
-    return 1 if $type eq "SVGLength";
     return 1 if $type eq "SVGMatrix";
-    return 1 if $type eq "SVGPoint";
-    return 1 if $type eq "SVGPreserveAspectRatio";
-    return 1 if $type eq "SVGRect";
     return 1 if $type eq "SVGTransform";
     return 0;
 }
@@ -2912,6 +3062,7 @@ sub TypeCanFailConversion
     $implIncludes{"ExceptionCode.h"} = 1 if $type eq "Attr";
     return 1 if $type eq "Attr";
     return 1 if $type eq "VoidCallback";
+    return 1 if $type eq "IDBKey";
     return BasicTypeCanFailConversion($signature);
 }
 
@@ -2927,7 +3078,6 @@ sub JSValueToNative
     return "$value" if $type eq "JSObject";
     return "$value->BooleanValue()" if $type eq "boolean";
     return "static_cast<$type>($value->NumberValue())" if $type eq "float" or $type eq "double";
-    return "$value->NumberValue()" if $type eq "SVGNumber";
 
     return "toInt32($value${maybeOkParam})" if $type eq "long";
     return "toUInt32($value${maybeOkParam})" if $type eq "unsigned long" or $type eq "unsigned short";
@@ -2959,10 +3109,6 @@ sub JSValueToNative
 
     if ($type eq "SVGRect") {
         $implIncludes{"FloatRect.h"} = 1;
-    }
-
-    if ($type eq "SVGPoint") {
-        $implIncludes{"FloatPoint.h"} = 1;
     }
 
     # Default, assume autogenerated type conversion routines
@@ -3218,6 +3364,7 @@ sub ReturnNativeToJSValue
     return "return toV8($value)";
 }
 
+# FIXME: This method will go away once all SVG animated properties are converted to the new scheme.
 sub GenerateSVGStaticPodTypeWrapper {
     my $type = shift;
     my $value = shift;
@@ -3272,17 +3419,24 @@ sub WriteData
     }
 }
 
+# FIXME: This method will go away once all SVG animated properties are converted to the new scheme.
 sub IsSVGTypeNeedingContextParameter
 {
     my $implClassName = shift;
 
-    if ($implClassName =~ /SVG/ and not $implClassName =~ /Element/) {
-        return 1 unless $implClassName =~ /SVGPaint/ or $implClassName =~ /SVGColor/ or $implClassName =~ /SVGDocument/;
-    }
+    return 0 unless $implClassName =~ /SVG/;
+    return 0 if $implClassName =~ /Element/;
+    return 0 if $codeGenerator->IsSVGNewStyleAnimatedType($implClassName);
+    return 0 if $codeGenerator->IsSVGTypeNeedingTearOff($implClassName);
 
-    return 0;
+    my @noContextNeeded = ("SVGColor", "SVGDocument", "SVGPaintType", "SVGPaint", "SVGZoomEvent");
+    foreach (@noContextNeeded) {
+        return 0 if $implClassName eq $_;
+    }
+    return 1;
 }
 
+# FIXME: This method will go away once all SVG animated properties are converted to the new scheme.
 sub GenerateSVGContextAssignment
 {
     my $srcType = shift;
@@ -3295,6 +3449,7 @@ sub GenerateSVGContextAssignment
     return $result;
 }
 
+# FIXME: This method will go away once all SVG animated properties are converted to the new scheme.
 sub GenerateSVGContextRetrieval
 {
     my $srcType = shift;
@@ -3347,7 +3502,6 @@ sub IsSVGListTypeNeedingSpecialHandling
 {
     my $className = shift;
 
-    return 1 if $className eq "SVGPointList";
     return 1 if $className eq "SVGTransformList";
 
     return 0;

@@ -35,44 +35,63 @@
 
 namespace WebCore {
 
+class IDBFactoryBackendImpl;
 class IDBObjectStoreBackendImpl;
+class IDBSQLiteDatabase;
 class IDBTransactionCoordinator;
 class SQLiteDatabase;
 
 class IDBDatabaseBackendImpl : public IDBDatabaseBackendInterface {
 public:
-    static PassRefPtr<IDBDatabaseBackendImpl> create(const String& name, const String& description, PassOwnPtr<SQLiteDatabase> database, IDBTransactionCoordinator* coordinator)
+    static PassRefPtr<IDBDatabaseBackendImpl> create(const String& name, const String& description, IDBSQLiteDatabase* database, IDBTransactionCoordinator* coordinator, IDBFactoryBackendImpl* factory, const String& uniqueIdentifier)
     {
-        return adoptRef(new IDBDatabaseBackendImpl(name, description, database, coordinator));
+        return adoptRef(new IDBDatabaseBackendImpl(name, description, database, coordinator, factory, uniqueIdentifier));
     }
     virtual ~IDBDatabaseBackendImpl();
 
     void setDescription(const String& description);
-    SQLiteDatabase& sqliteDatabase() const { return *m_sqliteDatabase.get(); }
+    SQLiteDatabase& sqliteDatabase() const;
 
-    // Implements IDBDatabase
+    static const int64_t InvalidId = 0;
+    int64_t id() const { return m_id; }
+
     virtual String name() const { return m_name; }
     virtual String description() const { return m_description; }
     virtual String version() const { return m_version; }
     virtual PassRefPtr<DOMStringList> objectStores() const;
 
-    virtual void createObjectStore(const String& name, const String& keyPath, bool autoIncrement, PassRefPtr<IDBCallbacks>);
-    virtual PassRefPtr<IDBObjectStoreBackendInterface> objectStore(const String& name, unsigned short mode);
-    virtual void removeObjectStore(const String& name, PassRefPtr<IDBCallbacks>);
-    virtual void setVersion(const String& version, PassRefPtr<IDBCallbacks>);
-    virtual PassRefPtr<IDBTransactionBackendInterface> transaction(DOMStringList* storeNames, unsigned short mode, unsigned long timeout);
+    virtual PassRefPtr<IDBObjectStoreBackendInterface> createObjectStore(const String& name, const String& keyPath, bool autoIncrement, IDBTransactionBackendInterface*, ExceptionCode&);
+    virtual void removeObjectStore(const String& name, IDBTransactionBackendInterface*, ExceptionCode&);
+    virtual void setVersion(const String& version, PassRefPtr<IDBCallbacks>, ExceptionCode&);
+    virtual PassRefPtr<IDBTransactionBackendInterface> transaction(DOMStringList* storeNames, unsigned short mode, unsigned long timeout, ExceptionCode&);
+    virtual void close();
 
+    PassRefPtr<IDBObjectStoreBackendInterface> objectStore(const String& name);
     IDBTransactionCoordinator* transactionCoordinator() const { return m_transactionCoordinator.get(); }
 
 private:
-    IDBDatabaseBackendImpl(const String& name, const String& description, PassOwnPtr<SQLiteDatabase> database, IDBTransactionCoordinator*);
+    IDBDatabaseBackendImpl(const String& name, const String& description, IDBSQLiteDatabase* database, IDBTransactionCoordinator*, IDBFactoryBackendImpl*, const String& uniqueIdentifier);
 
     void loadObjectStores();
 
-    OwnPtr<SQLiteDatabase> m_sqliteDatabase;
+    static void createObjectStoreInternal(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl>, PassRefPtr<IDBObjectStoreBackendImpl>, PassRefPtr<IDBTransactionBackendInterface>);
+    static void removeObjectStoreInternal(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl>, PassRefPtr<IDBObjectStoreBackendImpl>, PassRefPtr<IDBTransactionBackendInterface>);
+    static void setVersionInternal(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl>, const String& version, PassRefPtr<IDBCallbacks>, PassRefPtr<IDBTransactionBackendInterface>);
+
+    // These are used as setVersion transaction abort tasks.
+    static void removeObjectStoreFromMap(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl>, PassRefPtr<IDBObjectStoreBackendImpl>);
+    static void addObjectStoreToMap(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl>, PassRefPtr<IDBObjectStoreBackendImpl>);
+    static void resetVersion(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl>, const String& version);
+
+    RefPtr<IDBSQLiteDatabase> m_sqliteDatabase;
+    int64 m_id;
     String m_name;
     String m_description;
     String m_version;
+
+    String m_identifier;
+    // This might not need to be a RefPtr since the factory's lifetime is that of the page group, but it's better to be conservitive than sorry.
+    RefPtr<IDBFactoryBackendImpl> m_factory;
 
     typedef HashMap<String, RefPtr<IDBObjectStoreBackendImpl> > ObjectStoreMap;
     ObjectStoreMap m_objectStores;

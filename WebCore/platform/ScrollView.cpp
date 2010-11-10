@@ -332,6 +332,13 @@ void ScrollView::setScrollPosition(const IntPoint& scrollPoint)
     IntPoint newScrollPosition = scrollPoint.shrunkTo(maximumScrollPosition());
     newScrollPosition.clampNegativeToZero();
 
+#if ENABLE(TILED_BACKING_STORE)
+    if (delegatesScrolling()) {
+        hostWindow()->delegatedScrollRequested(IntSize(scrollPoint.x(), scrollPoint.y()));
+        return;
+    }
+#endif
+
     if (newScrollPosition == scrollPosition())
         return;
 
@@ -365,7 +372,7 @@ static const unsigned cMaxUpdateScrollbarsPass = 2;
 
 void ScrollView::updateScrollbars(const IntSize& desiredOffset)
 {
-    if (m_inUpdateScrollbars || prohibitsScrolling() || platformWidget())
+    if (m_inUpdateScrollbars || prohibitsScrolling() || delegatesScrolling() || platformWidget())
         return;
 
     // If we came in here with the view already needing a layout, then go ahead and do that
@@ -535,6 +542,8 @@ void ScrollView::scrollContents(const IntSize& scrollDelta)
     hostWindow()->invalidateWindow(updateRect, false /*immediate*/);
 
     if (m_drawPanScrollIcon) {
+        // FIXME: the pan icon is broken when accelerated compositing is on, since it will draw under the compositing layers.
+        // https://bugs.webkit.org/show_bug.cgi?id=47837
         int panIconDirtySquareSizeLength = 2 * (panIconSizeLength + max(abs(scrollDelta.width()), abs(scrollDelta.height()))); // We only want to repaint what's necessary
         IntPoint panIconDirtySquareLocation = IntPoint(m_panScrollIconPoint.x() - (panIconDirtySquareSizeLength / 2), m_panScrollIconPoint.y() - (panIconDirtySquareSizeLength / 2));
         IntRect panScrollIconDirtyRect = IntRect(panIconDirtySquareLocation , IntSize(panIconDirtySquareSizeLength, panIconDirtySquareSizeLength));
@@ -545,11 +554,11 @@ void ScrollView::scrollContents(const IntSize& scrollDelta)
     if (canBlitOnScroll()) { // The main frame can just blit the WebView window
         // FIXME: Find a way to scroll subframes with this faster path
         if (!scrollContentsFastPath(-scrollDelta, scrollViewRect, clipRect))
-            hostWindow()->invalidateContentsForSlowScroll(updateRect, false);
+            scrollContentsSlowPath(updateRect);
     } else { 
        // We need to go ahead and repaint the entire backing store.  Do it now before moving the
        // windowed plugins.
-       hostWindow()->invalidateContentsForSlowScroll(updateRect, false);
+       scrollContentsSlowPath(updateRect);
     }
 
     // This call will move children with native widgets (plugins) and invalidate them as well.
@@ -563,6 +572,11 @@ bool ScrollView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRec
 {
     hostWindow()->scroll(scrollDelta, rectToScroll, clipRect);
     return true;
+}
+
+void ScrollView::scrollContentsSlowPath(const IntRect& updateRect)
+{
+    hostWindow()->invalidateContentsForSlowScroll(updateRect, false);
 }
 
 IntPoint ScrollView::windowToContents(const IntPoint& windowPoint) const
@@ -688,27 +702,27 @@ void ScrollView::wheelEvent(PlatformWheelEvent& e)
         return;
     }
 
-    // Determine how much we want to scroll.  If we can move at all, we will accept the event.
+    // Accept the event if we have a scrollbar in that direction and can still
+    // scroll any further.
+    float deltaX = m_horizontalScrollbar ? e.deltaX() : 0;
+    float deltaY = m_verticalScrollbar ? e.deltaY() : 0;
     IntSize maxScrollDelta = maximumScrollPosition() - scrollPosition();
-    if ((e.deltaX() < 0 && maxScrollDelta.width() > 0) ||
-        (e.deltaX() > 0 && scrollOffset().width() > 0) ||
-        (e.deltaY() < 0 && maxScrollDelta.height() > 0) ||
-        (e.deltaY() > 0 && scrollOffset().height() > 0)) {
+    if ((deltaX < 0 && maxScrollDelta.width() > 0)
+        || (deltaX > 0 && scrollOffset().width() > 0)
+        || (deltaY < 0 && maxScrollDelta.height() > 0)
+        || (deltaY > 0 && scrollOffset().height() > 0)) {
         e.accept();
-        float deltaX = e.deltaX();
-        float deltaY = e.deltaY();
         if (e.granularity() == ScrollByPageWheelEvent) {
-            ASSERT(deltaX == 0);
+            ASSERT(!e.deltaX());
             bool negative = deltaY < 0;
             deltaY = max(max(static_cast<float>(visibleHeight()) * Scrollbar::minFractionToStepWhenPaging(), static_cast<float>(visibleHeight() - Scrollbar::maxOverlapBetweenPages())), 1.0f);
             if (negative)
                 deltaY = -deltaY;
         }
 
-        // Should we fall back on scrollBy() if there is no scrollbar for a non-zero delta?
-        if (deltaY && m_verticalScrollbar)
+        if (deltaY)
             m_verticalScrollbar->scroll(ScrollUp, ScrollByPixel, deltaY);
-        if (deltaX && m_horizontalScrollbar)
+        if (deltaX)
             m_horizontalScrollbar->scroll(ScrollLeft, ScrollByPixel, deltaX);
     }
 }
@@ -804,7 +818,7 @@ void ScrollView::paintScrollbars(GraphicsContext* context, const IntRect& rect)
 void ScrollView::paintPanScrollIcon(GraphicsContext* context)
 {
     static Image* panScrollIcon = Image::loadPlatformResource("panIcon").releaseRef();
-    context->drawImage(panScrollIcon, DeviceColorSpace, m_panScrollIconPoint);
+    context->drawImage(panScrollIcon, ColorSpaceDeviceRGB, m_panScrollIconPoint);
 }
 
 void ScrollView::paint(GraphicsContext* context, const IntRect& rect)

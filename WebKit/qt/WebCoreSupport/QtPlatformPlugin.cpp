@@ -91,20 +91,26 @@ QWebKitPlatformPlugin* QtPlatformPlugin::plugin()
 QWebSelectMethod* QtPlatformPlugin::createSelectInputMethod()
 {
     QWebKitPlatformPlugin* p = plugin();
-    return p ? qobject_cast<QWebSelectMethod*>(p->createExtension(QWebKitPlatformPlugin::MultipleSelections)) : 0;
+    return p ? static_cast<QWebSelectMethod*>(p->createExtension(QWebKitPlatformPlugin::MultipleSelections)) : 0;
 }
 
 
 QWebNotificationPresenter* QtPlatformPlugin::createNotificationPresenter()
 {
     QWebKitPlatformPlugin* p = plugin();
-    return p ? qobject_cast<QWebNotificationPresenter*>(p->createExtension(QWebKitPlatformPlugin::Notifications)) : 0;
+    return p ? static_cast<QWebNotificationPresenter*>(p->createExtension(QWebKitPlatformPlugin::Notifications)) : 0;
 }
 
 QWebHapticFeedbackPlayer* QtPlatformPlugin::createHapticFeedbackPlayer()
 {
     QWebKitPlatformPlugin* p = plugin();
-    return p ? qobject_cast<QWebHapticFeedbackPlayer*>(p->createExtension(QWebKitPlatformPlugin::Haptics)) : 0;
+    return p ? static_cast<QWebHapticFeedbackPlayer*>(p->createExtension(QWebKitPlatformPlugin::Haptics)) : 0;
+}
+
+QWebTouchModifier* QtPlatformPlugin::createTouchModifier()
+{
+    QWebKitPlatformPlugin* p = plugin();
+    return p ? static_cast<QWebTouchModifier*>(p->createExtension(QWebKitPlatformPlugin::TouchInteraction)) : 0;
 }
 
 }

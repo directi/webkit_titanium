@@ -32,6 +32,7 @@
 #include "Frame.h"
 #include "FrameLoaderClient.h"
 #include "FrameView.h"
+#include "HTMLHtmlElement.h"
 #include "HTMLImageElement.h"
 #include "HTMLNames.h"
 #include "LocalizedStrings.h"
@@ -194,6 +195,9 @@ void ImageDocument::createDocumentStructure()
     
     RefPtr<Element> rootElement = Document::createElement(htmlTag, false);
     appendChild(rootElement, ec);
+#if ENABLE(OFFLINE_WEB_APPLICATIONS)
+    static_cast<HTMLHtmlElement*>(rootElement.get())->insertedByParser();
+#endif
 
     if (frame() && frame()->loader())
         frame()->loader()->dispatchDocumentElementAvailable();
@@ -383,7 +387,7 @@ void ImageEventListener::handleEvent(ScriptExecutionContext*, Event* event)
 {
     if (event->type() == eventNames().resizeEvent)
         m_doc->windowSizeChanged();
-    else if (event->type() == eventNames().clickEvent) {
+    else if (event->type() == eventNames().clickEvent && event->isMouseEvent()) {
         MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
         m_doc->imageClicked(mouseEvent->x(), mouseEvent->y());
     }

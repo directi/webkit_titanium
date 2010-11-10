@@ -200,7 +200,7 @@ void RenderTextControl::setLastChangeWasUserEdit(bool lastChangeWasUserEdit)
     document()->setIgnoreAutofocus(lastChangeWasUserEdit);
 }
 
-int RenderTextControl::selectionStart()
+int RenderTextControl::selectionStart() const
 {
     Frame* frame = this->frame();
     if (!frame)
@@ -208,7 +208,7 @@ int RenderTextControl::selectionStart()
     return indexForVisiblePosition(frame->selection()->start());
 }
 
-int RenderTextControl::selectionEnd()
+int RenderTextControl::selectionEnd() const
 {
     Frame* frame = this->frame();
     if (!frame)
@@ -216,59 +216,55 @@ int RenderTextControl::selectionEnd()
     return indexForVisiblePosition(frame->selection()->end());
 }
 
-void RenderTextControl::setSelectionStart(int start)
+bool RenderTextControl::hasVisibleTextArea() const
 {
-    HTMLTextFormControlElement* element = static_cast<HTMLTextFormControlElement*>(node());
-    setSelectionRange(start, max(start, element->selectionEnd()));
+    return style()->visibility() == HIDDEN || !m_innerText || !m_innerText->renderer() || !m_innerText->renderBox()->height();
 }
 
-void RenderTextControl::setSelectionEnd(int end)
+void setSelectionRange(Node* node, int start, int end)
 {
-    HTMLTextFormControlElement* element = static_cast<HTMLTextFormControlElement*>(node());
-    setSelectionRange(min(end, element->selectionStart()), end);
-}
+    ASSERT(node);
+    node->document()->updateLayoutIgnorePendingStylesheets();
 
-void RenderTextControl::select()
-{
-    setSelectionRange(0, text().length());
-}
+    if (!node->renderer() || !node->renderer()->isTextControl())
+        return;
 
-void RenderTextControl::setSelectionRange(int start, int end)
-{
     end = max(end, 0);
     start = min(max(start, 0), end);
 
-    ASSERT(!document()->childNeedsAndNotInStyleRecalc());
+    RenderTextControl* control = toRenderTextControl(node->renderer());
 
-    if (style()->visibility() == HIDDEN || !m_innerText || !m_innerText->renderer() || !m_innerText->renderBox()->height()) {
-        cacheSelection(start, end);
+    if (control->hasVisibleTextArea()) {
+        control->cacheSelection(start, end);
         return;
     }
-    VisiblePosition startPosition = visiblePositionForIndex(start);
+    VisiblePosition startPosition = control->visiblePositionForIndex(start);
     VisiblePosition endPosition;
     if (start == end)
         endPosition = startPosition;
     else
-        endPosition = visiblePositionForIndex(end);
+        endPosition = control->visiblePositionForIndex(end);
 
     // startPosition and endPosition can be null position for example when
     // "-webkit-user-select: none" style attribute is specified.
     if (startPosition.isNotNull() && endPosition.isNotNull()) {
-        ASSERT(startPosition.deepEquivalent().node()->shadowAncestorNode() == node() && endPosition.deepEquivalent().node()->shadowAncestorNode() == node());
+        ASSERT(startPosition.deepEquivalent().node()->shadowAncestorNode() == node && endPosition.deepEquivalent().node()->shadowAncestorNode() == node);
     }
     VisibleSelection newSelection = VisibleSelection(startPosition, endPosition);
 
-    if (Frame* frame = this->frame())
+    if (Frame* frame = node->document()->frame())
         frame->selection()->setSelection(newSelection);
 }
 
-VisibleSelection RenderTextControl::selection(int start, int end) const
+PassRefPtr<Range> RenderTextControl::selection(int start, int end) const
 {
-    return VisibleSelection(VisiblePosition(m_innerText.get(), start, VP_DEFAULT_AFFINITY),
-                            VisiblePosition(m_innerText.get(), end, VP_DEFAULT_AFFINITY));
+    if (!m_innerText)
+        return 0;
+
+    return Range::create(document(), m_innerText, start, m_innerText, end);
 }
 
-VisiblePosition RenderTextControl::visiblePositionForIndex(int index)
+VisiblePosition RenderTextControl::visiblePositionForIndex(int index) const
 {
     if (index <= 0)
         return VisiblePosition(m_innerText.get(), 0, DOWNSTREAM);
@@ -285,7 +281,7 @@ VisiblePosition RenderTextControl::visiblePositionForIndex(int index)
     return VisiblePosition(endContainer, endOffset, UPSTREAM);
 }
 
-int RenderTextControl::indexForVisiblePosition(const VisiblePosition& pos)
+int RenderTextControl::indexForVisiblePosition(const VisiblePosition& pos) const
 {
     Position indexPosition = pos.deepEquivalent();
     if (!indexPosition.node() || indexPosition.node()->rootEditableElement() != m_innerText)
@@ -407,7 +403,7 @@ void RenderTextControl::computeLogicalHeight()
               m_innerText->renderBox()->paddingTop() + m_innerText->renderBox()->paddingBottom() +
               m_innerText->renderBox()->marginTop() + m_innerText->renderBox()->marginBottom());
 
-    adjustControlHeightBasedOnLineHeight(m_innerText->renderer()->lineHeight(true, true));
+    adjustControlHeightBasedOnLineHeight(m_innerText->renderBox()->lineHeight(true, HorizontalLine, PositionOfInteriorLineBoxes));
     setHeight(height() + borderAndPaddingHeight());
 
     // We are able to have a horizontal scrollbar if the overflow style is scroll, or if its auto and there's no word wrap.

@@ -100,7 +100,9 @@ module html {
         readonly attribute NodeList labels;
 
 #if defined(ENABLE_INPUT_SPEECH) && ENABLE_INPUT_SPEECH
-        attribute [Reflect, EnabledAtRuntime] boolean webkitspeech;
+        attribute [Reflect, EnabledAtRuntime] boolean webkitSpeech;
+        attribute [Reflect, EnabledAtRuntime] boolean webkitGrammar;
+        attribute [DontEnum] EventListener onwebkitspeechchange;
 #endif
     };
 

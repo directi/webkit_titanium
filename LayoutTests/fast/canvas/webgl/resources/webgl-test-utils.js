@@ -30,6 +30,14 @@ var error = function(msg) {
 };
 
 /**
+ * Turn off all logging.
+ */
+var loggingOff = function() {
+  log = function() {};
+  error = function() {};
+};
+
+/**
  * Converts a WebGL enum to a string
  * @param {!WebGLContext} gl The WebGLContext to use.
  * @param {number} value The enum value.
@@ -276,7 +284,7 @@ var fillTexture = function(gl, tex, width, height, color, opt_level) {
  */
 var createColoredTexture = function(gl, width, height, color) {
   var tex = gl.createTexture();
-  fillTexture(gl, text, width, height, color);
+  fillTexture(gl, tex, width, height, color);
   return tex;
 };
 
@@ -560,7 +568,7 @@ var setupWebGLWithShaders = function(
 
   // Bind attributes
   for (var i in attribs) {
-    gl.bindAttribLocation (program, i, attribs[i]);
+    gl.bindAttribLocation (program, parseInt(i), attribs[i]);
   }
 
   linkProgram(gl, program);
@@ -845,6 +853,7 @@ return {
   loadStandardFragmentShader: loadStandardFragmentShader,
   loadTexture: loadTexture,
   log: log,
+  loggingOff: loggingOff,
   error: error,
   setupProgram: setupProgram,
   setupSimpleTextureFragmentShader: setupSimpleTextureFragmentShader,

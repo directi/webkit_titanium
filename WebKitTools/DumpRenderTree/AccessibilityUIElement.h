@@ -130,9 +130,14 @@ public:
     JSStringRef selectedTextRange();
     bool isEnabled();
     bool isRequired() const;
+    
     bool isSelected() const;
     bool isSelectable() const;
     bool isMultiSelectable() const;
+    void setSelectedChild(AccessibilityUIElement*) const;
+    unsigned selectedChildrenCount() const;
+    AccessibilityUIElement selectedChildAtIndex(unsigned) const;
+    
     bool isExpanded() const;
     bool isChecked() const;
     bool isVisible() const;
@@ -179,6 +184,7 @@ public:
     
     // Parameterized attributes
     int lineForIndex(int);
+    JSStringRef rangeForLine(int);
     JSStringRef boundsForRange(unsigned location, unsigned length);
     void setSelectedTextRange(unsigned location, unsigned length);
     JSStringRef stringForRange(unsigned location, unsigned length);

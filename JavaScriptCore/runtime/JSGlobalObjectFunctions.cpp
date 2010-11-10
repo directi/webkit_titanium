@@ -35,7 +35,7 @@
 #include "LiteralParser.h"
 #include "Nodes.h"
 #include "Parser.h"
-#include "StringBuilder.h"
+#include "UStringBuilder.h"
 #include "dtoa.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -450,12 +450,12 @@ EncodedJSValue JSC_HOST_CALL globalFuncEval(ExecState* exec)
     if (JSValue parsedObject = preparser.tryLiteralParse())
         return JSValue::encode(parsedObject);
 
-    RefPtr<EvalExecutable> eval = EvalExecutable::create(exec, makeSource(s));
+    RefPtr<EvalExecutable> eval = EvalExecutable::create(exec, makeSource(s), false);
     JSObject* error = eval->compile(exec, static_cast<JSGlobalObject*>(unwrappedObject)->globalScopeChain().node());
     if (error)
         return throwVMError(exec, error);
 
-    return JSValue::encode(exec->interpreter()->execute(eval.get(), exec, thisObject, static_cast<JSGlobalObject*>(unwrappedObject)->globalScopeChain().node(), exec->exceptionSlot()));
+    return JSValue::encode(exec->interpreter()->execute(eval.get(), exec, thisObject, static_cast<JSGlobalObject*>(unwrappedObject)->globalScopeChain().node()));
 }
 
 EncodedJSValue JSC_HOST_CALL globalFuncParseInt(ExecState* exec)
@@ -464,7 +464,7 @@ EncodedJSValue JSC_HOST_CALL globalFuncParseInt(ExecState* exec)
     int32_t radix = exec->argument(1).toInt32(exec);
 
     if (radix != 0 && radix != 10)
-        return JSValue::encode(jsNumber(exec, parseInt(value.toString(exec), radix)));
+        return JSValue::encode(jsNumber(parseInt(value.toString(exec), radix)));
 
     if (value.isInt32())
         return JSValue::encode(value);
@@ -472,18 +472,18 @@ EncodedJSValue JSC_HOST_CALL globalFuncParseInt(ExecState* exec)
     if (value.isDouble()) {
         double d = value.asDouble();
         if (isfinite(d))
-            return JSValue::encode(jsNumber(exec, (d > 0) ? floor(d) : ceil(d)));
+            return JSValue::encode(jsNumber((d > 0) ? floor(d) : ceil(d)));
         if (isnan(d) || isinf(d))
-            return JSValue::encode(jsNaN(exec));
-        return JSValue::encode(jsNumber(exec, 0));
+            return JSValue::encode(jsNaN());
+        return JSValue::encode(jsNumber(0));
     }
 
-    return JSValue::encode(jsNumber(exec, parseInt(value.toString(exec), radix)));
+    return JSValue::encode(jsNumber(parseInt(value.toString(exec), radix)));
 }
 
 EncodedJSValue JSC_HOST_CALL globalFuncParseFloat(ExecState* exec)
 {
-    return JSValue::encode(jsNumber(exec, parseFloat(exec->argument(0).toString(exec))));
+    return JSValue::encode(jsNumber(parseFloat(exec->argument(0).toString(exec))));
 }
 
 EncodedJSValue JSC_HOST_CALL globalFuncIsNaN(ExecState* exec)
@@ -563,7 +563,7 @@ EncodedJSValue JSC_HOST_CALL globalFuncEscape(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL globalFuncUnescape(ExecState* exec)
 {
-    StringBuilder builder;
+    UStringBuilder builder;
     UString str = exec->argument(0).toString(exec);
     int k = 0;
     int len = str.length();
@@ -585,7 +585,7 @@ EncodedJSValue JSC_HOST_CALL globalFuncUnescape(ExecState* exec)
         builder.append(*c);
     }
 
-    return JSValue::encode(jsString(exec, builder.build()));
+    return JSValue::encode(jsString(exec, builder.toUString()));
 }
 
 #ifndef NDEBUG

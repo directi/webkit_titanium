@@ -128,6 +128,16 @@ static JSValueRef lineForIndexCallback(JSContextRef context, JSObjectRef functio
     return JSValueMakeNumber(context, toAXElement(thisObject)->lineForIndex(indexNumber));
 }
 
+static JSValueRef rangeForLineCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    int indexNumber = -1;
+    if (argumentCount == 1)
+        indexNumber = JSValueToNumber(context, arguments[0], exception);
+    
+    JSRetainPtr<JSStringRef> rangeLine(Adopt, toAXElement(thisObject)->rangeForLine(indexNumber));
+    return JSValueMakeString(context, rangeLine.get());
+}
+
 static JSValueRef boundsForRangeCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     unsigned location = UINT_MAX, length = 0;
@@ -194,6 +204,15 @@ static JSValueRef childAtIndexCallback(JSContextRef context, JSObjectRef functio
     return AccessibilityUIElement::makeJSAccessibilityUIElement(context, toAXElement(thisObject)->getChildAtIndex(indexNumber));
 }
 
+static JSValueRef selectedChildAtIndexCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    int indexNumber = -1;
+    if (argumentCount == 1)
+        indexNumber = JSValueToNumber(context, arguments[0], exception);
+    
+    return AccessibilityUIElement::makeJSAccessibilityUIElement(context, toAXElement(thisObject)->selectedChildAtIndex(indexNumber));
+}
+
 static JSValueRef linkedUIElementAtIndexCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     int indexNumber = -1;
@@ -248,6 +267,17 @@ static JSValueRef isEqualCallback(JSContextRef context, JSObjectRef function, JS
         return JSValueMakeBoolean(context, false);
     
     return JSValueMakeBoolean(context, toAXElement(thisObject)->isEqual(toAXElement(otherElement)));
+}
+
+static JSValueRef setSelectedChildCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    JSObjectRef element = 0;
+    if (argumentCount == 1)
+        element = JSValueToObject(context, arguments[0], exception);
+
+    toAXElement(thisObject)->setSelectedChild(toAXElement(element));
+
+    return JSValueMakeUndefined(context);
 }
 
 static JSValueRef elementAtPointCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
@@ -685,6 +715,11 @@ static JSValueRef speakCallback(JSContextRef context, JSObjectRef thisObject, JS
     return JSValueMakeString(context, speakString.get());
 }
 
+static JSValueRef selectedChildrenCountCallback(JSContextRef context, JSObjectRef thisObject, JSStringRef propertyName, JSValueRef* exception)
+{
+    return JSValueMakeNumber(context, toAXElement(thisObject)->selectedChildrenCount());
+}
+
 static JSValueRef getHasPopupCallback(JSContextRef context, JSObjectRef thisObject, JSStringRef, JSValueRef*)
 {
     return JSValueMakeBoolean(context, toAXElement(thisObject)->hasPopup());
@@ -746,6 +781,10 @@ static JSValueRef removeNotificationListenerCallback(JSContextRef context, JSObj
 // Unsupported methods on various platforms.
 #if !PLATFORM(MAC)
 JSStringRef AccessibilityUIElement::speak() { return 0; }
+JSStringRef AccessibilityUIElement::rangeForLine(int line) { return 0; }
+void AccessibilityUIElement::setSelectedChild(AccessibilityUIElement*) const { }
+unsigned AccessibilityUIElement::selectedChildrenCount() const { return 0; }
+AccessibilityUIElement AccessibilityUIElement::selectedChildAtIndex(unsigned) const { return 0; }
 #endif
 
 #if !SUPPORTS_AX_TEXTMARKERS
@@ -849,6 +888,7 @@ JSClassRef AccessibilityUIElement::getJSClass()
         { "ariaDropEffects", getARIADropEffectsCallback, 0, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "isIgnored", isIgnoredCallback, 0, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "speak", speakCallback, 0, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "selectedChildrenCount", selectedChildrenCountCallback, 0, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { 0, 0, 0, 0 }
     };
 
@@ -859,6 +899,7 @@ JSClassRef AccessibilityUIElement::getJSClass()
         { "attributesOfChildren", attributesOfChildrenCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "parameterizedAttributeNames", parameterizedAttributeNamesCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "lineForIndex", lineForIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "rangeForLine", rangeForLineCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "boundsForRange", boundsForRangeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "stringForRange", stringForRangeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "attributedStringForRange", attributedStringForRangeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -908,6 +949,8 @@ JSClassRef AccessibilityUIElement::getJSClass()
         { "accessibilityElementForTextMarker", accessibilityElementForTextMarkerCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "textMarkerRangeLength", textMarkerRangeLengthCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "textMarkerForPoint", textMarkerForPointCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "setSelectedChild", setSelectedChildCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "selectedChildAtIndex", selectedChildAtIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { 0, 0, 0 }
     };
 

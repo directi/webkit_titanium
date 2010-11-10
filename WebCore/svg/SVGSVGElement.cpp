@@ -186,7 +186,7 @@ void SVGSVGElement::setUseCurrentView(bool currentView)
 SVGViewSpec* SVGSVGElement::currentView() const
 {
     if (!m_viewSpec)
-        m_viewSpec = adoptPtr(new SVGViewSpec(this));
+        m_viewSpec = adoptPtr(new SVGViewSpec(const_cast<SVGSVGElement*>(this)));
     return m_viewSpec.get();
 }
 
@@ -213,14 +213,14 @@ void SVGSVGElement::setCurrentScale(float scale)
         RenderSVGResource::markForLayoutAndParentResourceInvalidation(object);
 }
 
-FloatPoint SVGSVGElement::currentTranslate() const
-{
-    return m_translation;
-}
-
-void SVGSVGElement::setCurrentTranslate(const FloatPoint &translation)
+void SVGSVGElement::setCurrentTranslate(const FloatPoint& translation)
 {
     m_translation = translation;
+    updateCurrentTranslate();
+}
+
+void SVGSVGElement::updateCurrentTranslate()
+{
     if (RenderObject* object = renderer())
         object->setNeedsLayout(true);
 
@@ -580,9 +580,9 @@ void SVGSVGElement::inheritViewAttributes(SVGViewElement* viewElement)
 {
     setUseCurrentView(true);
     if (viewElement->hasAttribute(SVGNames::viewBoxAttr))
-        currentView()->setViewBox(viewElement->viewBox());
+        currentView()->setViewBoxBaseValue(viewElement->viewBox());
     else
-        currentView()->setViewBox(viewBox());
+        currentView()->setViewBoxBaseValue(viewBox());
 
     SVGPreserveAspectRatio aspectRatio;
     if (viewElement->hasAttribute(SVGNames::preserveAspectRatioAttr))

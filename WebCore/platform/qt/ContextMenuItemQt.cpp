@@ -49,6 +49,16 @@ ContextMenuItem::ContextMenuItem(ContextMenuItemType type, ContextMenuAction act
         setSubMenu(subMenu);
 }
 
+ContextMenuItem::ContextMenuItem(ContextMenuItemType, ContextMenuAction, const String&, bool, bool)
+{
+    // FIXME: Implement
+}
+
+ContextMenuItem::ContextMenuItem(ContextMenuAction, const String&, bool, bool, Vector<ContextMenuItem>&)
+{
+    // FIXME: Implement
+}
+
 ContextMenuItem::~ContextMenuItem()
 {
 }
@@ -99,9 +109,20 @@ void ContextMenuItem::setSubMenu(ContextMenu* menu)
     m_platformDescription.subMenuItems = *menu->platformDescription();
 }
 
+void ContextMenuItem::setSubMenu(Vector<ContextMenuItem>&)
+{
+    // FIXME: Implement
+}
+
 void ContextMenuItem::setChecked(bool on)
 {
     m_platformDescription.checked = on;
+}
+
+bool ContextMenuItem::checked() const
+{
+    // FIXME - Implement
+    return false;
 }
 
 void ContextMenuItem::setEnabled(bool on)

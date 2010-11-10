@@ -38,6 +38,7 @@
 #include "FrameLoader.h"
 #include "FrameView.h"
 #include "HTMLNames.h"
+#include "HTMLParserIdioms.h"
 #include "Image.h"
 #include "MIMETypeRegistry.h"
 #include "NotImplemented.h"
@@ -50,12 +51,12 @@
 #include "ResourceResponse.h"
 #include "SharedBuffer.h"
 #include "WCDataObject.h"
-#include "csshelper.h"
 #include "markup.h"
 #include <shlwapi.h>
 #include <wininet.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/StringConcatenate.h>
 #include <wtf/text/StringHash.h>
 
 using namespace std;
@@ -63,9 +64,6 @@ using namespace std;
 namespace WebCore {
 
 using namespace HTMLNames;
-
-// format string for 
-static const char szShellDotUrlTemplate[] = "[InternetShortcut]\r\nURL=%s\r\n";
 
 // We provide the IE clipboard types (URL and Text), and the clipboard types specified in the WHATWG Web Applications 1.0 draft
 // see http://www.whatwg.org/specs/web-apps/current-work/ Section 6.3.5.3
@@ -101,6 +99,7 @@ static inline FORMATETC* fileContentFormatZero()
     return &fileContentFormat;
 }
 
+#if !OS(WINCE)
 static inline void pathRemoveBadFSCharacters(PWSTR psz, size_t length)
 {
     size_t writeTo = 0;
@@ -114,9 +113,14 @@ static inline void pathRemoveBadFSCharacters(PWSTR psz, size_t length)
     }
     psz[writeTo] = 0;
 }
+#endif
 
 static String filesystemPathFromUrlOrTitle(const String& url, const String& title, TCHAR* extension, bool isLink)
 {
+#if OS(WINCE)
+    notImplemented();
+    return String();
+#else
     static const size_t fsPathMaxLengthExcludingNullTerminator = MAX_PATH - 1;
     bool usedURL = false;
     WCHAR fsPathBuffer[MAX_PATH];
@@ -161,42 +165,7 @@ static String filesystemPathFromUrlOrTitle(const String& url, const String& titl
     String result(static_cast<UChar*>(fsPathBuffer));
     result += String(static_cast<UChar*>(extension));
     return result;
-}
-
-static HGLOBAL createGlobalURLContent(const String& url, int estimatedFileSize)
-{
-    HRESULT hr = S_OK;
-    HGLOBAL memObj = 0;
-
-    char* fileContents;
-    char ansiUrl[INTERNET_MAX_URL_LENGTH + 1];
-    // Used to generate the buffer. This is null terminated whereas the fileContents won't be.
-    char contentGenerationBuffer[INTERNET_MAX_URL_LENGTH + ARRAYSIZE(szShellDotUrlTemplate) + 1];
-    
-    if (estimatedFileSize > 0 && estimatedFileSize > ARRAYSIZE(contentGenerationBuffer))
-        return 0;
-
-    int ansiUrlSize = ::WideCharToMultiByte(CP_ACP, 0, (LPCWSTR)url.characters(), url.length(), ansiUrl, ARRAYSIZE(ansiUrl) - 1, 0, 0);
-    if (!ansiUrlSize)
-        return 0;
-
-    ansiUrl[ansiUrlSize] = 0;
-    
-    int fileSize = (int) (ansiUrlSize+strlen(szShellDotUrlTemplate)-2); // -2 to remove the %s
-    ASSERT(estimatedFileSize < 0 || fileSize == estimatedFileSize);
-
-    memObj = GlobalAlloc(GPTR, fileSize);
-    if (!memObj) 
-        return 0;
-
-    fileContents = (PSTR)GlobalLock(memObj);
-
-    sprintf_s(contentGenerationBuffer, ARRAYSIZE(contentGenerationBuffer), szShellDotUrlTemplate, ansiUrl);
-    CopyMemory(fileContents, contentGenerationBuffer, fileSize);
-    
-    GlobalUnlock(memObj);
-    
-    return memObj;
+#endif
 }
 
 static HGLOBAL createGlobalImageFileContent(SharedBuffer* data)
@@ -232,9 +201,13 @@ static HGLOBAL createGlobalHDropContent(const KURL& url, String& fileName, Share
         else
             return 0;
     } else {
+#if OS(WINCE)
+        notImplemented();
+        return 0;
+#else
         WCHAR tempPath[MAX_PATH];
         WCHAR extension[MAX_PATH];
-        if (!::GetTempPath(ARRAYSIZE(tempPath), tempPath))
+        if (!::GetTempPath(WTF_ARRAY_LENGTH(tempPath), tempPath))
             return 0;
         if (!::PathAppend(tempPath, fileName.charactersWithNullTermination()))
             return 0;
@@ -261,6 +234,7 @@ static HGLOBAL createGlobalHDropContent(const KURL& url, String& fileName, Share
         CloseHandle(tempFileHandle);
         if (!tempWriteSucceeded)
             return 0;
+#endif
     }
 
     SIZE_T dropFilesSize = sizeof(DROPFILES) + (sizeof(WCHAR) * (wcslen(filePath) + 2));
@@ -276,39 +250,6 @@ static HGLOBAL createGlobalHDropContent(const KURL& url, String& fileName, Share
     
     return memObj;
 }
-
-static HGLOBAL createGlobalUrlFileDescriptor(const String& url, const String& title, int& /*out*/ estimatedSize)
-{
-    HRESULT hr = S_OK;
-    HGLOBAL memObj = 0;
-    String fsPath;
-    memObj = GlobalAlloc(GPTR, sizeof(FILEGROUPDESCRIPTOR));
-    if (!memObj)
-        return 0;
-
-    FILEGROUPDESCRIPTOR* fgd = (FILEGROUPDESCRIPTOR*)GlobalLock(memObj);
-    memset(fgd, 0, sizeof(FILEGROUPDESCRIPTOR));
-    fgd->cItems = 1;
-    fgd->fgd[0].dwFlags = FD_FILESIZE;
-    int fileSize = ::WideCharToMultiByte(CP_ACP, 0, url.characters(), url.length(), 0, 0, 0, 0);
-    fileSize += strlen(szShellDotUrlTemplate) - 2; // -2 is for getting rid of %s in the template string
-    fgd->fgd[0].nFileSizeLow = fileSize;
-    estimatedSize = fileSize;
-    fsPath = filesystemPathFromUrlOrTitle(url, title, L".URL", true);
-
-    if (fsPath.length() <= 0) {
-        GlobalUnlock(memObj);
-        GlobalFree(memObj);
-        return 0;
-    }
-
-    int maxSize = min(fsPath.length(), ARRAYSIZE(fgd->fgd[0].cFileName));
-    CopyMemory(fgd->fgd[0].cFileName, (LPCWSTR)fsPath.characters(), maxSize * sizeof(UChar));
-    GlobalUnlock(memObj);
-    
-    return memObj;
-}
-
 
 static HGLOBAL createGlobalImageFileDescriptor(const String& url, const String& title, CachedImage* image)
 {
@@ -344,7 +285,7 @@ static HGLOBAL createGlobalImageFileDescriptor(const String& url, const String& 
         return 0;
     }
 
-    int maxSize = min(fsPath.length(), ARRAYSIZE(fgd->fgd[0].cFileName));
+    int maxSize = min(fsPath.length(), WTF_ARRAY_LENGTH(fgd->fgd[0].cFileName));
     CopyMemory(fgd->fgd[0].cFileName, (LPCWSTR)fsPath.characters(), maxSize * sizeof(UChar));
     GlobalUnlock(memObj);
     
@@ -377,11 +318,13 @@ static HRESULT writeFileToDataObject(IDataObject* dataObject, HGLOBAL fileDescri
     if (FAILED(hr = dataObject->SetData(fe, &medium, TRUE)))
         goto exit;
 
+#if PLATFORM(CF)
     // HDROP
     if (hDropContent) {
         medium.hGlobal = hDropContent;
         hr = dataObject->SetData(cfHDropFormat(), &medium, TRUE);
     }
+#endif
 
 exit:
     if (FAILED(hr)) {
@@ -589,6 +532,10 @@ HashSet<String> ClipboardWin::types() const
 
 PassRefPtr<FileList> ClipboardWin::files() const
 {
+#if OS(WINCE)
+    notImplemented();
+    return 0;
+#else
     RefPtr<FileList> files = FileList::create();
     if (policy() != ClipboardReadable && policy() != ClipboardTypesReadable)
         return files.release();
@@ -607,7 +554,7 @@ PassRefPtr<FileList> ClipboardWin::files() const
     WCHAR filename[MAX_PATH];
     UINT fileCount = DragQueryFileW(hdrop, 0xFFFFFFFF, 0, 0);
     for (UINT i = 0; i < fileCount; i++) {
-        if (!DragQueryFileW(hdrop, i, filename, ARRAYSIZE(filename)))
+        if (!DragQueryFileW(hdrop, i, filename, WTF_ARRAY_LENGTH(filename)))
             continue;
         files->append(File::create(reinterpret_cast<UChar*>(filename)));
     }
@@ -615,6 +562,7 @@ PassRefPtr<FileList> ClipboardWin::files() const
     GlobalUnlock(medium.hGlobal);
     ReleaseStgMedium(&medium);
     return files.release();
+#endif
 }
 
 void ClipboardWin::setDragImage(CachedImage* image, Node *node, const IntPoint &loc)
@@ -723,7 +671,7 @@ void ClipboardWin::declareAndWriteDragImage(Element* element, const KURL& url, c
     if (imageURL.isEmpty()) 
         return;
 
-    String fullURL = frame->document()->completeURL(deprecatedParseURL(imageURL)).string();
+    String fullURL = frame->document()->completeURL(stripLeadingAndTrailingHTMLSpaces(imageURL)).string();
     if (fullURL.isEmpty()) 
         return;
     STGMEDIUM medium = {0};
@@ -744,17 +692,39 @@ void ClipboardWin::writeURL(const KURL& kurl, const String& titleStr, Frame*)
          return;
     WebCore::writeURL(m_writableDataObject.get(), kurl, titleStr, true, true);
 
-    int estimatedSize = 0;
     String url = kurl.string();
+    ASSERT(url.containsOnlyASCII()); // KURL::string() is URL encoded.
 
-    HGLOBAL urlFileDescriptor = createGlobalUrlFileDescriptor(url, titleStr, estimatedSize);
+    String fsPath = filesystemPathFromUrlOrTitle(url, titleStr, L".URL", true);
+    CString content = makeString("[InternetShortcut]\r\nURL=", url, "\r\n").ascii();
+
+    if (fsPath.length() <= 0)
+        return;
+
+    HGLOBAL urlFileDescriptor = GlobalAlloc(GPTR, sizeof(FILEGROUPDESCRIPTOR));
     if (!urlFileDescriptor)
         return;
-    HGLOBAL urlFileContent = createGlobalURLContent(url, estimatedSize);
+
+    HGLOBAL urlFileContent = GlobalAlloc(GPTR, content.length());
     if (!urlFileContent) {
         GlobalFree(urlFileDescriptor);
         return;
     }
+
+    FILEGROUPDESCRIPTOR* fgd = static_cast<FILEGROUPDESCRIPTOR*>(GlobalLock(urlFileDescriptor));
+    ZeroMemory(fgd, sizeof(FILEGROUPDESCRIPTOR));
+    fgd->cItems = 1;
+    fgd->fgd[0].dwFlags = FD_FILESIZE;
+    fgd->fgd[0].nFileSizeLow = content.length();
+
+    unsigned maxSize = min(fsPath.length(), WTF_ARRAY_LENGTH(fgd->fgd[0].cFileName));
+    CopyMemory(fgd->fgd[0].cFileName, fsPath.characters(), maxSize * sizeof(UChar));
+    GlobalUnlock(urlFileDescriptor);
+
+    char* fileContents = static_cast<char*>(GlobalLock(urlFileContent));
+    CopyMemory(fileContents, content.data(), content.length());
+    GlobalUnlock(urlFileContent);
+
     writeFileToDataObject(m_writableDataObject.get(), urlFileDescriptor, urlFileContent, 0);
 }
 

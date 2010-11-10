@@ -81,15 +81,15 @@ static JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, const WebG
         return constructArray(exec, list);
     }
     case WebGLGetInfo::kTypeFloat:
-        return jsNumber(exec, info.getFloat());
+        return jsNumber(info.getFloat());
     case WebGLGetInfo::kTypeLong:
-        return jsNumber(exec, info.getLong());
+        return jsNumber(info.getLong());
     case WebGLGetInfo::kTypeNull:
         return jsNull();
     case WebGLGetInfo::kTypeString:
         return jsString(exec, info.getString());
     case WebGLGetInfo::kTypeUnsignedLong:
-        return jsNumber(exec, info.getUnsignedLong());
+        return jsNumber(info.getUnsignedLong());
     case WebGLGetInfo::kTypeWebGLBuffer:
         return toJS(exec, globalObject, info.getWebGLBuffer());
     case WebGLGetInfo::kTypeWebGLFloatArray:
@@ -171,15 +171,15 @@ JSValue JSWebGLRenderingContext::getAttachedShaders(ExecState* exec)
         return throwTypeError(exec);
     WebGLProgram* program = toWebGLProgram(exec->argument(0));
     if (exec->hadException())
-        return jsUndefined();
+        return jsNull();
     Vector<WebGLShader*> shaders;
     bool succeed = context->getAttachedShaders(program, shaders, ec);
     if (ec) {
         setDOMException(exec, ec);
-        return jsUndefined();
+        return jsNull();
     }
     if (!succeed)
-        return jsUndefined();
+        return jsNull();
     MarkedArgumentBuffer list;
     for (size_t ii = 0; ii < shaders.size(); ++ii)
         list.append(toJS(exec, globalObject(), shaders[ii]));

@@ -50,6 +50,7 @@ RenderView::RenderView(Node* node, FrameView* view)
     , m_selectionEndPos(-1)
     , m_maximalOutlineSize(0)
     , m_pageHeight(0)
+    , m_pageHeightChanged(false)
     , m_layoutState(0)
     , m_layoutStateDisableCount(0)
 {
@@ -93,6 +94,11 @@ void RenderView::computePreferredLogicalWidths()
     m_maxPreferredLogicalWidth = m_minPreferredLogicalWidth;
 }
 
+bool RenderView::isChildAllowed(RenderObject* child, RenderStyle*) const
+{
+    return child->isBox();
+}
+
 void RenderView::layout()
 {
     if (!document()->paginated())
@@ -116,6 +122,8 @@ void RenderView::layout()
     // FIXME: May be better to push a clip and avoid issuing offscreen repaints.
     state.m_clipped = false;
     state.m_pageHeight = m_pageHeight;
+    state.m_pageHeightChanged = m_pageHeightChanged;
+    m_pageHeightChanged = false;
     m_layoutState = &state;
 
     if (needsLayout())
@@ -270,11 +278,6 @@ void RenderView::repaintRectangleInViewAndCompositedLayers(const IntRect& ur, bo
     repaintViewRectangle(ur, immediate);
     
 #if USE(ACCELERATED_COMPOSITING)
-    // If we're a frame, repaintViewRectangle will have repainted via a RenderObject in the
-    // parent document.
-    if (document()->ownerElement())
-        return;
-
     if (compositor()->inCompositingMode())
         compositor()->repaintCompositedLayersAbsoluteRect(ur);
 #endif

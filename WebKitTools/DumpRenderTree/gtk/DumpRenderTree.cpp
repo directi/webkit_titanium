@@ -38,6 +38,7 @@
 #include "GOwnPtr.h"
 #include "LayoutTestController.h"
 #include "PixelDumpSupport.h"
+#include "WebCoreSupport/DumpRenderTreeSupportGtk.h"
 #include "WorkQueue.h"
 #include "WorkQueueItem.h"
 #include <JavaScriptCore/JavaScript.h>
@@ -68,7 +69,6 @@ extern guint webkit_web_frame_get_pending_unload_event_count(WebKitWebFrame* fra
 extern void webkit_web_settings_add_extra_plugin_directory(WebKitWebView* view, const gchar* directory);
 extern gchar* webkit_web_frame_get_response_mime_type(WebKitWebFrame* frame);
 extern void webkit_web_frame_clear_main_frame_name(WebKitWebFrame* frame);
-extern void webkit_web_view_set_group_name(WebKitWebView* view, const gchar* groupName);
 extern void webkit_reset_origin_access_white_lists();
 }
 
@@ -131,9 +131,28 @@ static void appendString(gchar*& target, gchar* string)
     g_free(oldString);
 }
 
-static void initializeFonts()
+static void initializeGtkFontSettings(const char* testURL)
+{
+    GtkSettings* settings = gtk_settings_get_default();
+    if (!settings)
+        return;
+    g_object_set(settings, "gtk-xft-antialias", 1,
+                 "gtk-xft-hinting", 0,
+                 "gtk-font-name", "Liberation Sans 16", NULL);
+
+    // One test needs subpixel anti-aliasing turned on, but generally we
+    // want all text in other tests to use to grayscale anti-aliasing.
+    if (testURL && strstr(testURL, "xsettings_antialias_settings.html"))
+        g_object_set(settings, "gtk-xft-rgba", "rgb", NULL);
+    else
+        g_object_set(settings, "gtk-xft-rgba", "none", NULL);
+}
+
+static void initializeFonts(const char* testURL = 0)
 {
 #if PLATFORM(X11)
+    initializeGtkFontSettings(testURL);
+
     FcInit();
 
     // If a test resulted a font being added or removed via the @font-face rule, then
@@ -177,6 +196,18 @@ static void initializeFonts()
           "/usr/share/fonts/liberation/LiberationSerif-Regular.ttf", },
         { "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf",
           "/usr/share/fonts/dejavu/DejaVuSans.ttf", },
+        { "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSerif.ttf",
+          "/usr/share/fonts/dejavu/DejaVuSerif.ttf", },
+
+        // MathML tests require the STIX fonts.
+        { "/usr/share/fonts/opentype/stix/STIXGeneral.otf",
+          "/usr/share/fonts/stix/STIXGeneral.otf" },
+        { "/usr/share/fonts/opentype/stix/STIXGeneralBolIta.otf",
+          "/usr/share/fonts/stix/STIXGeneralBolIta.otf" },
+        { "/usr/share/fonts/opentype/stix/STIXGeneralBol.otf",
+          "/usr/share/fonts/stix/STIXGeneralBol.otf" },
+        { "/usr/share/fonts/opentype/stix/STIXGeneralItalic.otf",
+          "/usr/share/fonts/stix/STIXGeneralItalic.otf" }
     };
 
     // TODO: Some tests use Lucida. We should load these as well, once it becomes
@@ -363,6 +394,7 @@ static void resetDefaultsToConsistentValues()
                  "enable-html5-local-storage", TRUE,
                  "enable-xss-auditor", FALSE,
                  "enable-spatial-navigation", FALSE,
+                 "enable-frame-flattening", FALSE,
                  "javascript-can-access-clipboard", TRUE,
                  "javascript-can-open-windows-automatically", TRUE,
                  "enable-offline-web-application-cache", TRUE,
@@ -373,6 +405,8 @@ static void resetDefaultsToConsistentValues()
                  "monospace-font-family", "Courier",
                  "serif-font-family", "Times",
                  "sans-serif-font-family", "Helvetica",
+                 "cursive-font-family", "cursive",
+                 "fantasy-font-family", "fantasy",
                  "default-font-size", 16,
                  "default-monospace-font-size", 13,
                  "minimum-font-size", 1,
@@ -394,6 +428,9 @@ static void resetDefaultsToConsistentValues()
 
     webkit_reset_origin_access_white_lists();
 
+    WebKitWebBackForwardList* list = webkit_web_view_get_back_forward_list(webView);
+    webkit_web_back_forward_list_clear(list);
+
 #ifdef HAVE_LIBSOUP_2_29_90
     SoupSession* session = webkit_get_default_session();
     SoupCookieJar* jar = reinterpret_cast<SoupCookieJar*>(soup_session_get_feature(session, SOUP_TYPE_COOKIE_JAR));
@@ -405,6 +442,8 @@ static void resetDefaultsToConsistentValues()
 #endif
 
     setlocale(LC_ALL, "");
+
+    DumpRenderTreeSupportGtk::setLinksIncludedInFocusChain(true);
 }
 
 static bool useLongRunningServerMode(int argc, char *argv[])
@@ -610,7 +649,7 @@ static void runTest(const string& testPathOrURL)
     if (prevTestBFItem)
         g_object_ref(prevTestBFItem);
 
-    initializeFonts();
+    initializeFonts(testURL.c_str());
 
     // Focus the web view before loading the test to avoid focusing problems
     gtk_widget_grab_focus(GTK_WIDGET(webView));
@@ -686,24 +725,8 @@ static char* getFrameNameSuitableForTestResult(WebKitWebView* view, WebKitWebFra
     return frameName;
 }
 
-static void webViewLoadCommitted(WebKitWebView* view, WebKitWebFrame* frame, void*)
-{
-    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
-        char* frameName = getFrameNameSuitableForTestResult(view, frame);
-        printf("%s - didCommitLoadForFrame\n", frameName);
-        g_free(frameName);
-    }
-}
-
-
 static void webViewLoadFinished(WebKitWebView* view, WebKitWebFrame* frame, void*)
 {
-    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
-        char* frameName = getFrameNameSuitableForTestResult(view, frame);
-        printf("%s - didFinishLoadForFrame\n", frameName);
-        g_free(frameName);
-    }
-
     if (frame != topLoadingFrame)
         return;
 
@@ -939,31 +962,46 @@ static WebKitWebView* webInspectorInspectWebView(WebKitWebInspector*, gpointer d
     return WEBKIT_WEB_VIEW(webView);
 }
 
-static void webViewLoadStatusNotified(WebKitWebView* view, gpointer user_data)
+static void webFrameLoadStatusNotified(WebKitWebFrame* frame, gpointer user_data)
 {
-    WebKitLoadStatus loadStatus = webkit_web_view_get_load_status(view);
+    WebKitLoadStatus loadStatus = webkit_web_frame_get_load_status(frame);
 
     if (gLayoutTestController->dumpFrameLoadCallbacks()) {
-        if (loadStatus == WEBKIT_LOAD_PROVISIONAL) {
-            char* frameName = getFrameNameSuitableForTestResult(view, mainFrame);
-            printf("%s - didStartProvisionalLoadForFrame\n", frameName);
-            g_free(frameName);
+        GOwnPtr<char> frameName(getFrameNameSuitableForTestResult(webkit_web_frame_get_web_view(frame), frame));
+
+        switch (loadStatus) {
+        case WEBKIT_LOAD_PROVISIONAL:
+            if (!done)
+                printf("%s - didStartProvisionalLoadForFrame\n", frameName.get());
+            break;
+        case WEBKIT_LOAD_COMMITTED:
+            if (!done)
+                printf("%s - didCommitLoadForFrame\n", frameName.get());
+            break;
+        case WEBKIT_LOAD_FINISHED:
+            if (frame != topLoadingFrame || !done)
+                printf("%s - didFinishLoadForFrame\n", frameName.get());
+            break;
+        default:
+            break;
         }
     }
+}
+
+static void frameCreatedCallback(WebKitWebView* webView, WebKitWebFrame* webFrame, gpointer user_data)
+{
+    g_signal_connect(webFrame, "notify::load-status", G_CALLBACK(webFrameLoadStatusNotified), NULL);
 }
 
 static WebKitWebView* createWebView()
 {
     WebKitWebView* view = WEBKIT_WEB_VIEW(webkit_web_view_new());
 
-    // From bug 11756: Use a frame group name for all WebViews created by
-    // DumpRenderTree to allow testing of cross-page frame lookup.
-    webkit_web_view_set_group_name(view, "org.webkit.gtk.DumpRenderTree");
+    DumpRenderTreeSupportGtk::setDumpRenderTreeModeEnabled(true);
 
     g_object_connect(G_OBJECT(view),
                      "signal::load-started", webViewLoadStarted, 0,
                      "signal::load-finished", webViewLoadFinished, 0,
-                     "signal::load-committed", webViewLoadCommitted, 0,
                      "signal::window-object-cleared", webViewWindowObjectCleared, 0,
                      "signal::console-message", webViewConsoleMessage, 0,
                      "signal::script-alert", webViewScriptAlert, 0,
@@ -981,11 +1019,8 @@ static WebKitWebView* createWebView()
                      "signal::drag-begin", dragBeginCallback, 0,
                      "signal::drag-end", dragEndCallback, 0,
                      "signal::drag-failed", dragFailedCallback, 0,
+                     "signal::frame-created", frameCreatedCallback, 0,
 
-                     NULL);
-
-    g_signal_connect(view,
-                     "notify::load-status", G_CALLBACK(webViewLoadStatusNotified),
                      NULL);
 
     WebKitWebInspector* inspector = webkit_web_view_get_inspector(view);
@@ -999,6 +1034,10 @@ static WebKitWebView* createWebView()
         WebKitWebSettings* settings = webkit_web_view_get_settings(webView);
         webkit_web_view_set_settings(view, settings);
     }
+
+    // frame-created is not issued for main frame. That's why we must do this here
+    WebKitWebFrame* frame = webkit_web_view_get_main_frame(view);
+    g_signal_connect(frame, "notify::load-status", G_CALLBACK(webFrameLoadStatusNotified), NULL);
 
     return view;
 }

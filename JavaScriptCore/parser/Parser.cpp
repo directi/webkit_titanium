@@ -26,17 +26,12 @@
 #include "Debugger.h"
 #include "JSParser.h"
 #include "Lexer.h"
-#include <wtf/HashSet.h>
-#include <wtf/Vector.h>
-
-#ifndef yyparse
-extern int jscyyparse(void*);
-#endif
 
 namespace JSC {
 
-void Parser::parse(JSGlobalData* globalData, FunctionParameters* parameters, int* errLine, UString* errMsg)
+void Parser::parse(JSGlobalObject* lexicalGlobalObject, FunctionParameters* parameters, JSParserStrictness strictness, JSParserMode mode, int* errLine, UString* errMsg)
 {
+    ASSERT(lexicalGlobalObject);
     m_sourceElements = 0;
 
     int defaultErrLine;
@@ -50,10 +45,10 @@ void Parser::parse(JSGlobalData* globalData, FunctionParameters* parameters, int
     *errLine = -1;
     *errMsg = UString();
 
-    Lexer& lexer = *globalData->lexer;
+    Lexer& lexer = *lexicalGlobalObject->globalData().lexer;
     lexer.setCode(*m_source, m_arena);
 
-    int parseError = jsParse(globalData, parameters, m_source);
+    int parseError = jsParse(lexicalGlobalObject, parameters, strictness, mode, m_source);
     int lineNumber = lexer.lineNumber();
     bool lexError = lexer.sawError();
     lexer.clear();

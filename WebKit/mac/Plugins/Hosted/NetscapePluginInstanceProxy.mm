@@ -50,6 +50,7 @@
 #import <WebCore/FrameLoader.h>
 #import <WebCore/FrameTree.h>
 #import <WebCore/KURL.h>
+#import <WebCore/ProxyServer.h>
 #import <WebCore/SecurityOrigin.h>
 #import <WebCore/ScriptController.h>
 #import <WebCore/ScriptValue.h>
@@ -871,9 +872,9 @@ bool NetscapePluginInstanceProxy::evaluate(uint32_t objectID, const String& scri
     bool oldAllowPopups = frame->script()->allowPopupsFromPlugin();
     frame->script()->setAllowPopupsFromPlugin(allowPopups);
     
-    globalObject->globalData()->timeoutChecker.start();
+    globalObject->globalData().timeoutChecker.start();
     Completion completion = JSC::evaluate(exec, globalObject->globalScopeChain(), makeSource(script));
-    globalObject->globalData()->timeoutChecker.stop();
+    globalObject->globalData().timeoutChecker.stop();
     ComplType type = completion.complType();
 
     frame->script()->setAllowPopupsFromPlugin(oldAllowPopups);
@@ -920,9 +921,9 @@ bool NetscapePluginInstanceProxy::invoke(uint32_t objectID, const Identifier& me
     demarshalValues(exec, argumentsData, argumentsLength, argList);
 
     ProtectedPtr<JSGlobalObject> globalObject = frame->script()->globalObject(pluginWorld());
-    globalObject->globalData()->timeoutChecker.start();
+    globalObject->globalData().timeoutChecker.start();
     JSValue value = call(exec, function, callType, callData, object, argList);
-    globalObject->globalData()->timeoutChecker.stop();
+    globalObject->globalData().timeoutChecker.stop();
         
     marshalValue(exec, value, resultData, resultLength);
     exec->clearException();
@@ -955,9 +956,9 @@ bool NetscapePluginInstanceProxy::invokeDefault(uint32_t objectID, data_t argume
     demarshalValues(exec, argumentsData, argumentsLength, argList);
 
     ProtectedPtr<JSGlobalObject> globalObject = frame->script()->globalObject(pluginWorld());
-    globalObject->globalData()->timeoutChecker.start();
+    globalObject->globalData().timeoutChecker.start();
     JSValue value = call(exec, object, callType, callData, object, argList);
-    globalObject->globalData()->timeoutChecker.stop();
+    globalObject->globalData().timeoutChecker.stop();
     
     marshalValue(exec, value, resultData, resultLength);
     exec->clearException();
@@ -991,9 +992,9 @@ bool NetscapePluginInstanceProxy::construct(uint32_t objectID, data_t argumentsD
     demarshalValues(exec, argumentsData, argumentsLength, argList);
 
     ProtectedPtr<JSGlobalObject> globalObject = frame->script()->globalObject(pluginWorld());
-    globalObject->globalData()->timeoutChecker.start();
+    globalObject->globalData().timeoutChecker.start();
     JSValue value = JSC::construct(exec, object, constructType, constructData, argList);
-    globalObject->globalData()->timeoutChecker.stop();
+    globalObject->globalData().timeoutChecker.stop();
     
     marshalValue(exec, value, resultData, resultLength);
     exec->clearException();
@@ -1333,7 +1334,7 @@ bool NetscapePluginInstanceProxy::demarshalValueFromArray(ExecState* exec, NSArr
             result = jsBoolean([[array objectAtIndex:index++] boolValue]);
             return true;
         case DoubleValueType:
-            result = jsNumber(exec, [[array objectAtIndex:index++] doubleValue]);
+            result = jsNumber([[array objectAtIndex:index++] doubleValue]);
             return true;
         case StringValueType: {
             NSString *string = [array objectAtIndex:index++];
@@ -1454,7 +1455,7 @@ void NetscapePluginInstanceProxy::willCallPluginFunction()
     m_pluginFunctionCallDepth++;
 }
     
-void NetscapePluginInstanceProxy::didCallPluginFunction()
+void NetscapePluginInstanceProxy::didCallPluginFunction(bool& stopped)
 {
     ASSERT(m_pluginFunctionCallDepth > 0);
     m_pluginFunctionCallDepth--;
@@ -1464,6 +1465,7 @@ void NetscapePluginInstanceProxy::didCallPluginFunction()
     if (!m_pluginFunctionCallDepth && m_shouldStopSoon) {
         m_shouldStopSoon = false;
         [m_pluginView stop];
+        stopped = true;
     }
 }
     
@@ -1557,7 +1559,8 @@ bool NetscapePluginInstanceProxy::getProxy(data_t urlData, mach_msg_type_number_
     if (!url)
         return false;
 
-    WTF::CString proxyStringUTF8 = proxiesForURL(url);
+    Vector<ProxyServer> proxyServers = proxyServersForURL(url, 0);
+    WTF::CString proxyStringUTF8 = toString(proxyServers).utf8();
 
     proxyLength = proxyStringUTF8.length();
     mig_allocate(reinterpret_cast<vm_address_t*>(&proxyData), proxyLength);

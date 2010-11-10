@@ -67,9 +67,12 @@ public:
 
     uint64_t setUpPolicyListener(WebCore::FramePolicyFunction);
     void invalidatePolicyListener();
-    void didReceivePolicyDecision(uint64_t listenerID, WebCore::PolicyAction);
+    void didReceivePolicyDecision(uint64_t listenerID, WebCore::PolicyAction, uint64_t downloadID);
+
+    void startDownload(const WebCore::ResourceRequest&);
 
     String source() const;
+    String contentsAsString() const;
 
     // WKBundleFrame API and SPI functions
     bool isMainFrame() const;
@@ -87,10 +90,13 @@ public:
     static String counterValue(JSObjectRef element);
     static String markerText(JSObjectRef element);
 
-    unsigned numberOfActiveAnimations();
+    unsigned numberOfActiveAnimations() const;
     bool pauseAnimationOnElementWithId(const String& animationName, const String& elementID, double time);
-
-    unsigned pendingUnloadCount();
+    void suspendAnimations();
+    void resumeAnimations();
+    String layerTreeAsText() const;
+    
+    unsigned pendingUnloadCount() const;
 
     // Simple listener class used by plug-ins to know when frames finish or fail loading.
     class LoadListener {
@@ -104,15 +110,20 @@ public:
     LoadListener* loadListener() const { return m_loadListener; }
 
 private:
-    static PassRefPtr<WebFrame> create(WebPage*, const String& frameName, WebCore::HTMLFrameOwnerElement*);
-    WebFrame(WebPage*, const String& frameName, WebCore::HTMLFrameOwnerElement*);
+    static PassRefPtr<WebFrame> create();
+    WebFrame();
+
+    void init(WebPage*, const String& frameName, WebCore::HTMLFrameOwnerElement*);
 
     virtual Type type() const { return APIType; }
+
+    bool isFrameSet() const;
 
     WebCore::Frame* m_coreFrame;
 
     uint64_t m_policyListenerID;
     WebCore::FramePolicyFunction m_policyFunction;
+    uint64_t m_policyDownloadID;
 
     WebFrameLoaderClient m_frameLoaderClient;
     LoadListener* m_loadListener;

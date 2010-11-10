@@ -49,6 +49,7 @@
 use strict;
 use warnings;
 
+use Config;
 use Cwd;
 use Data::Dumper;
 use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
@@ -157,7 +158,7 @@ my $testHTTP = 1;
 my $testWebSocket = 1;
 my $testMedia = 1;
 my $tmpDir = "/tmp";
-my $testResultsDirectory = File::Spec->catfile($tmpDir, "layout-test-results");
+my $testResultsDirectory = File::Spec->catdir($tmpDir, "layout-test-results");
 my $testsPerDumpTool = 1000;
 my $threaded = 0;
 # DumpRenderTree has an internal timeout of 30 seconds, so this must be > 30.
@@ -179,6 +180,8 @@ if (isWindows() || isMsys()) {
 
 # Default to --no-http for wx for now.
 $testHTTP = 0 if (isWx());
+
+my $perlInterpreter = "perl";
 
 my $expectedTag = "expected";
 my $actualTag = "actual";
@@ -224,7 +227,7 @@ if (isAppleMacWebKit()) {
     $platform = "gtk";
 } elsif (isWx()) {
     $platform = "wx";
-} elsif (isCygwin()) {
+} elsif (isCygwin() || isWindows()) {
     if (isWindowsXP()) {
         $platform = "win-xp";
     } elsif (isWindowsVista()) {
@@ -236,7 +239,7 @@ if (isAppleMacWebKit()) {
     }
 }
 
-if (isQt() || isCygwin()) {
+if (isQt() || isAppleWinWebKit()) {
     my $testfontPath = $ENV{"WEBKIT_TESTFONTS"};
     if (!$testfontPath || !-d "$testfontPath") {
         print "The WEBKIT_TESTFONTS environment variable is not defined or not set properly\n";
@@ -364,8 +367,13 @@ if ($useWebKitTestRunner) {
         $stripEditingCallbacks = 0 unless defined $stripEditingCallbacks;
         $realPlatform = $platform;
         $platform = "win-wk2";
+    } elsif (isQt()) {
+        $realPlatform = $platform;
+        $platform = "qt-wk2";
     }
 }
+
+$timeoutSeconds *= 10 if $guardMalloc;
 
 $stripEditingCallbacks = isCygwin() unless defined $stripEditingCallbacks;
 
@@ -409,8 +417,11 @@ if (!defined($root)) {
 
 my $dumpToolName = $useWebKitTestRunner ? "WebKitTestRunner" : "DumpRenderTree";
 
-$dumpToolName .= "_debug" if isCygwin() && configurationForVisualStudio() !~ /^Release|Debug_Internal$/;
-my $dumpTool = "$productDir/$dumpToolName";
+if (isAppleWinWebKit()) {
+    $dumpToolName .= "_debug" if configurationForVisualStudio() !~ /^Release|Debug_Internal$/;
+    $dumpToolName .= $Config{_exe};
+}
+my $dumpTool = File::Spec->catfile($productDir, $dumpToolName);
 die "can't find executable $dumpToolName (looked in $productDir)\n" unless -x $dumpTool;
 
 my $imageDiffTool = "$productDir/ImageDiff";
@@ -501,7 +512,7 @@ my $supportedFeaturesResult = "";
 if (isCygwin()) {
     # Collect supported features list
     setPathForRunningWebKitApp(\%ENV);
-    my $supportedFeaturesCommand = $dumpTool . " --print-supported-features 2>&1";
+    my $supportedFeaturesCommand = "\"$dumpTool\" --print-supported-features 2>&1";
     $supportedFeaturesResult = `$supportedFeaturesCommand 2>&1`;
 }
 
@@ -518,11 +529,37 @@ if (isCygwin()) {
 
 if (!$hasAcceleratedCompositing) {
     $ignoredDirectories{'compositing'} = 1;
+
+    # This test has slightly different floating-point rounding when accelerated
+    # compositing is enabled.
+    $ignoredFiles{'svg/custom/use-on-symbol-inside-pattern.svg'} = 1;
+
+    if (isAppleWebKit()) {
+        # In Apple's ports, the default controls for <video> contain a "full
+        # screen" button only if accelerated compositing is enabled.
+        $ignoredFiles{'media/controls-after-reload.html'} = 1;
+        $ignoredFiles{'media/controls-drag-timebar.html'} = 1;
+        $ignoredFiles{'media/controls-strict.html'} = 1;
+        $ignoredFiles{'media/controls-styling.html'} = 1;
+        $ignoredFiles{'media/video-controls-rendering.html'} = 1;
+        $ignoredFiles{'media/video-display-toggle.html'} = 1;
+        $ignoredFiles{'media/video-no-audio.html'} = 1;
+    }
+
+    # Here we're using !$hasAcceleratedCompositing as a proxy for "is a headless XP machine" (like
+    # our test slaves). Headless XP machines can neither support accelerated compositing nor pass
+    # this test, so skipping the test here is expedient, if a little sloppy. See
+    # <http://webkit.org/b/48333>.
+    $ignoredFiles{'platform/win/plugins/npn-invalidate-rect-invalidates-window.html'} = 1 if isAppleWinWebKit();
 }
 
 if (!$has3DRendering) {
     $ignoredDirectories{'animations/3d'} = 1;
     $ignoredDirectories{'transforms/3d'} = 1;
+
+    # These tests use the -webkit-transform-3d media query.
+    $ignoredFiles{'fast/media/mq-transform-02.html'} = 1;
+    $ignoredFiles{'fast/media/mq-transform-03.html'} = 1;
 }
 
 if (!checkWebCoreFeatureSupport("3D Canvas", 0)) {
@@ -681,7 +718,7 @@ for my $test (@tests) {
     my $suffixExpectedHash = "";
     if ($pixelTests && !$resetResults) {
         my $expectedPixelDir = expectedDirectoryForTest($base, 0, "png");
-        if (open EXPECTEDHASH, "$expectedPixelDir/$base-$expectedTag.checksum") {
+        if (open EXPECTEDHASH, File::Spec->catfile($expectedPixelDir, "$base-$expectedTag.checksum")) {
             my $expectedHash = <EXPECTEDHASH>;
             chomp($expectedHash);
             close EXPECTEDHASH;
@@ -693,7 +730,34 @@ for my $test (@tests) {
 
     if ($test =~ /^http\//) {
         configureAndOpenHTTPDIfNeeded();
-        if ($test !~ /^http\/tests\/local\// && $test !~ /^http\/tests\/ssl\// && $test !~ /^http\/tests\/wml\// && $test !~ /^http\/tests\/media\//) {
+        if ($test =~ /^http\/tests\/websocket\//) {
+            if ($test =~ /^websocket\/tests\/local\//) {
+                my $testPath = "$testDirectory/$test";
+                if (isCygwin()) {
+                    $testPath = toWindowsPath($testPath);
+                } else {
+                    $testPath = canonpath($testPath);
+                }
+                print OUT "$testPath\n";
+            } else {
+                if (openWebSocketServerIfNeeded()) {
+                    my $path = canonpath($test);
+                    if ($test =~ /^http\/tests\/websocket\/tests\/ssl\//) {
+                        # wss is disabled until all platforms support pyOpenSSL.
+                        print STDERR "Error: wss is disabled until all platforms support pyOpenSSL.";
+                    } else {
+                        $path =~ s/^http\/tests\///;
+                        print OUT "http://127.0.0.1:$httpdPort/$path\n";
+                    }
+                } else {
+                    # We failed to launch the WebSocket server.  Display a useful error message rather than attempting
+                    # to run tests that expect the server to be available.
+                    my $errorMessagePath = "$testDirectory/http/tests/websocket/resources/server-failed-to-start.html";
+                    $errorMessagePath = isCygwin() ? toWindowsPath($errorMessagePath) : canonpath($errorMessagePath);
+                    print OUT "$errorMessagePath\n";
+                }
+            }
+        } elsif ($test !~ /^http\/tests\/local\// && $test !~ /^http\/tests\/ssl\// && $test !~ /^http\/tests\/wml\// && $test !~ /^http\/tests\/media\//) {
             my $path = canonpath($test);
             $path =~ s/^http\/tests\///;
             print OUT "http://127.0.0.1:$httpdPort/$path$suffixExpectedHash\n";
@@ -709,33 +773,6 @@ for my $test (@tests) {
                 $testPath = canonpath($testPath);
             }
             print OUT "$testPath$suffixExpectedHash\n";
-        }
-    } elsif ($test =~ /^websocket\//) {
-        if ($test =~ /^websocket\/tests\/local\//) {
-            my $testPath = "$testDirectory/$test";
-            if (isCygwin()) {
-                $testPath = toWindowsPath($testPath);
-            } else {
-                $testPath = canonpath($testPath);
-            }
-            print OUT "$testPath\n";
-        } else {
-            if (openWebSocketServerIfNeeded()) {
-                my $path = canonpath($test);
-                if ($test =~ /^websocket\/tests\/ssl\//) {
-                    # wss is disabled until all platforms support pyOpenSSL.
-                    print STDERR "Error: wss is disabled until all platforms support pyOpenSSL.";
-                    # print OUT "https://127.0.0.1:$webSocketSecurePort/$path\n";
-                } else {
-                    print OUT "http://127.0.0.1:$webSocketPort/$path\n";
-                }
-            } else {
-                # We failed to launch the WebSocket server.  Display a useful error message rather than attempting
-                # to run tests that expect the server to be available.
-                my $errorMessagePath = "$testDirectory/websocket/resources/server-failed-to-start.html";
-                $errorMessagePath = isCygwin() ? toWindowsPath($errorMessagePath) : canonpath($errorMessagePath);
-                print OUT "$errorMessagePath\n";
-            }
         }
     } else {
         my $testPath = "$testDirectory/$test";
@@ -763,7 +800,7 @@ for my $test (@tests) {
     my $isText = isTextOnlyTest($actual);
 
     my $expectedDir = expectedDirectoryForTest($base, $isText, $expectedExtension);
-    $expectedResultPaths{$base} = "$expectedDir/$expectedFileName";
+    $expectedResultPaths{$base} = File::Spec->catfile($expectedDir, $expectedFileName);
 
     unless ($readResults->{status} eq "success") {
         my $crashed = $readResults->{status} eq "crashed";
@@ -777,7 +814,7 @@ for my $test (@tests) {
 
     my $expected;
 
-    if (!$resetResults && open EXPECTED, "<", "$expectedDir/$expectedFileName") {
+    if (!$resetResults && open EXPECTED, "<", $expectedResultPaths{$base}) {
         $expected = "";
         while (<EXPECTED>) {
             next if $stripEditingCallbacks && $_ =~ /^EDITING DELEGATE:/;
@@ -827,12 +864,13 @@ for my $test (@tests) {
 
     if ($actualPNGSize > 0) {
         my $expectedPixelDir = expectedDirectoryForTest($base, 0, "png");
+        my $expectedPNGPath = File::Spec->catfile($expectedPixelDir, "$base-$expectedTag.png");
 
         if (!$resetResults && ($expectedHash ne $actualHash || ($actualHash eq "" && $expectedHash eq ""))) {
-            if (-f "$expectedPixelDir/$base-$expectedTag.png") {
-                my $expectedPNGSize = -s "$expectedPixelDir/$base-$expectedTag.png";
+            if (-f $expectedPNGPath) {
+                my $expectedPNGSize = -s $expectedPNGPath;
                 my $expectedPNG = "";
-                open EXPECTEDPNG, "$expectedPixelDir/$base-$expectedTag.png";
+                open EXPECTEDPNG, $expectedPNGPath;
                 read(EXPECTEDPNG, $expectedPNG, $expectedPNGSize);
 
                 openDiffTool();
@@ -863,13 +901,14 @@ for my $test (@tests) {
             }
         }
 
-        if ($resetResults || !-f "$expectedPixelDir/$base-$expectedTag.png") {
+        if ($resetResults || !-f $expectedPNGPath) {
             mkpath catfile($expectedPixelDir, dirname($base)) if $testDirectory ne $expectedPixelDir;
-            writeToFile("$expectedPixelDir/$base-$expectedTag.png", $actualPNG);
+            writeToFile($expectedPNGPath, $actualPNG);
         }
 
-        if ($actualHash ne "" && ($resetResults || !-f "$expectedPixelDir/$base-$expectedTag.checksum")) {
-            writeToFile("$expectedPixelDir/$base-$expectedTag.checksum", $actualHash);
+        my $expectedChecksumPath = File::Spec->catfile($expectedPixelDir, "$base-$expectedTag.checksum");
+        if ($actualHash ne "" && ($resetResults || !-f $expectedChecksumPath)) {
+            writeToFile($expectedChecksumPath, $actualHash);
         }
     }
 
@@ -878,8 +917,7 @@ for my $test (@tests) {
         testCrashedOrTimedOut($test, $base, 1, $actual, $error);
     } elsif (!defined $expected) {
         if ($verbose) {
-            print "new " . ($resetResults ? "result" : "test") ."\n";
-            $atLineStart = 1;
+            print "new " . ($resetResults ? "result" : "test");
         }
         $result = "new";
 
@@ -897,11 +935,13 @@ for my $test (@tests) {
                 print "$test -> ";
             }
             my $resultsDir = catdir($expectedDir, dirname($base));
-            if ($generateNewResults) {
-                print "new (results generated in $resultsDir)\n";
-            } else {
-                print "new\n";
+            if (!$verbose) {
+                print "new";
             }
+            if ($generateNewResults) {
+                print " (results generated in $resultsDir)";
+            }
+            print "\n" unless $atLineStart;
             $atLineStart = 1;
         }
     } elsif ($actual eq $expected && $diffResult eq "passed") {
@@ -1006,11 +1046,10 @@ for my $test (@tests) {
     }
 
     if ($error) {
-        my $dir = "$testResultsDirectory/$base";
-        $dir =~ s|/([^/]+)$|| or die "Failed to find test name from base\n";
+        my $dir = dirname(File::Spec->catdir($testResultsDirectory, $base));
         mkpath $dir;
         
-        writeToFile("$testResultsDirectory/$base-$errorTag.txt", $error);
+        writeToFile(File::Spec->catfile($testResultsDirectory, "$base-$errorTag.txt"), $error);
         
         $counts{error}++;
         push @{$tests{error}}, $test;
@@ -1118,6 +1157,8 @@ if (isGtk()) {
   system "WebKitTools/Scripts/run-launcher", @configurationArgs, "file://".$testResults if $launchSafari;
 } elsif (isCygwin()) {
   system "cygstart", $testResults if $launchSafari;
+} elsif (isWindows()) {
+  system "start", $testResults if $launchSafari;
 } else {
   system "WebKitTools/Scripts/run-safari", @configurationArgs, "-NSOpen", $testResults if $launchSafari;
 }
@@ -1319,7 +1360,7 @@ sub launchWithEnv(\@\%)
     unshift @{$args}, "\"$allEnvVars\"";
 
     my $execScript = File::Spec->catfile(sourceDir(), qw(WebKitTools Scripts execAppWithEnv));
-    unshift @{$args}, $execScript;
+    unshift @{$args}, $perlInterpreter, $execScript;
     return @{$args};
 }
 
@@ -1361,7 +1402,7 @@ sub buildDumpTool($)
     }
 
     my @args = argumentsForConfiguration();
-    my $buildProcess = open3($childIn, $childOut, $childErr, "WebKitTools/Scripts/$dumpToolBuildScript", @args) or die "Failed to run build-dumprendertree";
+    my $buildProcess = open3($childIn, $childOut, $childErr, $perlInterpreter, File::Spec->catfile(qw(WebKitTools Scripts), $dumpToolBuildScript), @args) or die "Failed to run build-dumprendertree";
     close($childIn);
     waitpid $buildProcess, 0;
     my $buildResult = $?;
@@ -1379,6 +1420,10 @@ sub buildDumpTool($)
 sub openDumpTool()
 {
     return if $isDumpToolOpen;
+
+    if ($verbose && $testsPerDumpTool != 1) {
+        print "| Opening DumpTool |\n";
+    }
 
     my %CLEAN_ENV;
 
@@ -1445,6 +1490,12 @@ sub openDumpTool()
         unshift @args, "valgrind", "--suppressions=$platformBaseDirectory/qt/SuppressedValgrindErrors";
     } 
 
+    if ($useWebKitTestRunner) {
+        # Make WebKitTestRunner use a similar timeout. We don't use the exact same timeout to avoid
+        # race conditions.
+        push @args, "--timeout", $timeoutSeconds - 5;
+    }
+
     $CLEAN_ENV{MallocStackLogging} = 1 if $shouldCheckLeaks;
 
     $dumpToolPID = open3(\*OUT, \*IN, \*ERROR, launchWithEnv(@args, %CLEAN_ENV)) or die "Failed to start tool: $dumpTool\n";
@@ -1455,6 +1506,10 @@ sub openDumpTool()
 sub closeDumpTool()
 {
     return if !$isDumpToolOpen;
+
+    if ($verbose && $testsPerDumpTool != 1) {
+        print "| Closing DumpTool |\n";
+    }
 
     close IN;
     close OUT;
@@ -1504,7 +1559,7 @@ sub configureAndOpenHTTPDIfNeeded()
 sub checkPythonVersion()
 {
     # we have not chdir to sourceDir yet.
-    system sourceDir() . "/WebKitTools/Scripts/ensure-valid-python", "--check-only";
+    system $perlInterpreter, File::Spec->catfile(sourceDir(), qw(WebKitTools Scripts ensure-valid-python)), "--check-only";
     return exitStatus($?) == 0;
 }
 
@@ -1607,12 +1662,12 @@ sub expectedDirectoryForTest($;$;$)
     my ($base, $isText, $expectedExtension) = @_;
 
     my @directories = @platformResultHierarchy;
-    push @directories, map { catdir($platformBaseDirectory, $_) } qw(mac-snowleopard mac) if isCygwin();
+    push @directories, map { catdir($platformBaseDirectory, $_) } qw(mac-snowleopard mac) if isAppleWinWebKit();
     push @directories, $expectedDirectory;
 
     # If we already have expected results, just return their location.
     foreach my $directory (@directories) {
-        return $directory if (-f "$directory/$base-$expectedTag.$expectedExtension");
+        return $directory if -f File::Spec->catfile($directory, "$base-$expectedTag.$expectedExtension");
     }
 
     # For cross-platform tests, text-only results should go in the cross-platform directory,
@@ -1628,9 +1683,9 @@ sub countFinishedTest($$$$)
         if ($shouldCheckLeaks) {
             my $fileName;
             if ($testsPerDumpTool == 1) {
-                $fileName = "$testResultsDirectory/$base-leaks.txt";
+                $fileName = File::Spec->catfile($testResultsDirectory, "$base-leaks.txt");
             } else {
-                $fileName = "$testResultsDirectory/" . fileNameWithNumber($dumpToolName, $leaksOutputFileNumber) . "-leaks.txt";
+                $fileName = File::Spec->catfile($testResultsDirectory, fileNameWithNumber($dumpToolName, $leaksOutputFileNumber) . "-leaks.txt");
             }
             my $leakCount = countAndPrintLeaks($dumpToolName, $dumpToolPID, $fileName);
             $totalLeaks += $leakCount;
@@ -1653,14 +1708,13 @@ sub testCrashedOrTimedOut($$$$$)
 
     sampleDumpTool() unless $didCrash;
 
-    my $dir = "$testResultsDirectory/$base";
-    $dir =~ s|/([^/]+)$|| or die "Failed to find test name from base\n";
+    my $dir = dirname(File::Spec->catdir($testResultsDirectory, $base));
     mkpath $dir;
 
     deleteExpectedAndActualResults($base);
 
     if (defined($error) && length($error)) {
-        writeToFile("$testResultsDirectory/$base-$errorTag.txt", $error);
+        writeToFile(File::Spec->catfile($testResultsDirectory, "$base-$errorTag.txt"), $error);
     }
 
     recordActualResultsAndDiff($base, $actual);
@@ -1898,8 +1952,8 @@ sub recordActualResultsAndDiff($$)
 
     my $expectedResultPath = $expectedResultPaths{$base};
     my ($expectedResultFileNameMinusExtension, $expectedResultDirectoryPath, $expectedResultExtension) = fileparse($expectedResultPath, qr{\.[^.]+$});
-    my $actualResultsPath = "$testResultsDirectory/$base-$actualTag$expectedResultExtension";
-    my $copiedExpectedResultsPath = "$testResultsDirectory/$base-$expectedTag$expectedResultExtension";
+    my $actualResultsPath = File::Spec->catfile($testResultsDirectory, "$base-$actualTag$expectedResultExtension");
+    my $copiedExpectedResultsPath = File::Spec->catfile($testResultsDirectory, "$base-$expectedTag$expectedResultExtension");
 
     mkpath(dirname($actualResultsPath));
     writeToFile("$actualResultsPath", $actualResults);
@@ -1911,7 +1965,7 @@ sub recordActualResultsAndDiff($$)
         close EMPTY;
     }
 
-    my $diffOuputBasePath = "$testResultsDirectory/$base";
+    my $diffOuputBasePath = File::Spec->catfile($testResultsDirectory, $base);
     my $diffOutputPath = "$diffOuputBasePath-$diffsTag.txt";
     system "diff -u \"$copiedExpectedResultsPath\" \"$actualResultsPath\" > \"$diffOutputPath\"";
 
@@ -2052,7 +2106,6 @@ sub readFromDumpToolWithTimer(**)
     setFileHandleNonBlocking($fhError, 1);
 
     my $maximumSecondsWithoutOutput = $timeoutSeconds;
-    $maximumSecondsWithoutOutput *= 10 if $guardMalloc;
     my $microsecondsToWaitBeforeReadingAgain = 1000;
 
     my $timeOfLastSuccessfulRead = time;
@@ -2271,7 +2324,7 @@ sub findTestsToRun
     my @testsToRun = ();
 
     for my $test (@ARGV) {
-        $test =~ s/^($layoutTestsName|$testDirectory)\///;
+        $test =~ s/^(\Q$layoutTestsName\E|\Q$testDirectory\E)\///;
         my $fullPath = catfile($testDirectory, $test);
         if (file_name_is_absolute($test)) {
             print "can't run test $test outside $testDirectory\n";

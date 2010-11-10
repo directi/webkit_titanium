@@ -34,27 +34,27 @@
 
 #include "DRTDevToolsAgent.h"
 #include "TestShell.h"
+#include "WebAnimationController.h"
+#include "WebBindings.h"
+#include "WebConsoleMessage.h"
+#include "WebData.h"
+#include "WebDeviceOrientation.h"
+#include "WebDeviceOrientationClientMock.h"
+#include "WebDocument.h"
+#include "WebElement.h"
+#include "WebFrame.h"
+#include "WebGeolocationServiceMock.h"
+#include "WebInputElement.h"
+#include "WebKit.h"
+#include "WebNotificationPresenter.h"
+#include "WebScriptSource.h"
+#include "WebSecurityPolicy.h"
+#include "WebSettings.h"
+#include "WebSize.h"
+#include "WebSpeechInputControllerMock.h"
+#include "WebURL.h"
+#include "WebView.h"
 #include "WebViewHost.h"
-#include "public/WebAnimationController.h"
-#include "public/WebBindings.h"
-#include "public/WebConsoleMessage.h"
-#include "public/WebData.h"
-#include "public/WebDeviceOrientation.h"
-#include "public/WebDeviceOrientationClientMock.h"
-#include "public/WebDocument.h"
-#include "public/WebElement.h"
-#include "public/WebFrame.h"
-#include "public/WebGeolocationServiceMock.h"
-#include "public/WebInputElement.h"
-#include "public/WebKit.h"
-#include "public/WebNotificationPresenter.h"
-#include "public/WebScriptSource.h"
-#include "public/WebSecurityPolicy.h"
-#include "public/WebSettings.h"
-#include "public/WebSize.h"
-#include "public/WebSpeechInputControllerMock.h"
-#include "public/WebURL.h"
-#include "public/WebView.h"
 #include "webkit/support/webkit_support.h"
 #include <algorithm>
 #include <cstdlib>
@@ -71,6 +71,8 @@ using namespace std;
 
 LayoutTestController::LayoutTestController(TestShell* shell)
     : m_shell(shell)
+    , m_closeRemainingWindows(false)
+    , m_deferMainResourceDataLoad(false)
     , m_workQueue(this)
 {
 
@@ -94,6 +96,7 @@ LayoutTestController::LayoutTestController(TestShell* shell)
     bindMethod("dumpDatabaseCallbacks", &LayoutTestController::dumpDatabaseCallbacks);
     bindMethod("dumpEditingCallbacks", &LayoutTestController::dumpEditingCallbacks);
     bindMethod("dumpFrameLoadCallbacks", &LayoutTestController::dumpFrameLoadCallbacks);
+    bindMethod("dumpUserGestureInFrameLoadCallbacks", &LayoutTestController::dumpUserGestureInFrameLoadCallbacks);
     bindMethod("dumpResourceLoadCallbacks", &LayoutTestController::dumpResourceLoadCallbacks);
     bindMethod("dumpResourceResponseMIMETypes", &LayoutTestController::dumpResourceResponseMIMETypes);
     bindMethod("dumpSelectionRect", &LayoutTestController::dumpSelectionRect);
@@ -106,7 +109,9 @@ LayoutTestController::LayoutTestController(TestShell* shell)
     bindMethod("forceRedSelectionColors", &LayoutTestController::forceRedSelectionColors);
     bindMethod("grantDesktopNotificationPermission", &LayoutTestController::grantDesktopNotificationPermission);
     bindMethod("isCommandEnabled", &LayoutTestController::isCommandEnabled);
+    bindMethod("layerTreeAsText", &LayoutTestController::layerTreeAsText);
     bindMethod("markerTextForListItem", &LayoutTestController::markerTextForListItem);
+    bindMethod("hasSpellingMarker", &LayoutTestController::hasSpellingMarker);
     bindMethod("notifyDone", &LayoutTestController::notifyDone);
     bindMethod("numberOfActiveAnimations", &LayoutTestController::numberOfActiveAnimations);
     bindMethod("numberOfPages", &LayoutTestController::numberOfPages);
@@ -283,6 +288,12 @@ void LayoutTestController::dumpBackForwardList(const CppArgumentList&, CppVarian
 void LayoutTestController::dumpFrameLoadCallbacks(const CppArgumentList&, CppVariant* result)
 {
     m_dumpFrameLoadCallbacks = true;
+    result->setNull();
+}
+
+void LayoutTestController::dumpUserGestureInFrameLoadCallbacks(const CppArgumentList&, CppVariant* result)
+{
+    m_dumpUserGestureInFrameLoadCallbacks = true;
     result->setNull();
 }
 
@@ -520,6 +531,7 @@ void LayoutTestController::reset()
     m_dumpAsText = false;
     m_dumpEditingCallbacks = false;
     m_dumpFrameLoadCallbacks = false;
+    m_dumpUserGestureInFrameLoadCallbacks = false;
     m_dumpResourceLoadCallbacks = false;
     m_dumpResourceResponseMIMETypes = false;
     m_dumpBackForwardList = false;
@@ -1476,6 +1488,9 @@ void LayoutTestController::setEditingBehavior(const CppArgumentList& arguments, 
     } else if (key == "win") {
         m_shell->preferences()->editingBehavior = WebSettings::EditingBehaviorWin;
         m_shell->applyPreferences();
+    } else if (key == "unix") {
+        m_shell->preferences()->editingBehavior = WebSettings::EditingBehaviorUnix;
+        m_shell->applyPreferences();
     } else
         logErrorToConsole("Passed invalid editing behavior. Should be 'mac' or 'win'.");
 }
@@ -1524,10 +1539,10 @@ void LayoutTestController::abortModal(const CppArgumentList& arguments, CppVaria
 void LayoutTestController::setMockSpeechInputResult(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
-    if (arguments.size() < 1 || !arguments[0].isString())
+    if (arguments.size() < 2 || !arguments[0].isString() || !arguments[1].isString())
         return;
 
-    m_speechInputControllerMock->setMockRecognitionResult(cppVariantToWebString(arguments[0]));
+    m_speechInputControllerMock->setMockRecognitionResult(cppVariantToWebString(arguments[0]), cppVariantToWebString(arguments[1]));
 }
 
 WebKit::WebSpeechInputController* LayoutTestController::speechInputController(WebKit::WebSpeechInputListener* listener)
@@ -1535,6 +1550,11 @@ WebKit::WebSpeechInputController* LayoutTestController::speechInputController(We
     if (!m_speechInputControllerMock.get())
         m_speechInputControllerMock.set(WebSpeechInputControllerMock::create(listener));
     return m_speechInputControllerMock.get();
+}
+
+void LayoutTestController::layerTreeAsText(const CppArgumentList& args, CppVariant* result)
+{
+    result->set(m_shell->webView()->mainFrame()->layerTreeAsText().utf8());
 }
 
 void LayoutTestController::markerTextForListItem(const CppArgumentList& args, CppVariant* result)
@@ -1551,4 +1571,11 @@ WebDeviceOrientationClient* LayoutTestController::deviceOrientationClient()
     if (!m_deviceOrientationClientMock.get())
         m_deviceOrientationClientMock.set(WebDeviceOrientationClientMock::create());
     return m_deviceOrientationClientMock.get();
+}
+
+void LayoutTestController::hasSpellingMarker(const CppArgumentList& arguments, CppVariant* result)
+{
+    if (arguments.size() < 2 || !arguments[0].isNumber() || !arguments[1].isNumber())
+        return;
+    result->set(m_shell->webView()->mainFrame()->selectionStartHasSpellingMarkerFor(arguments[0].toInt32(), arguments[1].toInt32()));
 }

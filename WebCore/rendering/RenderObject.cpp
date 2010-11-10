@@ -1151,6 +1151,16 @@ void RenderObject::drawArcForBoxSide(GraphicsContext* graphicsContext, int x, in
     }
 }
 #endif
+    
+void RenderObject::paintFocusRing(GraphicsContext* context, int tx, int ty, RenderStyle* style)
+{
+    Vector<IntRect> focusRingRects;
+    addFocusRingRects(focusRingRects, tx, ty);
+    if (style->outlineStyleIsAuto())
+        context->drawFocusRing(focusRingRects, style->outlineWidth(), style->outlineOffset(), style->visitedDependentColor(CSSPropertyOutlineColor));
+    else
+        addPDFURLRect(context, unionRect(focusRingRects));
+}        
 
 void RenderObject::addPDFURLRect(GraphicsContext* context, const IntRect& rect)
 {
@@ -1181,12 +1191,7 @@ void RenderObject::paintOutline(GraphicsContext* graphicsContext, int tx, int ty
     if (styleToUse->outlineStyleIsAuto() || hasOutlineAnnotation()) {
         if (!theme()->supportsFocusRing(styleToUse)) {
             // Only paint the focus ring by hand if the theme isn't able to draw the focus ring.
-            Vector<IntRect> focusRingRects;
-            addFocusRingRects(focusRingRects, tx, ty);
-            if (styleToUse->outlineStyleIsAuto())
-                graphicsContext->drawFocusRing(focusRingRects, ow, offset, oc);
-            else
-                addPDFURLRect(graphicsContext, unionRect(focusRingRects));
+            paintFocusRing(graphicsContext, tx, ty, styleToUse);
         }
     }
 
@@ -1726,8 +1731,14 @@ StyleDifference RenderObject::adjustStyleDifference(StyleDifference diff, unsign
 
 void RenderObject::setStyle(PassRefPtr<RenderStyle> style)
 {
-    if (m_style == style)
+    if (m_style == style) {
+#if USE(ACCELERATED_COMPOSITING)
+        // We need to run through adjustStyleDifference() for iframes and plugins, so
+        // style sharing is disabled for them. That should ensure that we never hit this code path.
+        ASSERT(!isRenderIFrame() && !isEmbeddedObject() &&!isApplet());
+#endif
         return;
+    }
 
     StyleDifference diff = StyleDifferenceEqual;
     unsigned contextSensitiveProperties = ContextSensitivePropertyNone;
@@ -2224,7 +2235,7 @@ void RenderObject::updateDragState(bool dragOn)
 {
     bool valueChanged = (dragOn != m_isDragging);
     m_isDragging = dragOn;
-    if (valueChanged && style()->affectedByDragRules())
+    if (valueChanged && style()->affectedByDragRules() && node())
         node()->setNeedsStyleRecalc();
     for (RenderObject* curr = firstChild(); curr; curr = curr->nextSibling())
         curr->updateDragState(dragOn);
@@ -2270,17 +2281,6 @@ void RenderObject::updateHitTestResult(HitTestResult& result, const IntPoint& po
 bool RenderObject::nodeAtPoint(const HitTestRequest&, HitTestResult&, int /*x*/, int /*y*/, int /*tx*/, int /*ty*/, HitTestAction)
 {
     return false;
-}
-
-int RenderObject::lineHeight(bool firstLine, bool /*isRootLineBox*/) const
-{
-    return style(firstLine)->computedLineHeight();
-}
-
-int RenderObject::baselinePosition(bool firstLine, bool isRootLineBox) const
-{
-    const Font& f = style(firstLine)->font();
-    return f.ascent() + (lineHeight(firstLine, isRootLineBox) - f.height()) / 2;
 }
 
 void RenderObject::scheduleRelayout()

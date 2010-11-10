@@ -43,11 +43,7 @@ namespace WebCore {
 
 NativeImagePtr RGBA32Buffer::asNewNativeImage() const
 {
-    NativeImagePtr image = SharedBitmap::createInstance(false, width(), height(), false);
-
-    memcpy(image->bytes(), m_bytes.data(), m_bytes.size() * sizeof(PixelData));
-
-    return image;
+    return SharedBitmap::create(m_backingStore, m_size, hasAlpha());
 }
 
 bool FrameData::clear(bool clearMetaData)
@@ -82,9 +78,9 @@ bool BitmapImage::getHBITMAPOfSize(HBITMAP bmp, LPSIZE size)
 
         IntSize imageSize = BitmapImage::size();
         if (size)
-            drawFrameMatchingSourceSize(&gc, FloatRect(0, 0, bmpInfo.bmWidth, bmpInfo.bmHeight), IntSize(*size), DeviceColorSpace, CompositeCopy);
+            drawFrameMatchingSourceSize(&gc, FloatRect(0, 0, bmpInfo.bmWidth, bmpInfo.bmHeight), IntSize(*size), ColorSpaceDeviceRGB, CompositeCopy);
         else
-            draw(&gc, FloatRect(0, 0, bmpInfo.bmWidth, bmpInfo.bmHeight), FloatRect(0, 0, imageSize.width(), imageSize.height()), DeviceColorSpace, CompositeCopy);
+            draw(&gc, FloatRect(0, 0, bmpInfo.bmWidth, bmpInfo.bmHeight), FloatRect(0, 0, imageSize.width(), imageSize.height()), ColorSpaceDeviceRGB, CompositeCopy);
     }
 
     SelectObject(hdc.get(), hOldBmp);

@@ -36,6 +36,7 @@
 #include "ContextMenu.h"
 #include "ContextMenuItem.h"
 #include "CookieJar.h"
+#include "CookieStorage.h"
 #include "Cursor.h"
 #include "Database.h"
 #include "DocumentFragment.h"
@@ -91,15 +92,6 @@ using namespace WebCore;
 /********************************************************/
 /* Completely empty stubs (mostly to allow DRT to run): */
 /********************************************************/
-
-// This function is used by Javascript to find out what the default language
-// the user has selected. It is used by the JS object Navigator.language
-// I guess this information should be mapped with the Accept-Language: HTTP header.
-String WebCore::defaultLanguage()
-{
-    verifiedOk();
-    return "en";
-}
 
 namespace WebCore {
 
@@ -501,3 +493,12 @@ OpaqueJSClassContextData::~OpaqueJSClassContextData()
 }
 
 #endif
+
+namespace WebCore {
+
+void setCookieStoragePrivateBrowsingEnabled(bool)
+{
+    notImplemented();
+}
+
+} // namespace WebCore

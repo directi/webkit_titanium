@@ -26,6 +26,7 @@
 // This all-in-one cpp file cuts down on template bloat to allow us to build our Windows release build.
 
 #include <AppendNodeCommand.cpp>
+#include <ApplyBlockElementCommand.cpp>
 #include <ApplyStyleCommand.cpp>
 #include <BreakBlockquoteCommand.cpp>
 #include <CompositeEditCommand.cpp>
@@ -35,6 +36,7 @@
 #include <DeleteFromTextNodeCommand.cpp>
 #include <DeleteSelectionCommand.cpp>
 #include <EditCommand.cpp>
+#include <EditingStyle.cpp>
 #include <Editor.cpp>
 #include <EditorCommand.cpp>
 #include <FormatBlockCommand.cpp>
@@ -47,6 +49,7 @@
 #include <InsertParagraphSeparatorCommand.cpp>
 #include <InsertTextCommand.cpp>
 #include <JoinTextNodesCommand.cpp>
+#include <MarkupAccumulator.cpp>
 #include <MergeIdenticalElementsCommand.cpp>
 #include <ModifySelectionListLevel.cpp>
 #include <MoveSelectionCommand.cpp>
@@ -63,6 +66,7 @@
 #include <SplitElementCommand.cpp>
 #include <SplitTextNodeCommand.cpp>
 #include <SplitTextNodeContainingElementCommand.cpp>
+#include <TextCheckingHelper.cpp>
 #include <TextIterator.cpp>
 #include <TypingCommand.cpp>
 #include <UnlinkCommand.cpp>

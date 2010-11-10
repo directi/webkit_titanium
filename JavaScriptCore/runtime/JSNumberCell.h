@@ -35,239 +35,57 @@ namespace JSC {
     extern const double NaN;
     extern const double Inf;
 
-#if USE(JSVALUE32)
-    JSValue jsNumberCell(ExecState*, double);
-
-    class Identifier;
-    class JSCell;
-    class JSObject;
-    class JSString;
-    class PropertySlot;
-
-    struct ClassInfo;
-    struct Instruction;
-
-    class JSNumberCell : public JSCell {
-        friend class JIT;
-        friend JSValue jsNumberCell(JSGlobalData*, double);
-        friend JSValue jsNumberCell(ExecState*, double);
-
-    public:
-        double value() const { return m_value; }
-
-        virtual JSValue toPrimitive(ExecState*, PreferredPrimitiveType) const;
-        virtual bool getPrimitiveNumber(ExecState*, double& number, JSValue& value);
-        virtual bool toBoolean(ExecState*) const;
-        virtual double toNumber(ExecState*) const;
-        virtual UString toString(ExecState*) const;
-        virtual JSObject* toObject(ExecState*) const;
-
-        virtual JSObject* toThisObject(ExecState*) const;
-        virtual JSValue getJSNumber();
-
-        void* operator new(size_t size, ExecState* exec)
-        {
-            return exec->heap()->allocateNumber(size);
-        }
-
-        void* operator new(size_t size, JSGlobalData* globalData)
-        {
-            return globalData->heap.allocateNumber(size);
-        }
-
-        static PassRefPtr<Structure> createStructure(JSValue proto) { return Structure::create(proto, TypeInfo(NumberType, OverridesGetOwnPropertySlot | NeedsThisConversion), AnonymousSlotCount); }
-
-    private:
-        JSNumberCell(JSGlobalData* globalData, double value)
-            : JSCell(globalData->numberStructure.get())
-            , m_value(value)
-        {
-        }
-
-        JSNumberCell(ExecState* exec, double value)
-            : JSCell(exec->globalData().numberStructure.get())
-            , m_value(value)
-        {
-        }
-
-        virtual bool getUInt32(uint32_t&) const;
-
-        double m_value;
-    };
-
-    JSValue jsNumberCell(JSGlobalData*, double);
-
-    inline bool isNumberCell(JSValue v)
-    {
-        return v.isCell() && v.asCell()->isNumber();
-    }
-
-    inline JSNumberCell* asNumberCell(JSValue v)
-    {
-        ASSERT(isNumberCell(v));
-        return static_cast<JSNumberCell*>(v.asCell());
-    }
-
-    ALWAYS_INLINE JSValue::JSValue(EncodeAsDoubleTag, ExecState* exec, double d)
-    {
-        *this = jsNumberCell(exec, d);
-    }
-
-    inline JSValue::JSValue(ExecState* exec, double d)
-    {
-        JSValue v = JSImmediate::from(d);
-        *this = v ? v : jsNumberCell(exec, d);
-    }
-
-    inline JSValue::JSValue(ExecState* exec, int i)
-    {
-        JSValue v = JSImmediate::from(i);
-        *this = v ? v : jsNumberCell(exec, i);
-    }
-
-    inline JSValue::JSValue(ExecState* exec, unsigned i)
-    {
-        JSValue v = JSImmediate::from(i);
-        *this = v ? v : jsNumberCell(exec, i);
-    }
-
-    inline JSValue::JSValue(ExecState* exec, long i)
-    {
-        JSValue v = JSImmediate::from(i);
-        *this = v ? v : jsNumberCell(exec, i);
-    }
-
-    inline JSValue::JSValue(ExecState* exec, unsigned long i)
-    {
-        JSValue v = JSImmediate::from(i);
-        *this = v ? v : jsNumberCell(exec, i);
-    }
-
-    inline JSValue::JSValue(ExecState* exec, long long i)
-    {
-        JSValue v = JSImmediate::from(i);
-        *this = v ? v : jsNumberCell(exec, static_cast<double>(i));
-    }
-
-    inline JSValue::JSValue(ExecState* exec, unsigned long long i)
-    {
-        JSValue v = JSImmediate::from(i);
-        *this = v ? v : jsNumberCell(exec, static_cast<double>(i));
-    }
-
-    inline JSValue::JSValue(JSGlobalData* globalData, double d)
-    {
-        JSValue v = JSImmediate::from(d);
-        *this = v ? v : jsNumberCell(globalData, d);
-    }
-
-    inline JSValue::JSValue(JSGlobalData* globalData, int i)
-    {
-        JSValue v = JSImmediate::from(i);
-        *this = v ? v : jsNumberCell(globalData, i);
-    }
-
-    inline JSValue::JSValue(JSGlobalData* globalData, unsigned i)
-    {
-        JSValue v = JSImmediate::from(i);
-        *this = v ? v : jsNumberCell(globalData, i);
-    }
-
-    inline bool JSValue::isDouble() const
-    {
-        return isNumberCell(asValue());
-    }
-
-    inline double JSValue::asDouble() const
-    {
-        return asNumberCell(asValue())->value();
-    }
-
-    inline bool JSValue::isNumber() const
-    {
-        return JSImmediate::isNumber(asValue()) || isDouble();
-    }
-
-    inline double JSValue::uncheckedGetNumber() const
-    {
-        ASSERT(isNumber());
-        return JSImmediate::isImmediate(asValue()) ? JSImmediate::toDouble(asValue()) : asDouble();
-    }
-
-#endif // USE(JSVALUE32)
-
 #if USE(JSVALUE64)
-    ALWAYS_INLINE JSValue::JSValue(EncodeAsDoubleTag, ExecState*, double d)
+    ALWAYS_INLINE JSValue::JSValue(EncodeAsDoubleTag, double d)
     {
         *this = JSImmediate::fromNumberOutsideIntegerRange(d);
     }
 
-    inline JSValue::JSValue(ExecState*, double d)
+    inline JSValue::JSValue(double d)
     {
         JSValue v = JSImmediate::from(d);
         ASSERT(v);
         *this = v;
     }
 
-    inline JSValue::JSValue(ExecState*, int i)
+    inline JSValue::JSValue(int i)
     {
         JSValue v = JSImmediate::from(i);
         ASSERT(v);
         *this = v;
     }
 
-    inline JSValue::JSValue(ExecState*, unsigned i)
+    inline JSValue::JSValue(unsigned i)
     {
         JSValue v = JSImmediate::from(i);
         ASSERT(v);
         *this = v;
     }
 
-    inline JSValue::JSValue(ExecState*, long i)
+    inline JSValue::JSValue(long i)
     {
         JSValue v = JSImmediate::from(i);
         ASSERT(v);
         *this = v;
     }
 
-    inline JSValue::JSValue(ExecState*, unsigned long i)
+    inline JSValue::JSValue(unsigned long i)
     {
         JSValue v = JSImmediate::from(i);
         ASSERT(v);
         *this = v;
     }
 
-    inline JSValue::JSValue(ExecState*, long long i)
+    inline JSValue::JSValue(long long i)
     {
         JSValue v = JSImmediate::from(static_cast<double>(i));
         ASSERT(v);
         *this = v;
     }
 
-    inline JSValue::JSValue(ExecState*, unsigned long long i)
+    inline JSValue::JSValue(unsigned long long i)
     {
         JSValue v = JSImmediate::from(static_cast<double>(i));
-        ASSERT(v);
-        *this = v;
-    }
-
-    inline JSValue::JSValue(JSGlobalData*, double d)
-    {
-        JSValue v = JSImmediate::from(d);
-        ASSERT(v);
-        *this = v;
-    }
-
-    inline JSValue::JSValue(JSGlobalData*, int i)
-    {
-        JSValue v = JSImmediate::from(i);
-        ASSERT(v);
-        *this = v;
-    }
-
-    inline JSValue::JSValue(JSGlobalData*, unsigned i)
-    {
-        JSValue v = JSImmediate::from(i);
         ASSERT(v);
         *this = v;
     }
@@ -295,47 +113,42 @@ namespace JSC {
 
 #endif // USE(JSVALUE64)
 
-#if USE(JSVALUE32) || USE(JSVALUE64)
+#if USE(JSVALUE64)
 
-    inline JSValue::JSValue(ExecState*, char i)
+    inline JSValue::JSValue(char i)
     {
         ASSERT(JSImmediate::from(i));
         *this = JSImmediate::from(i);
     }
 
-    inline JSValue::JSValue(ExecState*, unsigned char i)
+    inline JSValue::JSValue(unsigned char i)
     {
         ASSERT(JSImmediate::from(i));
         *this = JSImmediate::from(i);
     }
 
-    inline JSValue::JSValue(ExecState*, short i)
+    inline JSValue::JSValue(short i)
     {
         ASSERT(JSImmediate::from(i));
         *this = JSImmediate::from(i);
     }
 
-    inline JSValue::JSValue(ExecState*, unsigned short i)
+    inline JSValue::JSValue(unsigned short i)
     {
         ASSERT(JSImmediate::from(i));
         *this = JSImmediate::from(i);
     }
 
-    inline JSValue jsNaN(ExecState* exec)
+    inline JSValue jsNaN()
     {
-        return jsNumber(exec, NaN);
-    }
-
-    inline JSValue jsNaN(JSGlobalData* globalData)
-    {
-        return jsNumber(globalData, NaN);
+        return jsNumber(NaN);
     }
 
     // --- JSValue inlines ----------------------------
 
     ALWAYS_INLINE JSValue JSValue::toJSNumber(ExecState* exec) const
     {
-        return isNumber() ? asValue() : jsNumber(exec, this->toNumber(exec));
+        return isNumber() ? asValue() : jsNumber(this->toNumber(exec));
     }
 
     inline bool JSValue::getNumber(double &result) const
@@ -351,7 +164,7 @@ namespace JSC {
         return true;
     }
 
-#endif // USE(JSVALUE32) || USE(JSVALUE64)
+#endif // USE(JSVALUE64)
 
 } // namespace JSC
 

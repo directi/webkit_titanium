@@ -46,7 +46,7 @@
 #include <webkit/webkitsecurityorigin.h>
 
 #include "ArchiveResource.h"
-#include "BackForwardList.h"
+#include "BackForwardListImpl.h"
 #include "DataObjectGtk.h"
 #include "DragActions.h"
 #include "Frame.h"
@@ -92,7 +92,7 @@ namespace WebKit {
     WebCore::HistoryItem* core(WebKitWebHistoryItem*);
     WebKitWebHistoryItem* kit(PassRefPtr<WebCore::HistoryItem>);
 
-    WebCore::BackForwardList* core(WebKitWebBackForwardList*);
+    WebCore::BackForwardListImpl* core(WebKitWebBackForwardList*);
 
     WebKitWebNavigationReason kit(WebCore::NavigationType type);
     WebCore::NavigationType core(WebKitWebNavigationReason reason);
@@ -153,6 +153,13 @@ extern "C" {
 
         PlatformRefPtr<GtkAdjustment> horizontalAdjustment;
         PlatformRefPtr<GtkAdjustment> verticalAdjustment;
+
+#ifndef GTK_API_VERSION_2
+        // GtkScrollablePolicy needs to be checked when
+        // driving the scrollable adjustment values
+        GtkScrollablePolicy horizontalScrollingPolicy;
+        GtkScrollablePolicy verticalScrollingPolicy;
+#endif
 
         gboolean zoomFullContent;
         WebKitLoadStatus loadStatus;
@@ -271,6 +278,9 @@ extern "C" {
     void
     webkit_web_view_add_resource(WebKitWebView*, const char*, WebKitWebResource*);
 
+    void
+    webkit_web_view_remove_resource(WebKitWebView*, const char*);
+
     WebKitWebResource*
     webkit_web_view_get_resource(WebKitWebView*, char*);
 
@@ -376,9 +386,6 @@ extern "C" {
 
     WEBKIT_API gchar*
     webkit_web_view_get_selected_text (WebKitWebView* web_view);
-
-    WEBKIT_API void
-    webkit_web_view_set_group_name(WebKitWebView* web_view, const gchar* group_name);
 
     WEBKIT_API void
     webkit_web_settings_add_extra_plugin_directory (WebKitWebView *web_view, const gchar* directory);

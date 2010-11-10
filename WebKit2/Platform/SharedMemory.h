@@ -30,6 +30,14 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
+#if PLATFORM(QT)
+#include <QtGlobal>
+QT_BEGIN_NAMESPACE
+class QSharedMemory;
+QT_END_NAMESPACE
+#include <wtf/text/WTFString.h>
+#endif
+
 namespace CoreIPC {
     class ArgumentDecoder;
     class ArgumentEncoder;
@@ -58,6 +66,10 @@ public:
         friend class SharedMemory;
 #if PLATFORM(MAC)
         mutable mach_port_t m_port;
+#elif PLATFORM(WIN)
+        mutable HANDLE m_handle;
+#elif PLATFORM(QT)
+        mutable String m_key;
 #endif
         size_t m_size;
     };
@@ -81,6 +93,11 @@ public:
 private:
     size_t m_size;
     void* m_data;
+#if PLATFORM(WIN)
+    HANDLE m_handle;
+#elif PLATFORM(QT)
+    QSharedMemory* m_impl;
+#endif
 };
 
 };

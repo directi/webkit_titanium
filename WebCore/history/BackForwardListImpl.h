@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2006, 2010 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2009 Google, Inc. All rights reserved.
  *
@@ -30,21 +30,40 @@
 
 #include "BackForwardList.h"
 #include <wtf/HashSet.h>
+#include <wtf/Vector.h>
 
 namespace WebCore {
 
-class HistoryItem;
 class Page;
 
 typedef Vector<RefPtr<HistoryItem> > HistoryItemVector;
 typedef HashSet<RefPtr<HistoryItem> > HistoryItemHashSet;
 
+// FIXME: Change Chromium to use its own BackForwardList implementation
+// and not use BackForwardListImpl at all, then remove this
+// BackForwardListClient feature entirely and just don't use this
+// class on Chromium.
+#if PLATFORM(CHROMIUM)
+// In the Chromium port, the back/forward list is managed externally.
+// See BackForwardListChromium.cpp
+class BackForwardListClient {
+public:
+    virtual ~BackForwardListClient() { }
+    virtual void addItem(PassRefPtr<HistoryItem>) = 0;
+    virtual void goToItem(HistoryItem*) = 0;
+    virtual HistoryItem* itemAtIndex(int) = 0;
+    virtual int backListCount() = 0;
+    virtual int forwardListCount() = 0;
+    virtual void close() = 0;
+};
+#endif
+
+// FIXME: After renaming BackForwardList to BackForwardClient,
+// rename this to BackForwardList.
 class BackForwardListImpl : public BackForwardList {
 public: 
     static PassRefPtr<BackForwardListImpl> create(Page* page) { return adoptRef(new BackForwardListImpl(page)); }
-    ~BackForwardListImpl();
-
-    bool isBackForwardListImpl() const { return true; }
+    virtual ~BackForwardListImpl();
 
 #if PLATFORM(CHROMIUM)
     // Must be called before any other methods. 
@@ -53,15 +72,15 @@ public:
     
     Page* page() { return m_page; }
     
-    void addItem(PassRefPtr<HistoryItem>);
+    virtual void addItem(PassRefPtr<HistoryItem>);
     void goBack();
     void goForward();
-    void goToItem(HistoryItem*);
+    virtual void goToItem(HistoryItem*);
         
     HistoryItem* backItem();
     HistoryItem* currentItem();
     HistoryItem* forwardItem();
-    HistoryItem* itemAtIndex(int);
+    virtual HistoryItem* itemAtIndex(int);
 
     void backListWithLimit(int, HistoryItemVector&);
     void forwardListWithLimit(int, HistoryItemVector&);
@@ -70,23 +89,25 @@ public:
     void setCapacity(int);
     bool enabled();
     void setEnabled(bool);
-    int backListCount();
-    int forwardListCount();
+    virtual int backListCount();
+    virtual int forwardListCount();
     bool containsItem(HistoryItem*);
 
-    void close();
+    virtual void close();
     bool closed();
     
     void removeItem(HistoryItem*);
     HistoryItemVector& entries();
     
 #if ENABLE(WML)
-    void clearWMLPageHistory();
+    virtual void clearWMLPageHistory();
 #endif
 
 private:
     BackForwardListImpl(Page*);
-    
+
+    virtual bool isActive() { return enabled() && capacity(); }
+
     Page* m_page;
 #if PLATFORM(CHROMIUM) 
     BackForwardListClient* m_client;

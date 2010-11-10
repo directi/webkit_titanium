@@ -37,10 +37,20 @@
 #include <QtGui/qgraphicseffect.h>
 #include <QtGui/qgraphicsitem.h>
 #include <QtGui/qgraphicsscene.h>
+#include <QtGui/qgraphicsview.h>
+#include <QtGui/qgraphicswidget.h>
 #include <QtGui/qpainter.h>
 #include <QtGui/qpixmap.h>
 #include <QtGui/qpixmapcache.h>
 #include <QtGui/qstyleoption.h>
+
+#if ENABLE(TILED_BACKING_STORE)
+#include "TiledBackingStore.h"
+#include "TiledBackingStoreClient.h"
+
+// The minimum width/height for tiling. We use the same value as the Windows implementation.
+#define GRAPHICS_LAYER_TILING_THRESHOLD 2000
+#endif
 
 
 #define QT_DEBUG_RECACHE 0
@@ -111,7 +121,11 @@ public:
 };
 #endif // QT_NO_GRAPHICSEFFECT
 
-class GraphicsLayerQtImpl : public QGraphicsObject {
+class GraphicsLayerQtImpl : public QGraphicsObject
+#if ENABLE(TILED_BACKING_STORE)
+, public virtual TiledBackingStoreClient
+#endif
+{
     Q_OBJECT
 
 public:
@@ -181,6 +195,16 @@ public:
     // ChromeClientQt::scheduleCompositingLayerSync (meaning the sync will happen ASAP)
     void flushChanges(bool recursive = true, bool forceTransformUpdate = false);
 
+#if ENABLE(TILED_BACKING_STORE)
+    // reimplementations from TiledBackingStoreClient
+    virtual void tiledBackingStorePaintBegin();
+    virtual void tiledBackingStorePaint(GraphicsContext*, const IntRect&);
+    virtual void tiledBackingStorePaintEnd(const Vector<IntRect>& paintedArea);
+    virtual IntRect tiledBackingStoreContentsRect();
+    virtual IntRect tiledBackingStoreVisibleRect();
+    virtual Color tiledBackingStoreBackgroundColor() const;
+#endif
+
 public slots:
     // We need to notify the client (ie. the layer compositor) when the animation actually starts.
     void notifyAnimationStarted();
@@ -199,6 +223,7 @@ public:
     TransformationMatrix m_transformRelativeToRootLayer;
     bool m_transformAnimationRunning;
     bool m_opacityAnimationRunning;
+    bool m_blockNotifySyncRequired;
 #ifndef QT_NO_GRAPHICSEFFECT
     QWeakPointer<MaskEffectQt> m_maskEffect;
 #endif
@@ -229,6 +254,10 @@ public:
     ContentData m_currentContent;
 
     int m_changeMask;
+
+#if ENABLE(TILED_BACKING_STORE)
+    TiledBackingStore* m_tiledBackingStore;
+#endif
 
     QSizeF m_size;
     struct {
@@ -299,7 +328,11 @@ GraphicsLayerQtImpl::GraphicsLayerQtImpl(GraphicsLayerQt* newLayer)
     , m_layer(newLayer)
     , m_transformAnimationRunning(false)
     , m_opacityAnimationRunning(false)
+    , m_blockNotifySyncRequired(false)
     , m_changeMask(NoChanges)
+#if ENABLE(TILED_BACKING_STORE)
+    , m_tiledBackingStore(0)
+#endif
 #if ENABLE(3D_CANVAS)
     , m_gc3D(0)
 #endif
@@ -320,14 +353,16 @@ GraphicsLayerQtImpl::~GraphicsLayerQtImpl()
     // our items automatically.
     const QList<QGraphicsItem*> children = childItems();
     QList<QGraphicsItem*>::const_iterator cit;
-    for (cit = children.begin(); cit != children.end(); ++cit) {
+    for (cit = children.constBegin(); cit != children.constEnd(); ++cit) {
         if (QGraphicsItem* item = *cit) {
             if (scene())
                 scene()->removeItem(item);
             item->setParentItem(0);
         }
     }
-
+#if ENABLE(TILED_BACKING_STORE)
+    delete m_tiledBackingStore;
+#endif
 #ifndef QT_NO_ANIMATION
     // We do, however, own the animations.
     QList<QWeakPointer<QAbstractAnimation> >::iterator it;
@@ -348,6 +383,27 @@ QPixmap GraphicsLayerQtImpl::recache(const QRegion& regionToUpdate)
 {
     if (!m_layer->drawsContent() || m_size.isEmpty() || !m_size.isValid())
         return QPixmap();
+
+#if ENABLE(TILED_BACKING_STORE)
+    const bool requiresTiling = (m_state.drawsContent && m_currentContent.contentType == HTMLContentType) && (m_size.width() > GRAPHICS_LAYER_TILING_THRESHOLD || m_size.height() > GRAPHICS_LAYER_TILING_THRESHOLD);
+    if (requiresTiling && !m_tiledBackingStore) {
+        m_tiledBackingStore = new TiledBackingStore(this);
+        m_tiledBackingStore->setTileCreationDelay(0);
+        setFlag(ItemUsesExtendedStyleOption, true);
+    } else if (!requiresTiling && m_tiledBackingStore) {
+        delete m_tiledBackingStore;
+        m_tiledBackingStore = 0;
+        setFlag(ItemUsesExtendedStyleOption, false);
+    }
+
+    if (m_tiledBackingStore) {
+        m_tiledBackingStore->adjustVisibleRect();
+        const QVector<QRect> rects = regionToUpdate.rects();
+        for (int i = 0; i < rects.size(); ++i)
+           m_tiledBackingStore->invalidate(rects[i]);
+        return QPixmap();
+    }
+#endif
 
     QPixmap pixmap;
     QRegion region = regionToUpdate;
@@ -523,7 +579,7 @@ void GraphicsLayerQtImpl::updateTransform()
 
     const QList<QGraphicsItem*> children = childItems();
     QList<QGraphicsItem*>::const_iterator it;
-    for (it = children.begin(); it != children.end(); ++it)
+    for (it = children.constBegin(); it != children.constEnd(); ++it)
         if (GraphicsLayerQtImpl* layer= toGraphicsLayerQtImpl(*it))
             layer->updateTransform();
 }
@@ -559,8 +615,15 @@ QRectF GraphicsLayerQtImpl::boundingRect() const
 
 void GraphicsLayerQtImpl::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
+#if ENABLE(TILED_BACKING_STORE)
+    // FIXME: There's currently no Qt API to know if a new region of an item is exposed outside of the paint event.
+    // Suggested for Qt: http://bugreports.qt.nokia.com/browse/QTBUG-14877.
+    if (m_tiledBackingStore)
+        m_tiledBackingStore->adjustVisibleRect();
+#endif
+
     if (m_currentContent.backgroundColor.isValid())
-        painter->fillRect(option->rect, QColor(m_currentContent.backgroundColor));
+        painter->fillRect(option->exposedRect, QColor(m_currentContent.backgroundColor));
 
     switch (m_currentContent.contentType) {
     case HTMLContentType:
@@ -592,6 +655,8 @@ void GraphicsLayerQtImpl::paint(QPainter* painter, const QStyleOptionGraphicsIte
 
 void GraphicsLayerQtImpl::notifySyncRequired()
 {
+    m_blockNotifySyncRequired = false;
+
     if (m_layer->client())
         m_layer->client()->notifySyncRequired(m_layer);
 }
@@ -599,8 +664,14 @@ void GraphicsLayerQtImpl::notifySyncRequired()
 void GraphicsLayerQtImpl::notifyChange(ChangeMask changeMask)
 {
     m_changeMask |= changeMask;
+
+    if (m_blockNotifySyncRequired)
+        return;
+
     static QMetaMethod syncMethod = staticMetaObject.method(staticMetaObject.indexOfMethod("notifySyncRequired()"));
     syncMethod.invoke(this, Qt::QueuedConnection);
+
+    m_blockNotifySyncRequired = true;
 }
 
 void GraphicsLayerQtImpl::flushChanges(bool recursive, bool forceUpdateTransform)
@@ -610,13 +681,13 @@ void GraphicsLayerQtImpl::flushChanges(bool recursive, bool forceUpdateTransform
     if (!m_layer || m_changeMask == NoChanges)
         goto afterLayerChanges;
 
-    if (m_currentContent.contentType == HTMLContentType && (m_changeMask & ParentChange)) {
+    if (m_changeMask & ParentChange) {
         // The WebCore compositor manages item ownership. We have to make sure graphicsview doesn't
         // try to snatch that ownership.
         if (!m_layer->parent() && !parentItem())
             setParentItem(0);
         else if (m_layer && m_layer->parent() && m_layer->parent()->nativeLayer() != parentItem())
-            setParentItem(m_layer->parent()->nativeLayer());
+            setParentItem(m_layer->parent()->platformLayer());
     }
 
     if (m_changeMask & ChildrenChange) {
@@ -634,13 +705,13 @@ void GraphicsLayerQtImpl::flushChanges(bool recursive, bool forceUpdateTransform
         const QSet<QGraphicsItem*> childrenToRemove = currentChildren - newChildren;
 
         QSet<QGraphicsItem*>::const_iterator it;
-        for (it = childrenToAdd.begin(); it != childrenToAdd.end(); ++it) {
+        for (it = childrenToAdd.constBegin(); it != childrenToAdd.constEnd(); ++it) {
              if (QGraphicsItem* w = *it)
                 w->setParentItem(this);
         }
 
         QSet<QGraphicsItem*>::const_iterator rit;
-        for (rit = childrenToRemove.begin(); rit != childrenToRemove.end(); ++rit) {
+        for (rit = childrenToRemove.constBegin(); rit != childrenToRemove.constEnd(); ++rit) {
              if (GraphicsLayerQtImpl* w = toGraphicsLayerQtImpl(*rit))
                 w->setParentItem(0);
         }
@@ -680,7 +751,7 @@ void GraphicsLayerQtImpl::flushChanges(bool recursive, bool forceUpdateTransform
         if (scene())
             scene()->update();
 
-    if (m_changeMask & (ChildrenTransformChange | Preserves3DChange | TransformChange | AnchorPointChange | SizeChange | BackfaceVisibilityChange | PositionChange)) {
+    if (m_changeMask & (ChildrenTransformChange | Preserves3DChange | TransformChange | AnchorPointChange | SizeChange | BackfaceVisibilityChange | PositionChange | ParentChange)) {
         // Due to the differences between the way WebCore handles transforms and the way Qt handles transforms,
         // all these elements affect the transforms of all the descendants.
         forceUpdateTransform = true;
@@ -737,6 +808,11 @@ void GraphicsLayerQtImpl::flushChanges(bool recursive, bool forceUpdateTransform
         const QRect rect(m_layer->contentsRect());
         if (m_state.contentsRect != rect) {
             m_state.contentsRect = rect;
+            if (m_pendingContent.mediaLayer) {
+                QGraphicsWidget* widget = qobject_cast<QGraphicsWidget*>(m_pendingContent.mediaLayer.data());
+                if (widget)
+                    widget->setGeometry(rect);
+            }
             update();
         }
     }
@@ -804,13 +880,63 @@ afterLayerChanges:
         children.append(m_state.maskLayer->platformLayer());
 
     QList<QGraphicsItem*>::const_iterator it;
-    for (it = children.begin(); it != children.end(); ++it) {
+    for (it = children.constBegin(); it != children.constEnd(); ++it) {
         if (QGraphicsItem* item = *it) {
             if (GraphicsLayerQtImpl* layer = toGraphicsLayerQtImpl(item))
                 layer->flushChanges(true, forceUpdateTransform);
         }
     }
 }
+
+#if ENABLE(TILED_BACKING_STORE)
+/* \reimp (TiledBackingStoreClient.h)
+*/
+void GraphicsLayerQtImpl::tiledBackingStorePaintBegin()
+{
+}
+
+/* \reimp (TiledBackingStoreClient.h)
+*/
+void GraphicsLayerQtImpl::tiledBackingStorePaint(GraphicsContext* gc,  const IntRect& rect)
+{
+    m_layer->paintGraphicsLayerContents(*gc, rect);
+}
+
+/* \reimp (TiledBackingStoreClient.h)
+*/
+void GraphicsLayerQtImpl::tiledBackingStorePaintEnd(const Vector<IntRect>& paintedArea)
+{
+    for (int i = 0; i < paintedArea.size(); ++i)
+        update(QRectF(paintedArea[i]));
+}
+
+/* \reimp (TiledBackingStoreClient.h)
+*/
+IntRect GraphicsLayerQtImpl::tiledBackingStoreContentsRect()
+{
+    return m_layer->contentsRect();
+}
+
+/* \reimp (TiledBackingStoreClient.h)
+*/
+Color GraphicsLayerQtImpl::tiledBackingStoreBackgroundColor() const
+{
+    if (m_currentContent.contentType == PixmapContentType && !m_currentContent.pixmap.hasAlphaChannel())
+        return Color(0, 0, 0);
+    // We return a transparent color so that the tiles initialize with alpha.
+    return Color(0, 0, 0, 0);
+}
+
+IntRect GraphicsLayerQtImpl::tiledBackingStoreVisibleRect()
+{
+    const QGraphicsView* view = scene()->views().isEmpty() ? 0 : scene()->views().first();
+    if (!view)
+        return mapFromScene(scene()->sceneRect()).boundingRect().toAlignedRect();
+
+    // All we get is the viewport's visible region. We have to map it to the scene and then to item coordinates.
+    return mapFromScene(view->mapToScene(view->viewport()->visibleRegion().boundingRect()).boundingRect()).boundingRect().toAlignedRect();
+}
+#endif
 
 void GraphicsLayerQtImpl::notifyAnimationStarted()
 {
@@ -848,6 +974,20 @@ void GraphicsLayerQt::setNeedsDisplayInRect(const FloatRect& rect)
 {
     m_impl->m_pendingContent.regionToUpdate |= QRectF(rect).toAlignedRect();
     m_impl->notifyChange(GraphicsLayerQtImpl::DisplayChange);
+}
+
+void GraphicsLayerQt::setContentsNeedsDisplay()
+{
+    switch (m_impl->m_pendingContent.contentType) {
+    case GraphicsLayerQtImpl::MediaContentType:
+        if (!m_impl->m_pendingContent.mediaLayer)
+            return;
+        m_impl->m_pendingContent.mediaLayer.data()->update();
+        break;
+    default:
+        setNeedsDisplay();
+        break;
+    }
 }
 
 /* \reimp (GraphicsLayer.h)

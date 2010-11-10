@@ -90,7 +90,7 @@ void CachedFrameBase::restore()
         m_document->accessSVGExtensions()->unpauseAnimations();
 #endif
 
-    frame->animation()->resumeAnimations(m_document.get());
+    frame->animation()->resumeAnimationsForDocument(m_document.get());
     frame->eventHandler()->setMousePressNode(m_mousePressNode.get());
     m_document->resumeActiveDOMObjects();
 
@@ -115,6 +115,8 @@ void CachedFrameBase::restore()
     if (m_document->hasListenerType(Document::TOUCH_LISTENER))
         m_document->page()->chrome()->client()->needTouchEvents(true);
 #endif
+
+    m_document->documentDidBecomeActive();
 }
 
 CachedFrame::CachedFrame(Frame* frame)

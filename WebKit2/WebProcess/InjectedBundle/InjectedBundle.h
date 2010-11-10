@@ -51,6 +51,8 @@ typedef CFBundleRef PlatformBundle;
 typedef HMODULE PlatformBundle;
 #elif PLATFORM(QT)
 typedef QLibrary PlatformBundle;
+#elif PLATFORM(GTK)
+typedef void* PlatformBundle;
 #endif
 
 class ImmutableArray;
@@ -67,7 +69,7 @@ public:
     }
     ~InjectedBundle();
 
-    bool load();
+    bool load(APIObject* initializationUserData);
 
 #if ENABLE(WEB_PROCESS_SANDBOX)
     void setSandboxToken(const String& sandboxToken) { m_sandboxToken = sandboxToken; }
@@ -104,6 +106,8 @@ public:
     void didReceiveMessage(const String&, APIObject*);
 
     void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+
+    static void reportException(JSContextRef, JSValueRef exception);
 
 private:
     InjectedBundle(const String&);

@@ -30,6 +30,7 @@
 #include "ArgumentDecoder.h"
 #include "ArgumentEncoder.h"
 #include "Arguments.h"
+#include "BinarySemaphore.h"
 #include "MessageID.h"
 #include "WorkQueue.h"
 #include <wtf/HashMap.h>
@@ -57,7 +58,7 @@ enum SyncReplyMode {
     AutomaticReply,
     ManualReply
 };
-    
+
 class Connection : public ThreadSafeShared<Connection> {
 public:
     class MessageReceiver {
@@ -76,6 +77,10 @@ public:
     public:
         virtual void didClose(Connection*) = 0;
         virtual void didReceiveInvalidMessage(Connection*, MessageID) = 0;
+
+        // Called on the connection work queue when the connection is closed, before
+        // didCall is called on the client thread.
+        virtual void didCloseOnConnectionWorkQueue(WorkQueue*, Connection*) { }
     };
 
 #if PLATFORM(MAC)
@@ -101,9 +106,9 @@ public:
 
     static const unsigned long long NoTimeout = 10000000000ULL;
     // FIXME: This variant of send is deprecated, all clients should move to the overload that takes a message.
-    template<typename E, typename T, typename U> bool sendSync(E messageID, uint64_t destinationID, const T& arguments, const U& reply, double timeout);
+    template<typename E, typename T, typename U> bool sendSync(E messageID, uint64_t destinationID, const T& arguments, const U& reply, double timeout = NoTimeout);
 
-    template<typename T> bool sendSync(const T& message, const typename T::Reply& reply, uint64_t destinationID, double timeout);
+    template<typename T> bool sendSync(const T& message, const typename T::Reply& reply, uint64_t destinationID, double timeout = NoTimeout);
     
     template<typename E> PassOwnPtr<ArgumentDecoder> waitFor(E messageID, uint64_t destinationID, double timeout);
 
@@ -167,7 +172,8 @@ private:
     // Called on the listener thread.
     void dispatchConnectionDidClose();
     void dispatchMessages();
-    
+    void dispatchSyncMessage(MessageID, ArgumentDecoder*);
+                             
     Client* m_client;
     bool m_isServer;
     uint64_t m_syncRequestID;
@@ -224,13 +230,13 @@ private:
             return reply.release();
         }
     };
+    
+    BinarySemaphore m_waitForSyncReplySemaphore;
 
-
-    Mutex m_waitForSyncReplyMutex;
-    ThreadCondition m_waitForSyncReplyCondition;
-
-    // This is protected by the m_waitForSyncReply mutex.    
+    Mutex m_syncReplyStateMutex;
+    bool m_shouldWaitForSyncReplies;
     Vector<PendingSyncReply> m_pendingSyncReplies;
+    Vector<IncomingMessage> m_syncMessagesReceivedWhileWaitingForSyncReply;
 
 #if PLATFORM(MAC)
     // Called on the connection queue.

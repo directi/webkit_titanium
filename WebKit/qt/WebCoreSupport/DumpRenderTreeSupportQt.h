@@ -98,8 +98,10 @@ public:
 
     static QString markerTextForListItem(const QWebElement& listItem);
     static QVariantMap computedStyleIncludingVisitedInfo(const QWebElement& element);
+    static QString plainText(const QVariant& rng);
 
     static void dumpFrameLoader(bool b);
+    static void dumpUserGestureInFrameLoader(bool b);
     static void dumpResourceLoadCallbacks(bool b);
     static void dumpResourceResponseMIMETypes(bool b);
     static void dumpResourceLoadCallbacksPath(const QString& path);
@@ -131,6 +133,8 @@ public:
     static void addUserStyleSheet(QWebPage* page, const QString& sourceCode);
     static void simulateDesktopNotificationClick(const QString& title);
     static QString viewportAsText(QWebPage*, const QSize&);
+
+    static QVariantList nodesFromRect(const QWebElement& document, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping);
 };
 
 #endif

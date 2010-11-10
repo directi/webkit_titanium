@@ -35,6 +35,12 @@
 #include "SharedMemory.h"
 #include <wtf/Noncopyable.h>
 
+#if PLATFORM(MAC)
+#include <wtf/RetainPtr.h>
+
+typedef struct __WKCARemoteLayerClientRef *WKCARemoteLayerClientRef;
+#endif
+
 namespace CoreIPC {
     class DataReference;
 }
@@ -48,7 +54,7 @@ class PluginControllerProxy : PluginController {
     WTF_MAKE_NONCOPYABLE(PluginControllerProxy);
 
 public:
-    static PassOwnPtr<PluginControllerProxy> create(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent);
+    static PassOwnPtr<PluginControllerProxy> create(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled);
     ~PluginControllerProxy();
 
     uint64_t pluginInstanceID() const { return m_pluginInstanceID; }
@@ -59,9 +65,14 @@ public:
     void didReceivePluginControllerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
     CoreIPC::SyncReplyMode didReceiveSyncPluginControllerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
 
-private:
-    PluginControllerProxy(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent);
+#if PLATFORM(MAC)
+    uint32_t remoteLayerClientID() const;
+#endif
 
+private:
+    PluginControllerProxy(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled);
+
+    void startPaintTimer();
     void paint();
 
     // PluginController
@@ -76,7 +87,11 @@ private:
     virtual void setStatusbarText(const String&);
     virtual bool isAcceleratedCompositingEnabled();
     virtual void pluginProcessCrashed();
-
+    virtual String proxiesForURL(const String&);
+    virtual String cookiesForURL(const String&);
+    virtual void setCookiesForURL(const String& urlString, const String& cookieString);
+    virtual bool isPrivateBrowsingEnabled();
+    
     // Message handlers.
     void geometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect, const SharedMemory::Handle& backingStoreHandle);
     void didEvaluateJavaScript(uint64_t requestID, const String& requestURLString, const String& result);
@@ -88,17 +103,28 @@ private:
     void handleWheelEvent(const WebWheelEvent&, bool& handled);
     void handleMouseEnterEvent(const WebMouseEvent&, bool& handled);
     void handleMouseLeaveEvent(const WebMouseEvent&, bool& handled);
+    void handleKeyboardEvent(const WebKeyboardEvent&, bool& handled);
+    void paintEntirePlugin();
     void setFocus(bool);
+    void didUpdate();
+    void getPluginScriptableNPObject(uint64_t& pluginScriptableNPObjectID);
+
 #if PLATFORM(MAC)
     void windowFocusChanged(bool);
     void windowFrameChanged(const WebCore::IntRect&);
     void windowVisibilityChanged(bool);
 #endif
+    void privateBrowsingStateChanged(bool);
+
+    void platformInitialize();
+    void platformDestroy();
+    void platformGeometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect);
 
     WebProcessConnection* m_connection;
     uint64_t m_pluginInstanceID;
 
     String m_userAgent;
+    bool m_isPrivateBrowsingEnabled;
 
     RefPtr<Plugin> m_plugin;
 
@@ -112,8 +138,17 @@ private:
     // The paint timer, used for coalescing painting.
     RunLoop::Timer<PluginControllerProxy> m_paintTimer;
 
+    // Whether we're waiting for the plug-in proxy in the web process to draw the contents of its
+    // backing store into the web process backing store.
+    bool m_waitingForDidUpdate;
+
     // The backing store that this plug-in draws into.
     RefPtr<BackingStore> m_backingStore;
+
+#if PLATFORM(MAC)
+    // For CA plug-ins, this holds the information needed to export the layer hierarchy to the UI process.
+    RetainPtr<WKCARemoteLayerClientRef> m_remoteLayerClient;
+#endif
 };
 
 } // namespace WebKit

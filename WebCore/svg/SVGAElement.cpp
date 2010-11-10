@@ -27,7 +27,6 @@
 
 #include "Attr.h"
 #include "Attribute.h"
-#include "CSSHelper.h"
 #include "Document.h"
 #include "EventHandler.h"
 #include "EventNames.h"
@@ -35,6 +34,7 @@
 #include "FrameLoader.h"
 #include "FrameLoaderTypes.h"
 #include "HTMLAnchorElement.h"
+#include "HTMLParserIdioms.h"
 #include "KeyboardEvent.h"
 #include "MouseEvent.h"
 #include "PlatformMouseEvent.h"
@@ -71,7 +71,7 @@ String SVGAElement::title() const
 void SVGAElement::parseMappedAttribute(Attribute* attr)
 {
     if (attr->name() == SVGNames::targetAttr)
-        setTargetBaseValue(attr->value());
+        setSVGTargetBaseValue(attr->value());
     else {
         if (SVGURIReference::parseMappedAttribute(attr))
             return;
@@ -105,14 +105,14 @@ void SVGAElement::synchronizeProperty(const QualifiedName& attrName)
     SVGStyledTransformableElement::synchronizeProperty(attrName);
 
     if (attrName == anyQName()) {
-        synchronizeTarget();
+        synchronizeSVGTarget();
         synchronizeHref();
         synchronizeExternalResourcesRequired();
         return;
     }
 
     if (attrName == SVGNames::targetAttr)
-        synchronizeTarget();
+        synchronizeSVGTarget();
     else if (SVGURIReference::isKnownAttribute(attrName))
         synchronizeHref();
     else if (SVGExternalResourcesRequired::isKnownAttribute(attrName))
@@ -137,7 +137,7 @@ void SVGAElement::defaultEventHandler(Event* event)
         }
 
         if (isLinkClick(event)) {
-            String url = deprecatedParseURL(href());
+            String url = stripLeadingAndTrailingHTMLSpaces(href());
 
 #if ENABLE(SVG_ANIMATION)
             if (url[0] == '#') {

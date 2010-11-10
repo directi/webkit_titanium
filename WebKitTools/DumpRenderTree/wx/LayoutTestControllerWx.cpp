@@ -320,7 +320,7 @@ void LayoutTestController::setGeolocationPermission(bool allow)
     setGeolocationPermissionCommon(allow);
 }
 
-void LayoutTestController::setMockSpeechInputResult(JSStringRef result)
+void LayoutTestController::setMockSpeechInputResult(JSStringRef result, JSStringRef language)
 {
     // FIXME: Implement for speech input layout tests.
     // See https://bugs.webkit.org/show_bug.cgi?id=39485.
@@ -505,6 +505,12 @@ void LayoutTestController::abortModal()
 {
 }
 
+bool LayoutTestController::hasSpellingMarker(int, int)
+{
+    // FIXME: Implement
+    return false;
+}
+
 JSRetainPtr<JSStringRef> LayoutTestController::pageProperty(const char* propertyName, int pageNumber) const
 {
     // FIXME: Implement
@@ -522,4 +528,3 @@ JSRetainPtr<JSStringRef> LayoutTestController::pageSizeAndMarginsInPixels(int pa
     // FIXME: Implement
     return 0;
 }
-

@@ -38,6 +38,7 @@
 MainWindow::MainWindow()
     : m_page(new WebPage(this))
     , m_toolBar(0)
+    , urlEdit(0)
 {
     setAttribute(Qt::WA_DeleteOnClose);
     if (qgetenv("QTTESTBROWSER_USE_ARGB_VISUALS").toInt() == 1)
@@ -48,6 +49,9 @@ MainWindow::MainWindow()
 
 void MainWindow::buildUI()
 {
+#if defined(Q_OS_SYMBIAN)
+    delete urlEdit;
+#endif
     delete m_toolBar;
 
     m_toolBar = addToolBar("Navigation");
@@ -112,12 +116,13 @@ WebPage* MainWindow::page() const
 
 void MainWindow::setAddressUrl(const QUrl& url)
 {
-    urlEdit->setText(url.toString(QUrl::RemoveUserInfo));
+    setAddressUrl(url.toString(QUrl::RemoveUserInfo));
 }
 
 void MainWindow::setAddressUrl(const QString& url)
 {
-    urlEdit->setText(url);
+    if (!url.contains("about:"))
+        urlEdit->setText(url);
 }
 
 void MainWindow::addCompleterEntry(const QUrl& url)

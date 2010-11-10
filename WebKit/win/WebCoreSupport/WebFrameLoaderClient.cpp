@@ -59,6 +59,7 @@
 #include <WebCore/HTMLFrameElement.h>
 #include <WebCore/HTMLFrameOwnerElement.h>
 #include <WebCore/HTMLNames.h>
+#include <WebCore/HTMLParserIdioms.h>
 #include <WebCore/HTMLPlugInElement.h>
 #include <WebCore/HistoryItem.h>
 #include <WebCore/Page.h>
@@ -66,7 +67,6 @@
 #include <WebCore/PluginView.h>
 #include <WebCore/RenderPart.h>
 #include <WebCore/ResourceHandle.h>
-#include <WebCore/ScriptString.h>
 #pragma warning(pop)
 
 using namespace WebCore;
@@ -426,7 +426,7 @@ void WebFrameLoaderClient::dispatchDidFirstVisuallyNonEmptyLayout()
         frameLoadDelegatePrivate->didFirstVisuallyNonEmptyLayoutInFrame(webView, m_webFrame);
 }
 
-Frame* WebFrameLoaderClient::dispatchCreatePage()
+Frame* WebFrameLoaderClient::dispatchCreatePage(const NavigationAction&)
 {
     WebView* webView = m_webFrame->webView();
 
@@ -494,11 +494,17 @@ void WebFrameLoaderClient::committedLoad(DocumentLoader* loader, const char* dat
     if (!m_manualLoader)
         loader->commitData(data, length);
 
+    // If the document is a stand-alone media document, now is the right time to cancel the WebKit load.
+    // FIXME: This code should be shared across all ports. <http://webkit.org/b/48762>.
+    Frame* coreFrame = core(m_webFrame);
+    if (coreFrame->document()->isMediaDocument())
+        loader->cancelMainResourceLoad(pluginWillHandleLoadError(loader->response()));
+
     if (!m_manualLoader)
         return;
 
     if (!m_hasSentResponseToPlugin) {
-        m_manualLoader->didReceiveResponse(core(m_webFrame)->loader()->documentLoader()->response());
+        m_manualLoader->didReceiveResponse(loader->response());
         // didReceiveResponse sets up a new stream to the plug-in. on a full-page plug-in, a failure in
         // setting up this stream can cause the main document load to be cancelled, setting m_manualLoader
         // to null
@@ -514,10 +520,10 @@ void WebFrameLoaderClient::finishedLoading(DocumentLoader* loader)
     // Telling the frame we received some data and passing 0 as the data is our
     // way to get work done that is normally done when the first bit of data is
     // received, even for the case of a document with no data (like about:blank)
-    if (!m_manualLoader) {
-        committedLoad(loader, 0, 0);
+    committedLoad(loader, 0, 0);
+
+    if (!m_manualLoader)
         return;
-    }
 
     m_manualLoader->didFinishLoading();
     m_manualLoader = 0;
@@ -714,6 +720,10 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
     core(m_webFrame)->createView(IntRect(rect).size(), backgroundColor, transparent, IntSize(), false);
 }
 
+void WebFrameLoaderClient::dispatchDidBecomeFrameset(bool)
+{
+}
+
 bool WebFrameLoaderClient::canCachePage() const
 {
     return true;
@@ -730,6 +740,29 @@ PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const KURL& url, const Strin
 
 void WebFrameLoaderClient::didTransferChildFrameToNewDocument(Page*)
 {
+    Frame* coreFrame = core(m_webFrame);
+    ASSERT(coreFrame);
+    WebView* webView = kit(coreFrame->page());
+    if (m_webFrame->webView() != webView)
+        m_webFrame->setWebView(webView);
+}
+
+void WebFrameLoaderClient::transferLoadingResourceFromPage(unsigned long identifier, DocumentLoader* loader, const ResourceRequest& request, Page* oldPage)
+{
+    assignIdentifierToInitialRequest(identifier, loader, request);
+
+    WebView* oldWebView = kit(oldPage);
+    if (!oldWebView)
+        return;
+
+    COMPtr<IWebResourceLoadDelegate> oldResourceLoadDelegate;
+    if (FAILED(oldWebView->resourceLoadDelegate(&oldResourceLoadDelegate)))
+        return;
+
+    COMPtr<IWebResourceLoadDelegatePrivate2> oldResourceLoadDelegatePrivate2(Query, oldResourceLoadDelegate);
+    if (!oldResourceLoadDelegatePrivate2)
+        return;
+    oldResourceLoadDelegatePrivate2->removeIdentifierForRequest(oldWebView, identifier);
 }
 
 PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const KURL& URL, const String& name, HTMLFrameOwnerElement* ownerElement, const String& referrer)
@@ -741,8 +774,8 @@ PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const KURL& URL, const Strin
 
     RefPtr<Frame> childFrame = webFrame->init(m_webFrame->webView(), coreFrame->page(), ownerElement);
 
-    coreFrame->tree()->appendChild(childFrame);
     childFrame->tree()->setName(name);
+    coreFrame->tree()->appendChild(childFrame);
     childFrame->init();
 
     coreFrame->loader()->loadURLIntoChildFrame(URL, referrer, childFrame.get());
@@ -768,7 +801,7 @@ void WebFrameLoaderClient::dispatchDidFailToStartPlugin(const PluginView* plugin
     ASSERT(frame == pluginView->parentFrame());
 
     if (!pluginView->pluginsPage().isNull()) {
-        KURL pluginPageURL = frame->document()->completeURL(deprecatedParseURL(pluginView->pluginsPage()));
+        KURL pluginPageURL = frame->document()->completeURL(stripLeadingAndTrailingHTMLSpaces(pluginView->pluginsPage()));
         if (pluginPageURL.protocolInHTTPFamily()) {
             static CFStringRef key = MarshallingHelpers::LPCOLESTRToCFStringRef(WebKitErrorPlugInPageURLStringKey);
             RetainPtr<CFStringRef> str(AdoptCF, pluginPageURL.string().createCFString());

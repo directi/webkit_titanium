@@ -51,7 +51,8 @@ public:
     {
         return adoptRef(new WebPreferences(preferences));
     }
-    ~WebPreferences();
+
+    virtual ~WebPreferences();
 
     void addContext(WebContext*);
     void removeContext(WebContext*);
@@ -79,6 +80,9 @@ public:
     void setPluginsEnabled(bool);
     bool pluginsEnabled() const;
 
+    void setJavaEnabled(bool);
+    bool javaEnabled() const;
+
     void setFontSmoothingLevel(FontSmoothingLevel);
     FontSmoothingLevel fontSmoothingLevel() const;
 
@@ -99,6 +103,24 @@ public:
 
     void setFantasyFontFamily(const String&);
     const String& fantasyFontFamily() const;
+    
+    void setMinimumFontSize(uint32_t);
+    uint32_t minimumFontSize() const;
+
+    void setAcceleratedCompositingEnabled(bool);
+    bool acceleratedCompositingEnabled() const;
+
+    void setCompositingBordersVisible(bool);
+    bool compositingBordersVisible() const;
+
+    void setCompositingRepaintCountersVisible(bool);
+    bool compositingRepaintCountersVisible() const;
+
+    void setPrivateBrowsingEnabled(bool);
+    bool privateBrowsingEnabled() const;
+
+    void setDeveloperExtrasEnabled(bool);
+    bool developerExtrasEnabled() const;
 
 private:
     WebPreferences();

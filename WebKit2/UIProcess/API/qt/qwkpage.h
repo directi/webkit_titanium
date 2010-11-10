@@ -16,7 +16,8 @@ class QCursor;
 class QWKGraphicsWidget;
 class QWKPreferences;
 class QWKPagePrivate;
-class QtViewportConfigurationPrivate;
+class QtViewportAttributesPrivate;
+class QWKHistory;
 
 class QWEBKIT_EXPORT QWKPage : public QObject {
     Q_OBJECT
@@ -35,14 +36,14 @@ public:
         WebActionCount
     };
 
-    class ViewportConfiguration {
+    class ViewportAttributes {
     public:
-        ViewportConfiguration();
-        ViewportConfiguration(const QWKPage::ViewportConfiguration& other);
+        ViewportAttributes();
+        ViewportAttributes(const QWKPage::ViewportAttributes& other);
 
-        ~ViewportConfiguration();
+        ~ViewportAttributes();
 
-        QWKPage::ViewportConfiguration& operator=(const QWKPage::ViewportConfiguration& other);
+        QWKPage::ViewportAttributes& operator=(const QWKPage::ViewportAttributes& other);
 
         inline qreal initialScaleFactor() const { return m_initialScaleFactor; };
         inline qreal minimumScaleFactor() const { return m_minimumScaleFactor; };
@@ -53,7 +54,7 @@ public:
         inline QSize size() const { return m_size; };
 
     private:
-        QSharedDataPointer<QtViewportConfigurationPrivate> d;
+        QSharedDataPointer<QtViewportAttributesPrivate> d;
         qreal m_initialScaleFactor;
         qreal m_minimumScaleFactor;
         qreal m_maximumScaleFactor;
@@ -79,13 +80,23 @@ public:
     QString title() const;
 
     void setViewportSize(const QSize&);
-    ViewportConfiguration viewportConfigurationForSize(QSize availableSize) const;
+    ViewportAttributes viewportAttributesForSize(const QSize& availableSize) const;
 
     QAction* action(WebAction action) const;
     void triggerAction(WebAction action, bool checked = false);
 
     typedef QWKPage* (*CreateNewPageFn)(QWKPage*);
     void setCreateNewPageFunction(CreateNewPageFn function);
+
+    void setCustomUserAgent(const QString&);
+
+    qreal textZoomFactor() const;
+    qreal pageZoomFactor() const;
+    void setTextZoomFactor(qreal zoomFactor);
+    void setPageZoomFactor(qreal zoomFactor);
+    void setPageAndTextZoomFactors(qreal pageZoomFactor, qreal textZoomFactor);
+
+    QWKHistory* history() const;
 
 public:
     Q_SIGNAL void statusBarMessage(const QString&);
@@ -96,7 +107,9 @@ public:
     Q_SIGNAL void initialLayoutCompleted();
     Q_SIGNAL void urlChanged(const QUrl&);
     Q_SIGNAL void contentsSizeChanged(const QSize&);
+    Q_SIGNAL void scrollRequested(int dx, int dy);
     Q_SIGNAL void cursorChanged(const QCursor&);
+    Q_SIGNAL void viewportChangeRequested();
 
 protected:
     void timerEvent(QTimerEvent*);

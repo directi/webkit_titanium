@@ -29,12 +29,10 @@
 
 #include "ArgumentDecoder.h"
 #include "ArgumentEncoder.h"
-#include "Attachment.h"
+#include "MappedMemoryPool.h"
 #include "WebCoreArgumentCoders.h"
-#include <QDebug>
-#include <QDir>
+#include <QIODevice>
 #include <QImage>
-#include <QTemporaryFile>
 #include <WebCore/FloatRect.h>
 #include <wtf/text/WTFString.h>
 
@@ -43,46 +41,6 @@ using namespace std;
 
 namespace WebKit {
 
-static MappedMemory* mapMemory(size_t size)
-{
-    MappedMemoryPool* pool = MappedMemoryPool::instance();
-    for (unsigned n = 0; n < pool->size(); ++n) {
-        MappedMemory& current = pool->at(n);
-        if (current.size >= size && current.isFree()) {
-            current.markUsed();
-            return &current;
-        }
-    }
-    MappedMemory newMap;
-    newMap.size = size;
-    newMap.file = new QTemporaryFile(QDir::tempPath() + "/WebKit2UpdateChunk");
-    newMap.file->open(QIODevice::ReadWrite);
-    newMap.file->resize(newMap.size);
-    newMap.data = newMap.file->map(0, newMap.size);
-    newMap.file->close();
-    newMap.markUsed();
-    return &pool->append(newMap);
-}
-    
-static MappedMemory* mapFile(QString fileName, size_t size)
-{
-    MappedMemoryPool* pool = MappedMemoryPool::instance();
-    for (unsigned n = 0; n < pool->size(); ++n) {
-        MappedMemory& current = pool->at(n);
-        if (current.file->fileName() == fileName) {
-            ASSERT(!current.isFree());
-            return &current;
-        }
-    }
-    MappedMemory newMap;
-    newMap.file = new QFile(fileName);
-    if (!newMap.file->open(QIODevice::ReadWrite))
-        return 0;
-    newMap.data = newMap.file->map(0, size);
-    ASSERT(!newMap.isFree());
-    newMap.file->close();
-    return &pool->append(newMap);
-}
 
 UpdateChunk::UpdateChunk()
     : m_mappedMemory(0)
@@ -91,7 +49,7 @@ UpdateChunk::UpdateChunk()
 
 UpdateChunk::UpdateChunk(const IntRect& rect)
     : m_rect(rect)
-    , m_mappedMemory(mapMemory(size()))
+    , m_mappedMemory(MappedMemoryPool::instance()->mapMemory(size()))
 {
 }
 
@@ -101,40 +59,38 @@ UpdateChunk::~UpdateChunk()
         m_mappedMemory->markFree();
 }
 
-uint8_t* UpdateChunk::data()
-{
-    ASSERT(m_mappedMemory);
-    ASSERT(m_mappedMemory->data);
-    return reinterpret_cast<uint8_t*>(m_mappedMemory->data);
-}
-
 void UpdateChunk::encode(CoreIPC::ArgumentEncoder* encoder) const
 {
     encoder->encode(m_rect);
-    encoder->encode(String(m_mappedMemory->file->fileName()));
+    encoder->encode(String(m_mappedMemory->mappedFile()->fileName()));
 
     m_mappedMemory = 0;
 }
 
 bool UpdateChunk::decode(CoreIPC::ArgumentDecoder* decoder, UpdateChunk& chunk)
 {
+    ASSERT_ARG(chunk, chunk.isEmpty());
+
     IntRect rect;
     if (!decoder->decode(rect))
         return false;
     chunk.m_rect = rect;
-    
+
+    if (chunk.isEmpty())
+        return true; // Successfully decoded empty chunk.
+
     String fileName;
     if (!decoder->decode(fileName))
         return false;
 
-    chunk.m_mappedMemory = mapFile(fileName, chunk.size());
-
-    return chunk.m_mappedMemory->data;
+    chunk.m_mappedMemory = MappedMemoryPool::instance()->mapFile(fileName, chunk.size());
+    return true;
 }
 
-QImage UpdateChunk::createImage()
+QImage UpdateChunk::createImage() const
 {
-    return QImage(data(), m_rect.width(), m_rect.height(), QImage::Format_RGB32);
+    ASSERT(m_mappedMemory);
+    return QImage(m_mappedMemory->data(), m_rect.width(), m_rect.height(), m_rect.width() * 4, QImage::Format_RGB32);
 }
 
 } // namespace WebKit

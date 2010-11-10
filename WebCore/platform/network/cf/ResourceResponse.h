@@ -22,6 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
+
 #ifndef ResourceResponse_h
 #define ResourceResponse_h
 
@@ -70,10 +71,16 @@ private:
     friend class ResourceResponseBase;
 
     void platformLazyInit();
+    PassOwnPtr<CrossThreadResourceResponseData> doPlatformCopyData(PassOwnPtr<CrossThreadResourceResponseData> data) const { return data; }
+    void doPlatformAdopt(PassOwnPtr<CrossThreadResourceResponseData>) { }
+
     static bool platformCompare(const ResourceResponse& a, const ResourceResponse& b);
 
     RetainPtr<CFURLResponseRef> m_cfResponse;
     bool m_isUpToDate;
+};
+
+struct CrossThreadResourceResponseData : public CrossThreadResourceResponseDataBase {
 };
 
 } // namespace WebCore

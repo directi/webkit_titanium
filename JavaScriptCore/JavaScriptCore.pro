@@ -68,6 +68,8 @@ wince* {
 include(pcre/pcre.pri)
 include(wtf/wtf.pri)
 
+INSTALLDEPS += all
+
 SOURCES += \
     API/JSBase.cpp \
     API/JSCallbackConstructor.cpp \
@@ -197,6 +199,7 @@ SOURCES += \
     runtime/RopeImpl.cpp \
     runtime/ScopeChain.cpp \
     runtime/SmallStrings.cpp \
+    runtime/StrictEvalActivation.cpp \
     runtime/StringConstructor.cpp \
     runtime/StringObject.cpp \
     runtime/StringPrototype.cpp \

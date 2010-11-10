@@ -51,12 +51,13 @@ public:
     virtual void takeFocus(WebCore::FocusDirection);
 
     virtual void focusedNodeChanged(WebCore::Node*);
+    virtual void focusedFrameChanged(Frame*);
 
     // The Frame pointer provides the ChromeClient with context about which
     // Frame wants to create the new Page.  Also, the newly created window
     // should not be shown to the user until the ChromeClient of the newly
     // created Page has its show method called.
-    virtual WebCore::Page* createWindow(WebCore::Frame*, const WebCore::FrameLoadRequest&, const WebCore::WindowFeatures&);
+    virtual WebCore::Page* createWindow(WebCore::Frame*, const WebCore::FrameLoadRequest&, const WebCore::WindowFeatures&, const WebCore::NavigationAction&);
     virtual void show();
 
     virtual bool canRunModal();
@@ -123,6 +124,10 @@ public:
     // The chrome client would need to take some action such as evicting some
     // old caches.
     virtual void reachedMaxAppCacheSize(int64_t spaceNeeded) = 0;
+#endif
+
+#if ENABLE(CONTEXT_MENUS)
+    virtual void showContextMenu() { }
 #endif
 
 #if ENABLE(NOTIFICATIONS)

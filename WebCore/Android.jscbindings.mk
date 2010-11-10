@@ -83,6 +83,7 @@ LOCAL_SRC_FILES += \
 	bindings/js/JSDOMBinding.cpp \
 	bindings/js/JSDOMFormDataCustom.cpp \
 	bindings/js/JSDOMGlobalObject.cpp \
+	bindings/js/JSDOMSettableTokenList.cpp \
 	bindings/js/JSDOMTokenList.cpp \
 	bindings/js/JSDOMWindowBase.cpp \
 	bindings/js/JSDOMWindowCustom.cpp \
@@ -100,6 +101,7 @@ LOCAL_SRC_FILES += \
 	bindings/js/JSEventListener.cpp \
 	bindings/js/JSEventTarget.cpp \
 	bindings/js/JSExceptionBase.cpp \
+	bindings/js/JSFileReaderCustom.cpp \
 	bindings/js/JSGeolocationCustom.cpp \
 	bindings/js/JSHTMLAllCollectionCustom.cpp \
 	bindings/js/JSHTMLAppletElementCustom.cpp \
@@ -115,6 +117,7 @@ LOCAL_SRC_FILES += \
 	bindings/js/JSHTMLInputElementCustom.cpp \
 	bindings/js/JSHTMLObjectElementCustom.cpp \
 	bindings/js/JSHTMLOptionsCollectionCustom.cpp \
+	bindings/js/JSHTMLOutputElementCustom.cpp \
 	bindings/js/JSHTMLSelectElementCustom.cpp \
 	bindings/js/JSHistoryCustom.cpp \
 	bindings/js/JSIDBAnyCustom.cpp \
@@ -151,6 +154,8 @@ LOCAL_SRC_FILES += \
 	bindings/js/JSStyleSheetCustom.cpp \
 	bindings/js/JSStyleSheetListCustom.cpp \
 	bindings/js/JSTextCustom.cpp \
+	bindings/js/JSTouchCustom.cpp \
+	bindings/js/JSTouchListCustom.cpp \
 	bindings/js/JSTreeWalkerCustom.cpp \
 	bindings/js/JSWebKitCSSMatrixCustom.cpp \
 	bindings/js/JSWebKitPointCustom.cpp \
@@ -164,8 +169,7 @@ LOCAL_SRC_FILES += \
 	bindings/js/ScheduledAction.cpp \
 	bindings/js/ScriptArray.cpp \
 	bindings/js/ScriptCachedFrameData.cpp \
-	bindings/js/ScriptCallFrame.cpp \
-	bindings/js/ScriptCallStack.cpp \
+	bindings/js/ScriptCallStackFactory.cpp \
 	bindings/js/ScriptController.cpp \
 	bindings/js/ScriptEventListener.cpp \
 	bindings/js/ScriptFunctionCall.cpp \

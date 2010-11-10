@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # Copyright (C) 2010 Google Inc. All rights reserved.
+# Copyright (C) 2010 Gabor Rapcsanyi (rgabor@inf.u-szeged.hu), University of Szeged
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -50,6 +51,7 @@ import time
 import traceback
 
 import test_failures
+import test_results
 
 _log = logging.getLogger("webkitpy.layout_tests.layout_package."
                          "dump_render_tree_thread")
@@ -132,8 +134,8 @@ def _process_output(port, options, test_info, test_types, test_args,
             time.time() - start_diff_time)
 
     total_time_for_all_diffs = time.time() - start_diff_time
-    return TestResult(test_info.filename, failures, test_run_time,
-                      total_time_for_all_diffs, time_for_diffs)
+    return test_results.TestResult(test_info.filename, failures, test_run_time,
+                                   total_time_for_all_diffs, time_for_diffs)
 
 
 def _pad_timeout(timeout):
@@ -151,16 +153,11 @@ def _milliseconds_to_seconds(msecs):
     return float(msecs) / 1000.0
 
 
-class TestResult(object):
-
-    def __init__(self, filename, failures, test_run_time,
-                 total_time_for_all_diffs, time_for_diffs):
-        self.failures = failures
-        self.filename = filename
-        self.test_run_time = test_run_time
-        self.time_for_diffs = time_for_diffs
-        self.total_time_for_all_diffs = total_time_for_all_diffs
-        self.type = test_failures.determine_result_type(failures)
+def _image_hash(test_info, test_args, options):
+    """Returns the image hash of the test if it's needed, otherwise None."""
+    if (test_args.new_baseline or test_args.reset_results or not options.pixel_tests):
+        return None
+    return test_info.image_hash()
 
 
 class SingleTestThread(threading.Thread):
@@ -195,10 +192,11 @@ class SingleTestThread(threading.Thread):
         self._driver = self._port.create_driver(self._test_args.png_path,
                                                 self._options)
         self._driver.start()
+        image_hash = _image_hash(test_info, self._test_args, self._options)
         start = time.time()
         crash, timeout, actual_checksum, output, error = \
             self._driver.run_test(test_info.uri.strip(), test_info.timeout,
-                                  test_info.image_hash())
+                                  image_hash)
         end = time.time()
         self._test_result = _process_output(self._port, self._options,
             test_info, self._test_types, self._test_args,
@@ -255,8 +253,8 @@ class TestShellThread(WatchableThread):
           options: command line options argument from optparse
           filename_list_queue: A thread safe Queue class that contains lists
               of tuples of (filename, uri) pairs.
-          result_queue: A thread safe Queue class that will contain tuples of
-              (test, failure lists) for the test results.
+          result_queue: A thread safe Queue class that will contain
+              serialized TestResult objects.
           test_types: A list of TestType objects to run the test output
               against.
           test_args: A TestArguments object to pass to each TestType.
@@ -271,23 +269,26 @@ class TestShellThread(WatchableThread):
         self._test_types = test_types
         self._test_args = test_args
         self._driver = None
-        self._directory_timing_stats = {}
+        self._test_group_timing_stats = {}
         self._test_results = []
         self._num_tests = 0
         self._start_time = 0
         self._stop_time = 0
+        self._have_http_lock = False
+        self._http_lock_wait_begin = 0
+        self._http_lock_wait_end = 0
 
-        # Current directory of tests we're running.
-        self._current_dir = None
-        # Number of tests in self._current_dir.
-        self._num_tests_in_current_dir = None
-        # Time at which we started running tests from self._current_dir.
-        self._current_dir_start_time = None
+        # Current group of tests we're running.
+        self._current_group = None
+        # Number of tests in self._current_group.
+        self._num_tests_in_current_group = None
+        # Time at which we started running tests from self._current_group.
+        self._current_group_start_time = None
 
-    def get_directory_timing_stats(self):
-        """Returns a dictionary mapping test directory to a tuple of
-        (number of tests in that directory, time to run the tests)"""
-        return self._directory_timing_stats
+    def get_test_group_timing_stats(self):
+        """Returns a dictionary mapping test group to a tuple of
+        (number of tests in that group, time to run the tests)"""
+        return self._test_group_timing_stats
 
     def get_test_results(self):
         """Return the list of all tests run on this thread.
@@ -298,7 +299,8 @@ class TestShellThread(WatchableThread):
         return self._test_results
 
     def get_total_time(self):
-        return max(self._stop_time - self._start_time, 0.0)
+        return max(self._stop_time - self._start_time -
+                   self._http_lock_wait_time(), 0.0)
 
     def get_num_tests(self):
         return self._num_tests
@@ -337,6 +339,25 @@ class TestShellThread(WatchableThread):
         do multi-threaded debugging."""
         self._run(test_runner, result_summary)
 
+    def cancel(self):
+        """Clean up http lock and set a flag telling this thread to quit."""
+        self._stop_servers_with_lock()
+        WatchableThread.cancel(self)
+
+    def next_timeout(self):
+        """Return the time the test is supposed to finish by."""
+        if self._next_timeout:
+            return self._next_timeout + self._http_lock_wait_time()
+        return self._next_timeout
+
+    def _http_lock_wait_time(self):
+        """Return the time what http locking takes."""
+        if self._http_lock_wait_begin == 0:
+            return 0
+        if self._http_lock_wait_end == 0:
+            return time.time() - self._http_lock_wait_begin
+        return self._http_lock_wait_end - self._http_lock_wait_begin
+
     def _run(self, test_runner, result_summary):
         """Main work entry point of the thread. Basically we pull urls from the
         filename queue and run the tests until we run out of urls.
@@ -359,21 +380,27 @@ class TestShellThread(WatchableThread):
                 return
 
             if len(self._filename_list) is 0:
-                if self._current_dir is not None:
-                    self._directory_timing_stats[self._current_dir] = \
-                        (self._num_tests_in_current_dir,
-                         time.time() - self._current_dir_start_time)
+                if self._current_group is not None:
+                    self._test_group_timing_stats[self._current_group] = \
+                        (self._num_tests_in_current_group,
+                         time.time() - self._current_group_start_time)
 
                 try:
-                    self._current_dir, self._filename_list = \
+                    self._current_group, self._filename_list = \
                         self._filename_list_queue.get_nowait()
                 except Queue.Empty:
+                    self._stop_servers_with_lock()
                     self._kill_dump_render_tree()
                     tests_run_file.close()
                     return
 
-                self._num_tests_in_current_dir = len(self._filename_list)
-                self._current_dir_start_time = time.time()
+                if self._current_group == "tests_to_http_lock":
+                    self._start_servers_with_lock()
+                elif self._have_http_lock:
+                    self._stop_servers_with_lock()
+
+                self._num_tests_in_current_group = len(self._filename_list)
+                self._current_group_start_time = time.time()
 
             test_info = self._filename_list.pop()
 
@@ -403,9 +430,9 @@ class TestShellThread(WatchableThread):
             else:
                 _log.debug("%s %s passed" % (self.getName(),
                            self._port.relative_test_filename(filename)))
-            self._result_queue.put(result)
+            self._result_queue.put(result.dumps())
 
-            if batch_size > 0 and batch_count > batch_size:
+            if batch_size > 0 and batch_count >= batch_size:
                 # Bounce the shell and reset count.
                 self._kill_dump_render_tree()
                 batch_count = 0
@@ -459,9 +486,8 @@ class TestShellThread(WatchableThread):
             failures = []
             _log.error('Cannot get results of test: %s' %
                        test_info.filename)
-            result = TestResult(test_info.filename, failures=[],
-                                test_run_time=0, total_time_for_all_diffs=0,
-                                time_for_diffs=0)
+            result = test_results.TestResult(test_info.filename, failures=[],
+                test_run_time=0, total_time_for_all_diffs=0, time_for_diffs=0)
 
         return result
 
@@ -471,20 +497,14 @@ class TestShellThread(WatchableThread):
         Args:
           test_info: Object containing the test filename, uri and timeout
 
-        Returns:
-          A list of TestFailure objects describing the error.
-
+        Returns: a TestResult object.
         """
         self._ensure_dump_render_tree_is_running()
         # The pixel_hash is used to avoid doing an image dump if the
         # checksums match, so it should be set to a blank value if we
         # are generating a new baseline.  (Otherwise, an image from a
         # previous run will be copied into the baseline.)
-        image_hash = test_info.image_hash()
-        if (image_hash and
-            (self._test_args.new_baseline or self._test_args.reset_results or
-            not self._options.pixel_tests)):
-            image_hash = ""
+        image_hash = _image_hash(test_info, self._test_args, self._options)
         start = time.time()
 
         thread_timeout = _milliseconds_to_seconds(
@@ -516,6 +536,29 @@ class TestShellThread(WatchableThread):
             self._driver = self._port.create_driver(self._test_args.png_path,
                                                     self._options)
             self._driver.start()
+
+    def _start_servers_with_lock(self):
+        """Acquire http lock and start the servers."""
+        self._http_lock_wait_begin = time.time()
+        _log.debug('Acquire http lock ...')
+        self._port.acquire_http_lock()
+        _log.debug('Starting HTTP server ...')
+        self._port.start_http_server()
+        _log.debug('Starting WebSocket server ...')
+        self._port.start_websocket_server()
+        self._http_lock_wait_end = time.time()
+        self._have_http_lock = True
+
+    def _stop_servers_with_lock(self):
+        """Stop the servers and release http lock."""
+        if self._have_http_lock:
+            _log.debug('Stopping HTTP server ...')
+            self._port.stop_http_server()
+            _log.debug('Stopping WebSocket server ...')
+            self._port.stop_websocket_server()
+            _log.debug('Release http lock ...')
+            self._port.release_http_lock()
+            self._have_http_lock = False
 
     def _kill_dump_render_tree(self):
         """Kill the DumpRenderTree process if it's running."""

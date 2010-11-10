@@ -55,7 +55,7 @@ public:
     {
         return adoptRef(new WebFrameProxy(page, frameID));
     }
-    ~WebFrameProxy();
+    virtual ~WebFrameProxy();
 
     enum LoadState {
         LoadStateProvisional,
@@ -69,18 +69,32 @@ public:
     void disconnect();
 
     bool isMainFrame() const;
+
+    void setIsFrameSet(bool value) { m_isFrameSet = value; }
+    bool isFrameSet() const { return m_isFrameSet; }
+
     LoadState loadState() const { return m_loadState; }
 
     const String& url() const { return m_url; }
     const String& provisionalURL() const { return m_provisionalURL; }
 
+    void setUnreachableURL(const String& unreachableURL) { m_unreachableURL = unreachableURL; }
+    const String& unreachableURL() const { return m_unreachableURL; }
+
+    void setMIMEType(const String& mimeType) { m_MIMEType = mimeType; }
+    const String& mimeType() const { return m_MIMEType; }
+
     void setCertificateInfo(PassRefPtr<WebCertificateInfo>);
     WebCertificateInfo* certificateInfo() const { return m_certificateInfo.get(); }
 
+    bool canProvideSource() const;
+
     void didStartProvisionalLoad(const String& url);
     void didReceiveServerRedirectForProvisionalLoad(const String& url);
+    void didFailProvisionalLoad();
     void didCommitLoad();
     void didFinishLoad();
+    void didFailLoad();
     void didReceiveTitle(const String&);
 
     void receivedPolicyDecision(WebCore::PolicyAction, uint64_t listenerID);
@@ -96,6 +110,9 @@ private:
     LoadState m_loadState;
     String m_url;
     String m_provisionalURL;
+    String m_unreachableURL;
+    String m_MIMEType;
+    bool m_isFrameSet;
     RefPtr<WebCertificateInfo> m_certificateInfo;
     RefPtr<WebFrameListenerProxy> m_activeListener;
     uint64_t m_frameID;

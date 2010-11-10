@@ -27,6 +27,7 @@
 
 #include "PluginProcessConnection.h"
 
+#include "NPRemoteObjectMap.h"
 #include "PluginProcessConnectionManager.h"
 #include "PluginProxy.h"
 #include "WebProcess.h"
@@ -38,11 +39,15 @@ PluginProcessConnection::PluginProcessConnection(PluginProcessConnectionManager*
     , m_pluginPath(pluginPath)
 {
     m_connection = CoreIPC::Connection::createClientConnection(connectionIdentifier, this, WebProcess::shared().runLoop());
+    m_npRemoteObjectMap = NPRemoteObjectMap::create(m_connection.get());
+
     m_connection->open();
 }
 
 PluginProcessConnection::~PluginProcessConnection()
 {
+    ASSERT(!m_connection);
+    ASSERT(!m_npRemoteObjectMap);
 }
 
 void PluginProcessConnection::addPluginProxy(PluginProxy* plugin)
@@ -59,10 +64,14 @@ void PluginProcessConnection::removePluginProxy(PluginProxy* plugin)
     if (!m_plugins.isEmpty())
         return;
 
+    // Invalidate our remote object map.
+    m_npRemoteObjectMap->invalidate();
+    m_npRemoteObjectMap = 0;
+    
     // We have no more plug-ins, invalidate the connection to the plug-in process.
     ASSERT(m_connection);
     m_connection->invalidate();
-    m_connection = 0;
+    m_connection = nullptr;
 
     // This will cause us to be deleted.
     m_pluginProcessConnectionManager->removePluginProcessConnection(this);
@@ -70,8 +79,25 @@ void PluginProcessConnection::removePluginProxy(PluginProxy* plugin)
 
 void PluginProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
 {
-    PluginProxy* pluginProxy = m_plugins.get(arguments->destinationID());
-    pluginProxy->didReceivePluginProxyMessage(connection, messageID, arguments);
+    if (arguments->destinationID()) {
+        if (PluginProxy* pluginProxy = m_plugins.get(arguments->destinationID()))
+            pluginProxy->didReceivePluginProxyMessage(connection, messageID, arguments);
+        return;
+    }
+
+    ASSERT_NOT_REACHED();
+}
+
+CoreIPC::SyncReplyMode PluginProcessConnection::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, CoreIPC::ArgumentEncoder* reply)
+{
+    if (messageID.is<CoreIPC::MessageClassNPObjectMessageReceiver>())
+        return m_npRemoteObjectMap->didReceiveSyncMessage(connection, messageID, arguments, reply);
+
+    if (PluginProxy* pluginProxy = m_plugins.get(arguments->destinationID()))
+        return pluginProxy->didReceiveSyncPluginProxyMessage(connection, messageID, arguments, reply);
+
+    ASSERT_NOT_REACHED();
+    return CoreIPC::AutomaticReply;
 }
 
 void PluginProcessConnection::didClose(CoreIPC::Connection*)
@@ -82,7 +108,6 @@ void PluginProcessConnection::didClose(CoreIPC::Connection*)
 
         pluginProxy->pluginProcessCrashed();
     }
-    
 }
 
 void PluginProcessConnection::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID)

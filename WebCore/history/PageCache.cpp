@@ -27,10 +27,12 @@
 #include "PageCache.h"
 
 #include "ApplicationCacheHost.h"
-#include "BackForwardList.h"
-#include "Cache.h"
+#include "BackForwardController.h"
+#include "MemoryCache.h"
 #include "CachedPage.h"
 #include "DOMWindow.h"
+#include "DeviceMotionController.h"
+#include "DeviceOrientationController.h"
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "Frame.h"
@@ -45,6 +47,7 @@
 #include "SystemTime.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/StringConcatenate.h>
 
 using namespace std;
 
@@ -74,7 +77,7 @@ static void pageCacheLog(const String& prefix, const String& message)
     LOG(PageCache, "%s%s", prefix.utf8().data(), message.utf8().data());
 }
     
-#define PCLOG(...) pageCacheLog(pageCacheLogPrefix(indentLevel), String::format(__VA_ARGS__))
+#define PCLOG(...) pageCacheLog(pageCacheLogPrefix(indentLevel), makeString(__VA_ARGS__))
     
 static bool logCanCacheFrameDecision(Frame* frame, int indentLevel)
 {
@@ -88,9 +91,9 @@ static bool logCanCacheFrameDecision(Frame* frame, int indentLevel)
     PCLOG("+---");
     KURL newURL = frame->loader()->provisionalDocumentLoader() ? frame->loader()->provisionalDocumentLoader()->url() : KURL();
     if (!newURL.isEmpty())
-        PCLOG(" Determining if frame can be cached navigating from (%s) to (%s):", currentURL.string().utf8().data(), newURL.string().utf8().data());
+        PCLOG(" Determining if frame can be cached navigating from (", currentURL.string(), ") to (", newURL.string(), "):");
     else
-        PCLOG(" Determining if subframe with URL (%s) can be cached:", currentURL.string().utf8().data());
+        PCLOG(" Determining if subframe with URL (", currentURL.string(), ") can be cached:");
     
     bool cannotCache = false;
     
@@ -189,18 +192,24 @@ static void logCanCachePageDecision(Page* page)
     bool cannotCache = !logCanCacheFrameDecision(page->mainFrame(), 1);
     
     FrameLoadType loadType = page->mainFrame()->loader()->loadType();
-    if (!page->backForwardList()->enabled()) {
-        PCLOG("   -The back/forward list is disabled");
-        cannotCache = true;
-    }
-    if (!(page->backForwardList()->capacity() > 0)) {
-        PCLOG("   -The back/forward list has a 0 capacity");
+    if (!page->backForward()->isActive()) {
+        PCLOG("   -The back/forward list is disabled or has 0 capacity");
         cannotCache = true;
     }
     if (!page->settings()->usesPageCache()) {
         PCLOG("   -Page settings says b/f cache disabled");
         cannotCache = true;
     }
+#if ENABLE(DEVICE_ORIENTATION)
+    if (page->deviceMotionController() && page->deviceMotionController()->isActive()) {
+        PCLOG("   -Page is using DeviceMotion");
+        cannotCache = true;
+    }
+    if (page->deviceOrientationController() && page->deviceOrientationController()->isActive()) {
+        PCLOG("   -Page is using DeviceOrientation");
+        cannotCache = true;
+    }
+#endif
     if (loadType == FrameLoadTypeReload) {
         PCLOG("   -Load type is: Reload");
         cannotCache = true;
@@ -294,10 +303,13 @@ bool PageCache::canCache(Page* page)
     FrameLoadType loadType = page->mainFrame()->loader()->loadType();
     
     return canCachePageContainingThisFrame(page->mainFrame())
-        && page->backForwardList()->enabled()
-        && page->backForwardList()->capacity() > 0
+        && page->backForward()->isActive()
         && page->settings()->usesPageCache()
-        && loadType != FrameLoadTypeReload 
+#if ENABLE(DEVICE_ORIENTATION)
+        && !(page->deviceMotionController() && page->deviceMotionController()->isActive())
+        && !(page->deviceOrientationController() && page->deviceOrientationController()->isActive())
+#endif
+        && loadType != FrameLoadTypeReload
         && loadType != FrameLoadTypeReloadFromOrigin
         && loadType != FrameLoadTypeSame;
 }

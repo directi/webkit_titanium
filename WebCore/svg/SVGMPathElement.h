@@ -21,8 +21,9 @@
 #define SVGMPathElement_h
 
 #if ENABLE(SVG)
-#include "SVGURIReference.h"
+#include "SVGAnimatedPropertyMacros.h"
 #include "SVGExternalResourcesRequired.h"
+#include "SVGURIReference.h"
 
 namespace WebCore {
     
@@ -43,10 +44,10 @@ namespace WebCore {
         virtual void synchronizeProperty(const QualifiedName&);
         
         // SVGURIReference
-        DECLARE_ANIMATED_PROPERTY(SVGMPathElement, XLinkNames::hrefAttr, String, Href, href)
+        DECLARE_ANIMATED_STATIC_PROPERTY_NEW(SVGMPathElement, XLinkNames::hrefAttr, String, Href, href)
 
         // SVGExternalResourcesRequired
-        DECLARE_ANIMATED_PROPERTY(SVGMPathElement, SVGNames::externalResourcesRequiredAttr, bool, ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_STATIC_PROPERTY_NEW(SVGMPathElement, SVGNames::externalResourcesRequiredAttr, bool, ExternalResourcesRequired, externalResourcesRequired)
     };
 
 } // namespace WebCore

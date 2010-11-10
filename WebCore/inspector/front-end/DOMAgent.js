@@ -60,6 +60,8 @@ WebInspector.DOMNode = function(doc, payload) {
     this.style = null;
     this._matchedCSSRules = [];
 
+    this.breakpoints = {};
+
     if (this.nodeType === Node.ELEMENT_NODE) {
         // HTML and BODY from internal iframes should not overwrite top-level ones.
         if (!this.ownerDocument.documentElement && this.nodeName === "HTML")
@@ -147,28 +149,6 @@ WebInspector.DOMNode.prototype = {
         }
         path.reverse();
         return path.join(",");
-    },
-
-    setBreakpoint: function(type)
-    {
-        return WebInspector.domBreakpointManager.setBreakpoint(this.id, type, true, this.path());
-    },
-
-    hasBreakpoint: function(type)
-    {
-        return !!WebInspector.domBreakpointManager.findBreakpoint(this.id, type);
-    },
-
-    removeBreakpoint: function(type)
-    {
-        var breakpoint = WebInspector.domBreakpointManager.findBreakpoint(this.id, type);
-        if (breakpoint)
-            breakpoint.remove();
-    },
-
-    removeBreakpoints: function()
-    {
-        WebInspector.domBreakpointManager.removeBreakpointsForNode(this.id);
     },
 
     _setAttributesPayload: function(attrs)
@@ -399,7 +379,7 @@ WebInspector.DOMAgent.prototype = {
             this.document = new WebInspector.DOMDocument(this, this._window, payload);
             this._idToDOMNode[payload.id] = this.document;
             this._bindNodes(this.document.children);
-            WebInspector.domBreakpointManager.restoreBreakpoints();
+            WebInspector.breakpointManager.restoreDOMBreakpoints();
         } else
             this.document = null;
         WebInspector.panels.elements.setDocument(this.document);
@@ -461,12 +441,13 @@ WebInspector.DOMAgent.prototype = {
 
     _removeBreakpoints: function(node)
     {
-        node.removeBreakpoints();
+        for (var type in node.breakpoints)
+            node.breakpoints[type].remove();
         if (!node.children)
             return;
         for (var i = 0; i < node.children.length; ++i)
             this._removeBreakpoints(node.children[i]);
-     }
+    }
 }
 
 WebInspector.ApplicationCache = {}
@@ -519,17 +500,12 @@ WebInspector.Cookies.buildCookiesFromString = function(rawCookieString)
 
 WebInspector.Cookies.cookieMatchesResourceURL = function(cookie, resourceURL)
 {
-    var match = resourceURL.match(WebInspector.GenericURLRegExp);
-    if (!match)
+    var url = resourceURL.asParsedURL();
+    if (!url || !this.cookieDomainMatchesResourceDomain(cookie.domain, url.host))
         return false;
-    // See WebInspector.URLRegExp for definitions of the group index constants.
-    if (!this.cookieDomainMatchesResourceDomain(cookie.domain, match[2]))
-        return false;
-    var resourcePort = match[3] ? match[3] : undefined;
-    var resourcePath = match[4] ? match[4] : '/';
-    return (resourcePath.indexOf(cookie.path) === 0
-        && (!cookie.port || resourcePort == cookie.port)
-        && (!cookie.secure || match[1].toLowerCase() === 'https'));
+    return (url.path.indexOf(cookie.path) === 0
+        && (!cookie.port || url.port == cookie.port)
+        && (!cookie.secure || url.scheme === "https"));
 }
 
 WebInspector.Cookies.cookieDomainMatchesResourceDomain = function(cookieDomain, resourceDomain)
@@ -550,90 +526,78 @@ WebInspector.EventListeners.getEventListenersForNodeAsync = function(node, callb
 
 WebInspector.CSSStyleDeclaration = function(payload)
 {
-    this.id = payload.id;
-    this.parentStyleSheetId = payload.parentStyleSheetId;
-    this.width = payload.width;
-    this.height = payload.height;
-    this.__disabledProperties = {};
-    this.__disabledPropertyValues = {};
-    this.__disabledPropertyPriorities = {};
-    if (payload.disabled) {
-        for (var i = 0; i < payload.disabled.length; ++i) {
-            var property = payload.disabled[i];
-            this.__disabledProperties[property.name] = true;
-            this.__disabledPropertyValues[property.name] = property.value;
-            this.__disabledPropertyPriorities[property.name] = property.priority;
-        }
-    }
-
+    this.id = payload.styleId;
+    this.properties = payload.properties;
     this._shorthandValues = payload.shorthandValues;
-    this._propertyMap = {};
-    this._longhandProperties = {};
-    this.length = payload.properties.length;
+    this._livePropertyMap = {}; // LIVE properties (source-based or style-based) : { name -> CSSProperty }
+    this._allProperties = []; // ALL properties: [ CSSProperty ]
+    this._longhandProperties = {}; // shorthandName -> [ CSSProperty ]
+    this.__disabledProperties = {}; // DISABLED properties: { index -> CSSProperty }
+    var payloadPropertyCount = payload.cssProperties.length;
 
-    for (var i = 0; i < this.length; ++i) {
-        var property = payload.properties[i];
+    var propertyIndex = 0;
+    for (var i = 0; i < payloadPropertyCount; ++i) {
+        var property = new WebInspector.CSSProperty.parsePayload(this, i, payload.cssProperties[i]);
+        this._allProperties.push(property);
+        if (property.disabled)
+            this.__disabledProperties[i] = property;
+        if (!property.active && !property.styleBased)
+            continue;
         var name = property.name;
-        this[i] = name;
-        this._propertyMap[name] = property;
+        this[propertyIndex] = name;
+        this._livePropertyMap[name] = property;
 
         // Index longhand properties.
-        if (property.shorthand) {
+        if (property.shorthand) { // only for parsed
             var longhands = this._longhandProperties[property.shorthand];
             if (!longhands) {
                 longhands = [];
                 this._longhandProperties[property.shorthand] = longhands;
             }
-            longhands.push(name);
+            longhands.push(property);
         }
+        ++propertyIndex;
     }
+    this.length = propertyIndex;
 }
 
-WebInspector.CSSStyleDeclaration.parseStyle = function(payload)
+WebInspector.CSSStyleDeclaration.parsePayload = function(payload)
 {
     return new WebInspector.CSSStyleDeclaration(payload);
 }
 
-WebInspector.CSSStyleDeclaration.parseRule = function(payload)
-{
-    var rule = {};
-    rule.id = payload.id;
-    rule.selectorText = payload.selectorText;
-    rule.style = new WebInspector.CSSStyleDeclaration(payload.style);
-    rule.style.parentRule = rule;
-    rule.isUserAgent = payload.isUserAgent;
-    rule.isUser = payload.isUser;
-    rule.isViaInspector = payload.isViaInspector;
-    rule.sourceLine = payload.sourceLine;
-    rule.documentURL = payload.documentURL;
-    if (payload.parentStyleSheet)
-        rule.parentStyleSheet = { href: payload.parentStyleSheet.href };
-
-    return rule;
-}
-
 WebInspector.CSSStyleDeclaration.prototype = {
+    get allProperties()
+    {
+        return this._allProperties;
+    },
+
+    getLiveProperty: function(name)
+    {
+        return this._livePropertyMap[name];
+    },
+
     getPropertyValue: function(name)
     {
-        var property = this._propertyMap[name];
+        var property = this._livePropertyMap[name];
         return property ? property.value : "";
     },
 
     getPropertyPriority: function(name)
     {
-        var property = this._propertyMap[name];
+        var property = this._livePropertyMap[name];
         return property ? property.priority : "";
     },
 
     getPropertyShorthand: function(name)
     {
-        var property = this._propertyMap[name];
+        var property = this._livePropertyMap[name];
         return property ? property.shorthand : "";
     },
 
     isPropertyImplicit: function(name)
     {
-        var property = this._propertyMap[name];
+        var property = this._livePropertyMap[name];
         return property ? property.implicit : "";
     },
 
@@ -675,7 +639,8 @@ WebInspector.CSSStyleDeclaration.prototype = {
 
     getShorthandValue: function(shorthandProperty)
     {
-        return this._shorthandValues[shorthandProperty];
+        var property = this.getLiveProperty(shorthandProperty);
+        return property ? property.value : this._shorthandValues[shorthandProperty];
     },
 
     getShorthandPriority: function(shorthandProperty)
@@ -686,6 +651,166 @@ WebInspector.CSSStyleDeclaration.prototype = {
 
         var longhands = this._longhandProperties[shorthandProperty];
         return longhands ? this.getPropertyPriority(longhands[0]) : null;
+    },
+
+    appendProperty: function(propertyName, propertyValue, userCallback)
+    {
+        function setPropertyCallback(userCallback, success, stylePayload)
+        {
+            if (!success)
+                userCallback(null);
+            else
+                userCallback(WebInspector.CSSStyleDeclaration.parsePayload(stylePayload));
+        }
+
+        // FIXME(apavlov): this should be migrated to the new InspectorCSSAgent API once it is enabled.
+        InspectorBackend.applyStyleText(this.id, propertyName + ": " + propertyValue + ";", propertyName, setPropertyCallback.bind(this, userCallback));
+    },
+
+    propertyAt: function(index)
+    {
+        return (index < this.allProperties.length) ? this.allProperties[index] : null;
+    }
+}
+
+WebInspector.CSSRule = function(payload)
+{
+    this.id = payload.ruleId;
+    this.selectorText = payload.selectorText;
+    this.sourceLine = payload.sourceLine;
+    this.sourceURL = payload.sourceURL;
+    this.origin = payload.origin;
+    this.style = WebInspector.CSSStyleDeclaration.parsePayload(payload.style);
+    this.style.parentRule = this;
+}
+
+WebInspector.CSSRule.parsePayload = function(payload)
+{
+    return new WebInspector.CSSRule(payload);
+}
+
+WebInspector.CSSRule.prototype = {
+    get isUserAgent()
+    {
+        return this.origin === "user-agent";
+    },
+
+    get isUser()
+    {
+        return this.origin === "user";
+    },
+
+    get isViaInspector()
+    {
+        return this.origin === "inspector";
+    },
+
+    get isRegular()
+    {
+        return this.origin === "";
+    }
+}
+
+WebInspector.CSSProperty = function(ownerStyle, index, name, value, priority, status, parsedOk, implicit, shorthand, text)
+{
+    this.ownerStyle = ownerStyle;
+    this.index = index;
+    this.name = name;
+    this.value = value;
+    this.priority = priority;
+    this.status = status;
+    this.parsedOk = parsedOk;
+    this.implicit = implicit;
+    this.shorthand = shorthand;
+    this.text = text;
+}
+
+WebInspector.CSSProperty.parsePayload = function(ownerStyle, index, payload)
+{
+    var result = new WebInspector.CSSProperty(
+        ownerStyle, index, payload.name, payload.value, payload.priority, payload.status, payload.parsedOk, payload.implicit, payload.shorthandName, payload.text);
+    return result;
+}
+
+WebInspector.CSSProperty.prototype = {
+    get propertyText()
+    {
+        if (this.text !== undefined)
+            return this.text;
+
+        return this.name + ": " + this.value + (this.priority ? " !" + this.priority : "") + ";";
+    },
+
+    get isLive()
+    {
+        return this.active || this.styleBased;
+    },
+
+    get active()
+    {
+        return this.status === "active";
+    },
+
+    get styleBased()
+    {
+        return this.status === "style";
+    },
+
+    get inactive()
+    {
+        return this.status === "inactive";
+    },
+
+    get disabled()
+    {
+        return this.status === "disabled";
+    },
+
+    // Replaces "propertyName: propertyValue [!important];" in the stylesheet by an arbitrary propertyText.
+    setText: function(propertyText, userCallback)
+    {
+        function callback(userCallback, success, stylePayload)
+        {
+            if (!userCallback)
+                return;
+            if (!success)
+                userCallback(null);
+            else {
+                var style = WebInspector.CSSStyleDeclaration.parsePayload(stylePayload);
+                userCallback(style);
+            }
+        }
+
+        if (!this.ownerStyle)
+            throw "No ownerStyle for property";
+        InspectorBackend.applyStyleText(this.ownerStyle.id, propertyText, this.name, callback.bind(this, userCallback));
+    },
+
+    setValue: function(newValue, userCallback)
+    {
+        var text = this.name + ": " + newValue + (this.priority ? " !" + this.priority : "") + ";"
+        this.setText(text, userCallback);
+    },
+
+    setDisabled: function(disabled, userCallback)
+    {
+        if (!this.ownerStyle && userCallback)
+            userCallback(null);
+        if (disabled === this.disabled && userCallback)
+            userCallback(this.ownerStyle);
+
+        function callback(userCallback, stylePayload)
+        {
+            if (!userCallback)
+                return;
+            if (!stylePayload)
+                userCallback(null);
+            else {
+                var style = WebInspector.CSSStyleDeclaration.parsePayload(stylePayload);
+                userCallback(style);
+            }
+        }
+        InspectorBackend.toggleStyleEnabled(this.ownerStyle.id, this.name, disabled, callback.bind(this, userCallback));
     }
 }
 
@@ -728,166 +853,3 @@ WebInspector.childNodeRemoved = function()
 {
     this.domAgent._childNodeRemoved.apply(this.domAgent, arguments);
 }
-
-WebInspector.DOMBreakpointManager = function()
-{
-    this._breakpoints = {};
-    this._pathCache = {};
-}
-
-WebInspector.DOMBreakpointManager.prototype = {
-    setBreakpoint: function(nodeId, type, enabled, path)
-    {
-        if (!(nodeId in this._breakpoints))
-            this._breakpoints[nodeId] = {};
-        else if (type in this._breakpoints[nodeId])
-            return;
-
-        var breakpoint = new WebInspector.DOMBreakpoint(nodeId, type, enabled);
-        this._breakpoints[nodeId][type] = breakpoint;
-        breakpoint.addEventListener("removed", this._breakpointRemoved, this);
-
-        if (!(nodeId in this._pathCache))
-            this._pathCache[nodeId] = path;
-
-        this.dispatchEventToListeners("dom-breakpoint-added", breakpoint);
-    },
-
-    findBreakpoint: function(nodeId, type)
-    {
-        var nodeBreakpoints = this._breakpoints[nodeId];
-        if (nodeBreakpoints && type in nodeBreakpoints)
-            return nodeBreakpoints[type];
-    },
-
-    removeBreakpointsForNode: function(nodeId)
-    {
-        var nodeBreakpoints = this._breakpoints[nodeId];
-        for (var type in nodeBreakpoints)
-            nodeBreakpoints[type].remove();
-    },
-
-    _breakpointRemoved: function(event)
-    {
-        var breakpoint = event.target;
-
-        var nodeBreakpoints = this._breakpoints[breakpoint.nodeId];
-        delete nodeBreakpoints[breakpoint.type];
-        for (var type in nodeBreakpoints)
-            return;
-
-        delete this._breakpoints[breakpoint.nodeId];
-        delete this._pathCache[breakpoint.nodeId];
-    },
-
-    restoreBreakpoints: function()
-    {
-        var breakpoints = this._breakpoints;
-        this._breakpoints = {};
-        var pathCache = this._pathCache;
-        this._pathCache = {};
-
-        for (var oldNodeId in breakpoints) {
-            var path = pathCache[oldNodeId];
-            InspectorBackend.pushNodeByPathToFrontend(path, restoreBreakpointsForNode.bind(this, breakpoints[oldNodeId], path));
-        }
-
-        function restoreBreakpointsForNode(nodeBreakpoints, path, nodeId)
-        {
-            if (!nodeId)
-                return;
-            for (var type in nodeBreakpoints) {
-                var breakpoint = nodeBreakpoints[type];
-                this.setBreakpoint(nodeId, breakpoint.type, breakpoint.enabled, path);
-            }
-        }
-    }
-}
-
-WebInspector.DOMBreakpointManager.prototype.__proto__ = WebInspector.Object.prototype;
-
-WebInspector.DOMBreakpoint = function(nodeId, type, enabled)
-{
-    this._nodeId = nodeId;
-    this._type = type;
-    this._enabled = enabled;
-
-    if (this.enabled)
-        InspectorBackend.setDOMBreakpoint(this.nodeId, this.type);
-}
-
-WebInspector.DOMBreakpoint.Types = {
-    SubtreeModified: 0,
-    AttributeModified: 1,
-    NodeRemoved: 2
-};
-
-WebInspector.DOMBreakpoint.labelForType = function(type)
-{
-    if (!WebInspector.DOMBreakpoint._labels) {
-        WebInspector.DOMBreakpoint._labels = {};
-        WebInspector.DOMBreakpoint._labels[WebInspector.DOMBreakpoint.Types.SubtreeModified] = WebInspector.UIString("Subtree Modified");
-        WebInspector.DOMBreakpoint._labels[WebInspector.DOMBreakpoint.Types.AttributeModified] = WebInspector.UIString("Attribute Modified");
-        WebInspector.DOMBreakpoint._labels[WebInspector.DOMBreakpoint.Types.NodeRemoved] = WebInspector.UIString("Node Removed");
-    }
-    return WebInspector.DOMBreakpoint._labels[type];
-}
-
-WebInspector.DOMBreakpoint.contextMenuLabelForType = function(type)
-{
-    if (!WebInspector.DOMBreakpoint._contextMenuLabels) {
-        WebInspector.DOMBreakpoint._contextMenuLabels = {};
-        WebInspector.DOMBreakpoint._contextMenuLabels[WebInspector.DOMBreakpoint.Types.SubtreeModified] = WebInspector.UIString("Break on Subtree Modifications");
-        WebInspector.DOMBreakpoint._contextMenuLabels[WebInspector.DOMBreakpoint.Types.AttributeModified] = WebInspector.UIString("Break on Attributes Modifications");
-        WebInspector.DOMBreakpoint._contextMenuLabels[WebInspector.DOMBreakpoint.Types.NodeRemoved] = WebInspector.UIString("Break on Node Removal");
-    }
-    return WebInspector.DOMBreakpoint._contextMenuLabels[type];
-}
-
-WebInspector.DOMBreakpoint.prototype = {
-    get nodeId()
-    {
-        return this._nodeId;
-    },
-
-    get type()
-    {
-        return this._type;
-    },
-
-    get enabled()
-    {
-        return this._enabled;
-    },
-
-    set enabled(enabled)
-    {
-        if (this._enabled === enabled)
-            return;
-
-        this._enabled = enabled;
-        if (this.enabled)
-            InspectorBackend.setDOMBreakpoint(this.nodeId, this.type);
-        else
-            InspectorBackend.removeDOMBreakpoint(this.nodeId, this.type);
-
-        this.dispatchEventToListeners("enable-changed");
-    },
-
-    compareTo: function(other)
-    {
-        if (this.type != other.type)
-            return this.type < other.type ? -1 : 1;
-        return 0;
-    },
-
-    remove: function()
-    {
-        if (this.enabled)
-            InspectorBackend.removeDOMBreakpoint(this.nodeId, this.type);
-        this.dispatchEventToListeners("removed");
-    }
-}
-
-WebInspector.DOMBreakpoint.prototype.__proto__ = WebInspector.Object.prototype;
-

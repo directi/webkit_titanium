@@ -24,10 +24,13 @@
  */
 
 #include "APIObject.h"
+#include <JavaScriptCore/JSBase.h>
+#include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
+    class IntRect;
     class Node;
 }
 
@@ -39,10 +42,20 @@ class InjectedBundleNodeHandle : public APIObject {
 public:
     static const Type APIType = TypeBundleNodeHandle;
 
+    static PassRefPtr<InjectedBundleNodeHandle> getOrCreate(JSContextRef, JSObjectRef);
     static PassRefPtr<InjectedBundleNodeHandle> getOrCreate(WebCore::Node*);
-    ~InjectedBundleNodeHandle();
+
+    virtual ~InjectedBundleNodeHandle();
 
     WebCore::Node* coreNode() const;
+
+    // Additional DOM Operations
+    // Note: These should only be operations that are not exposed to JavaScript.
+    WebCore::IntRect elementBounds() const;
+    void setHTMLInputElementValueForUser(const String&);
+    bool isHTMLInputElementAutofilled() const;
+    void setHTMLInputElementAutofilled(bool);
+    PassRefPtr<InjectedBundleNodeHandle> copyHTMLTableCellElementCellAbove();
 
 private:
     static PassRefPtr<InjectedBundleNodeHandle> create(WebCore::Node*);

@@ -45,6 +45,7 @@ namespace WebCore {
     class Geolocation;
     class HitTestResult;
     class IntRect;
+    class NavigationAction;
     class Node;
     class Page;
     class PopupMenuClient;
@@ -53,6 +54,7 @@ namespace WebCore {
 #endif
 
     struct FrameLoadRequest;
+    struct ViewportArguments;
     struct WindowFeatures;
     
     class Chrome : public HostWindow {
@@ -68,6 +70,9 @@ namespace WebCore {
         virtual void invalidateContentsAndWindow(const IntRect&, bool);
         virtual void invalidateContentsForSlowScroll(const IntRect&, bool);
         virtual void scroll(const IntSize&, const IntRect&, const IntRect&);
+#if ENABLE(TILED_BACKING_STORE)
+        virtual void delegatedScrollRequested(const IntSize& scrollDelta);
+#endif
         virtual IntPoint screenToWindow(const IntPoint&) const;
         virtual IntRect windowToScreen(const IntRect&) const;
         virtual PlatformPageClient platformPageClient() const;
@@ -92,8 +97,9 @@ namespace WebCore {
         void takeFocus(FocusDirection) const;
 
         void focusedNodeChanged(Node*) const;
+        void focusedFrameChanged(Frame*) const;
 
-        Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&) const;
+        Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, const NavigationAction&) const;
         void show() const;
 
         bool canRunModal() const;
@@ -139,6 +145,8 @@ namespace WebCore {
         void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
         void chooseIconForFiles(const Vector<String>&, FileChooser*);
 
+        void dispatchViewportDataDidChange(const ViewportArguments&) const;
+
 #if PLATFORM(MAC)
         void focusNSView(NSView*);
 #endif
@@ -150,6 +158,10 @@ namespace WebCore {
         bool selectItemWritingDirectionIsNatural();
         PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const;
         PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const;
+
+#if ENABLE(CONTEXT_MENUS)
+        void showContextMenu();
+#endif
 
     private:
         Page* m_page;

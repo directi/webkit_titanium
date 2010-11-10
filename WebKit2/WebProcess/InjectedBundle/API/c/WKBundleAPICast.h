@@ -42,23 +42,29 @@ namespace WebCore {
 namespace WebKit {
 
 class InjectedBundle;
+class InjectedBundleBackForwardList;
+class InjectedBundleBackForwardListItem;
 class InjectedBundleHitTestResult;
 class InjectedBundleNodeHandle;
 class InjectedBundleRangeHandle;
 class InjectedBundleScriptWorld;
+class PageOverlay;
 class WebFrame;
 class WebPage;
 
+WK_ADD_API_MAPPING(WKBundleBackForwardListRef, InjectedBundleBackForwardList)
+WK_ADD_API_MAPPING(WKBundleBackForwardListItemRef, InjectedBundleBackForwardListItem)
 WK_ADD_API_MAPPING(WKBundleCSSStyleDeclarationRef, WebCore::CSSStyleDeclaration)
 WK_ADD_API_MAPPING(WKBundleFrameRef, WebFrame)
 WK_ADD_API_MAPPING(WKBundleHitTestResultRef, InjectedBundleHitTestResult)
 WK_ADD_API_MAPPING(WKBundleNodeHandleRef, InjectedBundleNodeHandle)
+WK_ADD_API_MAPPING(WKBundlePageOverlayRef, PageOverlay)
 WK_ADD_API_MAPPING(WKBundlePageRef, WebPage)
 WK_ADD_API_MAPPING(WKBundleRangeHandleRef, InjectedBundleRangeHandle)
 WK_ADD_API_MAPPING(WKBundleRef, InjectedBundle)
 WK_ADD_API_MAPPING(WKBundleScriptWorldRef, InjectedBundleScriptWorld)
 
-inline WKInsertActionType toWK(WebCore::EditorInsertAction action)
+inline WKInsertActionType toAPI(WebCore::EditorInsertAction action)
 {
     switch (action) {
     case WebCore::EditorInsertActionTyped:
@@ -75,7 +81,7 @@ inline WKInsertActionType toWK(WebCore::EditorInsertAction action)
     return kWKInsertActionTyped;
 }
 
-inline WKAffinityType toWK(WebCore::EAffinity affinity)
+inline WKAffinityType toAPI(WebCore::EAffinity affinity)
 {
     switch (affinity) {
     case WebCore::UPSTREAM:

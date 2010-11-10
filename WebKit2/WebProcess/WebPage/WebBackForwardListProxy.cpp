@@ -27,9 +27,9 @@
 
 #include "WebCoreArgumentCoders.h"
 #include "WebPage.h"
-#include "WebPageProxyMessageKinds.h"
+#include "WebPageProxyMessages.h"
 #include "WebProcess.h"
-#include "WebProcessProxyMessageKinds.h"
+#include "WebProcessProxyMessages.h"
 #include <WebCore/HistoryItem.h>
 #include <wtf/HashMap.h>
 
@@ -86,7 +86,8 @@ static void updateBackForwardItem(HistoryItem* item)
     const String& originalURLString = item->originalURLString();
     const String& urlString = item->urlString();
     const String& title = item->title();
-    WebProcess::shared().connection()->send(WebProcessProxyMessage::AddBackForwardItem, 0, CoreIPC::In(itemID, originalURLString, urlString, title));
+
+    WebProcess::shared().connection()->send(Messages::WebProcessProxy::AddBackForwardItem(itemID, originalURLString, urlString, title), 0);
 }
 
 static void WK2NotifyHistoryItemChanged(HistoryItem* item)
@@ -101,103 +102,37 @@ HistoryItem* WebBackForwardListProxy::itemForID(uint64_t itemID)
 
 WebBackForwardListProxy::WebBackForwardListProxy(WebPage* page)
     : m_page(page)
-    , m_capacity(DefaultCapacity)
-    , m_closed(true)
-    , m_enabled(true)
 {
     WebCore::notifyHistoryItemChanged = WK2NotifyHistoryItemChanged;
 }
 
-WebBackForwardListProxy::~WebBackForwardListProxy()
-{
-}
-
 void WebBackForwardListProxy::addItem(PassRefPtr<HistoryItem> prpItem)
 {
-    if (!m_capacity || !m_enabled)
+    if (!m_page)
         return;
 
     RefPtr<HistoryItem> item = prpItem;
     uint64_t itemID = historyItemToIDMap().get(item);
-    WebProcess::shared().connection()->send(WebPageProxyMessage::BackForwardAddItem, m_page->pageID(), CoreIPC::In(itemID));
-}
-
-void WebBackForwardListProxy::goBack()
-{
-    ASSERT_NOT_REACHED();
-}
-
-void WebBackForwardListProxy::goForward()
-{
-    ASSERT_NOT_REACHED();
+    m_page->send(Messages::WebPageProxy::BackForwardAddItem(itemID));
 }
 
 void WebBackForwardListProxy::goToItem(HistoryItem* item)
 {
+    if (!m_page)
+        return;
+
     uint64_t itemID = historyItemToIDMap().get(item);
-    WebProcess::shared().connection()->send(WebPageProxyMessage::BackForwardGoToItem, m_page->pageID(), CoreIPC::In(itemID));
-}
-
-HistoryItem* WebBackForwardListProxy::backItem()
-{
-    uint64_t backItemID = 0;
-    if (!WebProcess::shared().connection()->sendSync(WebPageProxyMessage::BackForwardBackItem,
-                                                     m_page->pageID(), CoreIPC::In(),
-                                                     CoreIPC::Out(backItemID),
-                                                     CoreIPC::Connection::NoTimeout)) {
-        return 0;
-    }
-
-    if (!backItemID)
-        return 0;
-
-    RefPtr<HistoryItem> item = idToHistoryItemMap().get(backItemID);
-    return item.get();
-}
-
-HistoryItem* WebBackForwardListProxy::currentItem()
-{
-    uint64_t currentItemID = 0;
-    if (!WebProcess::shared().connection()->sendSync(WebPageProxyMessage::BackForwardCurrentItem,
-                                                     m_page->pageID(), CoreIPC::In(),
-                                                     CoreIPC::Out(currentItemID),
-                                                     CoreIPC::Connection::NoTimeout)) {
-        return 0;
-    }
-
-    if (!currentItemID)
-        return 0;
-
-    RefPtr<HistoryItem> item = idToHistoryItemMap().get(currentItemID);
-    return item.get();
-}
-
-HistoryItem* WebBackForwardListProxy::forwardItem()
-{
-    uint64_t forwardItemID = 0;
-    if (!WebProcess::shared().connection()->sendSync(WebPageProxyMessage::BackForwardForwardItem,
-                                                     m_page->pageID(), CoreIPC::In(),
-                                                     CoreIPC::Out(forwardItemID),
-                                                     CoreIPC::Connection::NoTimeout)) {
-        return 0;
-    }
-
-    if (!forwardItemID)
-        return 0;
-
-    RefPtr<HistoryItem> item = idToHistoryItemMap().get(forwardItemID);
-    return item.get();
+    m_page->send(Messages::WebPageProxy::BackForwardGoToItem(itemID));
 }
 
 HistoryItem* WebBackForwardListProxy::itemAtIndex(int itemIndex)
 {
-    uint64_t itemID = 0;
-    if (!WebProcess::shared().connection()->sendSync(WebPageProxyMessage::BackForwardItemAtIndex,
-                                                     m_page->pageID(), CoreIPC::In(itemIndex),
-                                                     CoreIPC::Out(itemID),
-                                                     CoreIPC::Connection::NoTimeout)) {
+    if (!m_page)
         return 0;
-    }
+
+    uint64_t itemID = 0;
+    if (!WebProcess::shared().connection()->sendSync(Messages::WebPageProxy::BackForwardItemAtIndex(itemIndex), Messages::WebPageProxy::BackForwardItemAtIndex::Reply(itemID), m_page->pageID()))
+        return 0;
 
     if (!itemID)
         return 0;
@@ -206,86 +141,44 @@ HistoryItem* WebBackForwardListProxy::itemAtIndex(int itemIndex)
     return item.get();
 }
 
-void WebBackForwardListProxy::backListWithLimit(int, HistoryItemVector&)
-{
-    ASSERT_NOT_REACHED();
-}
-
-void WebBackForwardListProxy::forwardListWithLimit(int, HistoryItemVector&)
-{
-    ASSERT_NOT_REACHED();
-}
-
-int WebBackForwardListProxy::capacity()
-{
-    return m_capacity;
-}
-
-void WebBackForwardListProxy::setCapacity(int capacity)
-{
-    m_capacity = capacity;
-}
-
-bool WebBackForwardListProxy::enabled()
-{
-    return m_enabled;
-}
-
-void WebBackForwardListProxy::setEnabled(bool enabled)
-{
-    m_enabled = enabled;
-}
-
 int WebBackForwardListProxy::backListCount()
 {
-    int backListCount = 0;
-    if (!WebProcess::shared().connection()->sendSync(WebPageProxyMessage::BackForwardBackListCount,
-                                                     m_page->pageID(), CoreIPC::In(),
-                                                     CoreIPC::Out(backListCount),
-                                                     CoreIPC::Connection::NoTimeout)) {
+    if (!m_page)
         return 0;
-    }
+
+    int backListCount = 0;
+    if (!WebProcess::shared().connection()->sendSync(Messages::WebPageProxy::BackForwardBackListCount(), Messages::WebPageProxy::BackForwardBackListCount::Reply(backListCount), m_page->pageID()))
+        return 0;
 
     return backListCount;
 }
 
 int WebBackForwardListProxy::forwardListCount()
 {
-    int forwardListCount = 0;
-    if (!WebProcess::shared().connection()->sendSync(WebPageProxyMessage::BackForwardForwardListCount,
-                                                     m_page->pageID(), CoreIPC::In(),
-                                                     CoreIPC::Out(forwardListCount),
-                                                     CoreIPC::Connection::NoTimeout)) {
+    if (!m_page)
         return 0;
-    }
+
+    int forwardListCount = 0;
+    if (!WebProcess::shared().connection()->sendSync(Messages::WebPageProxy::BackForwardForwardListCount(), Messages::WebPageProxy::BackForwardForwardListCount::Reply(forwardListCount), m_page->pageID()))
+        return 0;
 
     return forwardListCount;
 }
 
-bool WebBackForwardListProxy::containsItem(HistoryItem*)
-{
-    return false;
-}
-
 void WebBackForwardListProxy::close()
 {
-    m_closed = true;
     m_page = 0;
 }
 
-bool WebBackForwardListProxy::closed()
+bool WebBackForwardListProxy::isActive()
 {
-    return m_closed;
+    // FIXME: Should check the the list is enabled and has non-zero capacity.
+    return true;
 }
 
-void WebBackForwardListProxy::removeItem(HistoryItem*)
+void WebBackForwardListProxy::clear()
 {
-}
-
-HistoryItemVector& WebBackForwardListProxy::entries()
-{
-    static HistoryItemVector noEntries;
-    return noEntries;
+    m_page->send(Messages::WebPageProxy::BackForwardClear());
 }
 
 #if ENABLE(WML)

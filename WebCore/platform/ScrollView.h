@@ -104,6 +104,7 @@ public:
     virtual void setCanHaveScrollbars(bool);
     bool canHaveScrollbars() const { return horizontalScrollbarMode() != ScrollbarAlwaysOff || verticalScrollbarMode() != ScrollbarAlwaysOff; }
 
+    virtual bool delegatesScrolling() { return false; }
     virtual bool avoidScrollbarCreation() { return false; }
 
     // By default you only receive paint events for the area that is visible. In the case of using a
@@ -264,8 +265,10 @@ protected:
     virtual void updateScrollCorner();
     virtual void paintScrollCorner(GraphicsContext*, const IntRect& cornerRect);
 
-    // Scroll the content by blitting the pixels
+    // Scroll the content by blitting the pixels.
     virtual bool scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect);
+    // Scroll the content by invalidating everything.
+    virtual void scrollContentsSlowPath(const IntRect& updateRect);
 
 private:
     RefPtr<Scrollbar> m_horizontalScrollbar;
@@ -339,6 +342,8 @@ private:
 #if PLATFORM(GTK)
 public:
     void setGtkAdjustments(GtkAdjustment* hadj, GtkAdjustment* vadj, bool resetValues = true);
+    void setHorizontalAdjustment(GtkAdjustment* hadj, bool resetValues = true);
+    void setVerticalAdjustment(GtkAdjustment* vadj, bool resetValues = true);
     void setScrollOffset(const IntSize& offset) { m_scrollOffset = offset; }
 
 private:

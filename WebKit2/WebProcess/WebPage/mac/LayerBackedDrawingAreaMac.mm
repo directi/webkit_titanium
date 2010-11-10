@@ -42,12 +42,14 @@ namespace WebKit {
 
 void LayerBackedDrawingArea::platformInit()
 {
+    setUpUpdateLayoutRunLoopObserver();
+
     [m_backingLayer->platformLayer() setGeometryFlipped:YES];
 #if HAVE(HOSTED_CORE_ANIMATION)
     attachCompositingContext();
 #endif
 
-    setUpUpdateLayoutRunLoopObserver();
+    scheduleCompositingLayerSync();
 }
 
 void LayerBackedDrawingArea::platformClear()
@@ -59,7 +61,7 @@ void LayerBackedDrawingArea::platformClear()
 
 #if HAVE(HOSTED_CORE_ANIMATION)
     WKCARemoteLayerClientInvalidate(m_remoteLayerRef.get());
-    m_remoteLayerRef = 0;
+    m_remoteLayerRef = nullptr;
 #endif
 
     m_attached = false;
@@ -70,8 +72,6 @@ void LayerBackedDrawingArea::attachCompositingContext()
     if (m_attached)
         return;
 
-    m_backingLayer->syncCompositingStateForThisLayerOnly();
-        
     m_attached = true;
 
 #if HAVE(HOSTED_CORE_ANIMATION)
@@ -80,14 +80,15 @@ void LayerBackedDrawingArea::attachCompositingContext()
     WKCARemoteLayerClientSetLayer(m_remoteLayerRef.get(), m_backingLayer->platformLayer());
     
     uint32_t contextID = WKCARemoteLayerClientGetClientId(m_remoteLayerRef.get());
-    WebProcess::shared().connection()->sendSync(DrawingAreaProxyMessage::AttachCompositingContext, m_webPage->pageID(), CoreIPC::In(contextID), CoreIPC::Out(), CoreIPC::Connection::NoTimeout);
+    WebProcess::shared().connection()->sendSync(DrawingAreaProxyMessage::AttachCompositingContext, m_webPage->pageID(), CoreIPC::In(contextID), CoreIPC::Out());
 #endif
 }
 
 void LayerBackedDrawingArea::detachCompositingContext()
 {
     m_backingLayer->removeAllChildren();
-    m_backingLayer->syncCompositingStateForThisLayerOnly();
+
+    scheduleCompositingLayerSync();
 }
 
 void LayerBackedDrawingArea::setRootCompositingLayer(WebCore::GraphicsLayer* layer)
@@ -95,7 +96,8 @@ void LayerBackedDrawingArea::setRootCompositingLayer(WebCore::GraphicsLayer* lay
     m_backingLayer->removeAllChildren();
     if (layer)
         m_backingLayer->addChild(layer);
-    m_backingLayer->syncCompositingStateForThisLayerOnly();
+
+    scheduleCompositingLayerSync();
 }
 
 void LayerBackedDrawingArea::scheduleCompositingLayerSync()
@@ -110,6 +112,8 @@ void LayerBackedDrawingArea::scheduleCompositingLayerSync()
 
 void LayerBackedDrawingArea::syncCompositingLayers()
 {
+    m_backingLayer->syncCompositingStateForThisLayerOnly();
+
     bool didSync = m_webPage->corePage()->mainFrame()->view()->syncCompositingStateRecursive();
     if (!didSync) {
     
@@ -132,6 +136,8 @@ void LayerBackedDrawingArea::setUpUpdateLayoutRunLoopObserver()
 void LayerBackedDrawingArea::scheduleUpdateLayoutRunLoopObserver()
 {
     CFRunLoopRef currentRunLoop = CFRunLoopGetCurrent();
+    CFRunLoopWakeUp(currentRunLoop);
+
     if (CFRunLoopContainsObserver(currentRunLoop, m_updateLayoutRunLoopObserver.get(), kCFRunLoopCommonModes))
         return;
 

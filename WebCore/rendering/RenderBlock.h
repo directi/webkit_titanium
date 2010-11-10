@@ -57,8 +57,8 @@ public:
     virtual void destroy();
 
     // These two functions are overridden for inline-block.
-    virtual int lineHeight(bool firstLine, bool isRootLineBox = false) const;
-    virtual int baselinePosition(bool firstLine, bool isRootLineBox = false) const;
+    virtual int lineHeight(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
+    virtual int baselinePosition(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
 
     RenderLineBoxList* lineBoxes() { return &m_lineBoxes; }
     const RenderLineBoxList* lineBoxes() const { return &m_lineBoxes; }
@@ -90,14 +90,7 @@ public:
 
     void markAllDescendantsWithFloatsForLayout(RenderBox* floatToRemove = 0, bool inLayout = true);
     void markPositionedObjectsForLayout();
-    void markForPaginationRelayout()
-    { 
-        if (isTable())
-            markDescendantBlocksAndLinesForLayout();
-        else
-            setChildNeedsLayout(true, false);
-    }
-    virtual void markDescendantBlocksAndLinesForLayout(bool inLayout = true);
+    virtual void markForPaginationRelayoutIfNeeded();
     
     bool containsFloats() { return m_floatingObjects && !m_floatingObjects->isEmpty(); }
     bool containsFloat(RenderObject*);
@@ -105,10 +98,11 @@ public:
     int availableLogicalWidthForLine(int position, bool firstLine) const;
     int logicalRightOffsetForLine(int position, bool firstLine) const { return logicalRightOffsetForLine(position, logicalRightOffsetForContent(), firstLine); }
     int logicalLeftOffsetForLine(int position, bool firstLine) const { return logicalLeftOffsetForLine(position, logicalLeftOffsetForContent(), firstLine); }
-    
-    virtual int lowestPosition(bool includeOverflowInterior = true, bool includeSelf = true) const;
-    virtual int rightmostPosition(bool includeOverflowInterior = true, bool includeSelf = true) const;
-    virtual int leftmostPosition(bool includeOverflowInterior = true, bool includeSelf = true) const;
+
+    virtual int topmostPosition(bool includeOverflowInterior = true, bool includeSelf = true, ApplyTransform = IncludeTransform) const;
+    virtual int lowestPosition(bool includeOverflowInterior = true, bool includeSelf = true, ApplyTransform = IncludeTransform) const;
+    virtual int rightmostPosition(bool includeOverflowInterior = true, bool includeSelf = true, ApplyTransform = IncludeTransform) const;
+    virtual int leftmostPosition(bool includeOverflowInterior = true, bool includeSelf = true, ApplyTransform = IncludeTransform) const;
     
     virtual VisiblePosition positionForPoint(const IntPoint&);
     
@@ -121,14 +115,13 @@ public:
     bool containsNonZeroBidiLevel() const;
 
     GapRects selectionGapRectsForRepaint(RenderBoxModelObject* repaintContainer);
-    IntRect fillLeftSelectionGap(RenderObject* selObj, int xPos, int yPos, int height, RenderBlock* rootBlock, 
-                                 int blockX, int blockY, int tx, int ty, const PaintInfo*);
-    IntRect fillRightSelectionGap(RenderObject* selObj, int xPos, int yPos, int height, RenderBlock* rootBlock,
-                                  int blockX, int blockY, int tx, int ty, const PaintInfo*);
-    IntRect fillHorizontalSelectionGap(RenderObject* selObj, int xPos, int yPos, int width, int height, const PaintInfo*);
-
-    void getHorizontalSelectionGapInfo(SelectionState, bool& leftGap, bool& rightGap);
-
+    IntRect logicalLeftSelectionGap(RenderBlock* rootBlock, const IntPoint& rootBlockPhysicalPosition, const IntSize& offsetFromRootBlock,
+                                    RenderObject* selObj, int logicalLeft, int logicalTop, int logicalHeight, const PaintInfo*);
+    IntRect logicalRightSelectionGap(RenderBlock* rootBlock, const IntPoint& rootBlockPhysicalPosition, const IntSize& offsetFromRootBlock,
+                                     RenderObject* selObj, int logicalRight, int logicalTop, int logicalHeight, const PaintInfo*);
+    void getSelectionGapInfo(SelectionState, bool& leftGap, bool& rightGap);
+    IntRect logicalRectToPhysicalRect(const IntPoint& physicalPosition, const IntRect& logicalRect);
+        
     // Helper methods for computing line counts and heights for line counts.
     RootInlineBox* lineAtIndex(int);
     int lineCount();
@@ -170,8 +163,12 @@ public:
     void setPageY(int y);
 
     // Accessors for logical width/height and margins in the containing block's block-flow direction.
-    int logicalHeightForChild(RenderBox* child) { return style()->isVerticalBlockFlow() ? child->height() : child->width(); }
-    int logicalTopForChild(RenderBox* child) { return style()->isVerticalBlockFlow() ? child->y() : child->x(); }
+    enum ApplyLayoutDeltaMode { ApplyLayoutDelta, DoNotApplyLayoutDelta };
+    int logicalWidthForChild(RenderBox* child) { return style()->isHorizontalWritingMode() ? child->width() : child->height(); }
+    int logicalHeightForChild(RenderBox* child) { return style()->isHorizontalWritingMode() ? child->height() : child->width(); }
+    int logicalTopForChild(RenderBox* child) { return style()->isHorizontalWritingMode() ? child->y() : child->x(); }
+    void setLogicalLeftForChild(RenderBox* child, int logicalLeft, ApplyLayoutDeltaMode = DoNotApplyLayoutDelta);
+    void setLogicalTopForChild(RenderBox* child, int logicalTop, ApplyLayoutDeltaMode = DoNotApplyLayoutDelta);
     int marginBeforeForChild(RenderBoxModelObject* child) const;
     int marginAfterForChild(RenderBoxModelObject* child) const;
     int marginStartForChild(RenderBoxModelObject* child) const;
@@ -182,6 +179,35 @@ public:
     void setMarginAfterForChild(RenderBox* child, int);
     int collapsedMarginBeforeForChild(RenderBox* child) const;
     int collapsedMarginAfterForChild(RenderBox* child) const;
+
+    virtual void updateFirstLetter();
+
+    class MarginValues {
+    public:
+        MarginValues(int beforePos, int beforeNeg, int afterPos, int afterNeg)
+            : m_positiveMarginBefore(beforePos)
+            , m_negativeMarginBefore(beforeNeg)
+            , m_positiveMarginAfter(afterPos)
+            , m_negativeMarginAfter(afterNeg)
+        { }
+        
+        int positiveMarginBefore() const { return m_positiveMarginBefore; }
+        int negativeMarginBefore() const { return m_negativeMarginBefore; }
+        int positiveMarginAfter() const { return m_positiveMarginAfter; }
+        int negativeMarginAfter() const { return m_negativeMarginAfter; }
+        
+        void setPositiveMarginBefore(int pos) { m_positiveMarginBefore = pos; }
+        void setNegativeMarginBefore(int neg) { m_negativeMarginBefore = neg; }
+        void setPositiveMarginAfter(int pos) { m_positiveMarginAfter = pos; }
+        void setNegativeMarginAfter(int neg) { m_negativeMarginAfter = neg; }
+    
+    private:
+        int m_positiveMarginBefore;
+        int m_negativeMarginBefore;
+        int m_positiveMarginAfter;
+        int m_negativeMarginAfter;
+    };
+    MarginValues marginValuesForChild(RenderBox* child);
 
 protected:
     // These functions are only used internally to manipulate the render tree structure via remove/insert/appendChildNode.
@@ -208,10 +234,10 @@ protected:
     }
     void moveChildrenTo(RenderBlock* to, RenderObject* startChild, RenderObject* endChild, RenderObject* beforeChild, bool fullRemoveInsert = false);
     
-    int maxPosMarginBefore() const { return m_rareData ? m_rareData->m_beforePos : RenderBlockRareData::beforePosDefault(this); }
-    int maxNegMarginBefore() const { return m_rareData ? m_rareData->m_beforeNeg : RenderBlockRareData::beforeNegDefault(this); }
-    int maxPosMarginAfter() const { return m_rareData ? m_rareData->m_afterPos : RenderBlockRareData::afterPosDefault(this); }
-    int maxNegMarginAfter() const { return m_rareData ? m_rareData->m_afterNeg : RenderBlockRareData::afterNegDefault(this); }
+    int maxPositiveMarginBefore() const { return m_rareData ? m_rareData->m_margins.positiveMarginBefore() : RenderBlockRareData::positiveMarginBeforeDefault(this); }
+    int maxNegativeMarginBefore() const { return m_rareData ? m_rareData->m_margins.negativeMarginBefore() : RenderBlockRareData::negativeMarginBeforeDefault(this); }
+    int maxPositiveMarginAfter() const { return m_rareData ? m_rareData->m_margins.positiveMarginAfter() : RenderBlockRareData::positiveMarginAfterDefault(this); }
+    int maxNegativeMarginAfter() const { return m_rareData ? m_rareData->m_margins.negativeMarginAfter() : RenderBlockRareData::negativeMarginAfterDefault(this); }
     
     void setMaxMarginBeforeValues(int pos, int neg);
     void setMaxMarginAfterValues(int pos, int neg);
@@ -219,10 +245,8 @@ protected:
     void initMaxMarginValues()
     {
         if (m_rareData) {
-            m_rareData->m_beforePos = RenderBlockRareData::beforePosDefault(this);
-            m_rareData->m_beforeNeg = RenderBlockRareData::beforeNegDefault(this);
-            m_rareData->m_afterPos = RenderBlockRareData::afterPosDefault(this);
-            m_rareData->m_afterNeg = RenderBlockRareData::afterNegDefault(this);
+            m_rareData->m_margins = MarginValues(RenderBlockRareData::positiveMarginBeforeDefault(this) , RenderBlockRareData::negativeMarginBeforeDefault(this),
+                                                 RenderBlockRareData::positiveMarginAfterDefault(this), RenderBlockRareData::negativeMarginAfterDefault(this));
             m_rareData->m_paginationStrut = 0;
         }
     }
@@ -234,8 +258,8 @@ protected:
     virtual void paint(PaintInfo&, int tx, int ty);
     virtual void paintObject(PaintInfo&, int tx, int ty);
 
-    int logicalRightOffsetForContent() const;
-    int logicalLeftOffsetForContent() const;
+    int logicalRightOffsetForContent() const { return style()->isHorizontalWritingMode() ? borderLeft() + paddingLeft() + availableLogicalWidth() : borderTop() + paddingTop() + availableLogicalWidth(); }
+    int logicalLeftOffsetForContent() const { return style()->isHorizontalWritingMode() ? borderLeft() + paddingLeft() : borderTop() + paddingTop(); }
     int logicalRightOffsetForLine(int position, int fixedOffset, bool applyTextIndent = true, int* logicalHeightRemaining = 0) const;
     int logicalLeftOffsetForLine(int position, int fixedOffset, bool applyTextIndent = true, int* logicalHeightRemaining = 0) const;
 
@@ -245,8 +269,6 @@ protected:
 
     virtual int firstLineBoxBaseline() const;
     virtual int lastLineBoxBaseline() const;
-
-    virtual void updateFirstLetter();
 
     virtual void updateHitTestResult(HitTestResult&, const IntPoint&);
 
@@ -270,9 +292,9 @@ protected:
     // Only used by RenderSVGText, which explicitely overrides RenderBlock::layoutBlock(), do NOT use for anything else.
     void forceLayoutInlineChildren()
     {
-        int repaintTop = 0;
-        int repaintBottom = 0;
-        layoutInlineChildren(true, repaintTop, repaintBottom);
+        int repaintLogicalTop = 0;
+        int repaintLogicalBottom = 0;
+        layoutInlineChildren(true, repaintLogicalTop, repaintLogicalBottom);
     }
 #endif
 
@@ -298,19 +320,13 @@ private:
     
     virtual bool isSelfCollapsingBlock() const;
 
-    virtual int maxMarginBefore(MarginSign sign) const
-    { 
-        return (sign == PositiveMargin) ? maxPosMarginBefore() : maxNegMarginBefore();
-    }
-    virtual int maxMarginAfter(MarginSign sign) const
-    {
-        return (sign == PositiveMargin) ? maxPosMarginAfter() : maxNegMarginAfter();
-    }
+    virtual int collapsedMarginBefore() const { return maxPositiveMarginBefore() - maxNegativeMarginBefore(); }
+    virtual int collapsedMarginAfter() const { return maxPositiveMarginAfter() - maxNegativeMarginAfter(); }
 
     virtual void repaintOverhangingFloats(bool paintAllDescendants);
 
-    void layoutBlockChildren(bool relayoutChildren, int& maxFloatBottom);
-    void layoutInlineChildren(bool relayoutChildren, int& repaintTop, int& repaintBottom);
+    void layoutBlockChildren(bool relayoutChildren, int& maxFloatLogicalBottom);
+    void layoutInlineChildren(bool relayoutChildren, int& repaintLogicalTop, int& repaintLogicalBottom);
 
     virtual void positionListMarker() { }
 
@@ -337,36 +353,93 @@ private:
     };
 
     struct FloatingObject : Noncopyable {
-        enum Type {
-            FloatLeft,
-            FloatRight
-        };
+        // Note that Type uses bits so you can use FloatBoth as a mask to query for both left and right.
+        enum Type { FloatLeft = 1, FloatRight = 2, FloatBoth = 3 };
 
         FloatingObject(Type type)
             : m_renderer(0)
-            , m_top(0)
-            , m_bottom(0)
-            , m_left(0)
-            , m_width(0)
             , m_paginationStrut(0)
             , m_type(type)
             , m_shouldPaint(true)
             , m_isDescendant(false)
+            , m_isPlaced(false)
         {
         }
 
-        Type type() { return static_cast<Type>(m_type); }
+        FloatingObject(Type type, const IntRect& frameRect)
+            : m_renderer(0)
+            , m_frameRect(frameRect)
+            , m_paginationStrut(0)
+            , m_type(type)
+            , m_shouldPaint(true)
+            , m_isDescendant(false)
+            , m_isPlaced(true)
+        {
+        }
+
+        Type type() const { return static_cast<Type>(m_type); }
+        RenderBox* renderer() const { return m_renderer; }
+        
+        bool isPlaced() const { return m_isPlaced; }
+        void setIsPlaced(bool placed = true) { m_isPlaced = placed; }
+
+        int left() const { ASSERT(isPlaced()); return m_frameRect.x(); }
+        int right() const { ASSERT(isPlaced()); return m_frameRect.right(); }
+        int top() const { ASSERT(isPlaced()); return m_frameRect.y(); }
+        int bottom() const { ASSERT(isPlaced()); return m_frameRect.bottom(); }
+        int width() const { return m_frameRect.width(); }
+        int height() const { return m_frameRect.height(); }
+    
+        void setLeft(int left) { m_frameRect.setX(left); }
+        void setTop(int top) { m_frameRect.setY(top); }
+        void setWidth(int width) { m_frameRect.setWidth(width); }
+        void setHeight(int height) { m_frameRect.setHeight(height); }
+
+        const IntRect& frameRect() const { ASSERT(isPlaced()); return m_frameRect; }
+        void setFrameRect(const IntRect& frameRect) { m_frameRect = frameRect; }
 
         RenderBox* m_renderer;
-        int m_top;
-        int m_bottom;
-        int m_left;
-        int m_width;
+        IntRect m_frameRect;
         int m_paginationStrut;
-        unsigned m_type : 1; // Type (left or right aligned)
+        unsigned m_type : 2; // Type (left or right aligned)
         bool m_shouldPaint : 1;
         bool m_isDescendant : 1;
+        bool m_isPlaced : 1;
     };
+
+    int logicalTopForFloat(FloatingObject* child) const { return style()->isHorizontalWritingMode() ? child->top() : child->left(); }
+    int logicalBottomForFloat(FloatingObject* child) const { return style()->isHorizontalWritingMode() ? child->bottom() : child->right(); }
+    int logicalLeftForFloat(FloatingObject* child) const { return style()->isHorizontalWritingMode() ? child->left() : child->top(); }
+    int logicalRightForFloat(FloatingObject* child) const { return style()->isHorizontalWritingMode() ? child->right() : child->bottom(); }
+    int logicalWidthForFloat(FloatingObject* child) const { return style()->isHorizontalWritingMode() ? child->width() : child->height(); }
+    void setLogicalTopForFloat(FloatingObject* child, int logicalTop)
+    {
+        if (style()->isHorizontalWritingMode())
+            child->setTop(logicalTop);
+        else
+            child->setLeft(logicalTop);
+    }
+    void setLogicalLeftForFloat(FloatingObject* child, int logicalLeft)
+    {
+        if (style()->isHorizontalWritingMode())
+            child->setLeft(logicalLeft);
+        else
+            child->setTop(logicalLeft);
+    }
+    void setLogicalHeightForFloat(FloatingObject* child, int logicalHeight)
+    {
+        if (style()->isHorizontalWritingMode())
+            child->setHeight(logicalHeight);
+        else
+            child->setWidth(logicalHeight);
+    }
+    void setLogicalWidthForFloat(FloatingObject* child, int logicalWidth)
+    {
+        if (style()->isHorizontalWritingMode())
+            child->setWidth(logicalWidth);
+        else
+            child->setHeight(logicalWidth);
+    }
 
     // The following functions' implementations are in RenderBlockLineLayout.cpp.
     RootInlineBox* determineStartPosition(bool& firstLine, bool& fullLayout, bool& previousLineBrokeCleanly,
@@ -389,6 +462,10 @@ private:
     void deleteEllipsisLineBoxes();
     void checkLinesForTextOverflow();
     void addOverflowFromInlineChildren();
+    int beforeSideVisibleOverflowForLine(RootInlineBox*) const;
+    int afterSideVisibleOverflowForLine(RootInlineBox*) const;
+    int beforeSideLayoutOverflowForLine(RootInlineBox*) const;
+    int afterSideLayoutOverflowForLine(RootInlineBox*) const;
     // End of functions defined in RenderBlockLineLayout.cpp.
 
     void addOverflowFromBlockChildren();
@@ -420,15 +497,13 @@ private:
 
     virtual bool avoidsFloats() const;
 
-    bool hasOverhangingFloats() { return parent() && !hasColumns() && floatBottom() > height(); }
+    bool hasOverhangingFloats() { return parent() && !hasColumns() && lowestFloatLogicalBottom() > logicalHeight(); }
     void addIntrudingFloats(RenderBlock* prev, int xoffset, int yoffset);
     int addOverhangingFloats(RenderBlock* child, int xoffset, int yoffset, bool makeChildPaintOtherFloats);
 
-    int nextFloatBottomBelow(int) const;
-    int floatBottom() const;
-    inline int leftBottom();
-    inline int rightBottom();
-
+    int lowestFloatLogicalBottom(FloatingObject::Type = FloatingObject::FloatBoth) const;
+    int nextFloatLogicalBottomBelow(int) const;
+    
     virtual bool hitTestColumns(const HitTestRequest&, HitTestResult&, int x, int y, int tx, int ty, HitTestAction);
     virtual bool hitTestContents(const HitTestRequest&, HitTestResult&, int x, int y, int tx, int ty, HitTestAction);
     bool hitTestFloats(const HitTestRequest&, HitTestResult&, int x, int y, int tx, int ty);
@@ -455,17 +530,17 @@ private:
     }
     virtual bool shouldPaintSelectionGaps() const;
     bool isSelectionRoot() const;
-    GapRects fillSelectionGaps(RenderBlock* rootBlock, int blockX, int blockY, int tx, int ty,
-                               int& lastTop, int& lastLeft, int& lastRight, const PaintInfo* = 0);
-    GapRects fillInlineSelectionGaps(RenderBlock* rootBlock, int blockX, int blockY, int tx, int ty,
-                                     int& lastTop, int& lastLeft, int& lastRight, const PaintInfo*);
-    GapRects fillBlockSelectionGaps(RenderBlock* rootBlock, int blockX, int blockY, int tx, int ty,
-                                    int& lastTop, int& lastLeft, int& lastRight, const PaintInfo*);
-    IntRect fillVerticalSelectionGap(int lastTop, int lastLeft, int lastRight, int bottomY, RenderBlock* rootBlock,
-                                     int blockX, int blockY, const PaintInfo*);
-    int leftSelectionOffset(RenderBlock* rootBlock, int y);
-    int rightSelectionOffset(RenderBlock* rootBlock, int y);
-
+    GapRects selectionGaps(RenderBlock* rootBlock, const IntPoint& rootBlockPhysicalPosition, const IntSize& offsetFromRootBlock,
+                           int& lastLogicalTop, int& lastLogicalLeft, int& lastLogicalRight, const PaintInfo* = 0);
+    GapRects inlineSelectionGaps(RenderBlock* rootBlock, const IntPoint& rootBlockPhysicalPosition, const IntSize& offsetFromRootBlock,
+                           int& lastLogicalTop, int& lastLogicalLeft, int& lastLogicalRight, const PaintInfo*);
+    GapRects blockSelectionGaps(RenderBlock* rootBlock, const IntPoint& rootBlockPhysicalPosition, const IntSize& offsetFromRootBlock,
+                           int& lastLogicalTop, int& lastLogicalLeft, int& lastLogicalRight, const PaintInfo*);
+    IntRect blockSelectionGap(RenderBlock* rootBlock, const IntPoint& rootBlockPhysicalPosition, const IntSize& offsetFromRootBlock,
+                              int lastLogicalTop, int lastLogicalLeft, int lastLogicalRight, int logicalBottom, const PaintInfo*);
+    int logicalLeftSelectionOffset(RenderBlock* rootBlock, int position);
+    int logicalRightSelectionOffset(RenderBlock* rootBlock, int position);
+    
     virtual void absoluteRects(Vector<IntRect>&, int tx, int ty);
     virtual void absoluteQuads(Vector<FloatQuad>&);
 
@@ -482,7 +557,7 @@ private:
     void adjustPointToColumnContents(IntPoint&) const;
     void adjustForBorderFit(int x, int& left, int& right) const; // Helper function for borderFitAdjust
 
-    void markLinesDirtyInVerticalRange(int top, int bottom, RootInlineBox* highest = 0);
+    void markLinesDirtyInBlockRange(int logicalTop, int logicalBottom, RootInlineBox* highest = 0);
 
     void newLine(EClear);
 
@@ -538,24 +613,24 @@ private:
         bool m_determinedMarginBeforeQuirk : 1;
 
         // These flags track the previous maximal positive and negative margins.
-        int m_posMargin;
-        int m_negMargin;
+        int m_positiveMargin;
+        int m_negativeMargin;
 
     public:
         MarginInfo(RenderBlock* b, int beforeBorderPadding, int afterBorderPadding);
 
         void setAtBeforeSideOfBlock(bool b) { m_atBeforeSideOfBlock = b; }
         void setAtAfterSideOfBlock(bool b) { m_atAfterSideOfBlock = b; }
-        void clearMargin() { m_posMargin = m_negMargin = 0; }
+        void clearMargin() { m_positiveMargin = m_negativeMargin = 0; }
         void setMarginBeforeQuirk(bool b) { m_marginBeforeQuirk = b; }
         void setMarginAfterQuirk(bool b) { m_marginAfterQuirk = b; }
         void setDeterminedMarginBeforeQuirk(bool b) { m_determinedMarginBeforeQuirk = b; }
-        void setPosMargin(int p) { m_posMargin = p; }
-        void setNegMargin(int n) { m_negMargin = n; }
-        void setPosMarginIfLarger(int p) { if (p > m_posMargin) m_posMargin = p; }
-        void setNegMarginIfLarger(int n) { if (n > m_negMargin) m_negMargin = n; }
+        void setPositiveMargin(int p) { m_positiveMargin = p; }
+        void setNegativeMargin(int n) { m_negativeMargin = n; }
+        void setPositiveMarginIfLarger(int p) { if (p > m_positiveMargin) m_positiveMargin = p; }
+        void setNegativeMarginIfLarger(int n) { if (n > m_negativeMargin) m_negativeMargin = n; }
 
-        void setMargin(int p, int n) { m_posMargin = p; m_negMargin = n; }
+        void setMargin(int p, int n) { m_positiveMargin = p; m_negativeMargin = n; }
 
         bool atBeforeSideOfBlock() const { return m_atBeforeSideOfBlock; }
         bool canCollapseWithMarginBefore() const { return m_atBeforeSideOfBlock && m_canCollapseMarginBeforeWithChildren; }
@@ -566,12 +641,12 @@ private:
         bool determinedMarginBeforeQuirk() const { return m_determinedMarginBeforeQuirk; }
         bool marginBeforeQuirk() const { return m_marginBeforeQuirk; }
         bool marginAfterQuirk() const { return m_marginAfterQuirk; }
-        int posMargin() const { return m_posMargin; }
-        int negMargin() const { return m_negMargin; }
-        int margin() const { return m_posMargin - m_negMargin; }
+        int positiveMargin() const { return m_positiveMargin; }
+        int negativeMargin() const { return m_negativeMargin; }
+        int margin() const { return m_positiveMargin - m_negativeMargin; }
     };
 
-    void layoutBlockChild(RenderBox* child, MarginInfo&, int& previousFloatBottom, int& maxFloatBottom);
+    void layoutBlockChild(RenderBox* child, MarginInfo&, int& previousFloatLogicalBottom, int& maxFloatLogicalBottom);
     void adjustPositionedBlock(RenderBox* child, const MarginInfo&);
     void adjustFloatingBlock(const MarginInfo&);
     bool handleSpecialChild(RenderBox* child, const MarginInfo&);
@@ -584,7 +659,6 @@ private:
     void determineLogicalLeftPositionForChild(RenderBox* child);
     void handleAfterSideOfBlock(int top, int bottom, MarginInfo&);
     void setCollapsedBottomMargin(const MarginInfo&);
-    void setLogicalTopForChild(RenderBox* child, int logicalTop);
     // End helper functions and structs used by layoutBlockChildren.
 
     // Pagination routines.
@@ -604,41 +678,35 @@ private:
     // split into a sequence of inlines and blocks.  The continuation will either be
     // an anonymous block (that houses other blocks) or it will be an inline flow.
     RenderBoxModelObject* m_continuation;
-
+    
     // Allocated only when some of these fields have non-default values
     struct RenderBlockRareData : Noncopyable {
         RenderBlockRareData(const RenderBlock* block) 
-            : m_beforePos(beforePosDefault(block))
-            , m_beforeNeg(beforeNegDefault(block))
-            , m_afterPos(afterPosDefault(block))
-            , m_afterNeg(afterNegDefault(block))
+            : m_margins(positiveMarginBeforeDefault(block), negativeMarginBeforeDefault(block), positiveMarginAfterDefault(block), negativeMarginAfterDefault(block))
             , m_paginationStrut(0)
             , m_pageY(0)
         { 
         }
 
-        static int beforePosDefault(const RenderBlock* block)
+        static int positiveMarginBeforeDefault(const RenderBlock* block)
         { 
             return std::max(block->marginBefore(), 0);
         }
         
-        static int beforeNegDefault(const RenderBlock* block)
+        static int negativeMarginBeforeDefault(const RenderBlock* block)
         { 
             return std::max(-block->marginBefore(), 0);
         }
-        static int afterPosDefault(const RenderBlock* block)
+        static int positiveMarginAfterDefault(const RenderBlock* block)
         {
             return std::max(block->marginAfter(), 0);
         }
-        static int afterNegDefault(const RenderBlock* block)
+        static int negativeMarginAfterDefault(const RenderBlock* block)
         {
             return std::max(-block->marginAfter(), 0);
         }
         
-        int m_beforePos;
-        int m_beforeNeg;
-        int m_afterPos;
-        int m_afterNeg;
+        MarginValues m_margins;
         int m_paginationStrut;
         int m_pageY;
      };

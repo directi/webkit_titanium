@@ -32,6 +32,13 @@
 extern "C" {
 #endif
 
+enum {
+    kWKCacheModelDocumentViewer = 0,
+    kWKCacheModelDocumentBrowser = 1,
+    kWKCacheModelPrimaryWebBrowser = 2
+};
+typedef uint32_t WKCacheModel;
+
 // Injected Bundle Client
 typedef void (*WKContextDidReceiveMessageFromInjectedBundleCallback)(WKContextRef page, WKStringRef messageName, WKTypeRef messageBody, const void *clientInfo);
 typedef void (*WKContextDidReceiveSynchronousMessageFromInjectedBundleCallback)(WKContextRef page, WKStringRef messageName, WKTypeRef messageBody, WKTypeRef* returnData, const void *clientInfo);
@@ -62,6 +69,20 @@ struct WKContextHistoryClient {
 };
 typedef struct WKContextHistoryClient WKContextHistoryClient;
 
+// Download Client
+typedef void (*WKContextDownloadDidStartCallback)(WKContextRef context, WKDownloadRef download, const void *clientInfo);
+typedef void (*WKContextDownloadDidFinishCallback)(WKContextRef context, WKDownloadRef download, const void *clientInfo);
+typedef void (*WKContextDownloadDidCreateDestinationCallback)(WKContextRef context, WKDownloadRef download, WKStringRef path, const void *clientInfo);
+
+struct WKContextDownloadClient {
+    int                                                                 version;
+    const void *                                                        clientInfo;
+    WKContextDownloadDidStartCallback                                   didStart;
+    WKContextDownloadDidCreateDestinationCallback                       didCreateDestination;
+    WKContextDownloadDidFinishCallback                                  didFinish;
+};
+typedef struct WKContextDownloadClient WKContextDownloadClient;
+
 WK_EXPORT WKTypeID WKContextGetTypeID();
 
 WK_EXPORT WKContextRef WKContextCreate();
@@ -71,12 +92,17 @@ WK_EXPORT WKContextRef WKContextGetSharedProcessContext();
 WK_EXPORT void WKContextSetPreferences(WKContextRef context, WKPreferencesRef preferences);
 WK_EXPORT WKPreferencesRef WKContextGetPreferences(WKContextRef context);
 
-WK_EXPORT void WKContextSetHistoryClient(WKContextRef context, const WKContextHistoryClient* client);
 WK_EXPORT void WKContextSetInjectedBundleClient(WKContextRef context, const WKContextInjectedBundleClient* client);
+WK_EXPORT void WKContextSetHistoryClient(WKContextRef context, const WKContextHistoryClient* client);
+WK_EXPORT void WKContextSetDownloadClient(WKContextRef context, const WKContextDownloadClient* client);
 
+WK_EXPORT void WKContextSetInitializationUserDataForInjectedBundle(WKContextRef context, WKTypeRef userData);
 WK_EXPORT void WKContextPostMessageToInjectedBundle(WKContextRef context, WKStringRef messageName, WKTypeRef messageBody);
 
 WK_EXPORT void WKContextAddVisitedLink(WKContextRef context, WKStringRef visitedURL);
+
+WK_EXPORT void WKContextSetCacheModel(WKContextRef context, WKCacheModel cacheModel);
+WK_EXPORT WKCacheModel WKContextGetCacheModel(WKContextRef context);
 
 #ifdef __cplusplus
 }

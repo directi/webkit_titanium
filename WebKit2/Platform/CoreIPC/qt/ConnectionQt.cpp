@@ -28,7 +28,6 @@
 
 #include "ArgumentEncoder.h"
 #include "ProcessLauncher.h"
-#include "WebPageProxyMessageKinds.h"
 #include "WorkItem.h"
 #include <QApplication>
 #include <QLocalServer>
@@ -52,6 +51,7 @@ void Connection::platformInitialize(Identifier identifier)
 void Connection::platformInvalidate()
 {
     delete m_socket;
+    m_socket = 0;
 }
 
 void Connection::readyReadHandler()
@@ -66,12 +66,15 @@ void Connection::readyReadHandler()
         if (m_socket->bytesAvailable() < m_currentMessageSize)
             return;
 
+        if (m_readBuffer.size() < m_currentMessageSize)
+            m_readBuffer.grow(m_currentMessageSize);
+
         size_t numberOfBytesRead = m_socket->read(reinterpret_cast<char*>(m_readBuffer.data()), m_currentMessageSize);
         ASSERT_UNUSED(numberOfBytesRead, numberOfBytesRead);
 
         // The messageID is encoded at the end of the buffer.
-        size_t realBufferSize = m_currentMessageSize - sizeof(MessageID);
-        unsigned messageID = *reinterpret_cast<unsigned*>(m_readBuffer.data() + realBufferSize);
+        size_t realBufferSize = m_currentMessageSize - sizeof(uint32_t);
+        uint32_t messageID = *reinterpret_cast<uint32_t*>(m_readBuffer.data() + realBufferSize);
 
         processIncomingMessage(MessageID::fromInt(messageID), adoptPtr(new ArgumentDecoder(m_readBuffer.data(), realBufferSize)));
 
@@ -117,11 +120,18 @@ bool Connection::sendOutgoingMessage(MessageID messageID, PassOwnPtr<ArgumentEnc
 
     // Write message size first
     // FIXME: Should  just do a single write.
-    m_socket->write(reinterpret_cast<char*>(&bufferSize), sizeof(bufferSize));
+    qint64 bytesWrittenForSize = m_socket->write(reinterpret_cast<char*>(&bufferSize), sizeof(bufferSize));
+    if (bytesWrittenForSize != sizeof(bufferSize)) {
+        connectionDidClose();
+        return false;
+    }
 
-    qint64 bytesWritten = m_socket->write(reinterpret_cast<char*>(arguments->buffer()), arguments->bufferSize());
+    qint64 bytesWrittenForBuffer = m_socket->write(reinterpret_cast<char*>(arguments->buffer()), arguments->bufferSize());
+    if (bytesWrittenForBuffer != arguments->bufferSize()) {
+        connectionDidClose();
+        return false;
+    }
 
-    ASSERT_UNUSED(bytesWritten, bytesWritten == arguments->bufferSize());
     return true;
 }
 

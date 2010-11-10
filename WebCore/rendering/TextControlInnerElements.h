@@ -49,6 +49,7 @@ private:
     virtual bool isMouseFocusable() const { return false; } 
     virtual bool isShadowNode() const { return m_shadowParent; }
     virtual ContainerNode* shadowParentNode() { return m_shadowParent; }
+    virtual bool isSpellCheckingEnabled() const;
     void setShadowParentNode(HTMLElement* shadowParent) { m_shadowParent = shadowParent; }
 
     HTMLElement* m_shadowParent;
@@ -141,7 +142,7 @@ public:
     // SpeechInputListener methods.
     void didCompleteRecording(int);
     void didCompleteRecognition(int);
-    void setRecognitionResult(int, const String& result);
+    void setRecognitionResult(int, const SpeechInputResultArray&);
 
 private:
     InputFieldSpeechButtonElement(HTMLElement*);
@@ -151,6 +152,7 @@ private:
     bool m_capturing;
     SpeechInputState m_state;
     int m_listenerId;
+    SpeechInputResultArray m_results;
 };
 
 #endif // ENABLE(INPUT_SPEECH)

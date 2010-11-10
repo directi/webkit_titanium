@@ -83,7 +83,7 @@ void AccessibilityARIAGrid::addChildren()
 {
     ASSERT(!m_haveChildren); 
     
-    if (!isDataTable()) {
+    if (!isAccessibilityTable()) {
         AccessibilityRenderObject::addChildren();
         return;
     }
@@ -118,11 +118,12 @@ void AccessibilityARIAGrid::addChildren()
         column->setColumnIndex((int)i);
         column->setParentTable(this);
         m_columns.append(column);
-        m_children.append(column);
+        if (!column->accessibilityIsIgnored())
+            m_children.append(column);
     }
     
     AccessibilityObject* headerContainerObject = headerContainer();
-    if (headerContainerObject)
+    if (headerContainerObject && !headerContainerObject->accessibilityIsIgnored())
         m_children.append(headerContainerObject);
 }
     

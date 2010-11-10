@@ -206,9 +206,14 @@ void PluginPackage::determineQuirks(const String& mimeType)
             m_quirks.add(PluginQuirkWantsMozillaUserAgent);
         }
 
-#if PLATFORM(QT) && CPU(X86)
-        // 32-bit Flash will crash on repeated calls to SetWindow in windowed mode
+#if PLATFORM(QT)
+        // Flash will crash on repeated calls to SetWindow in windowed mode
         m_quirks.add(PluginQuirkDontCallSetWindowMoreThanOnce);
+
+#if CPU(X86_64)
+        // 64-bit Flash freezes if right-click is sent in windowless mode
+        m_quirks.add(PluginQuirkIgnoreRightClickInWindowlessMode);
+#endif
 #endif
 
         m_quirks.add(PluginQuirkRequiresDefaultScreenDepth);
@@ -329,6 +334,9 @@ void PluginPackage::initializeBrowserFuncs()
     m_browserFuncs.setexception = _NPN_SetException;
     m_browserFuncs.enumerate = _NPN_Enumerate;
     m_browserFuncs.construct = _NPN_Construct;
+    m_browserFuncs.getvalueforurl = NPN_GetValueForURL;
+    m_browserFuncs.setvalueforurl = NPN_SetValueForURL;
+    m_browserFuncs.getauthenticationinfo = NPN_GetAuthenticationInfo;
 }
 #endif
 
@@ -340,7 +348,7 @@ unsigned PluginPackage::hash() const
         m_lastModified
     };
 
-    return StringImpl::computeHash(reinterpret_cast<UChar*>(hashCodes), sizeof(hashCodes) / sizeof(UChar));
+    return WTF::StringHasher::createBlobHash<sizeof(hashCodes)>(hashCodes);
 }
 
 bool PluginPackage::equal(const PluginPackage& a, const PluginPackage& b)

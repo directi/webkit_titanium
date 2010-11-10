@@ -6,15 +6,8 @@
 <script>
 function doit()
 {
-    function callback(result)
-    {
-        if (result === "enabling")
-            return;
-        window.submitCalled = true;
-        document.getElementById("submit").click();
-    }
-
-    evaluateInWebInspector("frontend_enableResourceTracking", callback);
+    window.submitCalled = true;
+    document.getElementById("submit").click();
 }
 
 function onIframeLoad()
@@ -30,20 +23,9 @@ function onIframeLoad()
     evaluateInWebInspector("frontend_dumpFormData", callback);
 }
 
-function frontend_enableResourceTracking(testController)
-{
-    if (!WebInspector.panels.resources.resourceTrackingEnabled) {
-        WebInspector.panels.resources._toggleResourceTracking();
-        return "enabling";
-    }
-    return "enabled";
-}
-
 function frontend_dumpFormData(testController)
 {
-    var resource = WebInspector.resourceURLMap["http://localhost:8000/inspector/resources/post-target.cgi?queryParam1=queryValue1&queryParam2="];
-
-    WebInspector.panels.resources._toggleResourceTracking();
+    var resource = WebInspector.resourceForURL("http://localhost:8000/inspector/resources/post-target.cgi?queryParam1=queryValue1&queryParam2=");
 
     if (!resource) {
         testController.notifyDone("No resource found");

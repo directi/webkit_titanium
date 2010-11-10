@@ -26,7 +26,12 @@
 #include "PluginObject.h"
 
 #include "PluginTest.h"
+#include <cstdlib>
 #include <string>
+
+#ifdef XP_UNIX
+#include <X11/Xlib.h>
+#endif
 
 #if !defined(NP_NO_CARBON) && defined(QD_HEADERS_ARE_PRIVATE) && QD_HEADERS_ARE_PRIVATE
 extern "C" void GlobalToLocal(Point*);
@@ -54,9 +59,17 @@ static inline int strcasecmp(const char* s1, const char* s2)
 #define STDCALL
 #endif
 
+extern "C" {
+NPError STDCALL NP_GetEntryPoints(NPPluginFuncs *pluginFuncs);
+}
+
 // Entry points
 extern "C"
-NPError STDCALL NP_Initialize(NPNetscapeFuncs *browserFuncs)
+NPError STDCALL NP_Initialize(NPNetscapeFuncs *browserFuncs
+#ifdef XP_UNIX
+                              , NPPluginFuncs *pluginFuncs
+#endif
+                              )
 {
     initializeWasCalled = true;
 
@@ -67,7 +80,12 @@ NPError STDCALL NP_Initialize(NPNetscapeFuncs *browserFuncs)
 #endif
 
     browser = browserFuncs;
+
+#ifdef XP_UNIX
+    return NP_GetEntryPoints(pluginFuncs);
+#else
     return NPERR_NO_ERROR;
+#endif
 }
 
 extern "C"
@@ -75,11 +93,13 @@ NPError STDCALL NP_GetEntryPoints(NPPluginFuncs *pluginFuncs)
 {
     getEntryPointsWasCalled = true;
 
-#if XP_MACOSX
+#ifdef XP_MACOSX
     // Simulate Silverlight's behavior of crashing when NP_GetEntryPoints is called before NP_Initialize.
     if (!initializeWasCalled)
         CRASH();
 #endif
+
+    pluginFunctions = pluginFuncs;
 
     pluginFuncs->version = (NP_VERSION_MAJOR << 8) | NP_VERSION_MINOR;
     pluginFuncs->size = sizeof(pluginFuncs);
@@ -111,7 +131,7 @@ NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc
 {
     bool forceCarbon = false;
 
-#if XP_MACOSX
+#ifdef XP_MACOSX
     NPEventModel eventModel;
     
     // Always turn on the CG model
@@ -158,7 +178,7 @@ NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc
     PluginObject* obj = (PluginObject*)browser->createobject(instance, getPluginClass());
     instance->pdata = obj;
 
-#if XP_MACOSX
+#ifdef XP_MACOSX
     obj->eventModel = eventModel;
 #if !defined(BUILDING_ON_TIGER)
     obj->coreAnimationLayer = 0;
@@ -198,7 +218,7 @@ NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc
         else if (strcasecmp(argn[i], "testwindowopen") == 0)
             obj->testWindowOpen = TRUE;
         else if (strcasecmp(argn[i], "drawingmodel") == 0) {
-#if XP_MACOSX && !defined(BUILDING_ON_TIGER)
+#if defined(XP_MACOSX) && !defined(BUILDING_ON_TIGER)
             const char* value = argv[i];
             if (strcasecmp(value, "coreanimation") == 0) {
                 if (supportsCoreAnimation)
@@ -234,7 +254,7 @@ NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc
         }
     }
 
-#if XP_MACOSX
+#ifdef XP_MACOSX
     browser->setvalue(instance, NPPVpluginDrawingModel, (void *)drawingModelToUse);
 #if !defined(BUILDING_ON_TIGER)
     if (drawingModelToUse == NPDrawingModelCoreAnimation)
@@ -246,7 +266,12 @@ NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc
 
     obj->pluginTest = PluginTest::create(instance, testIdentifier);
 
+#ifdef XP_UNIX
+    // On Unix, plugins only get events if they are windowless.
+    return browser->setvalue(instance, NPPVpluginWindowBool, 0);
+#else
     return NPERR_NO_ERROR;
+#endif
 }
 
 NPError NPP_Destroy(NPP instance, NPSavedData **save)
@@ -276,10 +301,12 @@ NPError NPP_Destroy(NPP instance, NPSavedData **save)
         if (obj->logDestroy)
             pluginLog(instance, "NPP_Destroy");
 
-#if XP_MACOSX && !defined(BUILDING_ON_TIGER)
+#if defined(XP_MACOSX) && !defined(BUILDING_ON_TIGER)
         if (obj->coreAnimationLayer)
             CFRelease(obj->coreAnimationLayer);
 #endif
+
+        obj->pluginTest->NPP_Destroy(save);
 
         browser->releaseobject(&obj->header);
     }
@@ -400,7 +427,7 @@ void NPP_Print(NPP instance, NPPrint *platformPrint)
 {
 }
 
-#if XP_MACOSX
+#ifdef XP_MACOSX
 #ifndef NP_NO_CARBON
 static int16_t handleEventCarbon(NPP instance, PluginObject* obj, EventRecord* event)
 {
@@ -462,13 +489,13 @@ static int16_t handleEventCarbon(NPP instance, PluginObject* obj, EventRecord* e
             pluginLog(instance, "kHighLevelEvent");
             break;
         // NPAPI events
-        case getFocusEvent:
+        case NPEventType_GetFocusEvent:
             pluginLog(instance, "getFocusEvent");
             break;
-        case loseFocusEvent:
+        case NPEventType_LoseFocusEvent:
             pluginLog(instance, "loseFocusEvent");
             break;
-        case adjustCursorEvent:
+        case NPEventType_AdjustCursorEvent:
             pluginLog(instance, "adjustCursorEvent");
             break;
         default:
@@ -542,13 +569,61 @@ static int16_t handleEventCocoa(NPP instance, PluginObject* obj, NPCocoaEvent* e
 
 #endif // XP_MACOSX
 
+#ifdef XP_UNIX
+static int16_t handleEventX11(NPP instance, PluginObject* obj, XEvent* event)
+{
+    XButtonPressedEvent* buttonPressEvent = reinterpret_cast<XButtonPressedEvent*>(event);
+    XButtonReleasedEvent* buttonReleaseEvent = reinterpret_cast<XButtonReleasedEvent*>(event);
+    switch (event->type) {
+    case ButtonPress:
+        pluginLog(instance, "mouseDown at (%d, %d)", buttonPressEvent->x, buttonPressEvent->y);
+        if (obj->evaluateScriptOnMouseDownOrKeyDown && obj->mouseDownForEvaluateScript)
+            executeScript(obj, obj->evaluateScriptOnMouseDownOrKeyDown);
+        break;
+    case ButtonRelease:
+        pluginLog(instance, "mouseUp at (%d, %d)", buttonReleaseEvent->x, buttonReleaseEvent->y);
+        break;
+    case KeyPress:
+        // FIXME: extract key code
+        pluginLog(instance, "NOTIMPLEMENTED: keyDown '%c'", ' ');
+        if (obj->evaluateScriptOnMouseDownOrKeyDown && !obj->mouseDownForEvaluateScript)
+            executeScript(obj, obj->evaluateScriptOnMouseDownOrKeyDown);
+        break;
+    case KeyRelease:
+        // FIXME: extract key code
+        pluginLog(instance, "NOTIMPLEMENTED: keyUp '%c'", ' ');
+        break;
+    case GraphicsExpose:
+        pluginLog(instance, "updateEvt");
+        break;
+    // NPAPI events
+    case FocusIn:
+        pluginLog(instance, "getFocusEvent");
+        break;
+    case FocusOut:
+        pluginLog(instance, "loseFocusEvent");
+        break;
+    case EnterNotify:
+    case LeaveNotify:
+    case MotionNotify:
+        pluginLog(instance, "adjustCursorEvent");
+        break;
+    default:
+        pluginLog(instance, "event %d", event->type);
+    }
+
+    fflush(stdout);
+    return 0;
+}
+#endif // XP_UNIX
+
 int16_t NPP_HandleEvent(NPP instance, void *event)
 {
     PluginObject* obj = static_cast<PluginObject*>(instance->pdata);
     if (!obj->eventLogging)
         return 0;
 
-#if XP_MACOSX
+#ifdef XP_MACOSX
 #ifndef NP_NO_CARBON
     if (obj->eventModel == NPEventModelCarbon)
         return handleEventCarbon(instance, obj, static_cast<EventRecord*>(event));
@@ -556,6 +631,8 @@ int16_t NPP_HandleEvent(NPP instance, void *event)
 
     assert(obj->eventModel == NPEventModelCocoa);
     return handleEventCocoa(instance, obj, static_cast<NPCocoaEvent*>(event));
+#elif defined(XP_UNIX)
+    return handleEventX11(instance, obj, static_cast<XEvent*>(event));
 #else
     // FIXME: Implement for other platforms.
     return 0;
@@ -574,6 +651,17 @@ void NPP_URLNotify(NPP instance, const char *url, NPReason reason, void *notifyD
 
 NPError NPP_GetValue(NPP instance, NPPVariable variable, void *value)
 {
+#ifdef XP_UNIX
+    if (variable == NPPVpluginNameString) {
+        *((char **)value) = const_cast<char*>("WebKit Test PlugIn");
+        return NPERR_NO_ERROR;
+    }
+    if (variable == NPPVpluginDescriptionString) {
+        *((char **)value) = const_cast<char*>("Simple Netscape plug-in that handles test content for WebKit");
+        return NPERR_NO_ERROR;
+    }
+#endif
+
     PluginObject* obj = static_cast<PluginObject*>(instance->pdata);
 
     // First, check if the PluginTest object supports getting this value.
@@ -588,7 +676,7 @@ NPError NPP_GetValue(NPP instance, NPPVariable variable, void *value)
         return NPERR_NO_ERROR;
     }
     
-#if XP_MACOSX && !defined(BUILDING_ON_TIGER)
+#if defined(XP_MACOSX) && !defined(BUILDING_ON_TIGER)
     if (variable == NPPVpluginCoreAnimationLayer) {
         if (!obj->coreAnimationLayer)
             return NPERR_GENERIC_ERROR;
@@ -598,7 +686,7 @@ NPError NPP_GetValue(NPP instance, NPPVariable variable, void *value)
         return NPERR_NO_ERROR;
     }
 #endif
-    
+
     return NPERR_GENERIC_ERROR;
 }
 
@@ -614,3 +702,17 @@ NPError NPP_SetValue(NPP instance, NPNVariable variable, void *value)
             return NPERR_GENERIC_ERROR;
     }
 }
+
+#ifdef XP_UNIX
+extern "C"
+const char* NP_GetMIMEDescription(void)
+{
+    return "application/x-webkit-test-netscape:testnetscape:test netscape content";
+}
+
+extern "C"
+NPError NP_GetValue(NPP instance, NPPVariable variable, void* value)
+{
+    return NPP_GetValue(instance, variable, value);
+}
+#endif

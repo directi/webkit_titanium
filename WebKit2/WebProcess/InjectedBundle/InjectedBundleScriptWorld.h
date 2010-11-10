@@ -44,7 +44,7 @@ public:
     static PassRefPtr<InjectedBundleScriptWorld> getOrCreate(WebCore::DOMWrapperWorld*);
     static InjectedBundleScriptWorld* normalWorld();
 
-    ~InjectedBundleScriptWorld();
+    virtual ~InjectedBundleScriptWorld();
 
     WebCore::DOMWrapperWorld* coreWorld() const;
 

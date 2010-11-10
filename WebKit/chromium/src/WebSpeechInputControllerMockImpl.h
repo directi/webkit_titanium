@@ -54,15 +54,15 @@ public:
     // WebCore::SpeechInputListener methods.
     void didCompleteRecording(int requestId);
     void didCompleteRecognition(int requestId);
-    void setRecognitionResult(int requestId, const WTF::String& result);
+    void setRecognitionResult(int requestId, const WebCore::SpeechInputResultArray& result);
 
     // WebSpeechInputController methods.
-    bool startRecognition(int requestId, const WebRect& elementRect);
+    bool startRecognition(int requestId, const WebRect& elementRect, const WebString& language, const WebString& grammar);
     void cancelRecognition(int requestId);
     void stopRecording(int requestId);
 
     // WebSpeechInputControllerMock methods.
-    void setMockRecognitionResult(const WebString& result);
+    void setMockRecognitionResult(const WebString& result, const WebString& language);
 
 private:
     OwnPtr<WebCore::SpeechInputClientMock> m_webcoreMock;
@@ -72,4 +72,3 @@ private:
 } // namespace WebKit
 
 #endif // WebSpeechInputControllerMockImpl_h
-

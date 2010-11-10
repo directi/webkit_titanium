@@ -59,9 +59,10 @@ struct ProgressItem : Noncopyable {
     long long estimatedLength;
 };
 
+unsigned long ProgressTracker::s_uniqueIdentifier = 0;
+
 ProgressTracker::ProgressTracker()
-    : m_uniqueIdentifier(0)
-    , m_totalPageAndResourceBytesToLoad(0)
+    : m_totalPageAndResourceBytesToLoad(0)
     , m_totalBytesReceived(0)
     , m_lastNotifiedProgressValue(0)
     , m_lastNotifiedProgressTime(0)
@@ -100,7 +101,7 @@ void ProgressTracker::reset()
 
 void ProgressTracker::progressStarted(Frame* frame)
 {
-    LOG(Progress, "Progress started (%p) - frame %p(\"%s\"), value %f, tracked frames %d, originating frame %p", this, frame, frame->tree()->name().string().utf8().data(), m_progressValue, m_numProgressTrackedFrames, m_originatingProgressFrame.get());
+    LOG(Progress, "Progress started (%p) - frame %p(\"%s\"), value %f, tracked frames %d, originating frame %p", this, frame, frame->tree()->uniqueName().string().utf8().data(), m_progressValue, m_numProgressTrackedFrames, m_originatingProgressFrame.get());
 
     frame->loader()->client()->willChangeEstimatedProgress();
     
@@ -118,7 +119,7 @@ void ProgressTracker::progressStarted(Frame* frame)
 
 void ProgressTracker::progressCompleted(Frame* frame)
 {
-    LOG(Progress, "Progress completed (%p) - frame %p(\"%s\"), value %f, tracked frames %d, originating frame %p", this, frame, frame->tree()->name().string().utf8().data(), m_progressValue, m_numProgressTrackedFrames, m_originatingProgressFrame.get());
+    LOG(Progress, "Progress completed (%p) - frame %p(\"%s\"), value %f, tracked frames %d, originating frame %p", this, frame, frame->tree()->uniqueName().string().utf8().data(), m_progressValue, m_numProgressTrackedFrames, m_originatingProgressFrame.get());
     
     if (m_numProgressTrackedFrames <= 0)
         return;
@@ -240,7 +241,7 @@ void ProgressTracker::completeProgress(unsigned long identifier)
 {
     ProgressItem* item = m_progressItems.get(identifier);
     
-    // FIXME: Can this happen?
+    // This can happen if a load fails without receiving any response data.
     if (!item)
         return;
     
@@ -255,7 +256,7 @@ void ProgressTracker::completeProgress(unsigned long identifier)
 
 unsigned long ProgressTracker::createUniqueIdentifier()
 {
-    return ++m_uniqueIdentifier;
+    return ++s_uniqueIdentifier;
 }
 
 

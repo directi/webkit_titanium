@@ -26,86 +26,92 @@
 #include "config.h"
 #include "IDBDatabaseBackendImpl.h"
 
+#if ENABLE(INDEXED_DATABASE)
+
+#include "CrossThreadTask.h"
 #include "DOMStringList.h"
 #include "IDBDatabaseException.h"
+#include "IDBFactoryBackendImpl.h"
 #include "IDBObjectStoreBackendImpl.h"
+#include "IDBSQLiteDatabase.h"
+#include "IDBTransactionBackendImpl.h"
 #include "IDBTransactionCoordinator.h"
-#include "SQLiteDatabase.h"
 #include "SQLiteStatement.h"
 #include "SQLiteTransaction.h"
 
-#if ENABLE(INDEXED_DATABASE)
-
 namespace WebCore {
 
-static bool extractMetaData(SQLiteDatabase* sqliteDatabase, const String& expectedName, String& foundDescription, String& foundVersion)
+static bool extractMetaData(SQLiteDatabase& sqliteDatabase, const String& name, String& foundVersion, int64& foundId)
 {
-    SQLiteStatement metaDataQuery(*sqliteDatabase, "SELECT name, description, version FROM MetaData");
-    if (metaDataQuery.prepare() != SQLResultOk || metaDataQuery.step() != SQLResultRow)
+    SQLiteStatement databaseQuery(sqliteDatabase, "SELECT id, version FROM Databases WHERE name = ?");
+    if (databaseQuery.prepare() != SQLResultOk) {
+        ASSERT_NOT_REACHED();
+        return false;
+    }
+    databaseQuery.bindText(1, name);
+    if (databaseQuery.step() != SQLResultRow)
         return false;
 
-    if (metaDataQuery.getColumnText(0) != expectedName) {
-        LOG_ERROR("Name in MetaData (%s) doesn't match expected (%s) for IndexedDB", metaDataQuery.getColumnText(0).utf8().data(), expectedName.utf8().data());
-        ASSERT_NOT_REACHED();
-    }
-    foundDescription = metaDataQuery.getColumnText(1);
-    foundVersion = metaDataQuery.getColumnText(2);
+    foundId = databaseQuery.getColumnInt64(0);
+    foundVersion = databaseQuery.getColumnText(1);
 
-    if (metaDataQuery.step() == SQLResultRow) {
-        LOG_ERROR("More than one row found in MetaData table");
+    if (databaseQuery.step() == SQLResultRow)
         ASSERT_NOT_REACHED();
+    return true;
+}
+
+static bool setMetaData(SQLiteDatabase& sqliteDatabase, const String& name, const String& description, const String& version, int64_t& rowId)
+{
+    ASSERT(!name.isNull());
+    ASSERT(!description.isNull());
+    ASSERT(!version.isNull());
+
+    String sql = rowId != IDBDatabaseBackendImpl::InvalidId ? "UPDATE Databases SET name = ?, description = ?, version = ? WHERE id = ?"
+                                                            : "INSERT INTO Databases (name, description, version) VALUES (?, ?, ?)";
+    SQLiteStatement query(sqliteDatabase, sql);
+    if (query.prepare() != SQLResultOk) {
+        ASSERT_NOT_REACHED();
+        return false;
     }
+
+    query.bindText(1, name);
+    query.bindText(2, description);
+    query.bindText(3, version);
+    if (rowId != IDBDatabaseBackendImpl::InvalidId)
+        query.bindInt64(4, rowId);
+
+    if (query.step() != SQLResultDone)
+        return false;
+
+    if (rowId == IDBDatabaseBackendImpl::InvalidId)
+        rowId = sqliteDatabase.lastInsertRowID();
 
     return true;
 }
 
-static bool setMetaData(SQLiteDatabase* sqliteDatabase, const String& name, const String& description, const String& version)
-{
-    ASSERT(!name.isNull() && !description.isNull() && !version.isNull());
-
-    sqliteDatabase->executeCommand("DELETE FROM MetaData");
-
-    SQLiteStatement insert(*sqliteDatabase, "INSERT INTO MetaData (name, description, version) VALUES (?, ?, ?)");
-    if (insert.prepare() != SQLResultOk) {
-        LOG_ERROR("Failed to prepare MetaData insert statement for IndexedDB");
-        return false;
-    }
-
-    insert.bindText(1, name);
-    insert.bindText(2, description);
-    insert.bindText(3, version);
-
-    if (insert.step() != SQLResultDone) {
-        LOG_ERROR("Failed to insert row into MetaData for IndexedDB");
-        return false;
-    }
-
-    // FIXME: Should we assert there's only one row?
-
-    return true;
-}
-
-IDBDatabaseBackendImpl::IDBDatabaseBackendImpl(const String& name, const String& description, PassOwnPtr<SQLiteDatabase> sqliteDatabase, IDBTransactionCoordinator* coordinator)
+IDBDatabaseBackendImpl::IDBDatabaseBackendImpl(const String& name, const String& description, IDBSQLiteDatabase* sqliteDatabase, IDBTransactionCoordinator* coordinator, IDBFactoryBackendImpl* factory, const String& uniqueIdentifier)
     : m_sqliteDatabase(sqliteDatabase)
+    , m_id(InvalidId)
     , m_name(name)
+    , m_description(description)
     , m_version("")
+    , m_identifier(uniqueIdentifier)
+    , m_factory(factory)
     , m_transactionCoordinator(coordinator)
 {
     ASSERT(!m_name.isNull());
+    ASSERT(!m_description.isNull());
 
-    // FIXME: The spec is in flux about how to handle description. Sync it up once a final decision is made.
-    String foundDescription = "";
-    bool result = extractMetaData(m_sqliteDatabase.get(), m_name, foundDescription, m_version);
-    m_description = description.isNull() ? foundDescription : description;
-
-    if (!result || m_description != foundDescription)
-        setMetaData(m_sqliteDatabase.get(), m_name, m_description, m_version);
-
+    bool success = extractMetaData(m_sqliteDatabase->db(), m_name, m_version, m_id);
+    ASSERT_UNUSED(success, success == (m_id != InvalidId));
+    if (!setMetaData(m_sqliteDatabase->db(), m_name, m_description, m_version, m_id))
+        ASSERT_NOT_REACHED(); // FIXME: Need better error handling.
     loadObjectStores();
 }
 
 IDBDatabaseBackendImpl::~IDBDatabaseBackendImpl()
 {
+    m_factory->removeIDBDatabaseBackend(m_identifier);
 }
 
 void IDBDatabaseBackendImpl::setDescription(const String& description)
@@ -114,7 +120,12 @@ void IDBDatabaseBackendImpl::setDescription(const String& description)
         return;
 
     m_description = description;
-    setMetaData(m_sqliteDatabase.get(), m_name, m_description, m_version);
+    setMetaData(m_sqliteDatabase->db(), m_name, m_description, m_version, m_id);
+}
+
+SQLiteDatabase& IDBDatabaseBackendImpl::sqliteDatabase() const
+{
+    return m_sqliteDatabase->db();
 }
 
 PassRefPtr<DOMStringList> IDBDatabaseBackendImpl::objectStores() const
@@ -125,35 +136,50 @@ PassRefPtr<DOMStringList> IDBDatabaseBackendImpl::objectStores() const
     return objectStoreNames.release();
 }
 
-void IDBDatabaseBackendImpl::createObjectStore(const String& name, const String& keyPath, bool autoIncrement, PassRefPtr<IDBCallbacks> callbacks)
+PassRefPtr<IDBObjectStoreBackendInterface>  IDBDatabaseBackendImpl::createObjectStore(const String& name, const String& keyPath, bool autoIncrement, IDBTransactionBackendInterface* transactionPtr, ExceptionCode& ec)
 {
     if (m_objectStores.contains(name)) {
-        callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::CONSTRAINT_ERR, "An objectStore with that name already exists."));
-        return;
+        // FIXME: Throw CONSTRAINT_ERR in this case.
+        return 0;
     }
 
-    SQLiteStatement insert(sqliteDatabase(), "INSERT INTO ObjectStores (name, keyPath, doAutoIncrement) VALUES (?, ?, ?)");
-    bool ok = insert.prepare() == SQLResultOk;
-    ASSERT_UNUSED(ok, ok); // FIXME: Better error handling.
-    insert.bindText(1, name);
-    insert.bindText(2, keyPath);
-    insert.bindInt(3, static_cast<int>(autoIncrement));
-    ok = insert.step() == SQLResultDone;
-    ASSERT_UNUSED(ok, ok); // FIXME: Better error handling.
-    int64_t id = sqliteDatabase().lastInsertRowID();
-
-    RefPtr<IDBObjectStoreBackendImpl> objectStore = IDBObjectStoreBackendImpl::create(this, id, name, keyPath, autoIncrement);
+    RefPtr<IDBObjectStoreBackendImpl> objectStore = IDBObjectStoreBackendImpl::create(m_sqliteDatabase.get(), name, keyPath, autoIncrement);
     ASSERT(objectStore->name() == name);
+
+    RefPtr<IDBDatabaseBackendImpl> database = this;
+    RefPtr<IDBTransactionBackendInterface> transaction = transactionPtr;
+    if (!transaction->scheduleTask(createCallbackTask(&IDBDatabaseBackendImpl::createObjectStoreInternal, database, objectStore, transaction),
+                                   createCallbackTask(&IDBDatabaseBackendImpl::removeObjectStoreFromMap, database, objectStore))) {
+        return 0;
+    }
+
     m_objectStores.set(name, objectStore);
-    callbacks->onSuccess(objectStore.get());
+    return objectStore.release();
 }
 
-// FIXME: Do not expose this method via IDL.
-PassRefPtr<IDBObjectStoreBackendInterface> IDBDatabaseBackendImpl::objectStore(const String& name, unsigned short mode)
+void IDBDatabaseBackendImpl::createObjectStoreInternal(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl> database, PassRefPtr<IDBObjectStoreBackendImpl> objectStore,  PassRefPtr<IDBTransactionBackendInterface> transaction)
 {
-    ASSERT_UNUSED(mode, !mode); // FIXME: Remove the mode parameter. Transactions have modes, not object stores.
-    RefPtr<IDBObjectStoreBackendInterface> objectStore = m_objectStores.get(name);
-    return objectStore.release();
+    SQLiteStatement insert(database->sqliteDatabase(), "INSERT INTO ObjectStores (name, keyPath, doAutoIncrement, databaseId) VALUES (?, ?, ?, ?)");
+    if (insert.prepare() != SQLResultOk) {
+        transaction->abort();
+        return;
+    }
+    insert.bindText(1, objectStore->name());
+    insert.bindText(2, objectStore->keyPath());
+    insert.bindInt(3, static_cast<int>(objectStore->autoIncrement()));
+    insert.bindInt64(4, database->id());
+    if (insert.step() != SQLResultDone) {
+        transaction->abort();
+        return;
+    }
+    int64_t id = database->sqliteDatabase().lastInsertRowID();
+    objectStore->setId(id);
+    transaction->didCompleteTaskEvents();
+}
+
+PassRefPtr<IDBObjectStoreBackendInterface> IDBDatabaseBackendImpl::objectStore(const String& name)
+{
+    return m_objectStores.get(name);
 }
 
 static void doDelete(SQLiteDatabase& db, const char* sql, int64_t id)
@@ -166,43 +192,76 @@ static void doDelete(SQLiteDatabase& db, const char* sql, int64_t id)
     ASSERT_UNUSED(ok, ok); // FIXME: Better error handling.
 }
 
-void IDBDatabaseBackendImpl::removeObjectStore(const String& name, PassRefPtr<IDBCallbacks> callbacks)
+void IDBDatabaseBackendImpl::removeObjectStore(const String& name, IDBTransactionBackendInterface* transactionPtr, ExceptionCode& ec)
 {
     RefPtr<IDBObjectStoreBackendImpl> objectStore = m_objectStores.get(name);
     if (!objectStore) {
-        callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::NOT_FOUND_ERR, "No objectStore with that name exists."));
+        ec = IDBDatabaseException::NOT_FOUND_ERR;
         return;
     }
-
-    SQLiteTransaction transaction(sqliteDatabase());
-    transaction.begin();
-    doDelete(sqliteDatabase(), "DELETE FROM ObjectStores WHERE id = ?", objectStore->id());
-    doDelete(sqliteDatabase(), "DELETE FROM ObjectStoreData WHERE objectStoreId = ?", objectStore->id());
-    doDelete(sqliteDatabase(), "DELETE FROM IndexData WHERE indexId IN (SELECT id FROM Indexes WHERE objectStoreId = ?)", objectStore->id());
-    doDelete(sqliteDatabase(), "DELETE FROM Indexes WHERE objectStoreId = ?", objectStore->id());
-    transaction.commit();
-
+    RefPtr<IDBDatabaseBackendImpl> database = this;
+    RefPtr<IDBTransactionBackendInterface> transaction = transactionPtr;
+    if (!transaction->scheduleTask(createCallbackTask(&IDBDatabaseBackendImpl::removeObjectStoreInternal, database, objectStore, transaction),
+                                   createCallbackTask(&IDBDatabaseBackendImpl::addObjectStoreToMap, database, objectStore))) {
+        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        return;
+    }
     m_objectStores.remove(name);
-    callbacks->onSuccess();
 }
 
-void IDBDatabaseBackendImpl::setVersion(const String& version, PassRefPtr<IDBCallbacks> callbacks)
+void IDBDatabaseBackendImpl::removeObjectStoreInternal(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl> database, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBTransactionBackendInterface> transaction)
 {
-    m_version = version;
-    setMetaData(m_sqliteDatabase.get(), m_name, m_description, m_version);
-    callbacks->onSuccess();
+    doDelete(database->sqliteDatabase(), "DELETE FROM ObjectStores WHERE id = ?", objectStore->id());
+    doDelete(database->sqliteDatabase(), "DELETE FROM ObjectStoreData WHERE objectStoreId = ?", objectStore->id());
+    doDelete(database->sqliteDatabase(), "DELETE FROM IndexData WHERE indexId IN (SELECT id FROM Indexes WHERE objectStoreId = ?)", objectStore->id());
+    doDelete(database->sqliteDatabase(), "DELETE FROM Indexes WHERE objectStoreId = ?", objectStore->id());
+
+    transaction->didCompleteTaskEvents();
 }
 
-PassRefPtr<IDBTransactionBackendInterface> IDBDatabaseBackendImpl::transaction(DOMStringList* objectStores, unsigned short mode, unsigned long timeout)
+void IDBDatabaseBackendImpl::setVersion(const String& version, PassRefPtr<IDBCallbacks> prpCallbacks, ExceptionCode& ec)
 {
-    return m_transactionCoordinator->createTransaction(objectStores, mode, timeout, this);
+    RefPtr<IDBDatabaseBackendImpl> database = this;
+    RefPtr<IDBCallbacks> callbacks = prpCallbacks;
+    RefPtr<DOMStringList> objectStores = DOMStringList::create();
+    RefPtr<IDBTransactionBackendInterface> transaction = IDBTransactionBackendImpl::create(objectStores.get(), IDBTransaction::VERSION_CHANGE, 0, this);
+    if (!transaction->scheduleTask(createCallbackTask(&IDBDatabaseBackendImpl::setVersionInternal, database, version, callbacks, transaction),
+                                   createCallbackTask(&IDBDatabaseBackendImpl::resetVersion, database, m_version))) {
+        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+    }
+}
+
+void IDBDatabaseBackendImpl::setVersionInternal(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl> database, const String& version, PassRefPtr<IDBCallbacks> callbacks, PassRefPtr<IDBTransactionBackendInterface> transaction)
+{
+    int64_t databaseId = database->id();
+    database->m_version = version;
+    if (!setMetaData(database->m_sqliteDatabase->db(), database->m_name, database->m_description, database->m_version, databaseId)) {
+        // FIXME: The Indexed Database specification does not have an error code dedicated to I/O errors.
+        callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Error writing data to stable storage."));
+        transaction->abort();
+        return;
+    }
+    callbacks->onSuccess(transaction);
+}
+
+PassRefPtr<IDBTransactionBackendInterface> IDBDatabaseBackendImpl::transaction(DOMStringList* objectStores, unsigned short mode, unsigned long timeout, ExceptionCode&)
+{
+    // FIXME: Return not allowed err if close has been called.
+    return IDBTransactionBackendImpl::create(objectStores, mode, timeout, this);
+}
+
+void IDBDatabaseBackendImpl::close()
+{
+    // FIXME: Implement.
 }
 
 void IDBDatabaseBackendImpl::loadObjectStores()
 {
-    SQLiteStatement objectStoresQuery(sqliteDatabase(), "SELECT id, name, keyPath, doAutoIncrement FROM ObjectStores");
+    SQLiteStatement objectStoresQuery(sqliteDatabase(), "SELECT id, name, keyPath, doAutoIncrement FROM ObjectStores WHERE databaseId = ?");
     bool ok = objectStoresQuery.prepare() == SQLResultOk;
     ASSERT_UNUSED(ok, ok); // FIXME: Better error handling?
+
+    objectStoresQuery.bindInt64(1, m_id);
 
     while (objectStoresQuery.step() == SQLResultRow) {
         int64_t id = objectStoresQuery.getColumnInt64(0);
@@ -210,9 +269,28 @@ void IDBDatabaseBackendImpl::loadObjectStores()
         String keyPath = objectStoresQuery.getColumnText(2);
         bool autoIncrement = !!objectStoresQuery.getColumnInt(3);
 
-        m_objectStores.set(name, IDBObjectStoreBackendImpl::create(this, id, name, keyPath, autoIncrement));
+        m_objectStores.set(name, IDBObjectStoreBackendImpl::create(m_sqliteDatabase.get(), id, name, keyPath, autoIncrement));
     }
 }
+
+void IDBDatabaseBackendImpl::removeObjectStoreFromMap(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl> database, PassRefPtr<IDBObjectStoreBackendImpl> objectStore)
+{
+    ASSERT(database->m_objectStores.contains(objectStore->name()));
+    database->m_objectStores.remove(objectStore->name());
+}
+
+void IDBDatabaseBackendImpl::addObjectStoreToMap(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl> database, PassRefPtr<IDBObjectStoreBackendImpl> objectStore)
+{
+    RefPtr<IDBObjectStoreBackendImpl> objectStorePtr = objectStore;
+    ASSERT(!database->m_objectStores.contains(objectStorePtr->name()));
+    database->m_objectStores.set(objectStorePtr->name(), objectStorePtr);
+}
+
+void IDBDatabaseBackendImpl::resetVersion(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl> database, const String& version)
+{
+    database->m_version = version;
+}
+
 
 } // namespace WebCore
 

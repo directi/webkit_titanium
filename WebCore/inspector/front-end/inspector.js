@@ -50,20 +50,8 @@
 
 var WebInspector = {
     resources: {},
-    resourceURLMap: {},
-    cookieDomains: {},
-    applicationCacheDomains: {},
     missingLocalizedStrings: {},
     pendingDispatches: 0,
-
-    // RegExp groups:
-    // 1 - scheme
-    // 2 - hostname
-    // 3 - ?port
-    // 4 - ?path
-    // 5 - ?fragment
-    URLRegExp: /^(http[s]?|file):\/\/([^\/:]*)(?::([\d]+))?(?:(\/[^#]*)(?:#(.*))?)?$/i,
-    GenericURLRegExp: /^([^:]+):\/\/([^\/:]*)(?::([\d]+))?(?:(\/[^#]*)(?:#(.*))?)?$/i,
 
     get platform()
     {
@@ -191,7 +179,7 @@ var WebInspector = {
 
         for (var panelName in WebInspector.panels) {
             if (WebInspector.panels[panelName] === x) {
-                InspectorBackend.storeLastActivePanel(panelName);
+                WebInspector.settings.lastActivePanel = panelName;
                 this._panelHistory.setPanel(panelName);
             }
         }
@@ -202,7 +190,7 @@ var WebInspector = {
         var pane = new WebInspector.BreakpointsSidebarPane(WebInspector.UIString("Breakpoints"));
         function breakpointAdded(event)
         {
-            pane.addBreakpoint(new WebInspector.JSBreakpointItem(event.data));
+            pane.addBreakpointItem(new WebInspector.BreakpointItem(event.data));
         }
         WebInspector.breakpointManager.addEventListener("breakpoint-added", breakpointAdded);
         return pane;
@@ -213,9 +201,9 @@ var WebInspector = {
         var pane = new WebInspector.BreakpointsSidebarPane(WebInspector.UIString("DOM Breakpoints"));
         function breakpointAdded(event)
         {
-            pane.addBreakpoint(new WebInspector.DOMBreakpointItem(event.data));
+            pane.addBreakpointItem(new WebInspector.BreakpointItem(event.data));
         }
-        WebInspector.domBreakpointManager.addEventListener("dom-breakpoint-added", breakpointAdded);
+        WebInspector.breakpointManager.addEventListener("dom-breakpoint-added", breakpointAdded);
         return pane;
     },
 
@@ -224,7 +212,7 @@ var WebInspector = {
         var pane = new WebInspector.XHRBreakpointsSidebarPane();
         function breakpointAdded(event)
         {
-            pane.addBreakpoint(new WebInspector.XHRBreakpointItem(event.data));
+            pane.addBreakpointItem(new WebInspector.BreakpointItem(event.data));
         }
         WebInspector.breakpointManager.addEventListener("xhr-breakpoint-added", breakpointAdded);
         return pane;
@@ -235,10 +223,11 @@ var WebInspector = {
         var hiddenPanels = (InspectorFrontendHost.hiddenPanels() || "").split(',');
         if (hiddenPanels.indexOf("elements") === -1)
             this.panels.elements = new WebInspector.ElementsPanel();
-        if (Preferences.networkPanelEnabled && hiddenPanels.indexOf("network") === -1)
+
+        if (hiddenPanels.indexOf("storage") === -1 && hiddenPanels.indexOf("databases") === -1)
+            this.panels.storage = new WebInspector.StoragePanel();
+        if (hiddenPanels.indexOf("network") === -1)
             this.panels.network = new WebInspector.NetworkPanel();
-        if (hiddenPanels.indexOf("resources") === -1)
-            this.panels.resources = new WebInspector.ResourcesPanel();
         if (hiddenPanels.indexOf("scripts") === -1)
             this.panels.scripts = new WebInspector.ScriptsPanel();
         if (hiddenPanels.indexOf("timeline") === -1)
@@ -249,8 +238,6 @@ var WebInspector = {
             if (Preferences.heapProfilerPresent)
                 this.panels.profiles.registerProfileType(new WebInspector.HeapSnapshotProfileType());
         }
-        if (hiddenPanels.indexOf("storage") === -1 && hiddenPanels.indexOf("databases") === -1)
-            this.panels.storage = new WebInspector.StoragePanel();
         if (hiddenPanels.indexOf("audits") === -1)
             this.panels.audits = new WebInspector.AuditsPanel();
         if (hiddenPanels.indexOf("console") === -1)
@@ -450,6 +437,21 @@ var WebInspector = {
     {
         this.currentPanel = this.panels.elements;
         this.panels.elements.updateFocusedNode(nodeId);
+    },
+
+    get networkResources()
+    {
+        return this.panels.network.resources;
+    },
+
+    forAllResources: function(callback)
+    {
+        WebInspector.resourceManager.forAllResources(callback);
+    },
+
+    resourceForURL: function(url)
+    {
+        return this.resourceManager.resourceForURL(url);
     }
 }
 
@@ -502,8 +504,8 @@ WebInspector.doLoadedDone = function()
     document.body.addStyleClass("port-" + port);
 
     InspectorFrontendHost.loaded();
-    WebInspector.Settings.initialize();
-    
+    WebInspector.settings = new WebInspector.Settings();
+
     this._registerShortcuts();
 
     // set order of some sections explicitly
@@ -516,6 +518,7 @@ WebInspector.doLoadedDone = function()
     // this.changes = new WebInspector.ChangesView(this.drawer);
     // TODO: Remove class="hidden" from inspector.html on button#changes-status-bar-item
     this.drawer.visibleView = this.console;
+    this.resourceManager = new WebInspector.ResourceManager();
     this.domAgent = new WebInspector.DOMAgent();
 
     this.resourceCategories = {
@@ -525,12 +528,11 @@ WebInspector.doLoadedDone = function()
         scripts: new WebInspector.ResourceCategory("scripts", WebInspector.UIString("Scripts"), "rgb(255,121,0)"),
         xhr: new WebInspector.ResourceCategory("xhr", WebInspector.UIString("XHR"), "rgb(231,231,10)"),
         fonts: new WebInspector.ResourceCategory("fonts", WebInspector.UIString("Fonts"), "rgb(255,82,62)"),
-        websocket: new WebInspector.ResourceCategory("websockets", WebInspector.UIString("WebSocket"), "rgb(186,186,186)"), // FIXME: Decide the color.
+        websockets: new WebInspector.ResourceCategory("websockets", WebInspector.UIString("WebSocket"), "rgb(186,186,186)"), // FIXME: Decide the color.
         other: new WebInspector.ResourceCategory("other", WebInspector.UIString("Other"), "rgb(186,186,186)")
     };
 
     this.breakpointManager = new WebInspector.BreakpointManager();
-    this.domBreakpointManager = new WebInspector.DOMBreakpointManager();
     this.cssModel = new WebInspector.CSSStyleModel();
 
     this.panels = {};
@@ -543,6 +545,10 @@ WebInspector.doLoadedDone = function()
     this.panelOrder = [];
     for (var panelName in this.panels)
         previousToolbarItem = WebInspector.addPanelToolbarIcon(toolbarElement, this.panels[panelName], previousToolbarItem);
+
+    // FIXME: fix this once renamed StoragePanel.js to ResourcesPanel.js
+    this.panels.storage._toolbarItem.removeStyleClass("storage");
+    this.panels.storage._toolbarItem.addStyleClass("resources");
 
     this.Tips = {
         ResourceNotCompressed: {id: 0, message: WebInspector.UIString("You could save bandwidth by having your web server compress this transfer with gzip or zlib.")}
@@ -596,14 +602,17 @@ WebInspector.doLoadedDone = function()
         WebInspector.monitoringXHREnabled = inspectorState.monitoringXHREnabled;
         if ("pauseOnExceptionsState" in inspectorState)
             WebInspector.panels.scripts.updatePauseOnExceptionsState(inspectorState.pauseOnExceptionsState);
-        if (inspectorState.resourceTrackingEnabled)
-            WebInspector.panels.resources.resourceTrackingWasEnabled();
-        else
-            WebInspector.panels.resources.resourceTrackingWasDisabled();
     }
     InspectorBackend.getInspectorState(populateInspectorState);
 
-    InspectorBackend.populateScriptObjects();
+    function onPopulateScriptObjects()
+    {
+        if (!WebInspector.currentPanel)
+            WebInspector.showPanel(WebInspector.settings.lastActivePanel);
+    }
+    InspectorBackend.populateScriptObjects(onPopulateScriptObjects);
+
+    InspectorBackend.setConsoleMessagesEnabled(true);
 
     // As a DOMAgent method, this needs to happen after the frontend has loaded and the agent is available.
     InspectorBackend.getSupportedCSSProperties(WebInspector.CSSCompletions._load);
@@ -770,12 +779,12 @@ WebInspector.documentClick = function(event)
             return;
         }
 
-        const urlMatch = WebInspector.GenericURLRegExp.exec(anchor.href);
-        if (urlMatch && urlMatch[1] === "webkit-link-action") {
-            if (urlMatch[2] === "show-panel") {
-                const panel = urlMatch[4].substring(1);
+        var parsedURL = anchor.href.asParsedURL();
+        if (parsedURL && parsedURL.scheme === "webkit-link-action") {
+            if (parsedURL.host === "show-panel") {
+                var panel = parsedURL.path.substring(1);
                 if (WebInspector.panels[panel])
-                    WebInspector.currentPanel = WebInspector.panels[panel];
+                    WebInspector.showPanel(panel);
             }
             return;
         }
@@ -801,8 +810,8 @@ WebInspector.openResource = function(resourceURL, inResourcesPanel)
 {
     var resource = WebInspector.resourceForURL(resourceURL);
     if (inResourcesPanel && resource) {
-        WebInspector.panels.resources.showResource(resource);
-        WebInspector.showPanel("resources");
+        WebInspector.panels.storage.showResource(resource);
+        WebInspector.showPanel("storage");
     } else
         InspectorBackend.openInInspectedWindow(resource ? resource.url : resourceURL);
 }
@@ -1197,6 +1206,10 @@ WebInspector.showChanges = function()
 
 WebInspector.showPanel = function(panel)
 {
+    // FIXME: fix this once renamed StoragePanel.js to ResourcesPanel.js
+    if (panel === "resources")
+        panel = "storage";
+
     if (!(panel in this.panels))
         panel = "elements";
     this.currentPanel = this.panels[panel];
@@ -1219,117 +1232,20 @@ WebInspector.selectDOMStorage = function(o)
     WebInspector.panels.storage.selectDOMStorage(o);
 }
 
-WebInspector.updateResource = function(payload)
+WebInspector.domContentEventFired = function(time)
 {
-    var identifier = payload.id;
-    var resource = this.resources[identifier];
-    if (!resource) {
-        resource = new WebInspector.Resource(identifier, payload.url);
-        this.resources[identifier] = resource;
-        this.resourceURLMap[resource.url] = resource;
-        this.panels.resources.addResource(resource);
-        this.panels.audits.resourceStarted(resource);
-        if (this.panels.network)
-            this.panels.network.addResource(resource);
-    }
-
-    if (payload.didRequestChange) {
-        resource.domain = payload.host;
-        resource.path = payload.path;
-        resource.lastPathComponent = payload.lastPathComponent;
-        resource.requestHeaders = payload.requestHeaders;
-        resource.mainResource = payload.mainResource;
-        resource.requestMethod = payload.requestMethod;
-        resource.requestFormData = payload.requestFormData;
-        resource.documentURL = payload.documentURL;
-        if (typeof payload.webSocketRequestKey3 !== "undefined")
-            resource.webSocketRequestKey3 = payload.webSocketRequestKey3;
-
-        if (resource.mainResource)
-            this.mainResource = resource;
-
-        var match = payload.documentURL.match(WebInspector.GenericURLRegExp);
-        if (match) {
-            var protocol = match[1].toLowerCase();
-            this._addCookieDomain(match[2]);
-            this._addAppCacheDomain(match[2]);
-        }
-    }
-
-    if (payload.didResponseChange) {
-        resource.mimeType = payload.mimeType;
-        resource.suggestedFilename = payload.suggestedFilename;
-        resource.expectedContentLength = payload.expectedContentLength;
-        resource.statusCode = payload.statusCode;
-        resource.statusText = payload.statusText;
-        resource.suggestedFilename = payload.suggestedFilename;
-        resource.responseHeaders = payload.responseHeaders;
-        resource.connectionID = payload.connectionID;
-        resource.connectionReused = payload.connectionReused;
-        resource.timing = payload.timing;
-        resource.cached = payload.cached;
-        if (typeof payload.webSocketChallengeResponse !== "undefined")
-            resource.webSocketChallengeResponse = payload.webSocketChallengeResponse;
-    }
-
-    if (payload.didTypeChange)
-        resource.type = payload.type;
-
-    if (payload.didLengthChange)
-        resource.resourceSize = payload.resourceSize;
-
-    if (payload.didCompletionChange) {
-        resource.failed = payload.failed;
-        resource.finished = payload.finished;
-        if (this.panels.audits)
-            this.panels.audits.resourceFinished(resource);
-        this.extensionServer.notifyResourceFinished(resource);
-    }
-
-    if (payload.didTimingChange) {
-        if (payload.startTime)
-            resource.startTime = payload.startTime;
-        if (payload.responseReceivedTime)
-            resource.responseReceivedTime = payload.responseReceivedTime;
-        if (payload.endTime)
-            resource.endTime = payload.endTime;
-
-        if (payload.loadEventTime) {
-            // This loadEventTime is for the main resource, and we want to show it
-            // for all resources on this page. This means we want to set it as a member
-            // of the resources panel instead of the individual resource.
-            this.panels.resources.mainResourceLoadTime = payload.loadEventTime;
-            this.panels.audits.mainResourceLoadTime = payload.loadEventTime;
-            if (this.panels.network)
-                this.panels.network.mainResourceLoadTime = payload.loadEventTime;
-        }
-
-        if (payload.domContentEventTime) {
-            // This domContentEventTime is for the main resource, so it should go in
-            // the resources panel for the same reasons as above.
-            this.panels.resources.mainResourceDOMContentTime = payload.domContentEventTime;
-            this.panels.audits.mainResourceDOMContentTime = payload.domContentEventTime;
-            if (this.panels.network)
-                this.panels.network.mainResourceDOMContentTime = payload.domContentEventTime;
-        }
-    }
-
+    this.panels.audits.mainResourceDOMContentTime = time;
     if (this.panels.network)
-        this.panels.network.refreshResource(resource);
+        this.panels.network.mainResourceDOMContentTime = time;
+    this.mainResourceDOMContentTime = time;
 }
 
-WebInspector.removeResource = function(identifier)
+WebInspector.loadEventFired = function(time)
 {
-    var resource = this.resources[identifier];
-    if (!resource)
-        return;
-
-    resource.category.removeResource(resource);
-    delete this.resourceURLMap[resource.url];
-    delete this.resources[identifier];
-
-    if (this.panels.resources)
-        this.panels.resources.removeResource(resource);
+    this.panels.audits.mainResourceLoadTime = time;
+    if (this.panels.network)
+        this.panels.network.mainResourceLoadTime = time;
+    this.mainResourceLoadTime = time;
 }
 
 WebInspector.addDatabase = function(payload)
@@ -1342,30 +1258,6 @@ WebInspector.addDatabase = function(payload)
         payload.name,
         payload.version);
     this.panels.storage.addDatabase(database);
-}
-
-WebInspector._addCookieDomain = function(domain)
-{
-    // Eliminate duplicate domains from the list.
-    if (domain in this.cookieDomains)
-        return;
-    this.cookieDomains[domain] = true;
-
-    if (!this.panels.storage)
-        return;
-    this.panels.storage.addCookieDomain(domain);
-}
-
-WebInspector._addAppCacheDomain = function(domain)
-{
-    // Eliminate duplicate domains from the list.
-    if (domain in this.applicationCacheDomains)
-        return;
-    this.applicationCacheDomains[domain] = true;
-
-    if (!this.panels.storage)
-        return;
-    this.panels.storage.addApplicationCache(domain);
 }
 
 WebInspector.addDOMStorage = function(payload)
@@ -1387,6 +1279,21 @@ WebInspector.updateDOMStorage = function(storageId)
 WebInspector.updateApplicationCacheStatus = function(status)
 {
     this.panels.storage.updateApplicationCacheStatus(status);
+}
+
+WebInspector.didGetFileSystemPath = function(root, type, origin)
+{
+    this.panels.storage.updateFileSystemPath(root, type, origin);
+}
+
+WebInspector.didGetFileSystemError = function(type, origin)
+{
+    this.panels.storage.updateFileSystemError(type, origin);
+}
+
+WebInspector.didGetFileSystemDisabled = function()
+{
+    this.panels.storage.setFileSystemDisabled();
 }
 
 WebInspector.updateNetworkState = function(isNowOnline)
@@ -1446,39 +1353,34 @@ WebInspector.failedToParseScriptSource = function(sourceURL, source, startingLin
 
 WebInspector.pausedScript = function(details)
 {
-    this.panels.scripts.debuggerPaused(details);
+    this.panels.scripts.debuggerPaused(details.callFrames);
+    this.breakpointManager.debuggerPaused(details);
     InspectorFrontendHost.bringToFront();
 }
 
 WebInspector.resumedScript = function()
 {
+    this.breakpointManager.debuggerResumed();
     this.panels.scripts.debuggerResumed();
 }
 
 WebInspector.reset = function()
 {
+    this.breakpointManager.reset();
+
     for (var panelName in this.panels) {
         var panel = this.panels[panelName];
         if ("reset" in panel)
             panel.reset();
     }
 
-    this.sessionSettings.reset();
-    this.breakpointManager.reset();
-
-    for (var category in this.resourceCategories)
-        this.resourceCategories[category].removeAllResources();
-
     this.resources = {};
-    this.resourceURLMap = {};
-    this.cookieDomains = {};
-    this.applicationCacheDomains = {};
     this.highlightDOMNode(0);
-
-    delete this.mainResource;
 
     this.console.clearMessages();
     this.extensionServer.notifyInspectorReset();
+
+    this.breakpointManager.restoreBreakpoints();
 }
 
 WebInspector.resetProfilesPanel = function()
@@ -1495,13 +1397,12 @@ WebInspector.bringToFront = function()
 WebInspector.inspectedURLChanged = function(url)
 {
     InspectorFrontendHost.inspectedURLChanged(url);
+    this.settings.inspectedURLChanged(url);
     this.extensionServer.notifyInspectedURLChanged();
-}
-
-WebInspector.resourceURLChanged = function(resource, oldURL)
-{
-    delete this.resourceURLMap[oldURL];
-    this.resourceURLMap[resource.url] = resource;
+    if (!this._breakpointsRestored) {
+        this.breakpointManager.restoreBreakpoints();
+        this._breakpointsRestored = true;
+    }
 }
 
 WebInspector.didCommitLoad = function()
@@ -1632,7 +1533,7 @@ WebInspector.addProfileHeader = function(profile)
 WebInspector.setRecordingProfile = function(isProfiling)
 {
     this.panels.profiles.getProfileType(WebInspector.CPUProfileType.TypeId).setRecordingProfile(isProfiling);
-    if (this._previousIsProfiling !== isProfiling) {
+    if (this.panels.profiles.hasTemporaryProfile(WebInspector.CPUProfileType.TypeId) !== isProfiling) {
         if (!this._temporaryRecordingProfile) {
             this._temporaryRecordingProfile = {
                 typeId: WebInspector.CPUProfileType.TypeId,
@@ -1641,7 +1542,6 @@ WebInspector.setRecordingProfile = function(isProfiling)
                 isTemporary: true
             };
         }
-        this._previousIsProfiling = isProfiling;
         if (isProfiling)
             this.panels.profiles.addProfileHeader(this._temporaryRecordingProfile);
         else
@@ -1690,7 +1590,8 @@ WebInspector.displayNameForURL = function(url)
 {
     if (!url)
         return "";
-    var resource = this.resourceURLMap[url];
+
+    var resource = this.resourceForURL(url);
     if (resource)
         return resource.displayName;
 
@@ -1708,28 +1609,17 @@ WebInspector.displayNameForURL = function(url)
     return url.trimURL(WebInspector.mainResource.domain);
 }
 
-WebInspector.resourceForURL = function(url)
-{
-    if (url in this.resourceURLMap)
-        return this.resourceURLMap[url];
-
-    // No direct match found. Search for resources that contain
-    // a substring of the URL.
-    for (var resourceURL in this.resourceURLMap) {
-        if (resourceURL.hasSubstring(url))
-            return this.resourceURLMap[resourceURL];
-    }
-
-    return null;
-}
-
 WebInspector._choosePanelToShowSourceLine = function(url, line, preferredPanel)
 {
     preferredPanel = preferredPanel || "resources";
+    // FIXME: remove this once StoragePanel renamed to ResourcesPanel
+    if (preferredPanel === "resources")
+        preferredPanel = "storage";
+
     var panel = this.panels[preferredPanel];
     if (panel && panel.canShowSourceLine(url, line))
         return panel;
-    panel = this.panels.resources;
+    panel = this.panels.storage;
     return panel.canShowSourceLine(url, line) ? panel : null;
 }
 
@@ -1751,6 +1641,7 @@ WebInspector.linkifyStringAsFragment = function(string)
 {
     var container = document.createDocumentFragment();
     var linkStringRegEx = /(?:[a-zA-Z][a-zA-Z0-9+.-]{2,}:\/\/|www\.)[\w$\-_+*'=\|\/\\(){}[\]%@&#~,:;.!?]{2,}[\w$\-_+*=\|\/\\({%@&#~]/;
+    var lineColumnRegEx = /:(\d+)(:(\d+))?$/;
 
     while (string) {
         var linkString = linkStringRegEx.exec(string);
@@ -1768,7 +1659,17 @@ WebInspector.linkifyStringAsFragment = function(string)
             title = WebInspector.panels.profiles.displayTitleForProfileLink(profileStringMatches[2], profileStringMatches[1]);
 
         var realURL = (linkString.indexOf("www.") === 0 ? "http://" + linkString : linkString);
-        container.appendChild(WebInspector.linkifyURLAsNode(realURL, title, null, (realURL in WebInspector.resourceURLMap)));
+        var lineColumnMatch = lineColumnRegEx.exec(realURL);
+        if (lineColumnMatch)
+            realURL = realURL.substring(0, realURL.length - lineColumnMatch[0].length);
+
+        var hasResourceWithURL = !!WebInspector.resourceForURL(realURL);
+        var urlNode = WebInspector.linkifyURLAsNode(realURL, title, null, hasResourceWithURL);
+        container.appendChild(urlNode);
+        if (lineColumnMatch) {
+            urlNode.setAttribute("line_number", lineColumnMatch[1]);
+            urlNode.setAttribute("preferred_panel", "scripts");
+        }
         string = string.substring(linkIndex + linkString.length, string.length);
     }
 
@@ -1836,27 +1737,31 @@ WebInspector.resourceURLForRelatedNode = function(node, url)
     }
 
     // documentURL not found or has bad value
-    for (var resourceURL in WebInspector.resourceURLMap) {
-        var match = resourceURL.match(WebInspector.URLRegExp);
-        if (match && match[4] === url)
-            return resourceURL;
+    var resourceURL = url;
+    function callback(resource)
+    {
+        if (resource.path === url) {
+            resourceURL = resource.url;
+            return true;
+        }
     }
-    return url;
-},
+    WebInspector.forAllResources(callback);
+    return resourceURL;
+}
 
 WebInspector.completeURL = function(baseURL, href)
 {
-    var match = baseURL.match(WebInspector.URLRegExp);
-    if (match) {
+    var parsedURL = baseURL.asParsedURL();
+    if (parsedURL) {
         var path = href;
         if (path.charAt(0) !== "/") {
-            var basePath = match[4] || "/";
+            var basePath = parsedURL.path;
             path = basePath.substring(0, basePath.lastIndexOf("/")) + "/" + path;
         } else if (path.length > 1 && path.charAt(1) === "/") {
             // href starts with "//" which is a full URL with the protocol dropped (use the baseURL protocol).
-            return match[1] + ":" + path;
+            return parsedURL.scheme + ":" + path;
         }
-        return match[1] + "://" + match[2] + (match[3] ? (":" + match[3]) : "") + path;
+        return parsedURL.scheme + "://" + parsedURL.host + (parsedURL.port ? (":" + parsedURL.port) : "") + path;
     }
     return null;
 }
@@ -1939,9 +1844,10 @@ WebInspector.doPerformSearch = function(query, forceSearch, isBackwardSearch, re
 
         for (var panelName in this.panels) {
             var panel = this.panels[panelName];
-            if (panel.currentQuery && panel.searchCanceled)
-                panel.searchCanceled();
+            var hadCurrentQuery = !!panel.currentQuery;
             delete panel.currentQuery;
+            if (hadCurrentQuery && panel.searchCanceled)
+                panel.searchCanceled();
         }
 
         this.updateSearchMatchesCount();

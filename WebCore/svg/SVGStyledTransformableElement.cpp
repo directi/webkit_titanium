@@ -25,7 +25,7 @@
 
 #include "AffineTransform.h"
 #include "Attr.h"
-#include "RenderPath.h"
+#include "RenderSVGPath.h"
 #include "SVGDocument.h"
 #include "SVGStyledElement.h"
 #include "SVGTransformList.h"
@@ -35,6 +35,10 @@ namespace WebCore {
 SVGStyledTransformableElement::SVGStyledTransformableElement(const QualifiedName& tagName, Document* document)
     : SVGStyledLocatableElement(tagName, document)
     , m_transform(SVGTransformList::create(SVGNames::transformAttr))
+{
+}
+
+SVGStyledTransformableElement::~SVGStyledTransformableElement()
 {
 }
 
@@ -50,7 +54,7 @@ AffineTransform SVGStyledTransformableElement::getScreenCTM(StyleUpdateStrategy 
 
 AffineTransform SVGStyledTransformableElement::animatedLocalTransform() const
 {
-    return m_supplementalTransform ? transform()->concatenate().matrix() * *m_supplementalTransform : transform()->concatenate().matrix();
+    return m_supplementalTransform ? *m_supplementalTransform * transform()->concatenate().matrix() : transform()->concatenate().matrix();
 }
     
 AffineTransform* SVGStyledTransformableElement::supplementalTransform()
@@ -104,15 +108,14 @@ FloatRect SVGStyledTransformableElement::getBBox(StyleUpdateStrategy styleUpdate
 RenderObject* SVGStyledTransformableElement::createRenderer(RenderArena* arena, RenderStyle*)
 {
     // By default, any subclass is expected to do path-based drawing
-    return new (arena) RenderPath(this);
+    return new (arena) RenderSVGPath(this);
 }
 
-Path SVGStyledTransformableElement::toClipPath() const
+void SVGStyledTransformableElement::toClipPath(Path& path) const
 {
-    Path pathData = toPathData();
+    toPathData(path);
     // FIXME: How do we know the element has done a layout?
-    pathData.transform(animatedLocalTransform());
-    return pathData;
+    path.transform(animatedLocalTransform());
 }
 
 }

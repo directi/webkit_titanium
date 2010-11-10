@@ -26,13 +26,18 @@
 #ifndef WebProcess_h
 #define WebProcess_h
 
-#include "Connection.h"
+#include "CacheModel.h"
+#include "ChildProcess.h"
 #include "DrawingArea.h"
 #include "SharedMemory.h"
 #include "VisitedLinkTable.h"
 #include <WebCore/LinkHash.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
+
+#if PLATFORM(MAC)
+#include "MachPort.h"
+#endif
 
 namespace WebCore {
     class IntSize;
@@ -46,8 +51,9 @@ class WebFrame;
 class WebPage;
 struct WebPageCreationParameters;
 struct WebPreferencesStore;
+struct WebProcessCreationParameters;
 
-class WebProcess : CoreIPC::Connection::Client {
+class WebProcess : ChildProcess {
 public:
     static WebProcess& shared();
 
@@ -57,7 +63,7 @@ public:
     RunLoop* runLoop() const { return m_runLoop; }
 
     WebPage* webPage(uint64_t pageID) const;
-    WebPage* createWebPage(uint64_t pageID, const WebPageCreationParameters&);
+    void createWebPage(uint64_t pageID, const WebPageCreationParameters&);
     void removeWebPage(uint64_t pageID);
 
     InjectedBundle* injectedBundle() const { return m_injectedBundle.get(); }
@@ -81,23 +87,34 @@ private:
     WebProcess();
     void shutdown();
 
-#if ENABLE(WEB_PROCESS_SANDBOX)
-    void loadInjectedBundle(const String&, const String&);
-#else
-    void loadInjectedBundle(const String&);
-#endif
-    void setApplicationCacheDirectory(const String&);
+    void initializeWebProcess(const WebProcessCreationParameters&, CoreIPC::ArgumentDecoder*);
+    void setShouldTrackVisitedLinks(bool);
     void registerURLSchemeAsEmptyDocument(const String&);
+    void registerURLSchemeAsSecure(const String&) const;
+    void setDomainRelaxationForbiddenForURLScheme(const String&) const;
+    void languageChanged(const String&) const;
+#if PLATFORM(WIN)
+    void setShouldPaintNativeControls(bool);
+#endif
 
     void setVisitedLinkTable(const SharedMemory::Handle&);
     void visitedLinkStateChanged(const Vector<WebCore::LinkHash>& linkHashes);
     void allVisitedLinkStateChanged();
-    
+
+    void setCacheModel(uint32_t);
+    void platformSetCacheModel(CacheModel);
+    static void calculateCacheSizes(CacheModel cacheModel, uint64_t memorySize, uint64_t diskFreeSize,
+        unsigned& cacheTotalCapacity, unsigned& cacheMinDeadCapacity, unsigned& cacheMaxDeadCapacity, double& deadDecodedDataDeletionInterval,
+        unsigned& pageCacheCapacity, unsigned long& urlCacheMemoryCapacity, unsigned long& urlCacheDiskCapacity);
+
     // CoreIPC::Connection::Client
     void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
     void didClose(CoreIPC::Connection*);
     void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID);
 
+    // Implemented in generated WebProcessMessageReceiver.cpp
+    void didReceiveWebProcessMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    
     RefPtr<CoreIPC::Connection> m_connection;
     HashMap<uint64_t, RefPtr<WebPage> > m_pageMap;
     RefPtr<InjectedBundle> m_injectedBundle;
@@ -108,6 +125,9 @@ private:
 
     // FIXME: The visited link table should not be per process.
     VisitedLinkTable m_visitedLinkTable;
+
+    bool m_hasSetCacheModel;
+    CacheModel m_cacheModel;
 
 #if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
     mach_port_t m_compositingRenderServerPort;

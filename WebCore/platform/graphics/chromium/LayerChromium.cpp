@@ -174,6 +174,13 @@ LayerChromium::~LayerChromium()
 
 void LayerChromium::setLayerRenderer(LayerRendererChromium* renderer)
 {
+    // If we're changing layer renderers then we need to free up any resources
+    // allocated by the old renderer.
+    if (layerRenderer() && layerRenderer() != renderer) {
+        cleanupResources();
+        setNeedsDisplay();
+    }
+
     m_layerRenderer = renderer;
 }
 
@@ -363,6 +370,7 @@ void LayerChromium::setNeedsDisplay()
 {
     m_dirtyRect.setSize(m_bounds);
     m_contentsDirty = true;
+    setNeedsCommit();
 }
 
 void LayerChromium::resetNeedsDisplay()
@@ -446,15 +454,12 @@ void LayerChromium::drawDebugBorder()
     GLC(context, context->drawElements(GraphicsContext3D::LINE_LOOP, 4, GraphicsContext3D::UNSIGNED_SHORT, 6 * sizeof(unsigned short)));
 }
 
-const FloatRect LayerChromium::getDrawRect() const
+const IntRect LayerChromium::getDrawRect() const
 {
     // Form the matrix used by the shader to map the corners of the layer's
     // bounds into the view space.
-    TransformationMatrix renderMatrix = drawTransform();
-    renderMatrix.scale3d(bounds().width(), bounds().height(), 1);
-
-    FloatRect layerRect(-0.5, -0.5, 1, 1);
-    FloatRect mappedRect = renderMatrix.mapRect(layerRect);
+    FloatRect layerRect(-0.5 * bounds().width(), -0.5 * bounds().height(), bounds().width(), bounds().height());
+    IntRect mappedRect = enclosingIntRect(drawTransform().mapRect(layerRect));
     return mappedRect;
 }
 

@@ -359,7 +359,7 @@ void PluginView::setFocus(bool focused)
 
 #ifndef NP_NO_CARBON
     EventRecord record;
-    record.what = getFocusEvent;
+    record.what = NPEventType_GetFocusEvent;
     record.message = 0;
     record.when = TickCount();
     record.where = globalMousePosForPlugin();
@@ -576,9 +576,9 @@ void PluginView::handleMouseEvent(MouseEvent* event)
         m_lastMousePos = mousePosForPlugin(event);
         return;
     } else if (event->type() == eventNames().mouseoverEvent) {
-        record.what = adjustCursorEvent;
+        record.what = NPEventType_AdjustCursorEvent;
     } else if (event->type() == eventNames().mouseoutEvent) {
-        record.what = adjustCursorEvent;
+        record.what = NPEventType_AdjustCursorEvent;
     } else if (event->type() == eventNames().mousedownEvent) {
         record.what = mouseDown;
         // The plugin needs focus to receive keyboard events
@@ -600,7 +600,7 @@ void PluginView::handleMouseEvent(MouseEvent* event)
         record.modifiers |= controlKey;
 
     if (!dispatchNPEvent(record)) {
-        if (record.what == adjustCursorEvent)
+        if (record.what == NPEventType_AdjustCursorEvent)
             return; // Signals that the plugin wants a normal cursor
 
         LOG(Events, "PluginView::handleMouseEvent(): Mouse event type %d at %d,%d not accepted",
@@ -725,29 +725,10 @@ static int modifiersForEvent(UIEventWithKeyState* event)
 #endif
 
 #ifndef NP_NO_CARBON
-static bool tigerOrBetter()
-{
-    static SInt32 systemVersion = 0;
-
-    if (!systemVersion) {
-        if (Gestalt(gestaltSystemVersion, &systemVersion) != noErr)
-            return false;
-    }
-
-    return systemVersion >= 0x1040;
-}
-#endif
-
-#ifndef NP_NO_CARBON
 Point PluginView::globalMousePosForPlugin() const
 {
     Point pos;
     GetGlobalMouse(&pos);
-
-    float scaleFactor = tigerOrBetter() ? HIGetScaleFactor() : 1;
-
-    pos.h = short(pos.h * scaleFactor);
-    pos.v = short(pos.v * scaleFactor);
 
 #if PLATFORM(WX)
     // make sure the titlebar/toolbar size is included

@@ -56,6 +56,8 @@ typedef cairo_rectangle_int_t GdkRectangle;
 #endif
 #elif PLATFORM(HAIKU)
 class BRect;
+#elif PLATFORM(EFL)
+typedef struct _Eina_Rectangle Eina_Rectangle;
 #endif
 
 #if PLATFORM(WX)
@@ -141,6 +143,8 @@ public:
     void inflate(int d) { inflateX(d); inflateY(d); }
     void scale(float s);
 
+    IntRect transposedRect() const { return IntRect(m_location.transposedPoint(), m_size.transposedSize()); }
+
 #if PLATFORM(WX)
     IntRect(const wxRect&);
     operator wxRect() const;
@@ -158,6 +162,9 @@ public:
 #elif PLATFORM(HAIKU)
     explicit IntRect(const BRect&);
     operator BRect() const;
+#elif PLATFORM(EFL)
+    explicit IntRect(const Eina_Rectangle&);
+    operator Eina_Rectangle() const;
 #endif
 
 #if PLATFORM(CG)

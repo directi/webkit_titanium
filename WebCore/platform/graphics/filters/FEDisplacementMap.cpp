@@ -3,6 +3,7 @@
  * Copyright (C) 2004, 2005 Rob Buis <buis@kde.org>
  * Copyright (C) 2005 Eric Seidel <eric@webkit.org>
  * Copyright (C) 2009 Dirk Schulze <krit@webkit.org>
+ * Copyright (C) Research In Motion Limited 2010. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -25,7 +26,6 @@
 #if ENABLE(FILTERS)
 #include "FEDisplacementMap.h"
 
-#include "CanvasPixelArray.h"
 #include "Filter.h"
 #include "GraphicsContext.h"
 #include "ImageData.h"
@@ -88,24 +88,27 @@ void FEDisplacementMap::apply(Filter* filter)
     if (m_xChannelSelector == CHANNEL_UNKNOWN || m_yChannelSelector == CHANNEL_UNKNOWN)
         return;
 
-    if (!effectContext())
+    if (!effectContext(filter))
         return;
 
-    IntRect effectADrawingRect = requestedRegionOfInputImageData(in->repaintRectInLocalCoordinates());
-    RefPtr<CanvasPixelArray> srcPixelArrayA(in->resultImage()->getPremultipliedImageData(effectADrawingRect)->data());
+    IntRect effectADrawingRect = requestedRegionOfInputImageData(in->absolutePaintRect());
+    RefPtr<ImageData> srcImageDataA = in->resultImage()->getPremultipliedImageData(effectADrawingRect);
+    ByteArray* srcPixelArrayA = srcImageDataA->data()->data() ;
 
-    IntRect effectBDrawingRect = requestedRegionOfInputImageData(in2->repaintRectInLocalCoordinates());
-    RefPtr<CanvasPixelArray> srcPixelArrayB(in2->resultImage()->getUnmultipliedImageData(effectBDrawingRect)->data());
+    IntRect effectBDrawingRect = requestedRegionOfInputImageData(in2->absolutePaintRect());
+    RefPtr<ImageData> srcImageDataB = in2->resultImage()->getUnmultipliedImageData(effectBDrawingRect);
+    ByteArray* srcPixelArrayB = srcImageDataB->data()->data();
 
     IntRect imageRect(IntPoint(), resultImage()->size());
     RefPtr<ImageData> imageData = ImageData::create(imageRect.width(), imageRect.height());
+    ByteArray* dstPixelArray = imageData->data()->data();
 
     ASSERT(srcPixelArrayA->length() == srcPixelArrayB->length());
 
-    float scaleX = m_scale / 255.f * filter->filterResolution().width();
-    float scaleY = m_scale / 255.f * filter->filterResolution().height();
-    float scaleAdjustmentX = (0.5f - 0.5f * m_scale) * filter->filterResolution().width();
-    float scaleAdjustmentY = (0.5f - 0.5f * m_scale) * filter->filterResolution().height();
+    float scaleX = filter->applyHorizontalScale(m_scale / 255);
+    float scaleY = filter->applyVerticalScale(m_scale / 255);
+    float scaleAdjustmentX = filter->applyHorizontalScale(0.5f - 0.5f * m_scale);
+    float scaleAdjustmentY = filter->applyVerticalScale(0.5f - 0.5f * m_scale);
     int stride = imageRect.width() * 4;
     for (int y = 0; y < imageRect.height(); ++y) {
         int line = y * stride;
@@ -115,10 +118,10 @@ void FEDisplacementMap::apply(Filter* filter)
             int srcY = y + static_cast<int>(scaleY * srcPixelArrayB->get(dstIndex + m_yChannelSelector - 1) + scaleAdjustmentY);
             for (unsigned channel = 0; channel < 4; ++channel) {
                 if (srcX < 0 || srcX >= imageRect.width() || srcY < 0 || srcY >= imageRect.height())
-                    imageData->data()->set(dstIndex + channel, static_cast<unsigned char>(0));
+                    dstPixelArray->set(dstIndex + channel, static_cast<unsigned char>(0));
                 else {
                     unsigned char pixelValue = srcPixelArrayA->get(srcY * stride + srcX * 4 + channel);
-                    imageData->data()->set(dstIndex + channel, pixelValue);
+                    dstPixelArray->set(dstIndex + channel, pixelValue);
                 }
             }
 

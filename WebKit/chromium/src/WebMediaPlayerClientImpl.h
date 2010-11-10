@@ -36,6 +36,7 @@
 #include "MediaPlayerPrivate.h"
 #include "VideoFrameChromium.h"
 #include "VideoFrameProvider.h"
+#include "VideoLayerChromium.h"
 #include "WebMediaPlayerClient.h"
 #include <wtf/OwnPtr.h>
 
@@ -47,7 +48,9 @@ class WebMediaPlayer;
 // This class serves as a bridge between WebCore::MediaPlayer and
 // WebKit::WebMediaPlayer.
 class WebMediaPlayerClientImpl : public WebCore::MediaPlayerPrivateInterface
+#if USE(ACCELERATED_COMPOSITING)
                                , public WebCore::VideoFrameProvider
+#endif
                                , public WebMediaPlayerClient {
 
 public:
@@ -61,6 +64,7 @@ public:
     WebMediaPlayer* mediaPlayer() const;
 
     // WebMediaPlayerClient methods:
+    virtual ~WebMediaPlayerClientImpl();
     virtual void networkStateChanged();
     virtual void readyStateChanged();
     virtual void volumeChanged(float);
@@ -108,15 +112,14 @@ public:
     virtual void setSize(const WebCore::IntSize&);
     virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect&);
     virtual bool hasSingleSecurityOrigin() const;
+    virtual WebCore::MediaPlayer::MovieLoadType movieLoadType() const;
 #if USE(ACCELERATED_COMPOSITING)
     virtual bool supportsAcceleratedRendering() const;
-#endif
-
-    virtual WebCore::MediaPlayer::MovieLoadType movieLoadType() const;
 
     // VideoFrameProvider methods:
     virtual WebCore::VideoFrameChromium* getCurrentFrame();
     virtual void putCurrentFrame(WebCore::VideoFrameChromium*);
+#endif
 
 private:
     WebMediaPlayerClientImpl();
@@ -129,7 +132,7 @@ private:
     WebCore::MediaPlayer* m_mediaPlayer;
     OwnPtr<WebMediaPlayer> m_webMediaPlayer;
 #if USE(ACCELERATED_COMPOSITING)
-    RefPtr<WebCore::PlatformLayer> m_videoLayer;
+    RefPtr<WebCore::VideoLayerChromium> m_videoLayer;
     bool m_supportsAcceleratedCompositing;
 #endif
     static bool m_isEnabled;

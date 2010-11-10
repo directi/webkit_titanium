@@ -336,16 +336,12 @@ static const char* NPN_UserAgent(NPP npp)
 
 static void* NPN_MemAlloc(uint32_t size)
 {
-    // We could use fastMalloc here, but there might be plug-ins that mix NPN_MemAlloc/NPN_MemFree with malloc and free,
-    // so having them be equivalent seems like a good idea.
-    return malloc(size);
+    return npnMemAlloc(size);
 }
 
 static void NPN_MemFree(void* ptr)
 {
-    // We could use fastFree here, but there might be plug-ins that mix NPN_MemAlloc/NPN_MemFree with malloc and free,
-    // so having them be equivalent seems like a good idea.
-    free(ptr);
+    npnMemFree(ptr);
 }
 
 static uint32_t NPN_MemFlush(uint32_t size)
@@ -416,6 +412,12 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
             *(NPObject**)value = pluginElementNPObject;
             break;
         }
+        case NPNVprivateModeBool: {
+            RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+
+            *(NPBool*)value = plugin->isPrivateBrowsingEnabled();
+            break;
+        }
 #if PLATFORM(MAC)
         case NPNVsupportsCoreGraphicsBool:
             // Always claim to support the Core Graphics drawing model.
@@ -441,6 +443,11 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
             break;
 #endif
 #elif PLATFORM(WIN)
+       case NPNVnetscapeWindow: {
+           RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+           *reinterpret_cast<HWND*>(value) = plugin->containingWindow();
+           break;
+       }
        case NPNVSupportsWindowless:
            *(NPBool*)value = true;
            break;
@@ -537,7 +544,7 @@ static NPUTF8 *NPN_UTF8FromIdentifier(NPIdentifier identifier)
         return 0;
 
     uint32_t stringLength = strlen(string);
-    char* utf8String = static_cast<char*>(NPN_MemAlloc(stringLength + 1));
+    char* utf8String = npnMemNewArray<char>(stringLength + 1);
     memcpy(utf8String, string, stringLength);
     utf8String[stringLength] = '\0';
     
@@ -670,16 +677,70 @@ static bool NPN_Construct(NPP, NPObject* npObject, const NPVariant* arguments, u
     return false;
 }
 
-static NPError NPN_GetValueForURL(NPP instance, NPNURLVariable variable, const char* url, char** value, uint32_t* len)
+static NPError copyCString(const CString& string, char** value, uint32_t* len)
 {
-    notImplemented();
-    return NPERR_GENERIC_ERROR;
+    ASSERT(!string.isNull());
+    ASSERT(value);
+    ASSERT(len);
+
+    *value = npnMemNewArray<char>(string.length());
+    if (!*value)
+        return NPERR_GENERIC_ERROR;
+
+    memcpy(*value, string.data(), string.length());
+    *len = string.length();
+    return NPERR_NO_ERROR;
 }
 
-static NPError NPN_SetValueForURL(NPP instance, NPNURLVariable variable, const char* url, const char* value, uint32_t len)
+static NPError NPN_GetValueForURL(NPP npp, NPNURLVariable variable, const char* url, char** value, uint32_t* len)
 {
-    notImplemented();
-    return NPERR_GENERIC_ERROR;
+    if (!value || !len)
+        return NPERR_GENERIC_ERROR;
+    
+    switch (variable) {
+        case NPNURLVCookie: {
+            RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+
+            String cookies = plugin->cookiesForURL(makeURLString(url));
+            if (cookies.isNull())
+                return NPERR_GENERIC_ERROR;
+
+            return copyCString(cookies.utf8(), value, len);
+        }
+
+        case NPNURLVProxy: {
+            RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+
+            String proxies = plugin->proxiesForURL(makeURLString(url));
+            if (proxies.isNull())
+                return NPERR_GENERIC_ERROR;
+
+            return copyCString(proxies.utf8(), value, len);
+        }
+        default:
+            notImplemented();
+            return NPERR_GENERIC_ERROR;
+    }
+}
+
+static NPError NPN_SetValueForURL(NPP npp, NPNURLVariable variable, const char* url, const char* value, uint32_t len)
+{
+    switch (variable) {
+        case NPNURLVCookie: {
+            RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+
+            plugin->setCookiesForURL(makeURLString(url), String(value, len));
+            return NPERR_NO_ERROR;
+        }
+
+        case NPNURLVProxy:
+            // Can't set the proxy for a URL.
+            return NPERR_GENERIC_ERROR;
+
+        default:
+            notImplemented();
+            return NPERR_GENERIC_ERROR;
+    }
 }
 
 static NPError NPN_GetAuthenticationInfo(NPP instance, const char* protocol, const char* host, int32_t port, const char* scheme, 

@@ -70,8 +70,9 @@ public:
     virtual bool canTakeFocus(WebCore::FocusDirection);
     virtual void takeFocus(WebCore::FocusDirection);
     virtual void focusedNodeChanged(WebCore::Node*);
+    virtual void focusedFrameChanged(WebCore::Frame*);
     virtual WebCore::Page* createWindow(
-        WebCore::Frame*, const WebCore::FrameLoadRequest&, const WebCore::WindowFeatures&);
+        WebCore::Frame*, const WebCore::FrameLoadRequest&, const WebCore::WindowFeatures&, const WebCore::NavigationAction&);
     virtual void show();
     virtual bool canRunModal();
     virtual void runModal();
@@ -155,8 +156,6 @@ public:
     virtual bool allowsAcceleratedCompositing() const;
 #endif
 
-    virtual WebCore::SharedGraphicsContext3D* getSharedGraphicsContext3D();
-
     virtual bool supportsFullscreenForNode(const WebCore::Node*);
     virtual void enterFullscreenForNode(WebCore::Node*);
     virtual void exitFullscreenForNode(WebCore::Node*);
@@ -175,6 +174,10 @@ public:
     virtual bool selectItemWritingDirectionIsNatural();
     virtual PassRefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const;
     virtual PassRefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const;
+
+#if ENABLE(CONTEXT_MENUS)
+    virtual void showContextMenu() { }
+#endif
 
 private:
     void getPopupMenuInfo(WebCore::PopupContainer*, WebPopupMenuInfo*);

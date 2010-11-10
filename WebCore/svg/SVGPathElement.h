@@ -23,6 +23,7 @@
 
 #if ENABLE(SVG)
 #include "SVGAnimatedPathData.h"
+#include "SVGAnimatedPropertyMacros.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGLangSpace.h"
 #include "SVGStyledTransformableElement.h"
@@ -89,7 +90,7 @@ namespace WebCore {
         virtual SVGPathSegList* animatedPathSegList() const;
         virtual SVGPathSegList* animatedNormalizedPathSegList() const;
 
-        virtual Path toPathData() const;
+        virtual void toPathData(Path&) const;
 
     private:
         SVGPathElement(const QualifiedName&, Document*);
@@ -104,10 +105,10 @@ namespace WebCore {
 
         mutable RefPtr<SVGPathSegList> m_pathSegList;
 
-        DECLARE_ANIMATED_PROPERTY(SVGPathElement, SVGNames::pathLengthAttr, float, PathLength, pathLength)
+        DECLARE_ANIMATED_STATIC_PROPERTY_NEW(SVGPathElement, SVGNames::pathLengthAttr, float, PathLength, pathLength)
 
         // SVGExternalResourcesRequired
-        DECLARE_ANIMATED_PROPERTY(SVGPathElement, SVGNames::externalResourcesRequiredAttr, bool, ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_STATIC_PROPERTY_NEW(SVGPathElement, SVGNames::externalResourcesRequiredAttr, bool, ExternalResourcesRequired, externalResourcesRequired)
     };
 
 } // namespace WebCore

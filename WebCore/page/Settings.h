@@ -143,10 +143,12 @@ namespace WebCore {
         //  - HTML5/DOM Storage
         //  - Icon Database
         //  - Console Messages
-        //  - Cache
+        //  - MemoryCache
         //  - Application Cache
         //  - Back/Forward Page History
         //  - Page Search Results
+        //  - HTTP Cookies
+        //  - Plug-ins (that support NPNVprivateModeBool)
         void setPrivateBrowsingEnabled(bool);
         bool privateBrowsingEnabled() const { return m_privateBrowsingEnabled; }
 
@@ -167,6 +169,9 @@ namespace WebCore {
 
         void setShouldPrintBackgrounds(bool);
         bool shouldPrintBackgrounds() const { return m_shouldPrintBackgrounds; }
+
+        void setShouldDelegateScrolling(bool);
+        bool shouldDelegateScrolling() const { return m_shouldDelegateScrolling; }
 
         void setTextAreasAreResizable(bool);
         bool textAreasAreResizable() const { return m_textAreasAreResizable; }
@@ -330,6 +335,9 @@ namespace WebCore {
         void setHyperlinkAuditingEnabled(bool flag) { m_hyperlinkAuditingEnabled = flag; }
         bool hyperlinkAuditingEnabled() const { return m_hyperlinkAuditingEnabled; }
 
+        void setCrossOriginCheckInGetMatchedCSSRulesDisabled(bool flag) { m_crossOriginCheckInGetMatchedCSSRulesDisabled = flag; }
+        bool crossOriginCheckInGetMatchedCSSRulesDisabled() const { return m_crossOriginCheckInGetMatchedCSSRulesDisabled; }
+
     private:
         Page* m_page;
 
@@ -370,6 +378,7 @@ namespace WebCore {
         bool m_javaScriptCanOpenWindowsAutomatically : 1;
         bool m_javaScriptCanAccessClipboard : 1;
         bool m_shouldPrintBackgrounds : 1;
+        bool m_shouldDelegateScrolling : 1;
         bool m_textAreasAreResizable : 1;
 #if ENABLE(DASHBOARD_SUPPORT)
         bool m_usesDashboardBackwardCompatibilityMode : 1;
@@ -417,6 +426,7 @@ namespace WebCore {
         bool m_interactiveFormValidation: 1;
         bool m_usePreHTML5ParserQuirks: 1;
         bool m_hyperlinkAuditingEnabled : 1;
+        bool m_crossOriginCheckInGetMatchedCSSRulesDisabled : 1;
 
 #if USE(SAFARI_THEME)
         static bool gShouldPaintNativeControls;

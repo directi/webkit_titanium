@@ -98,7 +98,6 @@ PolicyDelegate* policyDelegate;
 COMPtr<FrameLoadDelegate> sharedFrameLoadDelegate;
 COMPtr<UIDelegate> sharedUIDelegate;
 COMPtr<EditingDelegate> sharedEditingDelegate;
-COMPtr<ResourceLoadDelegate> sharedResourceLoadDelegate;
 COMPtr<HistoryDelegate> sharedHistoryDelegate;
 
 IWebFrame* frame;
@@ -1201,7 +1200,10 @@ IWebView* createWebViewAndOffscreenWindow(HWND* webViewWindow)
     if (FAILED(viewEditing->setEditingDelegate(sharedEditingDelegate.get())))
         return 0;
 
-    if (FAILED(webView->setResourceLoadDelegate(sharedResourceLoadDelegate.get())))
+    ResourceLoadDelegate* resourceLoadDelegate = new ResourceLoadDelegate();
+    HRESULT result = webView->setResourceLoadDelegate(resourceLoadDelegate);
+    resourceLoadDelegate->Release(); // The delegate is owned by the WebView, so release our reference to it.
+    if (FAILED(result))
         return 0;
 
     openWindows().append(hostWindow);
@@ -1285,7 +1287,6 @@ int main(int argc, char* argv[])
     sharedFrameLoadDelegate.adoptRef(new FrameLoadDelegate);
     sharedUIDelegate.adoptRef(new UIDelegate);
     sharedEditingDelegate.adoptRef(new EditingDelegate);
-    sharedResourceLoadDelegate.adoptRef(new ResourceLoadDelegate);
     sharedHistoryDelegate.adoptRef(new HistoryDelegate);
 
     // FIXME - need to make DRT pass with Windows native controls <http://bugs.webkit.org/show_bug.cgi?id=25592>
@@ -1302,15 +1303,19 @@ int main(int argc, char* argv[])
     standardPreferences->setJavaScriptEnabled(TRUE);
     standardPreferences->setDefaultFontSize(16);
     standardPreferences->setAcceleratedCompositingEnabled(true);
+    standardPreferences->setContinuousSpellCheckingEnabled(TRUE);
 
     if (printSupportedFeatures) {
         BOOL acceleratedCompositingAvailable;
         standardPreferences->acceleratedCompositingEnabled(&acceleratedCompositingAvailable);
-        BOOL threeDRenderingAvailable = 
+
 #if ENABLE(3D_RENDERING)
-            true;
+        // In theory, we could have a software-based 3D rendering implementation that we use when
+        // hardware-acceleration is not available. But we don't have any such software
+        // implementation, so 3D rendering is only available when hardware-acceleration is.
+        BOOL threeDRenderingAvailable = acceleratedCompositingAvailable;
 #else
-            false;
+        BOOL threeDRenderingAvailable = FALSE;
 #endif
 
         printf("SupportedFeatures:%s %s\n", acceleratedCompositingAvailable ? "AcceleratedCompositing" : "", threeDRenderingAvailable ? "3DRendering" : "");

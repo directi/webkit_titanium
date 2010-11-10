@@ -28,6 +28,7 @@
 #include "Interpreter.h"
 #include "JSArray.h"
 #include "JSByteArray.h"
+#include "JSDocument.h"
 #include "JSDOMBinding.h"
 #include "JSDOMWindow.h"
 #include <JSFunction.h>
@@ -179,7 +180,7 @@ QVariant convertValueToQVariant(ExecState* exec, JSValue value, QMetaType::Type 
     }
 
     // check magic pointer values before dereferencing value
-    if (value == jsNaN(exec)
+    if (value == jsNaN()
         || (value == jsUndefined()
             && hint != QMetaType::QString
             && hint != (QMetaType::Type) qMetaTypeId<QVariant>())) {
@@ -747,6 +748,8 @@ QVariant convertValueToQVariant(ExecState* exec, JSValue value, QMetaType::Type 
             } else if (hint == (QMetaType::Type) qMetaTypeId<QWebElement>()) {
                 if (object && object->inherits(&JSHTMLElement::s_info))
                     ret = QVariant::fromValue<QWebElement>(QtWebElementRuntime::create((static_cast<JSHTMLElement*>(object))->impl()));
+                else if (object && object->inherits(&JSDocument::s_info))
+                    ret = QVariant::fromValue<QWebElement>(QtWebElementRuntime::create((static_cast<JSDocument*>(object))->impl()->documentElement()));
                 else
                     ret = QVariant::fromValue<QWebElement>(QWebElement());
             } else if (hint == (QMetaType::Type) qMetaTypeId<QVariant>()) {
@@ -816,7 +819,7 @@ JSValue convertQVariantToValue(ExecState* exec, PassRefPtr<RootObject> root, con
         type == QMetaType::UShort ||
         type == QMetaType::Float ||
         type == QMetaType::Double)
-        return jsNumber(exec, variant.toDouble());
+        return jsNumber(variant.toDouble());
 
     if (type == QMetaType::QRegExp) {
         QRegExp re = variant.value<QRegExp>();
@@ -1477,10 +1480,10 @@ void QtRuntimeMetaMethod::getOwnPropertyNames(ExecState* exec, PropertyNameArray
     QtRuntimeMethod::getOwnPropertyNames(exec, propertyNames, mode);
 }
 
-JSValue QtRuntimeMetaMethod::lengthGetter(ExecState* exec, JSValue, const Identifier&)
+JSValue QtRuntimeMetaMethod::lengthGetter(ExecState*, JSValue, const Identifier&)
 {
     // QtScript always returns 0
-    return jsNumber(exec, 0);
+    return jsNumber(0);
 }
 
 JSValue QtRuntimeMetaMethod::connectGetter(ExecState* exec, JSValue slotBase, const Identifier& ident)
@@ -1683,10 +1686,10 @@ void QtRuntimeConnectionMethod::getOwnPropertyNames(ExecState* exec, PropertyNam
     QtRuntimeMethod::getOwnPropertyNames(exec, propertyNames, mode);
 }
 
-JSValue QtRuntimeConnectionMethod::lengthGetter(ExecState* exec, JSValue, const Identifier&)
+JSValue QtRuntimeConnectionMethod::lengthGetter(ExecState*, JSValue, const Identifier&)
 {
     // we have one formal argument, and one optional
-    return jsNumber(exec, 1);
+    return jsNumber(1);
 }
 
 // ===============

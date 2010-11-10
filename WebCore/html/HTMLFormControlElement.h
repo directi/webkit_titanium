@@ -31,6 +31,7 @@ namespace WebCore {
 class FormDataList;
 class HTMLFormElement;
 class RenderTextControl;
+class ValidationMessage;
 class ValidityState;
 class VisibleSelection;
 
@@ -84,6 +85,8 @@ public:
 
     virtual bool willValidate() const;
     String validationMessage();
+    void updateVisibleValidationMessage();
+    void hideVisibleValidationMessage();
     bool checkValidity(Vector<RefPtr<HTMLFormControlElement> >* unhandledInvalidControls = 0);
     // This must be called when a validation constraint or control value is changed.
     void setNeedsValidityCheck();
@@ -111,6 +114,7 @@ protected:
 
     virtual void dispatchFocusEvent();
     virtual void dispatchBlurEvent();
+    virtual void detach();
 
     void removeFromForm();
 
@@ -131,9 +135,11 @@ private:
     virtual HTMLFormElement* virtualForm() const;
     virtual bool isDefaultButtonForForm() const;
     virtual bool isValidFormControlElement();
+    String visibleValidationMessage() const;
 
     HTMLFormElement* m_form;
     OwnPtr<ValidityState> m_validityState;
+    OwnPtr<ValidationMessage> m_validationMessage;
     bool m_disabled : 1;
     bool m_readOnly : 1;
     bool m_required : 1;
@@ -177,20 +183,22 @@ public:
 
     virtual ~HTMLTextFormControlElement();
 
+    // The derived class should return true if placeholder processing is needed.
+    virtual bool supportsPlaceholder() const = 0;
     String strippedPlaceholder() const;
+    bool placeholderShouldBeVisible() const;
 
-    int selectionStart();
-    int selectionEnd();
+    int selectionStart() const;
+    int selectionEnd() const;
     void setSelectionStart(int);
     void setSelectionEnd(int);
     void select();
     void setSelectionRange(int start, int end);
-    VisibleSelection selection() const;
+    PassRefPtr<Range> selection() const;
 
 protected:
     HTMLTextFormControlElement(const QualifiedName&, Document*, HTMLFormElement*);
 
-    bool placeholderShouldBeVisible() const;
     void updatePlaceholderVisibility(bool);
 
     virtual void parseMappedAttribute(Attribute*);
@@ -204,8 +212,6 @@ private:
     virtual int cachedSelectionStart() const = 0;
     virtual int cachedSelectionEnd() const = 0;
 
-    // The derived class should return true if placeholder processing is needed.
-    virtual bool supportsPlaceholder() const = 0;
     // Returns true if user-editable value is empty. Used to check placeholder visibility.
     virtual bool isEmptyValue() const = 0;
     // Called in dispatchFocusEvent(), after placeholder process, before calling parent's dispatchFocusEvent().

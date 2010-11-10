@@ -82,9 +82,9 @@ static inline String safariPluginsDirectory()
         cachedPluginDirectory = true;
 
         WCHAR moduleFileNameStr[MAX_PATH];
-        int moduleFileNameLen = ::GetModuleFileNameW(0, moduleFileNameStr, _countof(moduleFileNameStr));
+        int moduleFileNameLen = ::GetModuleFileNameW(0, moduleFileNameStr, WTF_ARRAY_LENGTH(moduleFileNameStr));
 
-        if (!moduleFileNameLen || moduleFileNameLen == _countof(moduleFileNameStr))
+        if (!moduleFileNameLen || moduleFileNameLen == WTF_ARRAY_LENGTH(moduleFileNameStr))
             return pluginsDirectory;
 
         if (!::PathRemoveFileSpecW(moduleFileNameStr))
@@ -109,7 +109,7 @@ static inline void addMozillaPluginDirectories(Vector<String>& directories)
 
     // Enumerate subkeys
     for (int i = 0;; i++) {
-        DWORD nameLen = _countof(name);
+        DWORD nameLen = WTF_ARRAY_LENGTH(name);
         result = ::RegEnumKeyExW(key, i, name, &nameLen, 0, 0, 0, &lastModified);
 
         if (result != ERROR_SUCCESS)
@@ -143,9 +143,9 @@ static inline void addWindowsMediaPlayerPluginDirectory(Vector<String>& director
 {
     // The new WMP Firefox plugin is installed in \PFiles\Plugins if it can't find any Firefox installs
     WCHAR pluginDirectoryStr[MAX_PATH + 1];
-    DWORD pluginDirectorySize = ::ExpandEnvironmentStringsW(L"%SYSTEMDRIVE%\\PFiles\\Plugins", pluginDirectoryStr, _countof(pluginDirectoryStr));
+    DWORD pluginDirectorySize = ::ExpandEnvironmentStringsW(L"%SYSTEMDRIVE%\\PFiles\\Plugins", pluginDirectoryStr, WTF_ARRAY_LENGTH(pluginDirectoryStr));
 
-    if (pluginDirectorySize > 0 && pluginDirectorySize <= _countof(pluginDirectoryStr))
+    if (pluginDirectorySize > 0 && pluginDirectorySize <= WTF_ARRAY_LENGTH(pluginDirectoryStr))
         directories.append(String(pluginDirectoryStr, pluginDirectorySize - 1));
 
     DWORD type;
@@ -187,7 +187,7 @@ static inline void addAdobeAcrobatPluginDirectory(Vector<String>& directories)
 
     // Enumerate subkeys
     for (int i = 0;; i++) {
-        DWORD nameLen = _countof(name);
+        DWORD nameLen = WTF_ARRAY_LENGTH(name);
         result = ::RegEnumKeyExW(key, i, name, &nameLen, 0, 0, 0, &lastModified);
 
         if (result != ERROR_SUCCESS)
@@ -222,7 +222,7 @@ static inline void addMacromediaPluginDirectories(Vector<String>& directories)
 #if !OS(WINCE)
     WCHAR systemDirectoryStr[MAX_PATH];
 
-    if (!::GetSystemDirectoryW(systemDirectoryStr, _countof(systemDirectoryStr)))
+    if (!::GetSystemDirectoryW(systemDirectoryStr, WTF_ARRAY_LENGTH(systemDirectoryStr)))
         return;
 
     WCHAR macromediaDirectoryStr[MAX_PATH];
@@ -303,6 +303,43 @@ Vector<String> PluginInfoStore::pluginPathsInDirectory(const String& directory)
     return paths;
 }
 
+static void addPluginPathsFromRegistry(HKEY rootKey, Vector<String>& paths)
+{
+    HKEY key;
+    if (::RegOpenKeyExW(rootKey, L"Software\\MozillaPlugins", 0, KEY_ENUMERATE_SUB_KEYS, &key) != ERROR_SUCCESS)
+        return;
+
+    for (size_t i = 0; ; ++i) {
+        // MSDN says that key names have a maximum length of 255 characters.
+        wchar_t name[256];
+        DWORD nameLen = WTF_ARRAY_LENGTH(name);
+        if (::RegEnumKeyExW(key, i, name, &nameLen, 0, 0, 0, 0) != ERROR_SUCCESS)
+            break;
+
+        wchar_t path[MAX_PATH];
+        DWORD pathSizeInBytes = sizeof(path);
+        DWORD type;
+        if (::SHGetValueW(key, name, L"Path", &type, path, &pathSizeInBytes) != ERROR_SUCCESS)
+            continue;
+        if (type != REG_SZ)
+            continue;
+
+        paths.append(path);
+    }
+
+    ::RegCloseKey(key);
+}
+
+Vector<String> PluginInfoStore::individualPluginPaths()
+{
+    Vector<String> paths;
+
+    addPluginPathsFromRegistry(HKEY_LOCAL_MACHINE, paths);
+    addPluginPathsFromRegistry(HKEY_CURRENT_USER, paths);
+
+    return paths;
+}
+
 static String getVersionInfo(const LPVOID versionInfoData, const String& info)
 {
     LPVOID buffer;
@@ -313,6 +350,14 @@ static String getVersionInfo(const LPVOID versionInfoData, const String& info)
 
     // Subtract 1 from the length; we don't want the trailing null character.
     return String(reinterpret_cast<UChar*>(buffer), bufferLength - 1);
+}
+
+static uint64_t fileVersion(DWORD leastSignificant, DWORD mostSignificant)
+{
+    ULARGE_INTEGER version;
+    version.LowPart = leastSignificant;
+    version.HighPart = mostSignificant;
+    return version.QuadPart;
 }
 
 bool PluginInfoStore::getPluginInfo(const String& pluginPath, Plugin& plugin)
@@ -329,6 +374,11 @@ bool PluginInfoStore::getPluginInfo(const String& pluginPath, Plugin& plugin)
     String name = getVersionInfo(versionInfoData.get(), "ProductName");
     String description = getVersionInfo(versionInfoData.get(), "FileDescription");
     if (name.isNull() || description.isNull())
+        return false;
+
+    VS_FIXEDFILEINFO* info;
+    UINT infoSize;
+    if (!::VerQueryValueW(versionInfoData.get(), L"\\", reinterpret_cast<void**>(&info), &infoSize) || infoSize < sizeof(VS_FIXEDFILEINFO))
         return false;
 
     Vector<String> types;
@@ -366,14 +416,72 @@ bool PluginInfoStore::getPluginInfo(const String& pluginPath, Plugin& plugin)
     plugin.info.name = name;
     plugin.info.file = pathGetFileName(pluginPath);
     plugin.info.mimes.swap(mimes);
+    plugin.fileVersion = fileVersion(info->dwFileVersionLS, info->dwFileVersionMS);
+
     return true;
 }
 
-bool PluginInfoStore::shouldUsePlugin(const Plugin& plugin, const Vector<Plugin>& loadedPlugins)
+static bool isOldWindowsMediaPlayerPlugin(const PluginInfoStore::Plugin& plugin)
 {
-    // FIXME: <http://webkit.org/b/43509> Migrate logic here from
-    // PluginDatabase::getPluginPathsInDirectories and PluginPackage::isPluginBlacklisted.
-    notImplemented();
+    return equalIgnoringCase(plugin.info.file, "npdsplay.dll");
+}
+
+static bool isNewWindowsMediaPlayerPlugin(const PluginInfoStore::Plugin& plugin)
+{
+    return equalIgnoringCase(plugin.info.file, "np-mswmp.dll");
+}
+
+bool PluginInfoStore::shouldUsePlugin(const Plugin& plugin)
+{
+    // FIXME: We should prefer a newer version of a plugin to an older version, rather than loading
+    // both. <http://webkit.org/b/49075>
+
+    if (plugin.info.name == "Citrix ICA Client") {
+        // The Citrix ICA Client plug-in requires a Mozilla-based browser; see <rdar://6418681>.
+        return false;
+    }
+
+    if (plugin.info.name == "Silverlight Plug-In") {
+        // workaround for <rdar://5557379> Crash in Silverlight when opening microsoft.com.
+        // the latest 1.0 version of Silverlight does not reproduce this crash, so allow it
+        // and any newer versions
+        static const uint64_t minimumRequiredVersion = fileVersion(0x51BE0000, 0x00010000);
+        return plugin.fileVersion >= minimumRequiredVersion;
+    }
+
+    if (equalIgnoringCase(plugin.info.file, "npmozax.dll")) {
+        // Bug 15217: Mozilla ActiveX control complains about missing xpcom_core.dll
+        return false;
+    }
+
+    if (plugin.info.name == "Yahoo Application State Plugin") {
+        // https://bugs.webkit.org/show_bug.cgi?id=26860
+        // Bug in Yahoo Application State plug-in earlier than 1.0.0.6 leads to heap corruption.
+        static const uint64_t minimumRequiredVersion = fileVersion(0x00000006, 0x00010000);
+        return plugin.fileVersion >= minimumRequiredVersion;
+    }
+
+    if (isOldWindowsMediaPlayerPlugin(plugin)) {
+        // Don't load the old Windows Media Player plugin if we've already loaded the new Windows
+        // Media Player plugin.
+        for (size_t i = 0; i < m_plugins.size(); ++i) {
+            if (!isNewWindowsMediaPlayerPlugin(m_plugins[i]))
+                continue;
+            return false;
+        }
+        return true;
+    }
+
+    if (isNewWindowsMediaPlayerPlugin(plugin)) {
+        // Unload the old Windows Media Player plugin if we've already loaded it.
+        for (size_t i = 0; i < m_plugins.size(); ++i) {
+            if (!isOldWindowsMediaPlayerPlugin(m_plugins[i]))
+                continue;
+            m_plugins.remove(i);
+        }
+        return true;
+    }
+
     return true;
 }
 

@@ -34,6 +34,8 @@
 
 namespace WebKit {
 
+class FindIndicatorWindow;
+
 // NOTE: This does not use String::operator NSString*() since that function
 // expects to be called on the thread running WebCore.
 NSString* nsStringFromWebCoreString(const String&);
@@ -46,19 +48,32 @@ public:
 private:
     PageClientImpl(WKView*);
 
-    virtual void processDidExit();
-    virtual void processDidRevive();
+    virtual void processDidCrash();
+    virtual void didRelaunchProcess();
     virtual void takeFocus(bool direction);
     virtual void toolTipChanged(const String& oldToolTip, const String& newToolTip);
     virtual void setCursor(const WebCore::Cursor&);
+    virtual void setViewportArguments(const WebCore::ViewportArguments&);
 
-    void registerEditCommand(PassRefPtr<WebEditCommandProxy>, UndoOrRedo);
-    void clearAllEditCommands();
-    void setEditCommandState(const String& commandName, bool isEnabled, int state);
+    virtual void registerEditCommand(PassRefPtr<WebEditCommandProxy>, WebPageProxy::UndoOrRedo);
+    virtual void clearAllEditCommands();
+    virtual void setEditCommandState(const String& commandName, bool isEnabled, int state);
+    virtual void interceptKeyEvent(const NativeWebKeyboardEvent& event, Vector<WebCore::KeypressCommand>& commandName);
+
+    virtual WebCore::FloatRect convertToDeviceSpace(const WebCore::FloatRect&);
+    virtual WebCore::FloatRect convertToUserSpace(const WebCore::FloatRect&);
+
+    virtual void didNotHandleKeyEvent(const NativeWebKeyboardEvent&);
+    virtual void selectionChanged(bool, bool, bool, bool);
+
+    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy();
+    virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*);
+
+    void setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut);
 
 #if USE(ACCELERATED_COMPOSITING)
-    void pageDidEnterAcceleratedCompositing();
-    void pageDidLeaveAcceleratedCompositing();
+    virtual void pageDidEnterAcceleratedCompositing();
+    virtual void pageDidLeaveAcceleratedCompositing();
 #endif
 
     WKView* m_wkView;

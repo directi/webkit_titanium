@@ -159,6 +159,7 @@ GEN := \
     $(intermediates)/html/JSBlob.h \
     $(intermediates)/html/JSBlobBuilder.h \
     $(intermediates)/html/JSDOMFormData.h \
+    $(intermediates)/html/JSDOMSettableTokenList.h \
     $(intermediates)/html/JSDOMTokenList.h \
     $(intermediates)/html/JSDataGridColumn.h \
     $(intermediates)/html/JSDataGridColumnList.h \
@@ -217,6 +218,7 @@ GEN := \
     $(intermediates)/html/JSHTMLOptGroupElement.h \
     $(intermediates)/html/JSHTMLOptionElement.h \
     $(intermediates)/html/JSHTMLOptionsCollection.h \
+    $(intermediates)/html/JSHTMLOutputElement.h \
     $(intermediates)/html/JSHTMLParagraphElement.h \
     $(intermediates)/html/JSHTMLParamElement.h \
     $(intermediates)/html/JSHTMLPreElement.h \

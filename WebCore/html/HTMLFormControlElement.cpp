@@ -45,12 +45,15 @@
 #include "RenderTextControl.h"
 #include "RenderTheme.h"
 #include "ScriptEventListener.h"
+#include "ValidationMessage.h"
 #include "ValidityState.h"
+#include <limits>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
 using namespace HTMLNames;
+using namespace std;
 
 HTMLFormControlElement::HTMLFormControlElement(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
     : HTMLElement(tagName, document)
@@ -73,6 +76,12 @@ HTMLFormControlElement::~HTMLFormControlElement()
 {
     if (m_form)
         m_form->removeFormElement(this);
+}
+
+void HTMLFormControlElement::detach()
+{
+    hideVisibleValidationMessage();
+    HTMLElement::detach();
 }
 
 bool HTMLFormControlElement::formNoValidate() const
@@ -255,7 +264,7 @@ bool HTMLFormControlElement::isKeyboardFocusable(KeyboardEvent* event) const
 
 bool HTMLFormControlElement::isMouseFocusable() const
 {
-#if PLATFORM(GTK)
+#if PLATFORM(GTK) || PLATFORM(QT)
     return HTMLElement::isMouseFocusable();
 #else
     return false;
@@ -299,12 +308,49 @@ void HTMLFormControlElement::setNeedsWillValidateCheck()
     m_willValidateInitialized = true;
     m_willValidate = newWillValidate;
     setNeedsStyleRecalc();
-    // FIXME: Show/hide a validation message.
+    if (!m_willValidate)
+        hideVisibleValidationMessage();
 }
 
 String HTMLFormControlElement::validationMessage()
 {
     return validity()->validationMessage();
+}
+
+void HTMLFormControlElement::updateVisibleValidationMessage()
+{
+    Page* page = document()->page();
+    if (!page)
+        return;
+    String message;
+    if (renderer() && willValidate()) {
+        message = validationMessage().stripWhiteSpace();
+        // HTML5 specification doesn't ask UA to show the title attribute value
+        // with the validationMessage.  However, this behavior is same as Opera
+        // and the specification describes such behavior as an example.
+        const AtomicString& title = getAttribute(titleAttr);
+        if (!message.isEmpty() && !title.isEmpty()) {
+            message.append('\n');
+            message.append(title);
+        }
+    }
+    if (!m_validationMessage) {
+        m_validationMessage = ValidationMessage::create(this);
+        m_validationMessage->setMessage(message);
+    } else if (message.isEmpty())
+        hideVisibleValidationMessage();
+    else if (m_validationMessage->message() != message)
+        m_validationMessage->setMessage(message);
+}
+
+void HTMLFormControlElement::hideVisibleValidationMessage()
+{
+    m_validationMessage = 0;
+}
+
+String HTMLFormControlElement::visibleValidationMessage() const
+{
+    return m_validationMessage ? m_validationMessage->message() : String();
 }
 
 bool HTMLFormControlElement::checkValidity(Vector<RefPtr<HTMLFormControlElement> >* unhandledInvalidControls)
@@ -336,7 +382,13 @@ void HTMLFormControlElement::setNeedsValidityCheck()
         setNeedsStyleRecalc();
     }
     m_isValid = newIsValid;
-    // FIXME: show/hide a validation message.
+
+    // Updates only if this control already has a validtion message.
+    if (!visibleValidationMessage().isEmpty()) {
+        // Calls updateVisibleValidationMessage() even if m_isValid is not
+        // changed because a validation message can be chagned.
+        updateVisibleValidationMessage();
+    }
 }
 
 void HTMLFormControlElement::setCustomValidity(const String& error)
@@ -358,6 +410,7 @@ void HTMLFormControlElement::dispatchBlurEvent()
         document()->page()->chrome()->client()->formDidBlur(this);
 
     HTMLElement::dispatchBlurEvent();
+    hideVisibleValidationMessage();
 }
 
 HTMLFormElement* HTMLFormControlElement::virtualForm() const
@@ -440,7 +493,7 @@ bool HTMLFormControlElementWithState::autoComplete() const
 bool HTMLFormControlElementWithState::shouldSaveAndRestoreFormControlState() const
 {
     // We don't save/restore control state in a form with autocomplete=off.
-    return autoComplete();
+    return attached() && autoComplete();
 }
 
 void HTMLFormControlElementWithState::finishParsingChildren()
@@ -548,29 +601,25 @@ RenderTextControl* HTMLTextFormControlElement::textRendererAfterUpdateLayout()
 
 void HTMLTextFormControlElement::setSelectionStart(int start)
 {
-    if (RenderTextControl* renderer = textRendererAfterUpdateLayout())
-        renderer->setSelectionStart(start);
+    setSelectionRange(start, max(start, selectionEnd()));
 }
 
 void HTMLTextFormControlElement::setSelectionEnd(int end)
 {
-    if (RenderTextControl* renderer = textRendererAfterUpdateLayout())
-        renderer->setSelectionEnd(end);
+    setSelectionRange(min(end, selectionStart()), end);
 }
 
 void HTMLTextFormControlElement::select()
 {
-    if (RenderTextControl* renderer = textRendererAfterUpdateLayout())
-        renderer->select();
+    setSelectionRange(0, numeric_limits<int>::max());
 }
 
 void HTMLTextFormControlElement::setSelectionRange(int start, int end)
 {
-    if (RenderTextControl* renderer = textRendererAfterUpdateLayout())
-        renderer->setSelectionRange(start, end);
+    WebCore::setSelectionRange(this, start, end);
 }
 
-int HTMLTextFormControlElement::selectionStart()
+int HTMLTextFormControlElement::selectionStart() const
 {
     if (!isTextFormControl())
         return 0;
@@ -581,7 +630,7 @@ int HTMLTextFormControlElement::selectionStart()
     return toRenderTextControl(renderer())->selectionStart();
 }
 
-int HTMLTextFormControlElement::selectionEnd()
+int HTMLTextFormControlElement::selectionEnd() const
 {
     if (!isTextFormControl())
         return 0;
@@ -592,10 +641,10 @@ int HTMLTextFormControlElement::selectionEnd()
     return toRenderTextControl(renderer())->selectionEnd();
 }
 
-VisibleSelection HTMLTextFormControlElement::selection() const
+PassRefPtr<Range> HTMLTextFormControlElement::selection() const
 {
     if (!renderer() || !isTextFormControl() || cachedSelectionStart() < 0 || cachedSelectionEnd() < 0)
-        return VisibleSelection();
+        return 0;
     return toRenderTextControl(renderer())->selection(cachedSelectionStart(), cachedSelectionEnd());
 }
 

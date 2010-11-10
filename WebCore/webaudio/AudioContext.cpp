@@ -1,29 +1,25 @@
 /*
- * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2010, Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- *
  * 1.  Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
+ *    notice, this list of conditions and the following disclaimer.
  * 2.  Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
- *     its contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL APPLE OR ITS CONTRIBUTORS BE LIABLE FOR ANY
+ * DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS BE LIABLE FOR ANY
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
@@ -38,6 +34,8 @@
 #include "AudioChannelSplitter.h"
 #include "AudioGainNode.h"
 #include "AudioListener.h"
+#include "AudioNodeInput.h"
+#include "AudioNodeOutput.h"
 #include "AudioPannerNode.h"
 #include "CachedAudio.h"
 #include "ConvolverNode.h"
@@ -104,10 +102,10 @@ AudioContext::AudioContext(Document* document)
     m_temporaryStereoBus = adoptPtr(new AudioBus(2, AudioNode::ProcessingSizeInFrames));
 
     // This sets in motion an asynchronous loading mechanism on another thread.
-    // We can check hrtfDatabaseLoader()->isLoaded() to find out whether or not it has been fully loaded.
+    // We can check m_hrtfDatabaseLoader->isLoaded() to find out whether or not it has been fully loaded.
     // It's not that useful to have a callback function for this since the audio thread automatically starts rendering on the graph
     // when this has finished (see AudioDestinationNode).
-    hrtfDatabaseLoader()->loadAsynchronously(sampleRate());
+    m_hrtfDatabaseLoader = HRTFDatabaseLoader::createAndLoadAsynchronouslyIfNecessary(sampleRate());
 }
 
 AudioContext::~AudioContext()
@@ -174,7 +172,7 @@ bool AudioContext::isRunnable() const
         return false;
     
     // Check with the HRTF spatialization system to see if it's finished loading.
-    return hrtfDatabaseLoader()->isLoaded();
+    return m_hrtfDatabaseLoader->isLoaded();
 }
 
 void AudioContext::stop()
@@ -394,12 +392,12 @@ void AudioContext::unlock()
     m_contextGraphMutex.unlock();
 }
 
-bool AudioContext::isAudioThread()
+bool AudioContext::isAudioThread() const
 {
     return currentThread() == m_audioThread;
 }
 
-bool AudioContext::isGraphOwner()
+bool AudioContext::isGraphOwner() const
 {
     return currentThread() == m_graphOwnerThread;
 }
@@ -408,6 +406,23 @@ void AudioContext::addDeferredFinishDeref(AudioNode* node, AudioNode::RefType re
 {
     ASSERT(isAudioThread());
     m_deferredFinishDerefList.append(AudioContext::RefInfo(node, refType));
+}
+
+void AudioContext::handlePreRenderTasks()
+{
+    ASSERT(isAudioThread());
+ 
+    // At the beginning of every render quantum, try to update the internal rendering graph state (from main thread changes).
+    // It's OK if the tryLock() fails, we'll just take slightly longer to pick up the changes.
+    bool mustReleaseLock;
+    if (tryLock(mustReleaseLock)) {
+        // Fixup the state of any dirty AudioNodeInputs and AudioNodeOutputs.
+        handleDirtyAudioNodeInputs();
+        handleDirtyAudioNodeOutputs();
+        
+        if (mustReleaseLock)
+            unlock();
+    }
 }
 
 void AudioContext::handlePostRenderTasks()
@@ -428,6 +443,10 @@ void AudioContext::handlePostRenderTasks()
         // Finally actually delete.
         deleteMarkedNodes();
 
+        // Fixup the state of any dirty AudioNodeInputs and AudioNodeOutputs.
+        handleDirtyAudioNodeInputs();
+        handleDirtyAudioNodeOutputs();
+        
         if (mustReleaseLock)
             unlock();
     }
@@ -460,6 +479,18 @@ void AudioContext::deleteMarkedNodes()
     while (size_t n = m_nodesToDelete.size()) {
         AudioNode* node = m_nodesToDelete[n - 1];
         m_nodesToDelete.removeLast();
+
+        // Before deleting the node, clear out any AudioNodeInputs from m_dirtyAudioNodeInputs.
+        unsigned numberOfInputs = node->numberOfInputs();
+        for (unsigned i = 0; i < numberOfInputs; ++i)
+            m_dirtyAudioNodeInputs.remove(node->input(i));
+
+        // Before deleting the node, clear out any AudioNodeOutputs from m_dirtyAudioNodeOutputs.
+        unsigned numberOfOutputs = node->numberOfOutputs();
+        for (unsigned i = 0; i < numberOfOutputs; ++i)
+            m_dirtyAudioNodeOutputs.remove(node->output(i));
+
+        // Finally, delete it.
         delete node;
 
         // Don't delete too many nodes per render quantum since we don't want to do too much work in the realtime audio thread.
@@ -467,6 +498,39 @@ void AudioContext::deleteMarkedNodes()
             break;
     }
 }
+
+void AudioContext::markAudioNodeInputDirty(AudioNodeInput* input)
+{
+    ASSERT(isGraphOwner());    
+    m_dirtyAudioNodeInputs.add(input);
+}
+
+void AudioContext::markAudioNodeOutputDirty(AudioNodeOutput* output)
+{
+    ASSERT(isGraphOwner());    
+    m_dirtyAudioNodeOutputs.add(output);
+}
+
+void AudioContext::handleDirtyAudioNodeInputs()
+{
+    ASSERT(isGraphOwner());    
+
+    for (HashSet<AudioNodeInput*>::iterator i = m_dirtyAudioNodeInputs.begin(); i != m_dirtyAudioNodeInputs.end(); ++i)
+        (*i)->updateRenderingState();
+
+    m_dirtyAudioNodeInputs.clear();
+}
+
+void AudioContext::handleDirtyAudioNodeOutputs()
+{
+    ASSERT(isGraphOwner());    
+
+    for (HashSet<AudioNodeOutput*>::iterator i = m_dirtyAudioNodeOutputs.begin(); i != m_dirtyAudioNodeOutputs.end(); ++i)
+        (*i)->updateRenderingState();
+
+    m_dirtyAudioNodeOutputs.clear();
+}
+
 
 } // namespace WebCore
 

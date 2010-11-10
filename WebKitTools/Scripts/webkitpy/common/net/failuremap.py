@@ -45,15 +45,18 @@ class FailureMap(object):
                              for failure_info in self._failures]
         return sorted(set(sum(failing_revisions, [])))
 
-    def revisions_causing_failures(self):
-        revision_to_failing_bots = {}
-        for failure_info in self._failures:
-            revisions = failure_info['regression_window'].revisions()
-            for revision in revisions:
-                failing_bots = revision_to_failing_bots.get(revision, [])
-                failing_bots.append(failure_info['builder'])
-                revision_to_failing_bots[revision] = failing_bots
-        return revision_to_failing_bots
+    def builders_failing_for(self, revision):
+        return self._builders_failing_because_of([revision])
+
+    def tests_failing_for(self, revision):
+        tests = [failure_info['regression_window'].failing_tests()
+                 for failure_info in self._failures
+                 if revision in failure_info['regression_window'].revisions()
+                    and failure_info['regression_window'].failing_tests()]
+        result = set()
+        for test in tests:
+            result = result.union(test)
+        return sorted(result)
 
     def _old_failures(self, is_old_failure):
         return filter(lambda revision: is_old_failure(revision),

@@ -31,7 +31,7 @@ namespace WebCore {
 
 class RenderTableCell : public RenderBlock {
 public:
-    RenderTableCell(Node*);
+    explicit RenderTableCell(Node*);
 
     // FIXME: need to implement cellIndex
     int cellIndex() const { return 0; }
@@ -51,11 +51,11 @@ public:
     RenderTableSection* section() const { return toRenderTableSection(parent()->parent()); }
     RenderTable* table() const { return toRenderTable(parent()->parent()->parent()); }
 
-    Length styleOrColWidth() const;
+    Length styleOrColLogicalWidth() const;
 
     virtual void computePreferredLogicalWidths();
 
-    void updateWidth(int);
+    void updateLogicalWidth(int);
 
     virtual int borderLeft() const;
     virtual int borderRight() const;
@@ -71,8 +71,18 @@ public:
     int borderHalfTop(bool outer) const;
     int borderHalfBottom(bool outer) const;
 
-    CollapsedBorderValue collapsedLeftBorder(bool rtl) const;
-    CollapsedBorderValue collapsedRightBorder(bool rtl) const;
+    int borderHalfStart(bool outer) const;
+    int borderHalfEnd(bool outer) const;
+    int borderHalfBefore(bool outer) const;
+    int borderHalfAfter(bool outer) const;
+
+    CollapsedBorderValue collapsedStartBorder() const;
+    CollapsedBorderValue collapsedEndBorder() const;
+    CollapsedBorderValue collapsedBeforeBorder() const;
+    CollapsedBorderValue collapsedAfterBorder() const;
+
+    CollapsedBorderValue collapsedLeftBorder() const;
+    CollapsedBorderValue collapsedRightBorder() const;
     CollapsedBorderValue collapsedTopBorder() const;
     CollapsedBorderValue collapsedBottomBorder() const;
 
@@ -88,7 +98,7 @@ public:
 
     void paintBackgroundsBehindCell(PaintInfo&, int tx, int ty, RenderObject* backgroundObject);
 
-    virtual int baselinePosition(bool firstLine = false, bool isRootLineBox = false) const;
+    virtual int baselinePosition(bool firstLine = false, LineDirectionMode = HorizontalLine, LinePositionMode = PositionOnContainingLine) const;
 
     void setIntrinsicPaddingBefore(int p) { m_intrinsicPaddingBefore = p; }
     void setIntrinsicPaddingAfter(int p) { m_intrinsicPaddingAfter = p; }

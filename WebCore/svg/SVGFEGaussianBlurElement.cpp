@@ -29,9 +29,6 @@
 
 namespace WebCore {
 
-char SVGStdDeviationXAttrIdentifier[] = "SVGStdDeviationXAttr";
-char SVGStdDeviationYAttrIdentifier[] = "SVGStdDeviationYAttr";
-
 inline SVGFEGaussianBlurElement::SVGFEGaussianBlurElement(const QualifiedName& tagName, Document* document)
     : SVGFilterPrimitiveStandardAttributes(tagName, document)
 {
@@ -42,9 +39,23 @@ PassRefPtr<SVGFEGaussianBlurElement> SVGFEGaussianBlurElement::create(const Qual
     return adoptRef(new SVGFEGaussianBlurElement(tagName, document));
 }
 
-void SVGFEGaussianBlurElement::setStdDeviation(float, float)
+const AtomicString& SVGFEGaussianBlurElement::stdDeviationXIdentifier()
 {
-    // FIXME: Needs an implementation.
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGStdDeviationX"));
+    return s_identifier;
+}
+
+const AtomicString& SVGFEGaussianBlurElement::stdDeviationYIdentifier()
+{
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGStdDeviationY"));
+    return s_identifier;
+}
+
+void SVGFEGaussianBlurElement::setStdDeviation(float x, float y)
+{
+    setStdDeviationXBaseValue(x);
+    setStdDeviationYBaseValue(y);
+    invalidate();
 }
 
 void SVGFEGaussianBlurElement::parseMappedAttribute(Attribute* attr)
@@ -60,6 +71,15 @@ void SVGFEGaussianBlurElement::parseMappedAttribute(Attribute* attr)
         setIn1BaseValue(value);
     else
         SVGFilterPrimitiveStandardAttributes::parseMappedAttribute(attr);
+}
+
+void SVGFEGaussianBlurElement::svgAttributeChanged(const QualifiedName& attrName)
+{
+    SVGFilterPrimitiveStandardAttributes::svgAttributeChanged(attrName);
+
+    if (attrName == SVGNames::inAttr
+        || attrName == SVGNames::stdDeviationAttr)
+        invalidate();
 }
 
 void SVGFEGaussianBlurElement::synchronizeProperty(const QualifiedName& attrName)

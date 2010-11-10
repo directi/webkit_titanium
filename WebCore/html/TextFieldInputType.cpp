@@ -31,11 +31,25 @@
 #include "config.h"
 #include "TextFieldInputType.h"
 
+#include "HTMLInputElement.h"
+#include "RenderTextControlSingleLine.h"
+#include <wtf/text/WTFString.h>
+
 namespace WebCore {
 
 bool TextFieldInputType::isTextField() const
 {
     return true;
+}
+
+bool TextFieldInputType::valueMissing(const String& value) const
+{
+    return value.isEmpty();
+}
+
+RenderObject* TextFieldInputType::createRenderer(RenderArena* arena, RenderStyle*) const
+{
+    return new (arena) RenderTextControlSingleLine(element(), element()->placeholderShouldBeVisible());
 }
 
 } // namespace WebCore

@@ -37,6 +37,7 @@ public:
         TypeNull = 0,
         TypeArray,
         TypeCertificateInfo,
+        TypeContextMenuItem,
         TypeData,
         TypeDictionary,
         TypeError,
@@ -45,6 +46,7 @@ public:
         TypeURL,
         TypeURLRequest,
         TypeURLResponse,
+        TypeUserContentURLPattern,
 
         // Base numeric types
         TypeBoolean,
@@ -55,9 +57,11 @@ public:
         TypeBackForwardList,
         TypeBackForwardListItem,
         TypeContext,
+        TypeDownload,
         TypeFormSubmissionListener,
         TypeFrame,
         TypeFramePolicyListener,
+        TypeInspector,
         TypeNavigationData,
         TypePage,
         TypePageNamespace,
@@ -65,10 +69,13 @@ public:
 
         // Bundle types
         TypeBundle,
+        TypeBundleBackForwardList,
+        TypeBundleBackForwardListItem,
         TypeBundleFrame,
         TypeBundleHitTestResult,
         TypeBundleNodeHandle,
         TypeBundlePage,
+        TypeBundlePageOverlay,
         TypeBundleRangeHandle,
         TypeBundleScriptWorld,
 

@@ -57,15 +57,19 @@ class AbstractRolloutPrepCommandTest(unittest.TestCase):
 class DownloadCommandsTest(CommandsTest):
     def _default_options(self):
         options = MockOptions()
-        options.force_clean = False
-        options.clean = True
-        options.check_builders = True
-        options.quiet = False
-        options.non_interactive = False
-        options.update = True
         options.build = True
-        options.test = True
+        options.build_style = True
+        options.check_builders = True
+        options.check_style = True
+        options.clean = True
         options.close_bug = True
+        options.force_clean = False
+        options.force_patch = True
+        options.non_interactive = False
+        options.parent_command = 'MOCK parent command'
+        options.quiet = False
+        options.test = True
+        options.update = True
         return options
 
     def test_build(self):
@@ -113,10 +117,6 @@ class DownloadCommandsTest(CommandsTest):
     def test_build_attachment(self):
         expected_stderr = "Processing 1 patch from 1 bug.\nUpdating working directory\nProcessing patch 197 from bug 42.\nBuilding WebKit\n"
         self.assert_execute_outputs(BuildAttachment(), [197], options=self._default_options(), expected_stderr=expected_stderr)
-
-    def test_post_attachment_to_rietveld(self):
-        expected_stderr = "Processing 1 patch from 1 bug.\nUpdating working directory\nProcessing patch 197 from bug 42.\nMOCK: Uploading patch to rietveld\nMOCK setting flag 'in-rietveld' to '+' on attachment '197' with comment 'None' and additional comment 'None'\n"
-        self.assert_execute_outputs(PostAttachmentToRietveld(), [197], options=self._default_options(), expected_stderr=expected_stderr)
 
     def test_land_attachment(self):
         # FIXME: This expected result is imperfect, notice how it's seeing the same patch as still there after it thought it would have cleared the flags.
@@ -182,5 +182,6 @@ where ATTACHMENT_ID is the ID of this attachment.
 
     def test_rollout(self):
         expected_stderr = "Preparing rollout for bug 42.\nUpdating working directory\nRunning prepare-ChangeLog\nMOCK: user.open_url: file://...\nBuilding WebKit\n"
-        self.assert_execute_outputs(Rollout(), [852, "Reason"], options=self._default_options(), expected_stderr=expected_stderr)
+        expected_stdout = "Was that diff correct?\n"
+        self.assert_execute_outputs(Rollout(), [852, "Reason"], options=self._default_options(), expected_stdout=expected_stdout, expected_stderr=expected_stderr)
 

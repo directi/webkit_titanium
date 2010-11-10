@@ -113,9 +113,6 @@ class Attachment(object):
     def commit_queue(self):
         return self._attachment_dictionary.get("commit-queue")
 
-    def in_rietveld(self):
-        return self._attachment_dictionary.get("in-rietveld")
-
     def url(self):
         # FIXME: This should just return
         # self._bugzilla().attachment_url_for_id(self.id()). scm_unittest.py
@@ -221,9 +218,6 @@ class Bug(object):
         # a valid committer.
         return filter(lambda patch: patch.committer(), patches)
 
-    def in_rietveld_queue_patches(self):
-        return [patch for patch in self.patches() if patch.in_rietveld() == None]
-
 
 # A container for all of the logic for making and parsing buzilla queries.
 class BugzillaQueries(object):
@@ -287,29 +281,18 @@ class BugzillaQueries(object):
         return sum([self._fetch_bug(bug_id).commit_queued_patches()
                     for bug_id in self.fetch_bug_ids_from_commit_queue()], [])
 
-    def fetch_first_patch_from_rietveld_queue(self):
-        # rietveld-queue processes all patches that don't have in-rietveld set.
-        query_url = "buglist.cgi?query_format=advanced&bug_status=UNCONFIRMED&bug_status=NEW&bug_status=ASSIGNED&bug_status=REOPENED&field0-0-0=flagtypes.name&type0-0-0=notsubstring&value0-0-0=in-rietveld&field0-1-0=attachments.ispatch&type0-1-0=equals&value0-1-0=1&order=Last+Changed&field0-2-0=attachments.isobsolete&type0-2-0=equals&value0-2-0=0"
-        bugs = self._fetch_bug_ids_advanced_query(query_url)
-        if not len(bugs):
-            return None
-
-        patches = self._fetch_bug(bugs[0]).in_rietveld_queue_patches()
-        return patches[0] if len(patches) else None
-
-    def _fetch_bug_ids_from_review_queue(self):
+    def fetch_bug_ids_from_review_queue(self):
         review_queue_url = "buglist.cgi?query_format=advanced&bug_status=UNCONFIRMED&bug_status=NEW&bug_status=ASSIGNED&bug_status=REOPENED&field0-0-0=flagtypes.name&type0-0-0=equals&value0-0-0=review?"
         return self._fetch_bug_ids_advanced_query(review_queue_url)
 
+    # This method will make several requests to bugzilla.
     def fetch_patches_from_review_queue(self, limit=None):
         # [:None] returns the whole array.
         return sum([self._fetch_bug(bug_id).unreviewed_patches()
-            for bug_id in self._fetch_bug_ids_from_review_queue()[:limit]], [])
+            for bug_id in self.fetch_bug_ids_from_review_queue()[:limit]], [])
 
-    # FIXME: Why do we have both fetch_patches_from_review_queue and
-    # fetch_attachment_ids_from_review_queue??
-    # NOTE: This is also the only client of _fetch_attachment_ids_request_query
-
+    # NOTE: This is the only client of _fetch_attachment_ids_request_query
+    # This method only makes one request to bugzilla.
     def fetch_attachment_ids_from_review_queue(self):
         review_queue_url = "request.cgi?action=queue&type=review&group=type"
         return self._fetch_attachment_ids_request_query(review_queue_url)
@@ -503,8 +486,6 @@ class Bugzilla(object):
         self._parse_attachment_flag(
                 element, 'review', attachment, 'reviewer_email')
         self._parse_attachment_flag(
-                element, 'in-rietveld', attachment, 'rietveld_uploader_email')
-        self._parse_attachment_flag(
                 element, 'commit-queue', attachment, 'committer_email')
         return attachment
 
@@ -592,11 +573,12 @@ class Bugzilla(object):
             self.authenticated = True
             return
 
+        credentials = Credentials(self.bug_server_host, git_prefix="bugzilla")
+
         attempts = 0
         while not self.authenticated:
             attempts += 1
-            (username, password) = Credentials(
-                self.bug_server_host, git_prefix="bugzilla").read_credentials()
+            username, password = credentials.read_credentials()
 
             log("Logging in as %s..." % username)
             self.browser.open(self.bug_server_url +
@@ -767,8 +749,6 @@ class Bugzilla(object):
             return self.browser.find_control(type='select', nr=0)
         elif flag_name == "commit-queue":
             return self.browser.find_control(type='select', nr=1)
-        elif flag_name == "in-rietveld":
-            return self.browser.find_control(type='select', nr=2)
         raise Exception("Don't know how to find flag named \"%s\"" % flag_name)
 
     def clear_attachment_flags(self,

@@ -26,13 +26,18 @@
 #include "WebView.h"
 
 #include "ChunkedUpdateDrawingAreaProxy.h"
+#include "FindIndicator.h"
 #include "RunLoop.h"
 #include "NativeWebKeyboardEvent.h"
+#include "WebContextMenuProxyWin.h"
 #include "WebEditCommandProxy.h"
 #include "WebEventFactory.h"
 #include "WebPageNamespace.h"
 #include "WebPageProxy.h"
+#include "WebPopupMenuProxyWin.h"
 #include <Commctrl.h>
+#include <WebCore/Cursor.h>
+#include <WebCore/FloatRect.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/WebCoreInstanceHandle.h>
 #include <WebCore/WindowMessageBroadcaster.h>
@@ -78,6 +83,9 @@ LRESULT WebView::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     bool handled = true;
 
     switch (message) {
+        case WM_CLOSE:
+            m_page->tryClose();
+            break;
         case WM_DESTROY:
             m_isBeingDestroyed = true;
             close();
@@ -173,12 +181,13 @@ bool WebView::registerWebViewWindowClass()
     return !!::RegisterClassEx(&wcex);
 }
 
-WebView::WebView(RECT rect, WebPageNamespace* pageNamespace, HWND hostWindow)
+WebView::WebView(RECT rect, WebPageNamespace* pageNamespace, HWND parentWindow)
     : m_rect(rect)
-    , m_hostWindow(hostWindow)
     , m_topLevelParentWindow(0)
     , m_toolTipWindow(0)
     , m_lastCursorSet(0)
+    , m_webCoreCursor(0)
+    , m_overrideCursor(0)
     , m_trackingMouseLeave(false)
     , m_isBeingDestroyed(false)
 {
@@ -189,7 +198,7 @@ WebView::WebView(RECT rect, WebPageNamespace* pageNamespace, HWND hostWindow)
     m_page->setDrawingArea(ChunkedUpdateDrawingAreaProxy::create(this));
 
     m_window = ::CreateWindowEx(0, kWebKit2WebViewWindowClassName, 0, WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-        rect.top, rect.left, rect.right - rect.left, rect.bottom - rect.top, m_hostWindow ? m_hostWindow : HWND_MESSAGE, 0, instanceHandle(), this);
+        rect.top, rect.left, rect.right - rect.left, rect.bottom - rect.top, parentWindow ? parentWindow : HWND_MESSAGE, 0, instanceHandle(), this);
     ASSERT(::IsWindow(m_window));
 
     m_page->initializeWebPage(IntRect(rect).size());
@@ -211,25 +220,23 @@ WebView::~WebView()
         ::DestroyWindow(m_toolTipWindow);
 }
 
-void WebView::setHostWindow(HWND hostWindow)
+void WebView::setParentWindow(HWND parentWindow)
 {
     if (m_window) {
         // If the host window hasn't changed, bail.
-        if (GetParent(m_window) == hostWindow)
+        if (::GetParent(m_window) == parentWindow)
             return;
-        if (hostWindow)
-            SetParent(m_window, hostWindow);
+        if (parentWindow)
+            ::SetParent(m_window, parentWindow);
         else if (!m_isBeingDestroyed) {
             // Turn the WebView into a message-only window so it will no longer be a child of the
-            // old host window and will be hidden from screen. We only do this when
+            // old parent window and will be hidden from screen. We only do this when
             // isBeingDestroyed() is false because doing this while handling WM_DESTROY can leave
             // m_window in a weird state (see <http://webkit.org/b/29337>).
-            SetParent(m_window, HWND_MESSAGE);
+            ::SetParent(m_window, HWND_MESSAGE);
         }
     }
 
-    m_hostWindow = hostWindow;
-    
     windowAncestryDidChange();
 }
 
@@ -251,7 +258,7 @@ void WebView::windowAncestryDidChange()
 {
     HWND newTopLevelParentWindow;
     if (m_window)
-        newTopLevelParentWindow = findTopLevelParentWindow(m_hostWindow);
+        newTopLevelParentWindow = findTopLevelParentWindow(m_window);
     else {
         // There's no point in tracking active state changes of our parent window if we don't have
         // a window ourselves.
@@ -309,23 +316,14 @@ LRESULT WebView::onMouseEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 
 LRESULT WebView::onWheelEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam, bool& handled)
 {
-    // Ctrl+Mouse wheel doesn't ever go into WebCore.  It is used to
-    // zoom instead (Mac zooms the whole Desktop, but Windows browsers trigger their
-    // own local zoom modes for Ctrl+wheel).
-    /*
-    if (wParam & MK_CONTROL) {
-        short delta = static_cast<short>(HIWORD(wParam));
-        if (delta < 0)
-            m_page->makeTextSmaller(0);
-        else
-            m_page->makeTextLarger(0);
-
-        handled = true;
+    WebWheelEvent wheelEvent = WebEventFactory::createWebWheelEvent(hWnd, message, wParam, lParam);
+    if (wheelEvent.controlKey()) {
+        // We do not want WebKit to handle Control + Wheel, this should be handled by the client application
+        // to zoom the page.
+        handled = false;
         return 0;
     }
-    */
 
-    WebWheelEvent wheelEvent = WebEventFactory::createWebWheelEvent(hWnd, message, wParam, lParam);
     m_page->handleWheelEvent(wheelEvent);
 
     handled = true;
@@ -336,6 +334,8 @@ LRESULT WebView::onKeyEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 {
     m_page->handleKeyboardEvent(NativeWebKeyboardEvent(hWnd, message, wParam, lParam));
 
+    // We claim here to always have handled the event. If the event is not in fact handled, we will
+    // find out later in didNotHandleKeyEvent.
     handled = true;
     return 0;
 }
@@ -524,17 +524,17 @@ void WebView::stopTrackingMouseLeave()
 
 void WebView::close()
 {
-    setHostWindow(0);
+    setParentWindow(0);
     m_page->close();
 }
 
 // PageClient
 
-void WebView::processDidExit()
+void WebView::processDidCrash()
 {
 }
 
-void WebView::processDidRevive()
+void WebView::didRelaunchProcess()
 {
 }
 
@@ -562,17 +562,37 @@ void WebView::toolTipChanged(const String&, const String& newToolTip)
     ::SendMessage(m_toolTipWindow, TTM_ACTIVATE, !newToolTip.isEmpty(), 0);
 }
 
-void WebView::setCursor(const WebCore::Cursor& cursor)
+void WebView::updateNativeCursor()
 {
-    HCURSOR platformCursor = cursor.platformCursor()->nativeCursor();
-    if (!platformCursor)
-        return;
+    // We only show the override cursor if the default (arrow) cursor is showing.
+    static HCURSOR arrowCursor = ::LoadCursor(0, IDC_ARROW);
+    if (m_overrideCursor && m_webCoreCursor == arrowCursor)
+        m_lastCursorSet = m_overrideCursor;
+    else
+        m_lastCursorSet = m_webCoreCursor;
 
-    m_lastCursorSet = platformCursor;
-    ::SetCursor(platformCursor);
+    ::SetCursor(m_lastCursorSet);
 }
 
-void WebView::registerEditCommand(PassRefPtr<WebEditCommandProxy>, UndoOrRedo)
+void WebView::setCursor(const WebCore::Cursor& cursor)
+{
+    if (!cursor.platformCursor()->nativeCursor())
+        return;
+    m_webCoreCursor = cursor.platformCursor()->nativeCursor();
+    updateNativeCursor();
+}
+
+void WebView::setOverrideCursor(HCURSOR overrideCursor)
+{
+    m_overrideCursor = overrideCursor;
+    updateNativeCursor();
+}
+
+void WebView::setViewportArguments(const WebCore::ViewportArguments&)
+{
+}
+
+void WebView::registerEditCommand(PassRefPtr<WebEditCommandProxy>, WebPageProxy::UndoOrRedo)
 {
 }
 
@@ -580,8 +600,45 @@ void WebView::clearAllEditCommands()
 {
 }
 
-void WebView::setEditCommandState(const WTF::String&, bool, int)
+void WebView::setEditCommandState(const String&, bool, int)
 {
+}
+
+FloatRect WebView::convertToDeviceSpace(const FloatRect& rect)
+{
+    return rect;
+}
+
+FloatRect WebView::convertToUserSpace(const FloatRect& rect)
+{
+    return rect;
+}
+
+void WebView::selectionChanged(bool, bool, bool, bool)
+{
+    // FIXME: Implement.
+}
+
+void WebView::didNotHandleKeyEvent(const NativeWebKeyboardEvent& event)
+{
+    // Calling ::DefWindowProcW will ensure that pressing the Alt key will generate a WM_SYSCOMMAND
+    // event, e.g. See <http://webkit.org/b/47671>.
+    ::DefWindowProcW(event.nativeEvent()->hwnd, event.nativeEvent()->message, event.nativeEvent()->wParam, event.nativeEvent()->lParam);
+}
+
+PassRefPtr<WebPopupMenuProxy> WebView::createPopupMenuProxy()
+{
+    return WebPopupMenuProxyWin::create(this);
+}
+
+PassRefPtr<WebContextMenuProxy> WebView::createContextMenuProxy(WebPageProxy*)
+{
+    return WebContextMenuProxyWin::create();
+}
+
+void WebView::setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut)
+{
+    // FIXME: Implement.
 }
 
 #if USE(ACCELERATED_COMPOSITING)

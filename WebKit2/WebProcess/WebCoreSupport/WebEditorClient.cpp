@@ -30,16 +30,18 @@
 
 #include "WebFrameLoaderClient.h"
 #include "WebPage.h"
-#include "WebPageProxyMessageKinds.h"
+#include "WebPageProxyMessages.h"
 #include "WebProcess.h"
 #include <WebCore/ArchiveResource.h>
 #include <WebCore/DocumentFragment.h>
 #include <WebCore/EditCommand.h>
+#include <WebCore/FocusController.h>
 #include <WebCore/Frame.h>
 #include <WebCore/HTMLInputElement.h>
 #include <WebCore/HTMLNames.h>
 #include <WebCore/HTMLTextAreaElement.h>
 #include <WebCore/KeyboardEvent.h>
+#include <WebCore/Page.h>
 #include <WebCore/UserTypingGestureIndicator.h>
 
 using namespace WebCore;
@@ -180,7 +182,10 @@ void WebEditorClient::respondToChangedSelection()
 {
     static const String WebViewDidChangeSelectionNotification = "WebViewDidChangeSelectionNotification";
     m_page->injectedBundleEditorClient().didChangeSelection(m_page, WebViewDidChangeSelectionNotification.impl());
-    notImplemented();
+    Frame* frame = m_page->corePage()->focusController()->focusedFrame();
+    if (!frame)
+        return;
+    m_page->send(Messages::WebPageProxy::DidSelectionChange(frame->selection()->isNone(), frame->selection()->isContentEditable(), frame->selection()->isInPasswordField(), frame->editor()->hasComposition()));
 }
 
 void WebEditorClient::didEndEditing()
@@ -211,8 +216,7 @@ void WebEditorClient::registerCommandForUndo(PassRefPtr<EditCommand> command)
     m_page->addWebEditCommand(webCommand->commandID(), webCommand.get());
     uint32_t editAction = static_cast<uint32_t>(webCommand->command()->editingAction());
 
-    WebProcess::shared().connection()->send(WebPageProxyMessage::RegisterEditCommandForUndo, m_page->pageID(),
-                                            CoreIPC::In(webCommand->commandID(), editAction));
+    m_page->send(Messages::WebPageProxy::RegisterEditCommandForUndo(webCommand->commandID(), editAction));
 }
 
 void WebEditorClient::registerCommandForRedo(PassRefPtr<EditCommand>)
@@ -221,7 +225,7 @@ void WebEditorClient::registerCommandForRedo(PassRefPtr<EditCommand>)
 
 void WebEditorClient::clearUndoRedoOperations()
 {
-    WebProcess::shared().connection()->send(WebPageProxyMessage::ClearAllEditCommands, m_page->pageID(), CoreIPC::In());
+    m_page->send(Messages::WebPageProxy::ClearAllEditCommands());
 }
 
 bool WebEditorClient::canUndo() const
@@ -246,6 +250,7 @@ void WebEditorClient::redo()
     notImplemented();
 }
 
+#if !PLATFORM(MAC)
 void WebEditorClient::handleKeyboardEvent(KeyboardEvent* event)
 {
     if (m_page->handleEditingKeyboardEvent(event))
@@ -256,6 +261,7 @@ void WebEditorClient::handleInputMethodKeydown(KeyboardEvent*)
 {
     notImplemented();
 }
+#endif
 
 void WebEditorClient::textFieldDidBeginEditing(Element* element)
 {

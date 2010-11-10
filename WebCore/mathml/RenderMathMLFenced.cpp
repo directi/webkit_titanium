@@ -40,6 +40,8 @@ namespace WebCore {
 using namespace MathMLNames;
     
 enum Braces { OpeningBraceChar = 0x28, ClosingBraceChar = 0x29 };
+    
+static const float gOperatorPadding = 0.1f;
 
 RenderMathMLFenced::RenderMathMLFenced(Node* fenced) 
     : RenderMathMLRow(fenced)
@@ -67,7 +69,7 @@ void RenderMathMLFenced::updateFromElement()
             if (!isSpaceOrNewline(separators[i]))
                 characters.append(separators[i]);
         }
-        m_separators = !separators.length() ? 0 : StringImpl::create(characters.data() , characters.size());
+        m_separators = !characters.size() ? 0 : StringImpl::create(characters.data() , characters.size());
     } else {
         // The separator defaults to a single comma.
         m_separators = StringImpl::create(",");
@@ -82,8 +84,7 @@ RefPtr<RenderStyle> RenderMathMLFenced::makeOperatorStyle()
     RefPtr<RenderStyle> newStyle = RenderStyle::create();
     newStyle->inheritFrom(style());
     newStyle->setDisplay(INLINE_BLOCK);
-    newStyle->setHeight(Length(100.0, Percent));
-    newStyle->setVerticalAlign(MIDDLE);
+    newStyle->setPaddingRight(Length(static_cast<int>(gOperatorPadding * style()->fontSize()), Fixed));
     return newStyle;
 }
 
@@ -141,24 +142,6 @@ void RenderMathMLFenced::addChild(RenderObject* child, RenderObject*)
         RenderBlock::addChild(child, lastChild());
 }
 
-void RenderMathMLFenced::layout() 
-{
-    RenderMathMLRow::layout();
-    
-    int width = 0;
-    for (RenderObject* current = firstChild(); current; current = current->nextSibling()) {
-        if (current->isBoxModelObject()) {
-            RenderBoxModelObject* box = toRenderBoxModelObject(current);
-            width += box->offsetWidth();
-        }
-    }
-    width++;
-    style()->setWidth(Length(width, Fixed));
-
-    setNeedsLayoutAndPrefWidthsRecalc();
-    markContainingBlocksForLayout();
-    RenderBlock::layout();
-}
 }    
 
 #endif

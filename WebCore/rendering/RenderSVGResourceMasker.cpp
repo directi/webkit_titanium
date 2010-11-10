@@ -107,7 +107,7 @@ bool RenderSVGResourceMasker::applyResource(RenderObject* object, RenderStyle*, 
         if (!maskElement)
             return false;
 
-        if (!SVGImageBufferTools::createImageBuffer(absoluteTargetRect, clampedAbsoluteTargetRect, maskerData->maskImage, LinearRGB))
+        if (!SVGImageBufferTools::createImageBuffer(absoluteTargetRect, clampedAbsoluteTargetRect, maskerData->maskImage, ColorSpaceLinearRGB))
             return false;
 
         GraphicsContext* maskImageContext = maskerData->maskImage->context();
@@ -156,15 +156,16 @@ void RenderSVGResourceMasker::drawContentIntoMaskImage(MaskerData* maskerData, c
     maskImageContext->restore();
 
 #if !PLATFORM(CG)
-    maskerData->maskImage->transformColorSpace(DeviceRGB, LinearRGB);
+    maskerData->maskImage->transformColorSpace(ColorSpaceDeviceRGB, ColorSpaceLinearRGB);
 #endif
 
     // Create the luminance mask.
     IntRect maskImageRect(IntPoint(), maskerData->maskImage->size());
-    RefPtr<ImageData> imageData(maskerData->maskImage->getUnmultipliedImageData(maskImageRect));
-    CanvasPixelArray* srcPixelArray(imageData->data());
+    RefPtr<ImageData> imageData = maskerData->maskImage->getUnmultipliedImageData(maskImageRect);
+    ByteArray* srcPixelArray = imageData->data()->data();
 
-    for (unsigned pixelOffset = 0; pixelOffset < srcPixelArray->length(); pixelOffset += 4) {
+    unsigned pixelArrayLength = srcPixelArray->length();
+    for (unsigned pixelOffset = 0; pixelOffset < pixelArrayLength; pixelOffset += 4) {
         unsigned char a = srcPixelArray->get(pixelOffset + 3);
         if (!a)
             continue;

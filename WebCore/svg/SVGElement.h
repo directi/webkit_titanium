@@ -24,6 +24,7 @@
 
 #if ENABLE(SVG)
 #include "SVGDocumentExtensions.h"
+#include "SVGLocatable.h"
 #include "StyledElement.h"
 
 namespace WebCore {
@@ -71,6 +72,8 @@ namespace WebCore {
 
         const HashSet<SVGElementInstance*>& instancesForElement() const;
 
+        bool boundingBox(FloatRect&, SVGLocatable::StyleUpdateStrategy = SVGLocatable::AllowStyleUpdate) const;
+
         void setCursorElement(SVGCursorElement*);
         void setCursorImageValue(CSSCursorImageValue*);
 
@@ -110,7 +113,7 @@ namespace WebCore {
 }
 
 // This file needs to be included after the SVGElement declaration
-#include "SVGAnimatedProperty.h"
+#include "DeprecatedSVGAnimatedProperty.h" // NOLINT
 
 #endif
 #endif

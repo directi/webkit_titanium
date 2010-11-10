@@ -45,6 +45,12 @@ void NetscapePlugin::platformDestroy()
     notImplemented();
 }
 
+bool NetscapePlugin::platformInvalidate(const IntRect&)
+{
+    notImplemented();
+    return false;
+}
+
 void NetscapePlugin::platformGeometryDidChange()
 {
     notImplemented();
@@ -103,6 +109,12 @@ bool NetscapePlugin::platformHandleMouseLeaveEvent(const WebMouseEvent& event)
     NPEvent npEvent = toNP(event);
     NPP_HandleEvent(&npEvent);
     return true;
+}
+
+bool NetscapePlugin::platformHandleKeyboardEvent(const WebKeyboardEvent&)
+{
+    notImplemented();
+    return false;
 }
 
 } // namespace WebKit

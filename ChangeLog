@@ -1,3 +1,299 @@
+2010-11-09  Gavin Peters  <gavinp@chromium.org>
+
+        Reviewed by Xan Lopez.
+
+        gtk platform doesn't support link prefetch
+        https://bugs.webkit.org/show_bug.cgi?id=49234
+
+        * configure.ac:
+
+2010-11-08  Xan Lopez  <xlopez@igalia.com>
+
+        Reviewed by Martin Robinson.
+
+        Update version numbers for release.
+
+        * configure.ac:
+
+2010-11-04  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Reviewed by Adam Barth.
+
+        [EFL] Enable HTML5 Video
+        https://bugs.webkit.org/show_bug.cgi?id=48972 
+
+        Enable HTML 5 Video option for WebKit EFL. 
+
+        * cmake/OptionsEfl.cmake:
+
+2010-11-01  Viatcheslav Ostapenko  <ostapenko.viatcheslav@nokia.com>
+
+        Reviewed by Andreas Kling.
+
+        [Qt][Symbian] QtTestBrowser runs out of memory with most of javascript benchmarks.
+        https://bugs.webkit.org/show_bug.cgi?id=48730
+
+        Increase the maximum heap size on Symbian to 256 MB.
+
+        * WebKit.pri:
+
+2010-10-29  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Reviewed by Adam Roben and David Kilzer.
+
+        Fix and cleanup of build systems
+        https://bugs.webkit.org/show_bug.cgi?id=48342
+
+        * cmake/OptionsEfl.cmake: Remove unnecessary ENABLE_SANDBOX.
+        * cmakeconfig.h.cmake:
+        * configure.ac:
+
+2010-10-26  Antonio Gomes  <agomes@rim.com>
+
+        Reviewed by Martin Robinson.
+
+        [GTK] Implement DumpRenderTreeSupportGtk (similarly to DumpRenderTreeSupportQt idea)
+        https://bugs.webkit.org/show_bug.cgi?id=48199
+
+        * GNUmakefile.am: Added WebKit/gtk/WebCoreSupport/DumpRenderTreeSupportGtk.cpp|h to GTK+'s build system;
+        * autotools/symbols.filter: Added DumpRenderTreeSupportGtk symbols to symbols.filter so they do not get
+          filtered and get visible by DRT.
+
+2010-10-24  Anders Bakken  <agbakken@gmail.com>
+
+        Reviewed by Simon Hausmann.
+
+        [Qt] Disable enable_fast_mobile_scrolling for QWS
+        https://bugs.webkit.org/show_bug.cgi?id=48006
+
+        Turning this on breaks the acidtests for QWS/DirectFB and QWS/QVFB
+
+        * WebKit.pri:
+
+2010-10-22  Adam Barth  <abarth@webkit.org>
+
+        Unreviewed, rolling out r70290.
+        http://trac.webkit.org/changeset/70290
+        https://bugs.webkit.org/show_bug.cgi?id=48111
+
+        Undelete Android build files.
+
+        * Android.mk: Added.
+
+2010-10-21  Adam Barth  <abarth@webkit.org>
+
+        Reviewed by David Levin.
+
+        Remove Android build system
+        https://bugs.webkit.org/show_bug.cgi?id=48111
+
+        * Android.mk: Removed.
+
+2010-10-19  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        Unreviewed, adding missed additionalArguments.
+
+        [CMAKE] additional arguments was missed in GENERATE_DOM_NAMES
+        https://bugs.webkit.org/show_bug.cgi?id=47694
+
+        Pass additionalArguments for make_names.pl to choose enabled features.
+
+        * cmake/WebKitMacros.cmake:
+
+2010-10-19  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r70034.
+        http://trac.webkit.org/changeset/70034
+        https://bugs.webkit.org/show_bug.cgi?id=47889
+
+        "Gustavo's bot is lame" (Requested by xan_ on #webkit).
+
+        * configure.ac:
+
+2010-10-19  Prof. MAAD  <himself@prof-maad.org>
+
+        Reviewed by Xan Lopez.
+
+        [GTK] Correct erroneous documentation for webkit_web_navigation_action_get_button()
+        https://bugs.webkit.org/show_bug.cgi?id=46723
+
+        * WebKit/gtk/webkit/webkitwebnavigationaction.cpp:
+
+2010-10-19  Xan Lopez  <xlopez@igalia.com>
+
+        Reviewed by Martin Robinson.
+
+        [GTK] Bump minimum requirement for libsoup to 2.30
+        https://bugs.webkit.org/show_bug.cgi?id=46176
+
+        Bump minimum libsoup to required version to 2.30.0.
+
+        * configure.ac:
+
+2010-10-18  Xan Lopez  <xlopez@igalia.com>
+
+        Reviewed by Martin Robinson.
+
+        Bump version numbers for 1.3.5 release.
+
+        * configure.ac:
+
+2006-10-27  Brady Eidson  <beidson@apple.com>
+
+        70,000!
+
+2010-10-15  Sergio Villar Senin  <svillar@igalia.com>
+
+        Reviewed by Martin Robinson.
+
+        [GTK] Fix introspection support
+        https://bugs.webkit.org/show_bug.cgi?id=47723
+
+        Added HTTP cache directory to the WebkitGtk+ GIR sources.
+
+        * GNUmakefile.am:
+
+2010-10-14  Andras Becsi  <abecsi@webkit.org>
+
+        Reviewed by Csaba Osztrogonác.
+
+        [Qt] Fix -Werror after r68637 on x86 platforms.
+        Qt's build system sets QT_ARCH statically to i386 or x86_64 accordingly,
+        so check for this instead of only checking for x86.
+
+        * WebKit.pri:
+
+2010-10-13  Sergio Villar Senin  <svillar@igalia.com>
+
+        Reviewed by Martin Robinson.
+
+        [GTK] Add HTTP caching support
+        https://bugs.webkit.org/show_bug.cgi?id=44261
+
+        Bump the required version of GLib. The serialization/deserialization
+        code of libsoup caching code uses GVariant, which was added to GLib in
+        version 2.24.
+
+        * GNUmakefile.am: Add paths for soup HTTP cache code.
+        * autotools/webkit.m4: Increase required glib version.
+
+2010-10-13  Xan Lopez  <xlopez@igalia.com>
+
+        Reviewed by Gustavo Noronha.
+
+        [GTK] Remove more warnings from the g-i scanner run
+        https://bugs.webkit.org/show_bug.cgi?id=47255
+
+        Fixes almost all warnings coming from the g-i scanner.
+
+        * GNUmakefile.am: Add missing files and include dirs to the
+        scanner run.
+
+2010-10-08  Balazs Kelemen  <kbalazs@webkit.org>
+
+        Reviewed by Csaba Osztrogonác.
+
+        [Qt] Turn on building WTR
+        https://bugs.webkit.org/show_bug.cgi?id=47349
+
+        * DerivedSources.pro:
+        * WebKit.pro:
+
+2010-10-07  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>, Andras Becsi  <abecsi@webkit.org>, Balazs Kelemen  <kbalazs@webkit.org>
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        [Qt] Add WTR's InjectedBundle build files.
+        https://bugs.webkit.org/show_bug.cgi?id=47333
+
+        * DerivedSources.pro:
+        * WebKit.pro:
+
+2010-10-07  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r69315.
+        http://trac.webkit.org/changeset/69315
+        https://bugs.webkit.org/show_bug.cgi?id=47363
+
+        Forgot to add the new files (Requested by kbalazs on #webkit).
+
+        * DerivedSources.pro:
+
+2010-10-07  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>, Andras Becsi  <abecsi@webkit.org>, Balazs Kelemen  <kbalazs@webkit.org>
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        [Qt] Add WTR's InjectedBundle build files.
+        https://bugs.webkit.org/show_bug.cgi?id=47333
+
+        * DerivedSources.pro:
+        * WebKit.pro:
+
+2010-10-07  Balazs Kelemen  <kbalazs@webkit.org>
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        [Qt] Turn on building WTR
+        https://bugs.webkit.org/show_bug.cgi?id=47349
+
+        * WebKit.pro:
+
+2010-10-07  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Reviewed by Xan Lopez.
+
+        [GTK] Fix the build for GTK+ 3
+        https://bugs.webkit.org/show_bug.cgi?id=47249
+
+        Bump required gtk+-3 version to 2.91.0
+
+        * configure.ac:
+
+2010-10-07  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        Rubber-stamped by Tor Arne Vestbø.
+
+        [Qt] Re-enable the web inspector for maemo6 builds
+
+        Yeah, it's strange :), but they really want it.
+
+        * WebKit.pri:
+
+2010-10-06  Balazs Kelemen  <kbalazs@webkit.org>
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        [Qt] Add WebKitTestRunner's build files
+        https://bugs.webkit.org/show_bug.cgi?id=44155
+
+        Add the new subdirs.
+        * DerivedSources.pro:
+        * WebKit.pro:
+
+2010-10-04  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Reviewed by Antonio Gomes.
+
+        [EFL] Use fast malloc for WebKit EFL
+        https://bugs.webkit.org/show_bug.cgi?id=46691
+
+        Use fast malloc for WebKit EFL because the fast malloc is to allocate
+        memory quickly.
+
+        * cmake/OptionsEfl.cmake:
+
+2010-10-03  Dimitri Glazkov  <dglazkov@chromium.org>
+
+        Add Chromium depot_tools to files that git should ignore.
+
+        * .gitignore: Added WebKit/chromium/depot_tools.
+
+2010-09-30  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Fix typo in build script.
+
+        * wscript:
+
 2010-09-29  Simon Hausmann  <simon.hausmann@nokia.com>
 
         Reviewed by Csaba Osztrogonác.

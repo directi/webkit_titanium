@@ -25,9 +25,9 @@
 #ifndef FrameView_h
 #define FrameView_h
 
-#include "Frame.h" // Only used by FrameView::inspectorTimelineAgent()
+#include "Frame.h"
 #include "IntSize.h"
-#include "Page.h" // Only used by FrameView::inspectorTimelineAgent()
+#include "Page.h"
 #include "RenderObject.h" // For PaintBehavior
 #include "ScrollView.h"
 #include <wtf/Forward.h>
@@ -38,7 +38,6 @@ namespace WebCore {
 class Color;
 class Event;
 class FrameViewPrivate;
-class InspectorTimelineAgent;
 class IntRect;
 class Node;
 class PlatformMouseEvent;
@@ -77,6 +76,7 @@ public:
 
     virtual PassRefPtr<Scrollbar> createScrollbar(ScrollbarOrientation);
 
+    virtual bool delegatesScrolling();
     virtual bool avoidScrollbarCreation();
 
     virtual void setContentsSize(const IntSize&);
@@ -107,6 +107,8 @@ public:
 #endif
 
     bool hasCompositedContent() const;
+    bool hasCompositedContentIncludingDescendants() const;
+    bool hasCompositingAncestor() const;
     void enterCompositingMode();
     bool isEnclosedInCompositingLayer() const;
 
@@ -154,6 +156,7 @@ public:
     void setUseSlowRepaints();
     void setIsOverlapped(bool);
     bool isOverlapped() const { return m_isOverlapped; }
+    bool isOverlappedIncludingAncestors() const;
     void setContentIsOpaque(bool);
 
     void addSlowRepaintObject();
@@ -243,7 +246,8 @@ public:
 
 protected:
     virtual bool scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect);
-    
+    virtual void scrollContentsSlowPath(const IntRect& updateRect);
+
 private:
     FrameView(Frame*);
 
@@ -255,10 +259,12 @@ private:
     friend class RenderWidget;
     bool useSlowRepaints() const;
     bool useSlowRepaintsIfNotOverlapped() const;
+    void updateCanBlitOnScrollRecursively();
 
     bool hasFixedObjects() const { return m_fixedObjectCount > 0; }
 
     void applyOverflowToViewport(RenderObject*, ScrollbarMode& hMode, ScrollbarMode& vMode);
+    void calculateScrollbarModesForLayout(ScrollbarMode& hMode, ScrollbarMode& vMode);
 
     void updateOverflowStatus(bool horizontalOverflow, bool verticalOverflow);
 
@@ -293,10 +299,6 @@ private:
     void scrollToAnchor();
     void scrollPositionChanged();
 
-#if ENABLE(INSPECTOR)
-    InspectorTimelineAgent* inspectorTimelineAgent() const;
-#endif
-    
     bool hasCustomScrollbars() const;
 
     virtual void updateScrollCorner();
@@ -385,13 +387,6 @@ private:
     static double s_maxDeferredRepaintDelayDuringLoading;
     static double s_deferredRepaintDelayIncrementDuringLoading;
 };
-
-#if ENABLE(INSPECTOR)
-inline InspectorTimelineAgent* FrameView::inspectorTimelineAgent() const
-{
-    return m_frame->page() ? m_frame->page()->inspectorTimelineAgent() : 0;
-}
-#endif
 
 } // namespace WebCore
 

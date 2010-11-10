@@ -38,6 +38,7 @@ svg/custom/manually-parsed-svg-disallowed-in-dashboard.html
 svg/custom/svg-disallowed-in-dashboard-object.html
 
 # Apache 1.3 doesn't support SSL <rdar://problem/5345985>
+http/tests/navigation/ping-cross-origin-from-https.html
 http/tests/ssl
 http/tests/security/cross-frame-access-protocol-explicit-domain.html
 http/tests/security/cross-frame-access-protocol.html
@@ -108,7 +109,6 @@ editing/execCommand/copy-without-selection.html
 # Drag & Drop doesn't work correctly in DRT <rdar://5621244>
 editing/pasteboard/drag-image-in-about-blank-frame.html
 editing/pasteboard/get-data-text-plain-drop.html
-editing/selection/drag-in-iframe.html
 fast/events/drag-in-frames.html
 fast/events/standalone-image-drag-to-editable.html
 
@@ -297,6 +297,88 @@ http/tests/css/css-image-loading.html
 editing/selection/context-menu-on-text.html
 # and https://bugs.webkit.org/show_bug.cgi?id=45021
 media/context-menu-actions.html
+
+# Assertion failure in replaySavedEvents http://webkit.org/b/21796
+editing/pasteboard/drop-text-events.html
+editing/selection/drag-in-iframe.html
+fast/events/dragging-mouse-moves.html
+
+# Crash beneath SocketStream::readStreamCallback http://webkit.org/b/44138
+http/tests/websocket/tests/workers/worker-handshake-challenge-randomness.html
+
+# http://webkit.org/b/46911
+accessibility/aria-hidden-update.html
+
+# Causes next test to time out http://webkit.org/b/46975
+http/tests/xmlhttprequest/xmlhttprequest-sync-vs-async-assertion-failure.html
+
+# Failing in Release builds http://webkit.org/b/46976
+fast/js/sputnik/Conformance/11_Expressions/11.7_Bitwise_Shift_Operators/11.7.3_The_Unsigned_Right_Shift_Operator/S11.7.3_A2.3_T1.html
+
+# Timing out http://webkit.org/b/46977
+inspector/debugger-pause-on-breakpoint.html
+
+# Sometimes fails http://webkit.org/b/46998
+svg/dom/SVGScriptElement/script-load-and-error-events.svg
+
+# Times out in Release builds http://webkit.org/b/47091
+http/tests/misc/copy-resolves-urls.html
+
+# Actual values are sometimes slightly out of range of expected values http://webkit.org/b/48451
+animations/combo-transform-translate+scale.html
+animations/play-state.html
+animations/suspend-resume-animation.html
+animations/3d/transform-origin-vs-functions.html
+
+# Sometimes fail http://webkit.org/b/48452
+compositing/reflections/animation-inside-reflection.html
+compositing/reflections/nested-reflection-animated.html
+
+# Sometimes fail http://webkit.org/b/48454
+compositing/tiling/huge-layer-resize.html
+compositing/tiling/huge-layer-with-layer-children-resize.html
+
+# http://webkit.org/b/48455
+transitions/cancel-transition.html
+
+# http://webkit.org/b/48456
+transitions/change-values-during-transition.html
+
+# Sometimes times out http://webkit.org/b/48457
+fast/workers/storage/use-same-database-in-page-and-workers.html
+
+# Times out on apple-windows-3 http://webkit.org/b/48750
+fast/frames/sandboxed-iframe-storage.html
+
+# Times out on apple-windows-3 http://webkit.org/b/48999
+fast/js/exceptions-thrown-in-callbacks.html
+
+# Sometimes fail due to an extra/missing "resources/" http://webkit.org/b/48752
+inspector/styles-source-lines-inline.html
+inspector/console-log-syntax-error.html
+
+# Sometimes times out http://webkit.org/b/48753
+http/tests/security/window-events-clear-port.html
+http/tests/security/window-properties-clear-port.html
+
+# Sometimes fails http://webkit.org/b/48909
+animations/play-state-suspend.html
+
+# Assertion failure http://webkit.org/b/48910
+http/tests/media/pdf-served-as-pdf.html
+http/tests/media/video-cancel-load.html
+
+# Sometimes crashes http://webkit.org/b/48996
+http/tests/websocket/tests/workers/close-in-onmessage-crash.html
+
+# Sometimes times out http://webkit.org/b/48997
+animations/animation-iteration-event-destroy-renderer.html
+
+# Sometimes times out http://webkit.org/b/49014
+fast/workers/storage/change-version-handle-reuse-sync.html
+
+# Sometimes fails http://webkit.org/b/49182
+animations/stop-animation-on-suspend.html
 
 ################################################################################
 ####################### No bugs filed about the below yet#######################
@@ -684,9 +766,7 @@ fast/forms/input-selectedoption.html
 http/tests/local/send-dragged-file.html
 http/tests/local/send-sliced-dragged-file.html
 http/tests/local/blob/send-hybrid-blob.html
-http/tests/local/formdata/send-form-data.html
-http/tests/local/formdata/send-form-data-with-sliced-file.html
-http/tests/local/formdata/upload-events.html
+http/tests/local/formdata
 
 # Need Blob.slice support
 http/tests/local/blob/send-sliced-data-blob.html
@@ -747,9 +827,6 @@ http/tests/security/xss-DENIED-getSVGDocument-object.html
 http/tests/navigation/dynamic-iframe-dynamic-form-back-entry.html
 http/tests/navigation/parsed-iframe-dynamic-form-back-entry.html
 
-# Shows subtle 0.0 vs -0.0 difference in path debug string, see https://bugs.webkit.org/show_bug.cgi?id=17393
-svg/custom/use-on-symbol-inside-pattern.svg
-
 # Crashes debug slave, see https://bugs.webkit.org/show_bug.cgi?id=33155
 fast/frames/iframe-onload-remove-self-no-crash.html
 
@@ -789,8 +866,8 @@ media/video-display-aspect-ratio.html
 http/tests/misc/image-checks-for-accept.html
 
 # Tests timeout: https://bugs.webkit.org/show_bug.cgi?id=35041
-websocket/tests/frame-lengths.html
-websocket/tests/simple-stress.html
+http/tests/websocket/tests/frame-lengths.html
+http/tests/websocket/tests/simple-stress.html
 
 # Needs platform specific API implemented in DRT, maybe not relevant for non-Mac and non-Windows ports
 fast/loader/api-test-new-window-data-load-base-url.html
@@ -805,9 +882,6 @@ java
 
 # Need to add functionality to DumpRenderTree to handle enable/disable Spatial Navigation
 fast/events/spatial-navigation
-
-# <rdar://problem/7718442> Implement 'preload=none'
-media/video-preload.html
 
 # For some reason crashes when run with all tests. Passes individually.
 fast/forms/multiple-form-submission-protection-mouse.html
@@ -833,16 +907,6 @@ fast/dom/HTMLProgressElement/progress-element.html
 fast/dom/HTMLProgressElement/set-progress-properties.html
 fast/dom/HTMLProgressElement/progress-bar-value-pseudo-element.html
 
-# meter element is not supported
-fast/dom/HTMLMeterElement/meter-element.html
-fast/dom/HTMLMeterElement/set-meter-properties.html
-fast/dom/HTMLMeterElement/meter-appearances-capacity.html
-fast/dom/HTMLMeterElement/meter-appearances-rating-relevancy.html
-fast/dom/HTMLMeterElement/meter-optimums.html
-fast/dom/HTMLMeterElement/meter-percent-size.html
-fast/dom/HTMLMeterElement/meter-styles.html
-fast/dom/HTMLMeterElement/meter-styles-changing-pseudo.html
-
 # view mode media feature
 fast/media/view-mode-media-feature.html
 
@@ -854,9 +918,6 @@ fast/overflow/scrollbar-restored-and-then-locked.html
 
 # <http://webkit.org/b/37096> http/tests/security/xss-DENIED-iframe-src-alias.html sometimes times out on Windows
 http/tests/security/xss-DENIED-iframe-src-alias.html
-
-# Doesn't support WOFF yet.
-fast/css/font-face-woff.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=38376
 media/media-document-audio-size.html
@@ -889,6 +950,7 @@ fast/dom/Window/window-properties-device-orientation.html
 
 # Link prefetch is disabled by default
 fast/dom/HTMLLinkElement/prefetch.html
+http/tests/misc/prefetch-purpose.html
 
 # LayoutTestController::pageProperty is not implemented for WIN yet.
 printing/page-rule-selection.html
@@ -945,12 +1007,6 @@ userscripts/user-script-top-frame-only.html
 userscripts/user-style-all-frames.html
 userscripts/user-style-top-frame-only.html
 
-# These tests are flaky on Windows. Needs investigation.
-# https://bugs.webkit.org/show_bug.cgi?id=45980
-userscripts/user-script-video-document.html
-userscripts/user-script-audio-document.html
-userscripts/user-script-plugin-document.html
-
 # Directory upload is not enabled.
 fast/forms/input-file-directory-upload.html
 
@@ -969,6 +1025,7 @@ fast/dom/navigation-type-back-forward.html
 fast/dom/navigation-type-navigate.html
 fast/dom/navigation-type-reload.html
 fast/dom/webtiming.html
+fast/dom/webtiming-document-open.html
 fast/dom/webtiming-navigate-within-document.html
 http/tests/misc/webtiming-one-redirect.php
 http/tests/misc/webtiming-two-redirects.php
@@ -1007,7 +1064,12 @@ fast/filesystem
 
 # LayoutTestController::nodesFromRect is not supported.
 fast/dom/nodesFromRect-basic.html
+fast/dom/nodesFromRect-links-and-text.html
+fast/dom/nodesFromRect-inner-documents.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=46223
 # The WebKit plugin implementation does not support iframe shims.
 plugins/iframe-shims.html
+
+# Requires WebP support.
+fast/images/webp-image-decoding.html
