@@ -31,6 +31,8 @@
 
 #if PLATFORM(CG)
 #include <WebKitSystemInterface/WebKitSystemInterface.h>
+#else
+#include "NotImplemented.h"
 #endif
 
 using namespace WebCore;
@@ -69,6 +71,7 @@ PlatformCertificateInfo::PlatformCertificateInfo(const ResourceResponse& respons
     }
 #else
     // FIXME: WinCairo implementation
+    notImplemented();
 #endif
 }
 

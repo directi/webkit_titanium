@@ -38,9 +38,15 @@ PassOwnPtr<GraphicsContext> BackingStore::createGraphicsContext()
     return 0;
 }
 
-void paint(WebCore::GraphicsContext&, const WebCore::IntPoint& dstPoint, const WebCore::IntRect& srcRect)
+void BackingStore::paint(WebCore::GraphicsContext&, const WebCore::IntPoint& dstPoint, const WebCore::IntRect& srcRect)
 {
     notImplemented();
+}
+
+PassOwnPtr<GraphicsContext> BackingStore::createFlippedGraphicsContext()
+{
+    notImplemented();
+	return 0;
 }
         
 } // namespace WebKit
