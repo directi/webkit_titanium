@@ -38,7 +38,7 @@ PassOwnPtr<GraphicsContext> BackingStore::createGraphicsContext()
     return 0;
 }
 
-void BackingStore::paint(GraphicsContext*, const IntRect&)
+void paint(WebCore::GraphicsContext&, const WebCore::IntPoint& dstPoint, const WebCore::IntRect& srcRect)
 {
     notImplemented();
 }
