@@ -45,6 +45,17 @@ enum Kind {
     // Called when an update chunk sent to the drawing area has been
     // incorporated into the backing store.
     DidUpdate,
+
+#if ENABLE(TILED_BACKING_STORE)
+    // Called to request a tile update.
+    RequestTileUpdate,
+
+    // Called to cancel a requested tile update.
+    CancelTileUpdate,
+
+    // Called to take a snapshot of the page contents.
+    TakeSnapshot,
+#endif
 };
 
 }

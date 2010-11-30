@@ -27,6 +27,7 @@
 #include "HTMLFormControlElement.h"
 #include "HTMLFormElement.h"
 #include "InputElement.h"
+#include "InputType.h"
 #include <wtf/OwnPtr.h>
 
 namespace WebCore {
@@ -68,6 +69,12 @@ public:
     bool getAllowedValueStepWithDecimalPlaces(double*, unsigned*) const;
     // For ValidityState.
     bool stepMismatch(const String&) const;
+    String minimumString() const;
+    String maximumString() const;
+    String stepBaseString() const;
+    String stepString() const;
+    String typeMismatchText() const;
+    String valueMissingText() const;
 
     // Implementations of HTMLInputElement::stepUp() and stepDown().
     void stepUp(int, ExceptionCode&);
@@ -102,7 +109,6 @@ public:
 
 #if ENABLE(INPUT_SPEECH)
     virtual bool isSpeechEnabled() const;
-    void dispatchWebkitSpeechChangeEvent();
 #endif
 
     bool checked() const { return m_checked; }
@@ -171,7 +177,7 @@ public:
 
     KURL src() const;
 
-    int maxLength() const;
+    virtual int maxLength() const;
     void setMaxLength(int, ExceptionCode&);
 
     bool multiple() const;
@@ -203,10 +209,6 @@ public:
             return formElement->checkedRadioButtons();
         return document()->checkedRadioButtons();
     }
-
-    // FIXME: We should move m_xPos and m_yPos to ImageInputType class.
-    int xPosition() const { return m_xPos; }
-    int yPosition() const { return m_yPos; }
 
 protected:
     HTMLInputElement(const QualifiedName&, Document*, HTMLFormElement* = 0);
@@ -337,7 +339,6 @@ private:
     void updateCheckedRadioButtons();
     
     void handleBeforeTextInsertedEvent(Event*);
-    void handleKeyEventForRange(KeyboardEvent*);
     PassRefPtr<HTMLFormElement> createTemporaryFormForIsIndex();
     // Helper for stepUp()/stepDown().  Adds step value * count to the current value.
     void applyStep(double count, ExceptionCode&);
@@ -351,8 +352,6 @@ private:
 #endif
 
     InputElementData m_data;
-    int m_xPos;
-    int m_yPos;
     short m_maxResults;
     OwnPtr<HTMLImageLoader> m_imageLoader;
     RefPtr<FileList> m_fileList;

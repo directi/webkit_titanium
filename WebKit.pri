@@ -55,8 +55,6 @@ CONFIG(release, debug|release) {
     DEFINES += NDEBUG
 }
 
-BASE_DIR = $$PWD
-
 symbian {
     INCLUDEPATH += $$PWD/include/QtWebKit
 } else {
@@ -84,6 +82,15 @@ symbian|*-armcc {
 
 symbian {
     QMAKE_CXXFLAGS.ARMCC += $$RVCT_COMMON_CXXFLAGS
+}
+
+valgrind {
+    contains(JAVASCRIPTCORE_JIT,yes): error("'JAVASCRIPTCORE_JIT=yes' not supported with valgrind")
+    QMAKE_CXXFLAGS += -g
+    QMAKE_LFLAGS += -g
+    DEFINES += USE_SYSTEM_MALLOC
+    DEFINES += ENABLE_JIT=0
+    JAVASCRIPTCORE_JIT = no
 }
 
 ##### Defaults for some mobile platforms

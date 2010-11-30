@@ -5,6 +5,7 @@
  *           (C) 2006 Alexey Proskuryakov (ap@webkit.org)
  * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
+ * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -94,6 +95,8 @@ class IntPoint;
 class DOMWrapperWorld;
 class JSNode;
 class MediaCanStartListener;
+class MediaQueryList;
+class MediaQueryMatcher;
 class MouseEventWithHitTestResults;
 class NodeFilter;
 class NodeIterator;
@@ -202,6 +205,8 @@ public:
         return adoptRef(new Document(frame, url, true, false));
     }
     virtual ~Document();
+
+    MediaQueryMatcher* mediaQueryMatcher();
 
     using ContainerNode::ref;
     using ContainerNode::deref;
@@ -319,8 +324,10 @@ public:
      *
      * @param centerX x reference for the rectangle in CSS pixels
      * @param centerY y reference for the rectangle in CSS pixels
-     * @param hPadding How much to expand the rectangle horizontally
-     * @param vPadding How much to expand the rectangle vertically
+     * @param topPadding How much to expand the top of the rectangle
+     * @param rightPadding How much to expand the right of the rectangle
+     * @param bottomPadding How much to expand the bottom of the rectangle
+     * @param leftPadding How much to expand the left of the rectangle
      * @param ignoreClipping whether or not to ignore the root scroll frame when retrieving the element.
      *        If false, this method returns null for coordinates outside of the viewport.
      */
@@ -482,6 +489,10 @@ public:
     void setStateForNewFormElements(const Vector<String>&);
     bool hasStateForNewFormElements() const;
     bool takeStateForFormElement(AtomicStringImpl* name, AtomicStringImpl* type, String& state);
+
+    void registerFormElementWithFormAttribute(Element*);
+    void unregisterFormElementWithFormAttribute(Element*);
+    void resetFormElementsOwner(HTMLFormElement*);
 
     FrameView* view() const; // can be NULL
     Frame* frame() const { return m_frame; } // can be NULL
@@ -667,6 +678,7 @@ public:
     void scheduleForcedStyleRecalc();
     void scheduleStyleRecalc();
     void unscheduleStyleRecalc();
+    bool isPendingStyleRecalc() const;
     void styleRecalcTimerFired(Timer<Document>*);
 
     void attachNodeIterator(NodeIterator*);
@@ -1048,6 +1060,8 @@ public:
 
     const DocumentTiming* timing() const { return &m_documentTiming; }
 
+    bool mayCauseFlashOfUnstyledContent() const;
+
 protected:
     Document(Frame*, const KURL& url, bool isXHTML, bool isHTML, const KURL& baseURL = KURL());
 
@@ -1197,6 +1211,7 @@ private:
 
     typedef ListHashSet<Element*, 64> FormElementListHashSet;
     FormElementListHashSet m_formElementsWithState;
+    FormElementListHashSet m_formElementsWithFormAttribute;
 
     typedef HashMap<FormElementKey, Vector<String>, FormElementKeyHash, FormElementKeyHashTraits> FormElementStateMap;
     FormElementStateMap m_stateForNewFormElements;
@@ -1363,6 +1378,7 @@ private:
     bool m_writingModeSetOnDocumentElement;
 
     DocumentTiming m_documentTiming;
+    RefPtr<MediaQueryMatcher> m_mediaQueryMatcher;
 };
 
 inline bool Document::DocumentOrderedMap::contains(AtomicStringImpl* id) const

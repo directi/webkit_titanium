@@ -27,6 +27,7 @@
 
 #include "ChunkedUpdateDrawingAreaProxy.h"
 #include "FindIndicator.h"
+#include "LayerBackedDrawingAreaProxy.h"
 #include "RunLoop.h"
 #include "NativeWebKeyboardEvent.h"
 #include "WebContextMenuProxyWin.h"
@@ -181,7 +182,7 @@ bool WebView::registerWebViewWindowClass()
     return !!::RegisterClassEx(&wcex);
 }
 
-WebView::WebView(RECT rect, WebPageNamespace* pageNamespace, HWND parentWindow)
+WebView::WebView(RECT rect, WebPageNamespace* pageNamespace, HWND parentWindow, InjectedBundleVisibility injectedBundleVisibility)
     : m_rect(rect)
     , m_topLevelParentWindow(0)
     , m_toolTipWindow(0)
@@ -196,6 +197,7 @@ WebView::WebView(RECT rect, WebPageNamespace* pageNamespace, HWND parentWindow)
     m_page = pageNamespace->createWebPage();
     m_page->setPageClient(this);
     m_page->setDrawingArea(ChunkedUpdateDrawingAreaProxy::create(this));
+    m_page->setVisibleToInjectedBundle(injectedBundleVisibility == VisibleToInjectedBundle);
 
     m_window = ::CreateWindowEx(0, kWebKit2WebViewWindowClassName, 0, WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
         rect.top, rect.left, rect.right - rect.left, rect.bottom - rect.top, parentWindow ? parentWindow : HWND_MESSAGE, 0, instanceHandle(), this);
@@ -641,14 +643,50 @@ void WebView::setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut)
     // FIXME: Implement.
 }
 
+void WebView::setIsInWindow(bool isInWindow)
+{
+    m_page->setIsInWindow(isInWindow);
+}
+
 #if USE(ACCELERATED_COMPOSITING)
+
 void WebView::pageDidEnterAcceleratedCompositing()
 {
+    switchToDrawingAreaTypeIfNecessary(DrawingAreaProxy::LayerBackedDrawingAreaType);
 }
 
 void WebView::pageDidLeaveAcceleratedCompositing()
 {
+    switchToDrawingAreaTypeIfNecessary(DrawingAreaProxy::ChunkedUpdateDrawingAreaType);
 }
+
+void WebView::switchToDrawingAreaTypeIfNecessary(DrawingAreaProxy::Type type)
+{
+    DrawingAreaBase::Type existingDrawingAreaType = m_page->drawingArea() ? m_page->drawingArea()->info().type : DrawingAreaBase::None;
+    if (existingDrawingAreaType == type)
+        return;
+
+    OwnPtr<DrawingAreaProxy> newDrawingArea;
+    switch (type) {
+        case DrawingAreaProxy::None:
+            break;
+        case DrawingAreaProxy::ChunkedUpdateDrawingAreaType: {
+            newDrawingArea = ChunkedUpdateDrawingAreaProxy::create(this);
+            break;
+        }
+        case DrawingAreaProxy::LayerBackedDrawingAreaType: {
+            newDrawingArea = LayerBackedDrawingAreaProxy::create(this);
+            break;
+        }
+    }
+
+    if (m_page->drawingArea())
+        newDrawingArea->setSize(m_page->drawingArea()->size());
+
+    m_page->drawingArea()->detachCompositingContext();
+    m_page->setDrawingArea(newDrawingArea.release());
+}
+
 #endif // USE(ACCELERATED_COMPOSITING)
 
 HWND WebView::nativeWindow()

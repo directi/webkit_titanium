@@ -143,6 +143,9 @@ void SVGUseElement::svgAttributeChanged(const QualifiedName& attrName)
     if (isXYAttribute || isWidthHeightAttribute)
         updateRelativeLengthsInformation();
 
+    if (SVGTests::handleAttributeChange(this, attrName))
+        return;
+
     RenderObject* object = renderer();
     if (!object)
         return;
@@ -180,8 +183,7 @@ void SVGUseElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    if (SVGTests::isKnownAttribute(attrName)
-        || SVGLangSpace::isKnownAttribute(attrName)
+    if (SVGLangSpace::isKnownAttribute(attrName)
         || SVGExternalResourcesRequired::isKnownAttribute(attrName))
         invalidateShadowTree();
 }
@@ -197,6 +199,7 @@ void SVGUseElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeHeight();
         synchronizeExternalResourcesRequired();
         synchronizeHref();
+        SVGTests::synchronizeProperties(this, attrName);
         return;
     }
 
@@ -212,6 +215,8 @@ void SVGUseElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeExternalResourcesRequired();
     else if (SVGURIReference::isKnownAttribute(attrName))
         synchronizeHref();
+    else if (SVGTests::isKnownAttribute(attrName))
+        SVGTests::synchronizeProperties(this, attrName);
 }
 
 static void updateContainerSize(SVGUseElement* useElement, SVGElementInstance* targetInstance)
@@ -743,7 +748,7 @@ void SVGUseElement::removeDisallowedElementsFromSubtree(Node* subtree)
         if (isDisallowedElement(node)) {
             Node* next = node->traverseNextSibling(subtree);
             // The subtree is not in document so this won't generate events that could mutate the tree.
-            node->parent()->removeChild(node, ec);
+            node->parentNode()->removeChild(node, ec);
             node = next;
         } else
             node = node->traverseNextNode(subtree);

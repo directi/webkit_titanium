@@ -26,8 +26,6 @@
 #ifndef RegexInterpreter_h
 #define RegexInterpreter_h
 
-#if ENABLE(YARR)
-
 #include "RegexParser.h"
 #include "RegexPattern.h"
 #include <wtf/PassOwnPtr.h>
@@ -39,6 +37,21 @@ class BumpPointerAllocator;
 using WTF::BumpPointerAllocator;
 
 namespace JSC { namespace Yarr {
+
+// TODO move the matchLimit constant and the JSRegExpResult enum to the JSRegExp.h when pcre is removed.
+
+// The below limit restricts the number of "recursive" match calls in order to
+// avoid spending exponential time on complex regular expressions.
+static const unsigned matchLimit = 1000000;
+
+enum JSRegExpResult {
+    JSRegExpMatch = 1,
+    JSRegExpNoMatch = 0,
+    JSRegExpErrorNoMatch = -1,
+    JSRegExpErrorHitLimit = -2,
+    JSRegExpErrorNoMemory = -3,
+    JSRegExpErrorInternal = -4
+};
 
 class ByteDisjunction;
 
@@ -68,6 +81,8 @@ struct ByteTerm {
         TypeParenthesesSubpattern,
         TypeParenthesesSubpatternOnceBegin,
         TypeParenthesesSubpatternOnceEnd,
+        TypeParenthesesSubpatternTerminalBegin,
+        TypeParenthesesSubpatternTerminalEnd,
         TypeParentheticalAssertionBegin,
         TypeParentheticalAssertionEnd,
         TypeCheckInput,
@@ -309,6 +324,7 @@ struct BytecodePattern : FastAllocBase {
         : m_body(body)
         , m_ignoreCase(pattern.m_ignoreCase)
         , m_multiline(pattern.m_multiline)
+        , m_containsBeginChars(pattern.m_containsBeginChars)
         , m_allocator(allocator)
     {
         newlineCharacterClass = pattern.newlineCharacterClass();
@@ -320,6 +336,8 @@ struct BytecodePattern : FastAllocBase {
         // array, so that it won't delete them on destruction.  We'll
         // take responsibility for that.
         pattern.m_userCharacterClasses.clear();
+
+        m_beginChars.append(pattern.m_beginChars);
     }
 
     ~BytecodePattern()
@@ -331,22 +349,25 @@ struct BytecodePattern : FastAllocBase {
     OwnPtr<ByteDisjunction> m_body;
     bool m_ignoreCase;
     bool m_multiline;
+    bool m_containsBeginChars;
     // Each BytecodePattern is associated with a RegExp, each RegExp is associated
     // with a JSGlobalData.  Cache a pointer to out JSGlobalData's m_regexAllocator.
     BumpPointerAllocator* m_allocator;
 
     CharacterClass* newlineCharacterClass;
     CharacterClass* wordcharCharacterClass;
+
+    Vector<BeginChar> m_beginChars;
+
 private:
     Vector<ByteDisjunction*> m_allParenthesesInfo;
     Vector<CharacterClass*> m_userCharacterClasses;
 };
 
 PassOwnPtr<BytecodePattern> byteCompileRegex(const UString& pattern, unsigned& numSubpatterns, const char*& error, BumpPointerAllocator*, bool ignoreCase = false, bool multiline = false);
+PassOwnPtr<BytecodePattern> byteCompileRegex(RegexPattern& pattern, BumpPointerAllocator*);
 int interpretRegex(BytecodePattern* v_regex, const UChar* input, unsigned start, unsigned length, int* output);
 
 } } // namespace JSC::Yarr
-
-#endif
 
 #endif // RegexInterpreter_h

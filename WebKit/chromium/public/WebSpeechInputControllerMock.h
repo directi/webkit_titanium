@@ -44,7 +44,9 @@ public:
         WebSpeechInputListener* listener);
     virtual ~WebSpeechInputControllerMock() { }
 
-    virtual void setMockRecognitionResult(const WebString& result, const WebString& language) = 0;
+    virtual void addMockRecognitionResult(const WebString& result, double confidence, const WebString& language) = 0;
+
+    virtual void clearResults() = 0;
 };
 
 } // namespace WebKit

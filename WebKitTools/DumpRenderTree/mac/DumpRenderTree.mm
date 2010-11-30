@@ -295,7 +295,7 @@ WebView *createWebViewAndOffscreenWindow()
     [webView setEditingDelegate:editingDelegate];
     [webView setResourceLoadDelegate:resourceLoadDelegate];
     [webView _setGeolocationProvider:[MockGeolocationProvider shared]];
-    [webView _setDeviceOrientationProvider:[[WebDeviceOrientationProviderMock alloc] init]];
+    [webView _setDeviceOrientationProvider:[WebDeviceOrientationProviderMock shared]];
 
     // Register the same schemes that Safari does
     [WebView registerURLSchemeAsLocal:@"feed"];
@@ -427,7 +427,7 @@ static void resetDefaultsToConsistentValues()
     [preferences setFantasyFontFamily:@"Papyrus"];
     [preferences setDefaultFontSize:16];
     [preferences setDefaultFixedFontSize:13];
-    [preferences setMinimumFontSize:1];
+    [preferences setMinimumFontSize:0];
     [preferences setJavaEnabled:NO];
     [preferences setJavaScriptEnabled:YES];
     [preferences setEditableLinkBehavior:WebKitEditableLinkOnlyLiveWithShiftKey];
@@ -907,14 +907,15 @@ void dump()
 {
     invalidateAnyPreviousWaitToDumpWatchdog();
 
-    bool dumpAsText = gLayoutTestController->dumpAsText();
     if (dumpTree) {
         NSString *resultString = nil;
         NSData *resultData = nil;
         NSString *resultMimeType = @"text/plain";
 
-        dumpAsText |= [[[mainFrame dataSource] _responseMIMEType] isEqualToString:@"text/plain"];
-        gLayoutTestController->setDumpAsText(dumpAsText);
+        if ([[[mainFrame dataSource] _responseMIMEType] isEqualToString:@"text/plain"]) {
+            gLayoutTestController->setDumpAsText(true);
+            gLayoutTestController->setGeneratePixelResults(false);
+        }
         if (gLayoutTestController->dumpAsText()) {
             resultString = dumpFramesAsText(mainFrame);
         } else if (gLayoutTestController->dumpAsPDF()) {
@@ -989,7 +990,7 @@ static bool shouldOpenWebInspector(const char* pathOrURL)
 
 static bool shouldEnableDeveloperExtras(const char* pathOrURL)
 {
-    return shouldOpenWebInspector(pathOrURL) || strstr(pathOrURL, "inspector-enabled/");
+    return true;
 }
 
 static void resetWebViewToConsistentStateBeforeTesting()

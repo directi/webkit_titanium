@@ -1,3 +1,133 @@
+2010-11-29  Xan Lopez  <xlopez@igalia.com>
+
+        Reviewed by Martin Robinson.
+
+        * configure.ac: bump version for 1.3.7 release.
+
+2010-11-28  Laszlo Gombos  <laszlo.1.gombos@nokia.com>
+
+        Reviewed by Antonio Gomes.
+
+        [Qt] Remove unused BASE_DIR from the build system
+        https://bugs.webkit.org/show_bug.cgi?id=50132
+
+        * WebKit.pri:
+
+2010-11-24  Hayato Ito  <hayato@chromium.org>
+
+        Reviewed by David Levin.
+
+        Add files which Chromium port generates to .gitignore.
+
+        https://bugs.webkit.org/show_bug.cgi?id=49943
+
+        * .gitignore:
+
+2010-11-23  Patrick Gansterer  <paroga@webkit.org>
+
+        Reviewed by David Levin.
+
+        Add WebKit2 VisualStudio files to .gitattributes
+        https://bugs.webkit.org/show_bug.cgi?id=49969
+
+        * .gitattributes:
+
+2010-11-19  Mihai Parparita  <mihaip@chromium.org>
+
+        Add recent upstream Chromium dependencies to .gitignore.
+
+        * .gitignore:
+
+2010-11-17  Martin Robinson  <mrobinson@igalia.com>
+
+        Reviewed by Gustavo Noronha Silva.
+
+        [GTK] Changing any GNUmakefile.am in the source tree forces a rebuld of the DOM bindings and WebKit APi
+        https://bugs.webkit.org/show_bug.cgi?id=49400
+
+        Move WebKit API build rules out of GNUmakefile.am. These are now in
+        WebKit/gtk/GNUmakefile.am.
+
+        * GNUmakefile.am: Remove WebKit API build rules.
+
+2010-11-17  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed.  Test commit for commit-queue@webkit.org.
+
+2010-11-16  Andreas Kling  <kling@webkit.org>
+
+        Unreviewed typo fix for previous commit.
+
+        * common.pri:
+
+2010-11-16  Andreas Kling  <kling@webkit.org>
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        [Qt][Scratchbox] Use gold linker explicitly when available
+
+        gold is faster at linking QtWebKit than binutils ld, but it cannot be
+        enabled by default on a system that compiles other Qt projects.
+        This is due to gold not supporting the --add-needed flag.
+
+        Original patch by Kimmo Kinnunen.
+
+        * common.pri:
+
+2010-11-16  Andreas Kling  <kling@webkit.org>
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        [Qt] Add 'valgrind' build mode
+
+        Passing CONFIG+=valgrind to qmake will now build WebKit in a way
+        suitable for debugging with Valgrind.
+
+        Original patch by Christian Sejersen.
+
+        * WebKit.pri:
+
+2010-11-15  Patrick Gansterer  <paroga@webkit.org>
+
+        Reviewed by Andreas Kling.
+
+        [CMake] Add additional flags to cmakeconfig.h
+        https://bugs.webkit.org/show_bug.cgi?id=49556
+
+        * cmake/OptionsEfl.cmake:
+        * cmakeconfig.h.cmake:
+
+2010-11-14  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        Reviewed by Martin Robinson.
+
+        [EFL] add pango support
+        https://bugs.webkit.org/show_bug.cgi?id=46029
+
+        Add FONT_BACKEND option to switch between pango and freetype.
+
+        * cmake/OptionsEfl.cmake:
+
+2010-11-11  Eric Seidel  <eric@webkit.org>
+
+        Rubber-stamped by Adam Roben.
+
+        * .: Modified property svn:ignore.
+         - Add WebKitSupportLibrary.zip and WebKitBuild to the root ignore list.
+
+2010-11-10  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Reviewed by David Hyatt.
+
+        HTML5 Ruby support should be mandatory feature
+        https://bugs.webkit.org/show_bug.cgi?id=49272
+
+        Remove Ruby as optional feature.
+
+        * cmake/OptionsEfl.cmake:
+        * cmakeconfig.h.cmake:
+        * configure.ac:
+
 2010-11-09  Gavin Peters  <gavinp@chromium.org>
 
         Reviewed by Xan Lopez.

@@ -70,7 +70,7 @@ public:
     static inline bool compareByStart(const InlineTextBox* first, const InlineTextBox* second) { return first->start() < second->start(); }
 
     
-    virtual int baselinePosition() const;
+    virtual int baselinePosition(FontBaseline) const;
     virtual int lineHeight() const;
 
 private:
@@ -119,7 +119,7 @@ public:
 private:
     virtual unsigned caretMaxRenderedOffset() const;
 
-    int textPos() const;
+    int textPos() const; // returns the x position relative to the left start of the text line.
 
 public:
     virtual int offsetForPosition(int x, bool includePartialGlyphs = true) const;

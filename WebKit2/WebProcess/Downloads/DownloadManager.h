@@ -30,12 +30,15 @@
 #include <wtf/Noncopyable.h>
 
 namespace WebCore {
+    class ResourceHandle;
     class ResourceRequest;
+    class ResourceResponse;
 }
 
 namespace WebKit {
 
 class Download;
+class WebPage;
 
 class DownloadManager {
     WTF_MAKE_NONCOPYABLE(DownloadManager);
@@ -43,7 +46,13 @@ class DownloadManager {
 public:
     static DownloadManager& shared();
 
-    void startDownload(uint64_t downloadID, const WebCore::ResourceRequest&);
+    void startDownload(uint64_t downloadID, WebPage* initiatingPage, const WebCore::ResourceRequest&);
+    void convertHandleToDownload(uint64_t downloadID, WebPage* initiatingPage, WebCore::ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceRequest& initialRequest, const WebCore::ResourceResponse&);
+
+    void cancelDownload(uint64_t downloadID);
+
+    void downloadFinished(Download*);
+    bool isDownloading() const { return !m_downloads.isEmpty(); }
 
 private:
     DownloadManager();

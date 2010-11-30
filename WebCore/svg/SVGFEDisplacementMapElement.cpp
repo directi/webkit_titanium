@@ -69,6 +69,18 @@ void SVGFEDisplacementMapElement::parseMappedAttribute(Attribute* attr)
         SVGFilterPrimitiveStandardAttributes::parseMappedAttribute(attr);
 }
 
+void SVGFEDisplacementMapElement::svgAttributeChanged(const QualifiedName& attrName)
+{
+    SVGFilterPrimitiveStandardAttributes::svgAttributeChanged(attrName);
+
+    if (attrName == SVGNames::xChannelSelectorAttr
+        || attrName == SVGNames::yChannelSelectorAttr
+        || attrName == SVGNames::inAttr
+        || attrName == SVGNames::in2Attr
+        || attrName == SVGNames::scaleAttr)
+        invalidate();
+}
+
 void SVGFEDisplacementMapElement::synchronizeProperty(const QualifiedName& attrName)
 {
     SVGFilterPrimitiveStandardAttributes::synchronizeProperty(attrName);
@@ -94,7 +106,7 @@ void SVGFEDisplacementMapElement::synchronizeProperty(const QualifiedName& attrN
         synchronizeScale();
 }
 
-PassRefPtr<FilterEffect> SVGFEDisplacementMapElement::build(SVGFilterBuilder* filterBuilder)
+PassRefPtr<FilterEffect> SVGFEDisplacementMapElement::build(SVGFilterBuilder* filterBuilder, Filter* filter)
 {
     FilterEffect* input1 = filterBuilder->getEffectById(in1());
     FilterEffect* input2 = filterBuilder->getEffectById(in2());
@@ -102,7 +114,7 @@ PassRefPtr<FilterEffect> SVGFEDisplacementMapElement::build(SVGFilterBuilder* fi
     if (!input1 || !input2)
         return 0;
 
-    RefPtr<FilterEffect> effect = FEDisplacementMap::create(static_cast<ChannelSelectorType>(xChannelSelector()), 
+    RefPtr<FilterEffect> effect = FEDisplacementMap::create(filter, static_cast<ChannelSelectorType>(xChannelSelector()), 
                                                                 static_cast<ChannelSelectorType>(yChannelSelector()), scale());
     FilterEffectVector& inputEffects = effect->inputEffects();
     inputEffects.reserveCapacity(2);

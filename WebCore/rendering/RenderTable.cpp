@@ -252,7 +252,7 @@ void RenderTable::layout()
     recalcSectionsIfNeeded();
         
     LayoutRepainter repainter(*this, checkForRepaintDuringLayout());
-    LayoutStateMaintainer statePusher(view(), this, IntSize(x(), y()));
+    LayoutStateMaintainer statePusher(view(), this, IntSize(x(), y()), style()->isFlippedBlocksWritingMode());
 
     setLogicalHeight(0);
     m_overflow.clear();
@@ -383,6 +383,8 @@ void RenderTable::layout()
     // table can be containing block of positioned elements.
     // FIXME: Only pass true if width or height changed.
     layoutPositionedObjects(true);
+
+    updateLayerTransform();
 
     // Add overflow from borders.
     int rightBorderOverflow = width() + (collapsing ? outerBorderRight() - borderRight() : 0);

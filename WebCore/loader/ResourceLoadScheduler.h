@@ -46,8 +46,8 @@ class SubresourceLoaderClient;
 class ResourceLoadScheduler : public Noncopyable {
 public:
     friend ResourceLoadScheduler* resourceLoadScheduler();
-    
-    enum Priority { VeryLow, Low, Medium, High };
+
+    enum Priority { VeryLow, Low, Medium, High, LowestPriority = VeryLow, HighestPriority = High };
     PassRefPtr<SubresourceLoader> scheduleSubresourceLoad(Frame*, SubresourceLoaderClient*, const ResourceRequest&, Priority = Low, SecurityCheckPolicy = DoSecurityCheck, bool sendResourceLoadCallbacks = true, bool shouldContentSniff = true);
     PassRefPtr<NetscapePlugInStreamLoader> schedulePluginStreamLoad(Frame*, NetscapePlugInStreamLoaderClient*, const ResourceRequest&);
     void addMainResourceLoad(ResourceLoader*);
@@ -57,10 +57,6 @@ public:
     void servePendingRequests(Priority minimumPriority = VeryLow);
     void suspendPendingRequests();
     void resumePendingRequests();
-    
-#ifndef NDEBUG
-    void assertLoaderBeingCounted(ResourceLoader*);
-#endif
 
 private:
     ResourceLoadScheduler();
@@ -81,16 +77,12 @@ private:
         void remove(ResourceLoader*);
         bool hasRequests() const;
         bool limitRequests() const { return m_requestsLoading.size() >= m_maxRequestsInFlight; }
-        
-#ifndef NDEBUG
-        void assertLoaderBeingCounted(ResourceLoader*);
-#endif
 
         typedef Deque<RefPtr<ResourceLoader> > RequestQueue;
         RequestQueue& requestsPending(Priority priority) { return m_requestsPending[priority]; }
 
     private:                    
-        RequestQueue m_requestsPending[High + 1];
+        RequestQueue m_requestsPending[HighestPriority + 1];
         typedef HashSet<RefPtr<ResourceLoader> > RequestMap;
         RequestMap m_requestsLoading;
         const String m_name;

@@ -159,7 +159,7 @@ PassRefPtr<Element> Element::cloneElementWithChildren()
 
 PassRefPtr<Element> Element::cloneElementWithoutChildren()
 {
-    RefPtr<Element> clone = document()->createElement(tagQName(), false);
+    RefPtr<Element> clone = cloneElementWithoutAttributesAndChildren();
     // This will catch HTML elements in the wrong namespace that are not correctly copied.
     // This is a sanity check as HTML overloads some of the DOM methods.
     ASSERT(isHTMLElement() == clone->isHTMLElement());
@@ -171,6 +171,11 @@ PassRefPtr<Element> Element::cloneElementWithoutChildren()
     clone->copyNonAttributeProperties(this);
 
     return clone.release();
+}
+
+PassRefPtr<Element> Element::cloneElementWithoutAttributesAndChildren() const
+{
+    return document()->createElement(tagQName(), false);
 }
 
 void Element::removeAttribute(const QualifiedName& name, ExceptionCode& ec)
@@ -541,16 +546,16 @@ PassRefPtr<ClientRect> Element::getBoundingClientRect() const
     if (quads.isEmpty())
         return ClientRect::create();
 
-    IntRect result = quads[0].enclosingBoundingBox();
+    FloatRect result = quads[0].boundingBox();
     for (size_t i = 1; i < quads.size(); ++i)
-        result.unite(quads[i].enclosingBoundingBox());
+        result.unite(quads[i].boundingBox());
 
     if (FrameView* view = document()->view()) {
         IntRect visibleContentRect = view->visibleContentRect();
         result.move(-visibleContentRect.x(), -visibleContentRect.y());
     }
 
-    adjustIntRectForAbsoluteZoom(result, renderer());
+    adjustFloatRectForAbsoluteZoom(result, renderer());
     return ClientRect::create(result);
 }
 
@@ -1502,7 +1507,7 @@ AtomicString Element::computeInheritedLanguage() const
             value = static_cast<const Document*>(n)->contentLanguage();
         }
 
-        n = n->parent();
+        n = n->parentNode();
     }
 
     return value;
@@ -1736,7 +1741,8 @@ bool Element::isSpellCheckingEnabled() const
             break;
         }
 
-        element = element->parentElement();
+        ContainerNode* parent = const_cast<Element*>(element)->parentOrHostNode();
+        element = (parent && parent->isElementNode()) ? toElement(parent) : 0;
     }
 
     return true;

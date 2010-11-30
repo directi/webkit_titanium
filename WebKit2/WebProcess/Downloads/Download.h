@@ -26,6 +26,11 @@
 #ifndef Download_h
 #define Download_h
 
+#include "MessageSender.h"
+#include <WebCore/ResourceRequest.h>
+#include <wtf/Noncopyable.h>
+#include <wtf/PassOwnPtr.h>
+
 #if PLATFORM(MAC)
 #include <wtf/RetainPtr.h>
 #ifdef __OBJC__
@@ -37,12 +42,20 @@ class WKDownloadAsDelegate;
 #endif
 #endif
 
-#include "MessageSender.h"
-#include <WebCore/ResourceRequest.h>
-#include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
+namespace CoreIPC {
+    class DataReference;
+}
+
+namespace WebCore {
+    class ResourceError;
+    class ResourceHandle;
+    class ResourceResponse;
+}
 
 namespace WebKit {
+
+class SandboxExtension;
+class WebPage;
 
 class Download : public CoreIPC::MessageSender<Download> {
     WTF_MAKE_NONCOPYABLE(Download);
@@ -53,14 +66,23 @@ public:
 
     // Used by MessageSender.
     CoreIPC::Connection* connection() const;
-    uint64_t destinationID() const { return m_downloadID; }
+    uint64_t destinationID() const { return downloadID(); }
 
-    void start();
+    void start(WebPage* initiatingWebPage);
+    void startWithHandle(WebPage* initiatingPage, WebCore::ResourceHandle*, const WebCore::ResourceRequest& initialRequest, const WebCore::ResourceResponse&);
+    void cancel();
+
+    uint64_t downloadID() const { return m_downloadID; }
 
     void didStart();
+    void didReceiveResponse(const WebCore::ResourceResponse&);
     void didReceiveData(uint64_t length);
+    bool shouldDecodeSourceDataOfMIMEType(const String& mimeType);
+    String decideDestinationWithSuggestedFilename(const String& filename, bool& allowOverwrite);
     void didCreateDestination(const String& path);
     void didFinish();
+    void didFail(const WebCore::ResourceError&, const CoreIPC::DataReference& resumeData);
+    void didCancel(const CoreIPC::DataReference& resumeData);
 
 private:
     Download(uint64_t downloadID, const WebCore::ResourceRequest&);
@@ -69,6 +91,8 @@ private:
 
     uint64_t m_downloadID;
     WebCore::ResourceRequest m_request;
+
+    RefPtr<SandboxExtension> m_sandboxExtension;
 
 #if PLATFORM(MAC)
     RetainPtr<NSURLDownload> m_nsURLDownload;

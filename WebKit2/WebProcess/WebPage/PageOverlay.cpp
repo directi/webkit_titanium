@@ -70,9 +70,15 @@ void PageOverlay::setPage(WebPage* webPage)
     m_client->didMoveToWebPage(this, webPage);
 }
 
+void PageOverlay::setNeedsDisplay(const WebCore::IntRect& dirtyRect)
+{
+    if (m_webPage)
+        m_webPage->drawingArea()->setNeedsDisplay(dirtyRect);
+}
+
 void PageOverlay::setNeedsDisplay()
 {
-    m_webPage->drawingArea()->setNeedsDisplay(bounds());
+    setNeedsDisplay(bounds());
 }
 
 void PageOverlay::drawRect(GraphicsContext& graphicsContext, const IntRect& dirtyRect)
@@ -81,8 +87,15 @@ void PageOverlay::drawRect(GraphicsContext& graphicsContext, const IntRect& dirt
     IntRect paintRect = intersection(dirtyRect, bounds());
     if (paintRect.isEmpty())
         return;
-    
+
+    graphicsContext.save();
+    graphicsContext.beginTransparencyLayer(1);
+    graphicsContext.setCompositeOperation(CompositeCopy);
+
     m_client->drawRect(this, graphicsContext, paintRect);
+
+    graphicsContext.endTransparencyLayer();
+    graphicsContext.restore();
 }
     
 bool PageOverlay::mouseEvent(const WebMouseEvent& mouseEvent)

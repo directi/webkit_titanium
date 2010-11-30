@@ -225,7 +225,7 @@ gdk_pixbuf_get_from_surface(cairo_surface_t * surface,
     GdkPixbuf * dest;
 
     /* General sanity checks */
-    g_return_val_if_fail(!surface, NULL);
+    g_return_val_if_fail(surface, NULL);
     g_return_val_if_fail(srcX >= 0 && srcY >= 0, NULL);
     g_return_val_if_fail(width > 0 && height > 0, NULL);
 
@@ -260,4 +260,14 @@ gdk_pixbuf_get_from_surface(cairo_surface_t * surface,
     cairo_surface_destroy(surface);
     return dest;
 }
+
 #endif // GTK_API_VERSION_2
+
+#if !GLIB_CHECK_VERSION(2, 27, 1)
+gboolean g_signal_accumulator_first_wins(GSignalInvocationHint *invocationHint, GValue *returnAccumulator, const GValue *handlerReturn, gpointer data)
+{
+    g_value_copy(handlerReturn, returnAccumulator);
+    return FALSE;
+}
+#endif
+

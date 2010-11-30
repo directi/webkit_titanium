@@ -41,6 +41,7 @@ public:
 
 private:
     RangeInputType(HTMLInputElement* element) : InputType(element) { }
+    virtual bool isRangeControl() const;
     virtual const AtomicString& formControlType() const;
     virtual double valueAsNumber() const;
     virtual void setValueAsNumber(double, ExceptionCode&) const;
@@ -53,6 +54,7 @@ private:
     virtual double stepBase() const;
     virtual double defaultStep() const;
     virtual double stepScaleFactor() const;
+    virtual bool handleKeydownEvent(KeyboardEvent*);
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) const;
     virtual double parseToDouble(const String&, double) const;
     virtual String serialize(double) const;

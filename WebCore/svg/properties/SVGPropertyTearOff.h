@@ -34,10 +34,10 @@ public:
 
     // Used for child types (baseVal/animVal) of a SVGAnimated* property (for example: SVGAnimatedLength::baseVal()).
     // Also used for list tear offs (for example: text.x.baseVal.getItem(0)).
-    static PassRefPtr<Self> create(SVGAnimatedProperty* animatedProperty, SVGPropertyRole, PropertyType& value)
+    static PassRefPtr<Self> create(SVGAnimatedProperty* animatedProperty, SVGPropertyRole role, PropertyType& value)
     {
         ASSERT(animatedProperty);
-        return adoptRef(new Self(animatedProperty, value));
+        return adoptRef(new Self(animatedProperty, role, value));
     }
 
     // Used for non-animated POD types (for example: SVGSVGElement::createSVGLength()).
@@ -69,6 +69,9 @@ public:
 
     void detachWrapper()
     {
+        if (m_valueIsCopy)
+            return;
+
         // Switch from a live value, to a non-live value.
         // For example: <text x="50"/>
         // var item = text.x.baseVal.getItem(0);
@@ -76,7 +79,6 @@ public:
         // item.value still has to report '50' and it has to be possible to modify 'item'
         // w/o changing the "new item" (with x=100) in the text element.
         // Whenever the XML DOM modifies the "x" attribute, all existing wrappers are detached, using this function.
-        ASSERT(!m_valueIsCopy);
         m_value = new PropertyType(*m_value);
         m_valueIsCopy = true;
         m_animatedProperty = 0;
@@ -89,9 +91,12 @@ public:
         m_animatedProperty->commitChange();
     }
 
+    virtual SVGPropertyRole role() const { return m_role; }
+
 protected:
-    SVGPropertyTearOff(SVGAnimatedProperty* animatedProperty, PropertyType& value)
+    SVGPropertyTearOff(SVGAnimatedProperty* animatedProperty, SVGPropertyRole role, PropertyType& value)
         : m_animatedProperty(animatedProperty)
+        , m_role(role)
         , m_value(&value)
         , m_valueIsCopy(false)
     {
@@ -101,6 +106,7 @@ protected:
 
     SVGPropertyTearOff(const PropertyType& initialValue)
         : m_animatedProperty(0)
+        , m_role(UndefinedRole)
         , m_value(new PropertyType(initialValue))
         , m_valueIsCopy(true)
     {
@@ -113,6 +119,7 @@ protected:
     }
 
     RefPtr<SVGAnimatedProperty> m_animatedProperty;
+    SVGPropertyRole m_role;
     PropertyType* m_value;
     bool m_valueIsCopy : 1;
 };

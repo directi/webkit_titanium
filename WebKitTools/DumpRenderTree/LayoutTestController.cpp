@@ -1076,19 +1076,21 @@ static JSValueRef setMockGeolocationErrorCallback(JSContextRef context, JSObject
     return JSValueMakeUndefined(context);
 }
 
-static JSValueRef setMockSpeechInputResultCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+static JSValueRef addMockSpeechInputResultCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
-    if (argumentCount < 2)
+    if (argumentCount < 3)
         return JSValueMakeUndefined(context);
 
     JSRetainPtr<JSStringRef> result(Adopt, JSValueToStringCopy(context, arguments[0], exception));
     ASSERT(!*exception);
 
-    JSRetainPtr<JSStringRef> language(Adopt, JSValueToStringCopy(context, arguments[1], exception));
+    double confidence = JSValueToNumber(context, arguments[1], exception);
+
+    JSRetainPtr<JSStringRef> language(Adopt, JSValueToStringCopy(context, arguments[2], exception));
     ASSERT(!*exception);
 
     LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
-    controller->setMockSpeechInputResult(result.get(), language.get());
+    controller->addMockSpeechInputResult(result.get(), confidence, language.get());
 
     return JSValueMakeUndefined(context);
 }
@@ -1786,8 +1788,8 @@ static JSValueRef setEditingBehaviorCallback(JSContextRef context, JSObjectRef f
     char* behaviorBuffer = new char[maxLength + 1];
     JSStringGetUTF8CString(editingBehavior.get(), behaviorBuffer, maxLength);
 
-    if (strcmp(behaviorBuffer, "mac") && strcmp(behaviorBuffer, "win")) {
-        JSRetainPtr<JSStringRef> invalidArgument(JSStringCreateWithUTF8CString("Passed invalid editing behavior. Must be 'mac' or 'win'."));
+    if (strcmp(behaviorBuffer, "mac") && strcmp(behaviorBuffer, "win") && strcmp(behaviorBuffer, "unix")) {
+        JSRetainPtr<JSStringRef> invalidArgument(JSStringCreateWithUTF8CString("Passed invalid editing behavior. Must be 'mac', 'win', or 'unix'."));
         *exception = JSValueMakeString(context, invalidArgument.get());
         return JSValueMakeUndefined(context);
     }
@@ -1973,7 +1975,7 @@ JSStaticFunction* LayoutTestController::staticFunctions()
         { "setMockDeviceOrientation", setMockDeviceOrientationCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setMockGeolocationError", setMockGeolocationErrorCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setMockGeolocationPosition", setMockGeolocationPositionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "setMockSpeechInputResult", setMockSpeechInputResultCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "addMockSpeechInputResult", addMockSpeechInputResultCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setNewWindowsCopyBackForwardList", setNewWindowsCopyBackForwardListCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setPOSIXLocale", setPOSIXLocaleCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setPersistentUserStyleSheetLocation", setPersistentUserStyleSheetLocationCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },

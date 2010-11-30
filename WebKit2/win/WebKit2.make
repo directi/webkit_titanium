@@ -1,12 +1,13 @@
-!IF !defined(BUILDSTYLE)
-BUILDSTYLE=Release
-!ELSEIF "$(BUILDSTYLE)"=="DEBUG"
+!IF "$(BUILDSTYLE)"=="DEBUG"
 BUILDSTYLE=Debug_All
+!ELSE
+BUILDSTYLE=Release_LTCG
 !ENDIF
 
 install:
 	set WebKitLibrariesDir=$(SRCROOT)\AppleInternal
 	set WebKitOutputDir=$(OBJROOT)
+	set WebKitVSPropsRedirectionDir=$(SRCROOT)\AppleInternal\tools\vsprops\OpenSource\1\2\
 	set PRODUCTION=1
 	devenv "WebKit2.submit.sln" /rebuild $(BUILDSTYLE)
 	-xcopy "$(OBJROOT)\bin\*.exe" "$(DSTROOT)\AppleInternal\bin\" /e/v/i/h/y

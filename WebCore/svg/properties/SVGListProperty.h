@@ -110,7 +110,7 @@ public:
 
         // Not specified, but FF/Opera do it this way, and it's just sane.
         if (!passNewItem) {
-            ec = TYPE_MISMATCH_ERR;
+            ec = SVGException::SVG_WRONG_TYPE_ERR;
             return 0;
         }
 
@@ -207,7 +207,7 @@ public:
 
         // Not specified, but FF/Opera do it this way, and it's just sane.
         if (!passNewItem) {
-            ec = TYPE_MISMATCH_ERR;
+            ec = SVGException::SVG_WRONG_TYPE_ERR;
             return 0;
         }
 
@@ -258,6 +258,12 @@ public:
         // Spec: If the item is already in this list, note that the index of the item to replace is before the removal of the item.
         processIncomingListItemValue(newItem, &index);
 
+        if (values.isEmpty()) {
+            // 'newItem' already lived in our list, we removed it, and now we're empty, which means there's nothing to replace.
+            ec = INDEX_SIZE_ERR;
+            return ListItemType();
+        }
+
         // Update the value at the desired position 'index'. 
         values.at(index) = newItem;
 
@@ -274,7 +280,7 @@ public:
 
         // Not specified, but FF/Opera do it this way, and it's just sane.
         if (!passNewItem) {
-            ec = TYPE_MISMATCH_ERR;
+            ec = SVGException::SVG_WRONG_TYPE_ERR;
             return 0;
         }
 
@@ -286,8 +292,15 @@ public:
         // Spec: If the item is already in this list, note that the index of the item to replace is before the removal of the item.
         processIncomingListItemWrapper(newItem, &index);
 
+        if (values.isEmpty()) {
+            ASSERT(wrappers.isEmpty());
+            // 'passNewItem' already lived in our list, we removed it, and now we're empty, which means there's nothing to replace.
+            ec = INDEX_SIZE_ERR;
+            return 0;
+        }
+
         // Detach the existing wrapper.
-        RefPtr<ListItemTearOff>& oldItem = wrappers.at(index);
+        RefPtr<ListItemTearOff> oldItem = wrappers.at(index);
         if (oldItem)
             oldItem->detachWrapper();
 
@@ -336,10 +349,11 @@ public:
         ASSERT(values.size() == wrappers.size());
 
         // Detach the existing wrapper.
-        RefPtr<ListItemTearOff>& oldItem = wrappers.at(index);
-        if (oldItem)
-            oldItem->detachWrapper();
+        RefPtr<ListItemTearOff> oldItem = wrappers.at(index);
+        if (!oldItem)
+            oldItem = ListItemTearOff::create(animatedList, UndefinedRole, values.at(index));
 
+        oldItem->detachWrapper();
         wrappers.remove(index);
         values.remove(index);
 
@@ -371,7 +385,7 @@ public:
 
         // Not specified, but FF/Opera do it this way, and it's just sane.
         if (!passNewItem) {
-            ec = TYPE_MISMATCH_ERR;
+            ec = SVGException::SVG_WRONG_TYPE_ERR;
             return 0;
         }
 
@@ -391,6 +405,8 @@ public:
         commitChange();
         return newItem.release();
     }
+
+    virtual SVGPropertyRole role() const { return m_role; }
 
 protected:
     SVGListProperty(SVGPropertyRole role)

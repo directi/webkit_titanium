@@ -21,6 +21,7 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <gtk/gtk.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <webkit/webkit.h>
 
@@ -220,6 +221,78 @@ static void runGetTextTests(AtkText* textObject)
     testGetTextFunction(textObject, atk_text_get_text_at_offset, ATK_TEXT_BOUNDARY_LINE_END,
                         0, "This is a test. This is the second sentence. And this the third.", 0, 64);
 }
+
+static void stateChangedCb(AtkObject* object, gchar* stateName, gboolean stateSet, gpointer unused)
+{
+    /* Only 'defunct' and 'busy' state changes are considered. */
+    if (!g_strcmp0(stateName, "defunct")) {
+        g_print("[defunct]");
+        return;
+    }
+
+    if (!g_strcmp0(stateName, "busy")) {
+        g_print("[busy:%d]", stateSet);
+        /* If 'busy' state is unset, it means we're done. */
+        if (!stateSet)
+            exit(0);
+    }
+}
+
+static void documentReloadCb(AtkDocument* document, gpointer unused)
+{
+    g_print("[reloaded]");
+}
+
+static void documentLoadCompleteCb(AtkDocument* document, gpointer unused)
+{
+    g_print("[load completed]");
+}
+
+static void webviewLoadStatusChangedCb(WebKitWebView* webView, GParamSpec* pspec, gpointer unused)
+{
+    /* We need to explicitly connect here to the signals emitted by
+     * the AtkObject associated to the webView because the AtkObject
+     * iniatially associated at the beginning of the process (when in
+     * the LOAD_PROVISIONAL state) will get destroyed and replaced by
+     * a new one later on, when the LOAD_COMMITED state is reached. */
+    WebKitLoadStatus loadStatus = webkit_web_view_get_load_status(webView);
+    if (loadStatus == WEBKIT_LOAD_PROVISIONAL || loadStatus == WEBKIT_LOAD_COMMITTED) {
+        AtkObject* axWebView = gtk_widget_get_accessible(GTK_WIDGET(webView));
+        g_assert(ATK_IS_DOCUMENT(axWebView));
+
+        g_signal_connect(axWebView, "state-change", G_CALLBACK(stateChangedCb), 0);
+        g_signal_connect(axWebView, "reload", G_CALLBACK(documentReloadCb), 0);
+        g_signal_connect(axWebView, "load-complete", G_CALLBACK(documentLoadCompleteCb), 0);
+    }
+}
+
+static void testWebkitAtkDocumentReloadEvents()
+{
+    WebKitWebView* webView = WEBKIT_WEB_VIEW(webkit_web_view_new());
+    g_object_ref_sink(webView);
+    GtkAllocation allocation = { 0, 0, 800, 600 };
+    gtk_widget_size_allocate(GTK_WIDGET(webView), &allocation);
+
+    webkit_web_view_load_string(webView, contents, 0, 0, 0);
+
+    /* Wait for the accessible objects to be created. */
+    waitForAccessibleObjects();
+
+    AtkObject* axWebView = gtk_widget_get_accessible(GTK_WIDGET(webView));
+    g_assert(ATK_IS_DOCUMENT(axWebView));
+
+    if (g_test_trap_fork (2000000, G_TEST_TRAP_SILENCE_STDOUT)) {
+        g_signal_connect(webView, "notify::load-status", G_CALLBACK(webviewLoadStatusChangedCb), 0);
+        webkit_web_view_reload(webView);
+    }
+
+    /* Check results. */
+    g_test_trap_assert_passed();
+    g_test_trap_assert_stdout("[busy:1][reloaded][defunct][load completed][busy:0]");
+
+    g_object_unref(webView);
+}
+
 
 static void testWebkitAtkGetTextAtOffsetForms()
 {
@@ -776,6 +849,16 @@ static void testWebkitAtkTextSelections()
     g_assert_cmpstr(selectedText, ==, "a li");
     g_free (selectedText);
 
+    /* Make a selection after the link and check selection for the whole paragraph. */
+    result = atk_text_set_selection(paragraph2, 0, 27, 37);
+    g_assert(result);
+    g_assert_cmpint(atk_text_get_n_selections(paragraph2), ==, 1);
+    selectedText = atk_text_get_selection(paragraph2, 0, &startOffset, &endOffset);
+    g_assert_cmpint(startOffset, ==, 27);
+    g_assert_cmpint(endOffset, ==, 37);
+    g_assert_cmpstr(selectedText, ==, "the middle");
+    g_free (selectedText);
+
     /* Remove selections and text everything again. */
     result = atk_text_remove_selection(paragraph2, 0);
     g_assert(result);
@@ -1201,6 +1284,7 @@ int main(int argc, char** argv)
     gtk_test_init(&argc, &argv, 0);
 
     g_test_bug_base("https://bugs.webkit.org/");
+    g_test_add_func("/webkit/atk/documentReloadEvents", testWebkitAtkDocumentReloadEvents);
     g_test_add_func("/webkit/atk/getTextAtOffset", testWebkitAtkGetTextAtOffset);
     g_test_add_func("/webkit/atk/getTextAtOffsetForms", testWebkitAtkGetTextAtOffsetForms);
     g_test_add_func("/webkit/atk/getTextAtOffsetNewlines", testWebkitAtkGetTextAtOffsetNewlines);

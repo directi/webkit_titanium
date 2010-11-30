@@ -42,20 +42,54 @@ String ValidityState::validationMessage() const
 
     if (customError())
         return m_customErrorMessage;
-    if (valueMissing())
+    bool isInputElement = m_control->hasTagName(inputTag);
+    bool isTextAreaElement = m_control->hasTagName(textareaTag);
+    // The order of the following checks is meaningful. e.g. We'd like to show the
+    // valueMissing message even if the control has other validation errors.
+    if (valueMissing()) {
+        if (m_control->hasTagName(selectTag))
+            return validationMessageValueMissingForSelectText();
+        if (isInputElement)
+            return static_cast<HTMLInputElement*>(m_control)->valueMissingText();
         return validationMessageValueMissingText();
-    if (typeMismatch())
+    }
+    if (typeMismatch()) {
+        if (isInputElement)
+            return static_cast<HTMLInputElement*>(m_control)->typeMismatchText();
         return validationMessageTypeMismatchText();
+    }
     if (patternMismatch())
         return validationMessagePatternMismatchText();
-    if (tooLong())
-        return validationMessageTooLongText();
-    if (rangeUnderflow())
-        return validationMessageRangeUnderflowText();
-    if (rangeOverflow())
-        return validationMessageRangeOverflowText();
-    if (stepMismatch())
-        return validationMessageStepMismatchText();
+    if (tooLong()) {
+        if (!isInputElement && !isTextAreaElement) {
+            ASSERT_NOT_REACHED();
+            return String();
+        }
+        HTMLTextFormControlElement* text = static_cast<HTMLTextFormControlElement*>(m_control);
+        return validationMessageTooLongText(numGraphemeClusters(text->value()), text->maxLength());
+    }
+    if (rangeUnderflow()) {
+        if (!isInputElement) {
+            ASSERT_NOT_REACHED();
+            return String();
+        }
+        return validationMessageRangeUnderflowText(static_cast<HTMLInputElement*>(m_control)->minimumString());
+    }
+    if (rangeOverflow()) {
+        if (!isInputElement) {
+            ASSERT_NOT_REACHED();
+            return String();
+        }
+        return validationMessageRangeOverflowText(static_cast<HTMLInputElement*>(m_control)->maximumString());
+    }
+    if (stepMismatch()) {
+        if (!isInputElement) {
+            ASSERT_NOT_REACHED();
+            return String();
+        }
+        HTMLInputElement* input = static_cast<HTMLInputElement*>(m_control);
+        return validationMessageStepMismatchText(input->stepBaseString(), input->stepString());
+    }
 
     return String();
 }

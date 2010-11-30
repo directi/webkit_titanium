@@ -26,7 +26,11 @@
 #include "Download.h"
 
 #include "Connection.h"
+#include "DataReference.h"
 #include "DownloadProxyMessages.h"
+#include "DownloadManager.h"
+#include "SandboxExtension.h"
+#include "WebCoreArgumentCoders.h"
 #include "WebProcess.h"
 
 using namespace WebCore;
@@ -57,11 +61,40 @@ CoreIPC::Connection* Download::connection() const
 
 void Download::didStart()
 {
-    send(Messages::DownloadProxy::DidStart());
+    send(Messages::DownloadProxy::DidStart(m_request));
+}
+
+void Download::didReceiveResponse(const ResourceResponse& response)
+{
+    send(Messages::DownloadProxy::DidReceiveResponse(response));
 }
 
 void Download::didReceiveData(uint64_t length)
 {
+    send(Messages::DownloadProxy::DidReceiveData(length));
+}
+
+bool Download::shouldDecodeSourceDataOfMIMEType(const String& mimeType)
+{
+    bool result;
+    if (!sendSync(Messages::DownloadProxy::ShouldDecodeSourceDataOfMIMEType(mimeType), Messages::DownloadProxy::ShouldDecodeSourceDataOfMIMEType::Reply(result)))
+        return true;
+
+    return result;
+}
+
+String Download::decideDestinationWithSuggestedFilename(const String& filename, bool& allowOverwrite)
+{
+    String destination;
+    SandboxExtension::Handle sandboxExtensionHandle;
+    if (!sendSync(Messages::DownloadProxy::DecideDestinationWithSuggestedFilename(filename), Messages::DownloadProxy::DecideDestinationWithSuggestedFilename::Reply(destination, allowOverwrite, sandboxExtensionHandle)))
+        return String();
+
+    m_sandboxExtension = SandboxExtension::create(sandboxExtensionHandle);
+    if (m_sandboxExtension)
+        m_sandboxExtension->consume();
+
+    return destination;
 }
 
 void Download::didCreateDestination(const String& path)
@@ -72,6 +105,28 @@ void Download::didCreateDestination(const String& path)
 void Download::didFinish()
 {
     send(Messages::DownloadProxy::DidFinish());
+
+    if (m_sandboxExtension)
+        m_sandboxExtension->invalidate();
+    DownloadManager::shared().downloadFinished(this);
+}
+
+void Download::didFail(const ResourceError& error, const CoreIPC::DataReference& resumeData)
+{
+    send(Messages::DownloadProxy::DidFail(error, resumeData));
+
+    if (m_sandboxExtension)
+        m_sandboxExtension->invalidate();
+    DownloadManager::shared().downloadFinished(this);
+}
+
+void Download::didCancel(const CoreIPC::DataReference& resumeData)
+{
+    send(Messages::DownloadProxy::DidCancel(resumeData));
+
+    if (m_sandboxExtension)
+        m_sandboxExtension->invalidate();
+    DownloadManager::shared().downloadFinished(this);
 }
 
 } // namespace WebKit

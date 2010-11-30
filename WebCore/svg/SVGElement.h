@@ -99,8 +99,6 @@ namespace WebCore {
 
         virtual bool isSupported(StringImpl* feature, StringImpl* version) const;
 
-        virtual ContainerNode* eventParentNode();
-
         virtual bool needsPendingResourceHandling() const { return true; }
         virtual void buildPendingResource() { }
 
@@ -111,9 +109,6 @@ namespace WebCore {
     };
 
 }
-
-// This file needs to be included after the SVGElement declaration
-#include "DeprecatedSVGAnimatedProperty.h" // NOLINT
 
 #endif
 #endif

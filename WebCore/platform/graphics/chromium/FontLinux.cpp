@@ -164,7 +164,8 @@ public:
     TextRunWalker(const TextRun&, unsigned, const Font*);
     ~TextRunWalker();
 
-    bool isWordBreak(unsigned, bool);
+    bool isWordBreak(unsigned);
+    int determineWordBreakSpacing(unsigned);
     // setPadding sets a number of pixels to be distributed across the TextRun.
     // WebKit uses this to justify text.
     void setPadding(int);
@@ -182,10 +183,8 @@ public:
     // setLetterSpacingAdjustment sets an additional number of pixels that is
     // added to the advance after each output cluster. This matches the behaviour
     // of WidthIterator::advance.
-    //
-    // (NOTE: currently does nothing because I don't know how to get the
-    // cluster information from Harfbuzz.)
     void setLetterSpacingAdjustment(int letterSpacingAdjustment) { m_letterSpacing = letterSpacingAdjustment; }
+    int letterSpacing() const { return m_letterSpacing; }
 
     // Set the x offset for the next script run. This affects the values in
     // |xPositions|
@@ -235,6 +234,7 @@ private:
     static bool isCodepointSpace(HB_UChar16 c) { return c == ' ' || c == '\t'; }
 
     const Font* const m_font;
+    const SimpleFontData* m_currentFontData;
     HB_ShaperItem m_item;
     uint16_t* m_glyphs16; // A vector of 16-bit glyph ids.
     SkScalar* m_xPositions; // A vector of x positions for each glyph.
@@ -256,7 +256,7 @@ private:
                       // Since we only add a whole number of padding pixels at
                       // each word break we accumulate error. This is the
                       // number of pixels that we are behind so far.
-    unsigned m_letterSpacing; // pixels to be added after each glyph.
+    int m_letterSpacing; // pixels to be added after each glyph.
 };
 
 
@@ -301,11 +301,32 @@ TextRunWalker::~TextRunWalker()
     delete[] m_item.log_clusters;
 }
 
-bool TextRunWalker::isWordBreak(unsigned index, bool isRTL)
+bool TextRunWalker::isWordBreak(unsigned index)
 {
-    if (!isRTL)
-        return index && isCodepointSpace(m_item.string[index]) && !isCodepointSpace(m_item.string[index - 1]);
-    return index != m_item.stringLength - 1 && isCodepointSpace(m_item.string[index]) && !isCodepointSpace(m_item.string[index + 1]);
+    return index && isCodepointSpace(m_item.string[index]) && !isCodepointSpace(m_item.string[index - 1]);
+}
+
+int TextRunWalker::determineWordBreakSpacing(unsigned logClustersIndex)
+{
+    int wordBreakSpacing = 0;
+    // The first half of the conjunction works around the case where
+    // output glyphs aren't associated with any codepoints by the
+    // clusters log.
+    if (logClustersIndex < m_item.item.length
+        && isWordBreak(m_item.item.pos + logClustersIndex)) {
+        wordBreakSpacing = m_wordSpacingAdjustment;
+
+        if (m_padding > 0) {
+            int toPad = roundf(m_padPerWordBreak + m_padError);
+            m_padError += m_padPerWordBreak - toPad;
+
+            if (m_padding < toPad)
+                toPad = m_padding;
+            m_padding -= toPad;
+            wordBreakSpacing += toPad;
+        }
+    }
+    return wordBreakSpacing;
 }
 
 // setPadding sets a number of pixels to be distributed across the TextRun.
@@ -320,10 +341,9 @@ void TextRunWalker::setPadding(int padding)
     // amount to each space. The last space gets the smaller amount, if
     // any.
     unsigned numWordBreaks = 0;
-    bool isRTL = m_iterateBackwards;
 
     for (unsigned i = 0; i < m_item.stringLength; i++) {
-        if (isWordBreak(i, isRTL))
+        if (isWordBreak(i))
             numWordBreaks++;
     }
 
@@ -361,6 +381,7 @@ bool TextRunWalker::nextScriptRun()
         // (and the glyphs in each A, C and T section are backwards too)
         if (!hb_utf16_script_run_prev(&m_numCodePoints, &m_item.item, m_run.characters(), m_run.length(), &m_indexOfNextScriptRun))
             return false;
+        m_currentFontData = m_font->glyphDataForCharacter(m_item.string[m_item.item.pos], false, false).fontData;
     } else {
         if (!hb_utf16_script_run_next(&m_numCodePoints, &m_item.item, m_run.characters(), m_run.length(), &m_indexOfNextScriptRun))
             return false;
@@ -372,11 +393,11 @@ bool TextRunWalker::nextScriptRun()
         // in the harfbuzz data structures to e.g. pick the correct script's shaper.
         // So we allow that to run first, then do a second pass over the range it
         // found and take the largest subregion that stays within a single font.
-        const FontData* glyphData = m_font->glyphDataForCharacter(m_item.string[m_item.item.pos], false, false).fontData;
+        m_currentFontData = m_font->glyphDataForCharacter(m_item.string[m_item.item.pos], false, false).fontData;
         unsigned endOfRun;
         for (endOfRun = 1; endOfRun < m_item.item.length; ++endOfRun) {
-            const FontData* nextGlyphData = m_font->glyphDataForCharacter(m_item.string[m_item.item.pos + endOfRun], false, false).fontData;
-            if (nextGlyphData != glyphData)
+            const SimpleFontData* nextFontData = m_font->glyphDataForCharacter(m_item.string[m_item.item.pos + endOfRun], false, false).fontData;
+            if (nextFontData != m_currentFontData)
                 break;
         }
         m_item.item.length = endOfRun;
@@ -490,54 +511,57 @@ void TextRunWalker::setGlyphXPositions(bool isRTL)
     // RTL) codepoint of the current glyph.  Each time we advance a glyph,
     // we skip over all the codepoints that contributed to the current
     // glyph.
-    unsigned logClustersIndex = isRTL ? m_item.num_glyphs - 1 : 0;
+    int logClustersIndex = 0;
 
-    for (unsigned iter = 0; iter < m_item.num_glyphs; ++iter) {
+    if (isRTL) {
+        logClustersIndex = m_item.num_glyphs - 1;
+
         // Glyphs are stored in logical order, but for layout purposes we
         // always go left to right.
-        int i = isRTL ? m_item.num_glyphs - iter - 1 : iter;
+        for (int i = m_item.num_glyphs - 1; i >= 0; --i) {
+            if (!m_currentFontData->isZeroWidthSpaceGlyph(m_glyphs16[i])) {
+                // Whitespace must be laid out in logical order, so when inserting
+                // spaces in RTL (but iterating in LTR order) we must insert spaces
+                // _before_ the next glyph.
+                if (static_cast<unsigned>(i + 1) >= m_item.num_glyphs || m_item.attributes[i + 1].clusterStart)
+                    position += m_letterSpacing;
 
-        m_glyphs16[i] = m_item.glyphs[i];
-        double offsetX = truncateFixedPointToInteger(m_item.offsets[i].x);
-        m_xPositions[i] = m_offsetX + position + offsetX;
-
-        double advance = truncateFixedPointToInteger(m_item.advances[i]);
-        // The first half of the conjuction works around the case where
-        // output glyphs aren't associated with any codepoints by the
-        // clusters log.
-        if (logClustersIndex < m_item.item.length
-            && isWordBreak(m_item.item.pos + logClustersIndex, isRTL)) {
-            advance += m_wordSpacingAdjustment;
-
-            if (m_padding > 0) {
-                unsigned toPad = roundf(m_padPerWordBreak + m_padError);
-                m_padError += m_padPerWordBreak - toPad;
-
-                if (m_padding < toPad)
-                    toPad = m_padding;
-                m_padding -= toPad;
-                advance += toPad;
+                position += determineWordBreakSpacing(logClustersIndex);
             }
-        }
 
-        // We would like to add m_letterSpacing after each cluster, but I
-        // don't know where the cluster information is. This is typically
-        // fine for Roman languages, but breaks more complex languages
-        // terribly.
-        // advance += m_letterSpacing;
+            m_glyphs16[i] = m_item.glyphs[i];
+            double offsetX = truncateFixedPointToInteger(m_item.offsets[i].x);
+            m_xPositions[i] = m_offsetX + position + offsetX;
 
-        if (isRTL) {
             while (logClustersIndex > 0 && logClusters()[logClustersIndex] == i)
                 logClustersIndex--;
-        } else {
-            while (logClustersIndex < m_item.item.length && logClusters()[logClustersIndex] == i)
-                logClustersIndex++;
+
+            if (!m_currentFontData->isZeroWidthSpaceGlyph(m_glyphs16[i]))
+                position += truncateFixedPointToInteger(m_item.advances[i]);
         }
+    } else {
+        for (size_t i = 0; i < m_item.num_glyphs; ++i) {
+            m_glyphs16[i] = m_item.glyphs[i];
+            double offsetX = truncateFixedPointToInteger(m_item.offsets[i].x);
+            m_xPositions[i] = m_offsetX + position + offsetX;
 
-        position += advance;
+            if (m_currentFontData->isZeroWidthSpaceGlyph(m_glyphs16[i]))
+                continue;
+
+            double advance = truncateFixedPointToInteger(m_item.advances[i]);
+
+            advance += determineWordBreakSpacing(logClustersIndex);
+
+            if (m_item.attributes[i].clusterStart)
+                advance += m_letterSpacing;
+
+            while (static_cast<unsigned>(logClustersIndex) < m_item.item.length && logClusters()[logClustersIndex] == i)
+                logClustersIndex++;
+
+            position += advance;
+        }
     }
-
-    m_pixelWidth = position;
+    m_pixelWidth = std::max(position, 0.0);
     m_offsetX += m_pixelWidth;
 }
 
@@ -552,6 +576,8 @@ void TextRunWalker::normalizeSpacesAndMirrorChars(const UChar* source, bool rtl,
         U16_NEXT(source, nextPosition, length, character);
         if (Font::treatAsSpace(character))
             character = ' ';
+        else if (Font::treatAsZeroWidthSpace(character))
+            character = zeroWidthSpace;
         else if (rtl)
             character = u_charMirror(character);
         U16_APPEND(destination, position, length, character, error);
@@ -575,7 +601,7 @@ const TextRun& TextRunWalker::getNormalizedTextRun(const TextRun& originalRun, O
     // 2) Convert spacing characters into plain spaces, as some fonts will provide glyphs
     // for characters like '\n' otherwise.
     // 3) Convert mirrored characters such as parenthesis for rtl text.
- 
+
     // Convert to NFC form if the text has diacritical marks.
     icu::UnicodeString normalizedString;
     UErrorCode error = U_ZERO_ERROR;
@@ -675,16 +701,19 @@ float Font::floatWidthForComplexText(const TextRun& run, HashSet<const SimpleFon
 static int glyphIndexForXPositionInScriptRun(const TextRunWalker& walker, int x)
 {
     const HB_Fixed* advances = walker.advances();
+    int letterSpacing = walker.letterSpacing();
     int glyphIndex;
     if (walker.rtl()) {
         for (glyphIndex = walker.length() - 1; glyphIndex >= 0; --glyphIndex) {
-            if (x < truncateFixedPointToInteger(advances[glyphIndex]))
+            // When iterating LTR over RTL text, we must include the whitespace
+            // _before_ the glyph, so no + 1 here.
+            if (x < (static_cast<int>(walker.length()) - glyphIndex) * letterSpacing + truncateFixedPointToInteger(advances[glyphIndex]))
                 break;
             x -= truncateFixedPointToInteger(advances[glyphIndex]);
         }
     } else {
         for (glyphIndex = 0; static_cast<unsigned>(glyphIndex) < walker.length(); ++glyphIndex) {
-            if (x < truncateFixedPointToInteger(advances[glyphIndex]))
+            if (x < (glyphIndex * letterSpacing + truncateFixedPointToInteger(advances[glyphIndex])))
                 break;
             x -= truncateFixedPointToInteger(advances[glyphIndex]);
         }

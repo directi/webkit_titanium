@@ -153,11 +153,6 @@ void BytecodeGenerator::generate()
     if ((m_codeType == FunctionCode && !m_codeBlock->needsFullScopeChain() && !m_codeBlock->usesArguments()) || m_codeType == EvalCode)
         symbolTable().clear();
 
-#if !ENABLE(OPCODE_SAMPLING)
-    if (!m_regeneratingForExceptionInfo && !m_usesExceptions && (m_codeType == FunctionCode || m_codeType == EvalCode))
-        m_codeBlock->clearExceptionInfo();
-#endif
-
     m_codeBlock->shrinkToFit();
 }
 
@@ -199,9 +194,10 @@ void BytecodeGenerator::preserveLastVar()
         m_lastVar = &m_calleeRegisters.last();
 }
 
-BytecodeGenerator::BytecodeGenerator(ProgramNode* programNode, const Debugger* debugger, const ScopeChain& scopeChain, SymbolTable* symbolTable, ProgramCodeBlock* codeBlock)
-    : m_shouldEmitDebugHooks(!!debugger)
+BytecodeGenerator::BytecodeGenerator(ProgramNode* programNode, const ScopeChain& scopeChain, SymbolTable* symbolTable, ProgramCodeBlock* codeBlock)
+    : m_shouldEmitDebugHooks(scopeChain.globalObject()->debugger())
     , m_shouldEmitProfileHooks(scopeChain.globalObject()->supportsProfiling())
+    , m_shouldEmitRichSourceInfo(scopeChain.globalObject()->supportsRichSourceInfo())
     , m_scopeChain(&scopeChain)
     , m_symbolTable(symbolTable)
     , m_scopeNode(programNode)
@@ -217,7 +213,7 @@ BytecodeGenerator::BytecodeGenerator(ProgramNode* programNode, const Debugger* d
     , m_hasCreatedActivation(true)
     , m_firstLazyFunction(0)
     , m_lastLazyFunction(0)
-    , m_globalData(&scopeChain.globalObject()->globalExec()->globalData())
+    , m_globalData(&scopeChain.globalObject()->globalData())
     , m_lastOpcodeID(op_end)
 #ifndef NDEBUG
     , m_lastOpcodePosition(0)
@@ -293,9 +289,10 @@ BytecodeGenerator::BytecodeGenerator(ProgramNode* programNode, const Debugger* d
     codeBlock->m_numCapturedVars = codeBlock->m_numVars;
 }
 
-BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, const Debugger* debugger, const ScopeChain& scopeChain, SymbolTable* symbolTable, CodeBlock* codeBlock)
-    : m_shouldEmitDebugHooks(!!debugger)
+BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, const ScopeChain& scopeChain, SymbolTable* symbolTable, CodeBlock* codeBlock)
+    : m_shouldEmitDebugHooks(scopeChain.globalObject()->debugger())
     , m_shouldEmitProfileHooks(scopeChain.globalObject()->supportsProfiling())
+    , m_shouldEmitRichSourceInfo(scopeChain.globalObject()->supportsRichSourceInfo())
     , m_scopeChain(&scopeChain)
     , m_symbolTable(symbolTable)
     , m_scopeNode(functionBody)
@@ -310,7 +307,7 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, const Debug
     , m_hasCreatedActivation(false)
     , m_firstLazyFunction(0)
     , m_lastLazyFunction(0)
-    , m_globalData(&scopeChain.globalObject()->globalExec()->globalData())
+    , m_globalData(&scopeChain.globalObject()->globalData())
     , m_lastOpcodeID(op_end)
 #ifndef NDEBUG
     , m_lastOpcodePosition(0)
@@ -387,7 +384,7 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, const Debug
                 addVar(ident, varStack[i].second & DeclarationStacks::IsConstant);
         }
     }
-    bool canLazilyCreateFunctions = !functionBody->needsActivationForMoreThanVariables() && !debugger;
+    bool canLazilyCreateFunctions = !functionBody->needsActivationForMoreThanVariables() && !m_shouldEmitDebugHooks;
     if (!canLazilyCreateFunctions && !m_hasCreatedActivation) {
         m_hasCreatedActivation = true;
         emitOpcode(op_create_activation);
@@ -419,7 +416,7 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, const Debug
             addVar(ident, varStack[i].second & DeclarationStacks::IsConstant);
     }
     
-    if (debugger)
+    if (m_shouldEmitDebugHooks)
         codeBlock->m_numCapturedVars = codeBlock->m_numVars;
 
     FunctionParameters& parameters = *functionBody->parameters();
@@ -443,7 +440,6 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, const Debug
         emitOpcode(op_get_callee);
         instructions().append(func->index());
         // Load prototype.
-        emitGetByIdExceptionInfo(op_create_this);
         emitGetById(funcProto.get(), func.get(), globalData()->propertyNames->prototype);
 
         emitOpcode(op_create_this);
@@ -458,9 +454,10 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, const Debug
     }
 }
 
-BytecodeGenerator::BytecodeGenerator(EvalNode* evalNode, const Debugger* debugger, const ScopeChain& scopeChain, SymbolTable* symbolTable, EvalCodeBlock* codeBlock)
-    : m_shouldEmitDebugHooks(!!debugger)
+BytecodeGenerator::BytecodeGenerator(EvalNode* evalNode, const ScopeChain& scopeChain, SymbolTable* symbolTable, EvalCodeBlock* codeBlock)
+    : m_shouldEmitDebugHooks(scopeChain.globalObject()->debugger())
     , m_shouldEmitProfileHooks(scopeChain.globalObject()->supportsProfiling())
+    , m_shouldEmitRichSourceInfo(scopeChain.globalObject()->supportsRichSourceInfo())
     , m_scopeChain(&scopeChain)
     , m_symbolTable(symbolTable)
     , m_scopeNode(evalNode)
@@ -475,7 +472,7 @@ BytecodeGenerator::BytecodeGenerator(EvalNode* evalNode, const Debugger* debugge
     , m_hasCreatedActivation(true)
     , m_firstLazyFunction(0)
     , m_lastLazyFunction(0)
-    , m_globalData(&scopeChain.globalObject()->globalExec()->globalData())
+    , m_globalData(&scopeChain.globalObject()->globalData())
     , m_lastOpcodeID(op_end)
 #ifndef NDEBUG
     , m_lastOpcodePosition(0)
@@ -1158,6 +1155,12 @@ bool BytecodeGenerator::findScopedProperty(const Identifier& property, int& inde
     return true;
 }
 
+void BytecodeGenerator::emitCheckHasInstance(RegisterID* base)
+{ 
+    emitOpcode(op_check_has_instance);
+    instructions().append(base->index());
+}
+
 RegisterID* BytecodeGenerator::emitInstanceOf(RegisterID* dst, RegisterID* value, RegisterID* base, RegisterID* basePrototype)
 { 
     emitOpcode(op_instanceof);
@@ -1644,10 +1647,6 @@ RegisterID* BytecodeGenerator::emitCall(OpcodeID opcodeID, RegisterID* dst, Regi
     if (m_shouldEmitProfileHooks) {
         emitOpcode(op_profile_will_call);
         instructions().append(callArguments.profileHookRegister()->index());
-
-#if ENABLE(JIT)
-        m_codeBlock->addFunctionRegisterInfo(instructions().size(), callArguments.profileHookRegister()->index());
-#endif
     }
 
     emitExpressionInfo(divot, startOffset, endOffset);
@@ -1692,10 +1691,6 @@ RegisterID* BytecodeGenerator::emitCallVarargs(RegisterID* dst, RegisterID* func
     if (m_shouldEmitProfileHooks) {
         emitOpcode(op_profile_will_call);
         instructions().append(func->index());
-        
-#if ENABLE(JIT)
-        m_codeBlock->addFunctionRegisterInfo(instructions().size(), func->index());
-#endif
     }
     
     emitExpressionInfo(divot, startOffset, endOffset);
@@ -2050,13 +2045,16 @@ RegisterID* BytecodeGenerator::emitCatch(RegisterID* targetRegister, Label* star
     return targetRegister;
 }
 
-RegisterID* BytecodeGenerator::emitNewError(RegisterID* dst, bool isReferenceError, JSValue message)
+void BytecodeGenerator::emitThrowReferenceError(const UString& message)
 {
-    emitOpcode(op_new_error);
-    instructions().append(dst->index());
-    instructions().append(isReferenceError);
-    instructions().append(addConstantValue(message)->index());
-    return dst;
+    emitOpcode(op_throw_reference_error);
+    instructions().append(addConstantValue(jsString(globalData(), message))->index());
+}
+
+void BytecodeGenerator::emitThrowSyntaxError(const UString& message)
+{
+    emitOpcode(op_throw_syntax_error);
+    instructions().append(addConstantValue(jsString(globalData(), message))->index());
 }
 
 PassRefPtr<Label> BytecodeGenerator::emitJumpSubroutine(RegisterID* retAddrDst, Label* finally)
@@ -2211,9 +2209,8 @@ RegisterID* BytecodeGenerator::emitThrowExpressionTooDeepException()
     // that from an arbitrary node. However, calling emitExpressionInfo without any useful data
     // is still good enough to get us an accurate line number.
     emitExpressionInfo(0, 0, 0);
-    RegisterID* exception = emitNewError(newTemporary(), false, jsString(globalData(), "Expression too deep"));
-    emitThrow(exception);
-    return exception;
+    emitThrowSyntaxError("Expression too deep");
+    return newTemporary();
 }
 
 void BytecodeGenerator::setIsNumericCompareFunction(bool isNumericCompareFunction)

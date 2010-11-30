@@ -1,3 +1,1529 @@
+2010-11-29  Steve Falkenburg  <sfalken@apple.com>
+
+        Reviewed by Darin Adler.
+
+        JavaScriptCore projects on Windows should use cmd files for build events
+        https://bugs.webkit.org/show_bug.cgi?id=50193
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCoreCommon.vsprops:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCorePostBuild.cmd: Added.
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCorePreBuild.cmd: Added.
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCorePreLink.cmd: Added.
+        * JavaScriptCore.vcproj/WTF/WTFPostBuild.cmd: Added property svn:eol-style.
+        * JavaScriptCore.vcproj/WTF/WTFPreBuild.cmd: Added property svn:eol-style.
+        * JavaScriptCore.vcproj/jsc/jscCommon.vsprops:
+        * JavaScriptCore.vcproj/jsc/jscPostBuild.cmd: Added.
+        * JavaScriptCore.vcproj/jsc/jscPreBuild.cmd: Added.
+        * JavaScriptCore.vcproj/jsc/jscPreLink.cmd: Added.
+        * JavaScriptCore.vcproj/testapi/testapiCommon.vsprops:
+        * JavaScriptCore.vcproj/testapi/testapiPostBuild.cmd: Added.
+        * JavaScriptCore.vcproj/testapi/testapiPreBuild.cmd: Added.
+        * JavaScriptCore.vcproj/testapi/testapiPreLink.cmd: Added.
+
+2010-11-29  Dai Mikurube  <dmikurube@google.com>
+
+        Reviewed by Kent Tamura.
+
+        when empty, clicking "down" on outer-spin-button returns "max value"
+        https://bugs.webkit.org/show_bug.cgi?id=45491
+
+        It is required to calculate UTC/DST offsets to retrieve the current local milliseconds for
+        date/time type inputs. WTF::currentTimeMS() returns a UTC time, and WTF::getLocalTime()
+        returns a struct tm, not milliseconds.
+
+        Calculating milliseconds from a struct tm is not simple since timegm() cannot be used in all
+        environments. This calculation is already done in calculateUTCOffset(), and complicated.
+        Duplicating this complicated calculation is unreasonable because of maintainability.
+        To achieve this without duplication, we must call calculate{UTC|DST}Offset in some way.
+
+        * JavaScriptCore.exp:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+        * wtf/DateMath.cpp: Changed calculateUTCOffset() and calculateDSTOffset() to external functions.
+        (WTF::calculateUTCOffset):
+        (WTF::calculateDSTOffset):
+        * wtf/DateMath.h:
+
+2010-11-29  Chris Rogers  <crogers@google.com>
+
+        Reviewed by Kenneth Russell.
+
+        Switch web audio code to use FloatPoint3D instead of Vector3
+        https://bugs.webkit.org/show_bug.cgi?id=50186
+
+        * wtf/Vector3.h: Removed.
+
+2010-11-29  Steve Falkenburg  <sfalken@apple.com>
+
+        Reviewed by Adam Roben.
+
+        Add a mechanism for Windows pre-build/pre-link/post-build events to be separated into individual cmd files
+        https://bugs.webkit.org/show_bug.cgi?id=49858
+
+        We're migrating our prebuild/prelink/postbuild steps out of vcproj and vsprops files:
+        - To simplify editing (editing vsprops build steps is confusing).
+        - For more readable diffs.
+
+        * JavaScriptCore.vcproj/WTF/WTFCommon.vsprops:
+        * JavaScriptCore.vcproj/WTF/WTFPostBuild.cmd: Added.
+        * JavaScriptCore.vcproj/WTF/WTFPreBuild.cmd: Added.
+
+2010-11-29  Geoffrey Garen  <ggaren@apple.com>
+
+        Reviewed by Gavin Barraclough.
+
+        Improved accuracy of command-line SunSpider.
+
+        * jsc.cpp:
+        (functionRun): Changed the "run" function to run a given test in
+        its own global object. Previously, all tests ran in the same global
+        object, which created name conflicts, and made globals from previous
+        tests artificially survive into later tests.
+        
+        Also changed "run" to return the elapsed milliseconds when running a
+        given test, for slightly more accurate numbers.
+
+        (functionCheckSyntax): Ditto on returning elapsed milliseconds.
+
+2010-11-29  Darin Adler  <darin@apple.com>
+
+        Reviewed by Andreas Kling.
+
+        Remove a couple unneeded overflow checks
+        https://bugs.webkit.org/show_bug.cgi?id=49816
+
+        * wtf/text/CString.cpp:
+        (WTF::CString::init): Use an ASSERT instead of
+        an overflow check with CRASH.
+
+2010-11-29  Adam Roben  <aroben@apple.com>
+
+        Robustify react-to-vsprops-changes.py against changes to its location
+        or the location of the .vsprops files
+
+        Suggested by John Sullivan.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/react-to-vsprops-changes.py:
+        Removed file_modification_times.
+        (main): Use glob.glob to find the .vsprops files and assert that we found some.
+
+2010-11-29  Adam Roben  <aroben@apple.com>
+
+        Touch wtf/Platform.h whenever any .vsprops file changes
+
+        This will cause all files to be recompiled, which will make changes to
+        preprocessor macros (e.g., ENABLE_*) actually take effect.
+
+        Fixes <http://webkit.org/b/50167> Windows build fails when ENABLE_*
+        macros are changed (because not enough files are rebuilt)
+
+        Reviewed by John Sullivan.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/react-to-vsprops-changes.py:
+        (main): Touch wtf/Platform.h if it's older than any .vsprops file. Also
+        added some comments and logging to make it clearer what the script is
+        doing and why.
+
+2010-11-29  Adam Roben  <aroben@apple.com>
+
+        Update react-to-vsprops-changes.py after r72555
+
+        .vsprops files are no longer accessed relative to $WebKitLibrariesDir.
+
+        Fixes <http://webkit.org/b/50166> REGRESSION (r72555):
+        react-to-vsprops-changes.py no longer works for people with a
+        non-default $WebKitLibrariesDir
+
+        Reviewed by John Sullivan.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/react-to-vsprops-changes.py:
+        (main): Always look in WebKitLibraries/win for .vsprops files, not in
+        $WebKitLibrariesDir.
+
+2010-11-28  Gavin Barraclough  <barraclough@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        Bug 48100 - YARR allows what seems like a bogus character-class range
+
+        Per ECMA-262 character classes containing character ranges containing
+        character classes are invalid, eg:
+            /[\d-x]/
+            /[x-\d]/
+            /[\d-\d]/
+        These should throw a syntax error.
+
+        * yarr/RegexParser.h:
+
+2010-11-27  Gavin Barraclough  <barraclough@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        Bug 48101 - Yarr gives different results for /(?:a*?){2,}/
+
+        The test cases in the linked mozilla bug demostrate a couple of
+        problems in subpattern matching. These bugs lie in the optimized
+        cases - for matching parentheses with a quantity count of 1, and
+        for matching greedy quantified parentheses at the end of a regex
+        (which do not backtrack).
+
+        In both of these cases we are failing to correctly handle empty
+        matches. In the case of parenthese-single matches (quantity count
+        one) we are failing to test for empty matches at all. In the case
+        of terminal subpattern matches we do currenty check, however there
+        is a subtler bug here too. In the case of an empty match we will
+        presently immediately fall through to the next alternative (or
+        complete the regex match), whereas upon a failed match we should
+        be backtracking into the failing alternative, to give it a chance
+        to match further (e.g. consider /a??b?|a/.exec("ab") - upon first
+        attempting to match the first alternative this will match the empty
+        string - since a?? is non-greedy, however rather than moving on to
+        the second alternative we should be re-matching the first one, at
+        which point the non-greedy a?? will match, and as such the result
+        should be "ab", not "a").
+
+        Terminal sunpattern matching contains a second bug, too. The frame
+        location values in the subpattern should be being allocated with
+        the outer disjunction's frame (as we do for the parentheses-single
+        optimization). Consider the following three regexes:
+            /a*(?:b*)*c*/
+            /a*(?:b*)c*/
+            /a*(?:b*)*/
+        Considering only the frame location required by the atoms a,b, and
+        c, (ignoring space associated with the nested subpattern) the first
+        regex (a normal subpattern match) requires a frame size of 2 for
+        the outer disjunction, (to backtrack terms a & c), with each
+        iteration of the subpattern requiring a frame of size 1 (in order
+        to backtrack b). In the case of the second regex (where the
+        parentheses-single optimization will kick in) the outer frame must
+        be set up with a frame size of 3, since the outer frame will also
+        be used when running the nested subpattern. We will currently only
+        allocate a farme of size 1 for the outer disjuntion (to contain a),
+        howver the frame size should be 2 (since the subpattern will be
+        evaluated in the outer frame). In addition to failing to allocate
+        frame space the frame offsets are also presently invalid - in the
+        case of the last regex b's frame location will be set assuming it
+        to be the first term in the frame, whereas in this case b lies
+        after the term a, and should be taking a separate frame location.
+
+        In order to correctly allocate the frame for terminal subpattern
+        matches we must move this optimization back up from the JIT into
+        the compiler (and thus interpreter too), since this is where the
+        frame allocation takes place.
+
+        * yarr/RegexCompiler.cpp:
+        (JSC::Yarr::RegexPatternConstructor::setupAlternativeOffsets):
+        (JSC::Yarr::RegexPatternConstructor::checkForTerminalParentheses):
+        (JSC::Yarr::compileRegex):
+        * yarr/RegexInterpreter.cpp:
+        (JSC::Yarr::Interpreter::matchParenthesesOnceBegin):
+        (JSC::Yarr::Interpreter::matchParenthesesOnceEnd):
+        (JSC::Yarr::Interpreter::backtrackParenthesesOnceBegin):
+        (JSC::Yarr::Interpreter::backtrackParenthesesOnceEnd):
+        (JSC::Yarr::Interpreter::matchParenthesesTerminalBegin):
+        (JSC::Yarr::Interpreter::matchParenthesesTerminalEnd):
+        (JSC::Yarr::Interpreter::backtrackParenthesesTerminalBegin):
+        (JSC::Yarr::Interpreter::backtrackParenthesesTerminalEnd):
+        (JSC::Yarr::Interpreter::matchDisjunction):
+        (JSC::Yarr::ByteCompiler::atomParenthesesOnceBegin):
+        (JSC::Yarr::ByteCompiler::atomParenthesesTerminalBegin):
+        (JSC::Yarr::ByteCompiler::atomParenthesesSubpatternBegin):
+        (JSC::Yarr::ByteCompiler::atomParentheticalAssertionEnd):
+        (JSC::Yarr::ByteCompiler::atomParenthesesSubpatternEnd):
+        (JSC::Yarr::ByteCompiler::atomParenthesesOnceEnd):
+        (JSC::Yarr::ByteCompiler::atomParenthesesTerminalEnd):
+        (JSC::Yarr::ByteCompiler::emitDisjunction):
+        * yarr/RegexInterpreter.h:
+        * yarr/RegexJIT.cpp:
+        (JSC::Yarr::RegexGenerator::generateParenthesesSingle):
+        (JSC::Yarr::RegexGenerator::generateParenthesesGreedyNoBacktrack):
+        (JSC::Yarr::RegexGenerator::generateTerm):
+        * yarr/RegexPattern.h:
+        (JSC::Yarr::PatternTerm::PatternTerm):
+
+2010-11-24  Patrick Gansterer  <paroga@webkit.org>
+
+        Reviewed by Csaba Osztrogonác.
+
+        Remove Bakefile build system files
+        https://bugs.webkit.org/show_bug.cgi?id=49983
+
+        r53757 only removed the content, but not the files.
+        This patch removes that empty files.
+
+        * JavaScriptCoreSources.bkl: Removed.
+        * jscore.bkl: Removed.
+
+2010-11-24  Gabor Loki  <loki@webkit.org>
+
+        Reviewed by Csaba Osztrogonác.
+
+        Merge the usage of jumps and calls at ARM-JIT
+        https://bugs.webkit.org/show_bug.cgi?id=50008
+
+        Those JmpSrc objects which represent jumps (not calls) should point to
+        after the jump instruction.
+
+        * assembler/ARMAssembler.h:
+        (JSC::ARMAssembler::blx):
+        (JSC::ARMAssembler::loadBranchTarget):
+        (JSC::ARMAssembler::getAbsoluteJumpAddress):
+        (JSC::ARMAssembler::linkJump):
+        (JSC::ARMAssembler::relinkJump):
+        (JSC::ARMAssembler::linkCall):
+        (JSC::ARMAssembler::relinkCall):
+        (JSC::ARMAssembler::getRelocatedAddress):
+        (JSC::ARMAssembler::getDifferenceBetweenLabels):
+        (JSC::ARMAssembler::getCallReturnOffset):
+        * assembler/MacroAssemblerARM.h:
+        (JSC::MacroAssemblerARM::call):
+
+2010-11-24  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Reviewed by Xan Lopez.
+
+        [GTK] Optimize foldCase, toLower and toUpper methods in glib unicode backend
+        https://bugs.webkit.org/show_bug.cgi?id=48625
+
+        GLib methods use UTF-8 strings, so we have to convert from UTF-16 to
+        UTF-8 to perform the case operations and then convert back the result to
+        UTF-16. GLib conversion methods return a new allocated string, so we
+        have to memcpy the result into the destination buffer too. Using our
+        own methods to convert between UTF-8 and UTF-16 from wtf/unicode/UTF8.h
+        we don't need such memcpy, since they take an already allocated buffer
+        rather than returning a new one. There's another optimization for the
+        case when the destination buffer is not large enough. In that case,
+        methods should return the expected destination buffer size and are
+        called again with a new buffer. We can avoid the conversion to UTF-16 by
+        pre-calculating the required size for the destination buffer.
+
+        * wtf/unicode/glib/UnicodeGLib.cpp:
+        (WTF::Unicode::getUTF16LengthFromUTF8):
+        (WTF::Unicode::convertCase):
+        (WTF::Unicode::foldCase):
+        (WTF::Unicode::toLower):
+        (WTF::Unicode::toUpper):
+
+2010-11-23  Patrick Gansterer  <paroga@webkit.org>
+
+        Reviewed by Sam Weinig.
+
+        Use WTF::StringHasher directly in JavaScriptCore
+        https://bugs.webkit.org/show_bug.cgi?id=49893
+
+        * profiler/CallIdentifier.h:
+        (JSC::CallIdentifier::Hash::hash):
+        * runtime/Identifier.cpp:
+        (JSC::IdentifierCStringTranslator::hash):
+        (JSC::IdentifierUCharBufferTranslator::hash):
+
+2010-11-22  Patrick Gansterer  <paroga@webkit.org>
+
+        Reviewed by Sam Weinig.
+
+        Add WTF::FixedArray::size()
+        https://bugs.webkit.org/show_bug.cgi?id=49891
+
+        Add a method to get the size of a FixedArray.
+
+        * wtf/FixedArray.h:
+        (WTF::FixedArray::size):
+
+2010-11-22  Patrick Gansterer  <paroga@webkit.org>
+
+        Reviewed by Adam Roben.
+
+        [WINCE] Set correct preprocessor definitions
+        https://bugs.webkit.org/show_bug.cgi?id=49887
+
+        * wtf/Platform.h:
+
+2010-11-22  Adam Roben  <aroben@apple.com>
+
+        Use paths relative to $WebKitVSPropsRedirectionDir to access shared .vsprops files
+
+        Apple's Windows build allows placing header files and import libraries for WebKit's
+        dependencies (CoreGraphics, CFNetwork, SQLite, etc.) outside the source tree via the
+        $WebKitLibrariesDir environment variable. This is both required for production builds and
+        convenient for Apple-internal developer builds. Apple's production builds also require that
+        WebKit's shared .vsprops files be accessed relative to $WebKitLibrariesDir. In production
+        builds, the files are copied into that directory tree by the
+        WebKitLibraries/win/tools/WinTools.make file. In Apple-internal developer builds, the
+        copying is done by
+        JavaScriptCore/JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCoreGenerated.make.
+
+        This .vsprops copying is problematic in one very important case: when a developer updates
+        their source tree and then tries to build. Visual Studio only reads .vsprops files when a
+        project is first loaded. So, when Visual Studio is first opened after the .vsprops files are
+        updated, it reads in the old files that were already residing in $WebKitLibrariesDir. When a
+        build is started, JavaScriptCoreGenerated.make copies the new .vsprops files into
+        $WebKitLibrariesDir, but Visual Studio will not pick up the changes.  The rest of the build
+        will proceed with out-of-date .vsprops files, which will likely result in a build failure.
+
+        To fix this, we now use normal relative paths to access the .vsprops files in the source
+        tree rather than in $WebKitLibrariesDir, but prefix those paths with a new environment
+        variable, $WebKitVSPropsRedirectionDir. In developer builds, this environment variable is
+        unset, so the normal relative paths are used to read the .vsprops files out of the source
+        tree directly. In production builds, this environment variable is set to a fake directory
+        that will cause the .vsprops files in $WebKitLibrariesDir to be found when the relative path
+        is resolved.
+        
+        For example, JavaScriptCore.vcproj uses this path for FeatureDefines.vsprops:
+
+        $(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops
+
+        In developer builds, where $WebKitVSPropsRedirectionDir is unset, this will point to the
+        files in WebKitLibraries\win\tools\vsprops in the source tree. In production builds,
+        JavaScriptCore.make sets $WebKitVSPropsRedirectionDir to
+        "$(SRCROOT)\AppleInternal\tools\vsprops\OpenSource\1\2\3\", so the full path for
+        FeatureDefines.vsprops becomes:
+
+        $(SRCROOT)\AppleInternal\tools\vsprops\OpenSource\1\2\3\..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops
+
+        which resolves to:
+
+        $(SRCROOT)\AppleInternal\tools\vsprops\OpenSource\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops
+
+        (We rely on the fact that Windows doesn't care whether the directories "1", "2", and "3"
+        actually exist since they are matched by an equal number of ".." path components.)
+
+        Note that Visual Studio still won't pick up changes made to .vsprops files while Visual
+        Studio is open, but that problem hasn't seemed to cause developers many headaches so far.
+
+        Fixes <http://webkit.org/b/49181> Windows build fails mysteriously when .vsprops files are
+        updated
+
+        Reviewed by Dave Hyatt.
+
+        * JavaScriptCore.vcproj/JavaScriptCore.make: Set $WebKitVSPropsRedirectionDir so that
+        production builds can find the .vsprops files.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCoreGenerated.make: Stopy copying the
+        .vsprops files. It isn't needed anymore.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.vcproj/WTF/WTF.vcproj:
+        * JavaScriptCore.vcproj/jsc/jsc.vcproj:
+        * JavaScriptCore.vcproj/testapi/testapi.vcproj:
+        Changed to use paths relative to $WebKitVSPropsRedirectionDir to access shared .vsprops
+        files.
+
+2010-11-19  Peter Varga  <pvarga@inf.u-szeged.hu>
+
+        Reviewed by Gavin Barraclough.
+
+        YARR JIT should fallback to YARR Interpreter instead of PCRE.
+        https://bugs.webkit.org/show_bug.cgi?id=46719
+
+        Remove the ENABLE_YARR macro and the option of matching regular
+        expressions with PCRE from JavaScriptCore.
+
+        * runtime/JSGlobalData.h:
+        * runtime/RegExp.cpp:
+        (JSC::RegExp::compile):
+        (JSC::RegExp::match):
+        * tests/mozilla/expected.html:
+        * wtf/Platform.h:
+        * yarr/RegexCompiler.cpp:
+        * yarr/RegexCompiler.h:
+        * yarr/RegexInterpreter.cpp:
+        (JSC::Yarr::byteCompileRegex):
+        * yarr/RegexInterpreter.h:
+        * yarr/RegexJIT.cpp:
+        (JSC::Yarr::jitCompileRegex):
+        * yarr/RegexJIT.h:
+        (JSC::Yarr::RegexCodeBlock::RegexCodeBlock):
+        (JSC::Yarr::RegexCodeBlock::~RegexCodeBlock):
+        (JSC::Yarr::RegexCodeBlock::getFallback):
+        (JSC::Yarr::RegexCodeBlock::isFallback):
+        (JSC::Yarr::RegexCodeBlock::setFallback):
+        (JSC::Yarr::executeRegex):
+        * yarr/RegexParser.h:
+        * yarr/RegexPattern.h:
+
+2010-11-20  Kwang Yul Seo  <skyul@company100.net>
+
+        Reviewed by David Kilzer.
+
+        [BREWMP] Replace DBGPRINTF and DBGPRINTF_FATAL with dbg_Message
+        https://bugs.webkit.org/show_bug.cgi?id=49520
+
+        DBGPRINTF and DBGPRINTF_FATAL macros are prohibited in Mod1. Use dbg_Message instead.
+
+        * wtf/Assertions.cpp:
+        * wtf/Assertions.h:
+
+2010-11-20  Gabor Loki  <loki@webkit.org>
+
+        Reviewed by Gavin Barraclough.
+
+        Support JIT_OPTIMIZE_MOD on Thumb-2
+        https://bugs.webkit.org/show_bug.cgi?id=49432
+
+        Rewrite the soft modulo operation into macroassembler form, and move it
+        to JSValue32_64 section.
+        Add support for soft modulo on Thumb-2 JIT also.
+
+        * assembler/ARMv7Assembler.h:
+        (JSC::ARMv7Assembler::clz):
+        * assembler/MacroAssemblerARM.h:
+        (JSC::MacroAssemblerARM::countLeadingZeros32):
+        (JSC::MacroAssemblerARM::relativeTableJump):
+        * assembler/MacroAssemblerARMv7.h:
+        (JSC::MacroAssemblerARMv7::countLeadingZeros32):
+        (JSC::MacroAssemblerARMv7::relativeTableJump):
+        * jit/JITArithmetic.cpp:
+        (JSC::JIT::emit_op_mod):
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::privateCompileCTIMachineTrampolines):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::softModulo):
+        * jit/JITStubs.cpp:
+        (JSC::JITThunks::JITThunks):
+        * wtf/Platform.h:
+
+2010-11-20  David Kilzer  <ddkilzer@apple.com>
+
+        <http://webkit.org/b/49848> Make it possible to display the last character of a secure text field unobscured
+
+        Reviewed by Darin Adler.
+
+        * JavaScriptCore.exp:
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::secure): Added argument that controls whether
+        the last character is obscured or not.  Implemented behavior.
+        * wtf/text/StringImpl.h:
+        (WTF::StringImpl::LastCharacterBehavior): Added enum.
+        (WTF::StringImpl::secure): Updated method signature.
+
+2010-11-19  William Chan  <willchan@chromium.org>
+
+        Reviewed by David Levin.
+
+        Add USE(CHROMIUM_NET)
+
+        Indicates the use of Chromium's network stack.  Chromium's network
+        stack performs better when it has full view of all resource requests,
+        so USE(CHROMIUM_NET) can be used to bypass throttles.
+
+        https://bugs.webkit.org/show_bug.cgi?id=49778
+
+        * wtf/Platform.h:
+
+2010-11-19  Steve Falkenburg  <sfalken@apple.com>
+
+        Reviewed by Adam Roben.
+
+        Add Debug_Cairo_CFLite and Release_Cairo_CFLite configurations for all vcproj files
+        https://bugs.webkit.org/show_bug.cgi?id=49819
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCoreGenerated.vcproj:
+        * JavaScriptCore.vcproj/WTF/WTF.vcproj:
+        * JavaScriptCore.vcproj/WTF/WTFCommon.vsprops:
+        * JavaScriptCore.vcproj/jsc/jsc.vcproj:
+        * JavaScriptCore.vcproj/testapi/testapi.vcproj:
+
+2010-11-19  Oliver Hunt  <oliver@apple.com>
+
+        Reviewed by Geoffrey Garen.
+
+        Don't check for constant registers when we can guarantee that the register won't be in the constant pool
+        https://bugs.webkit.org/show_bug.cgi?id=49814
+
+        Add uncheckedR(int) to CallFrame, and replace all the uses of r() with uncheckedR()
+        when we can guarantee that the register is not referring to a constant.
+        This makes the interpreter about 0.5% faster, and makes the CallFrame initialisation
+        logic correct when we're using a faked callframe (as in the case of the globalExec).
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::createActivation):
+        * debugger/DebuggerCallFrame.cpp:
+        (JSC::DebuggerCallFrame::thisObject):
+        * interpreter/CallFrame.h:
+        (JSC::ExecState::uncheckedR):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::resolve):
+        (JSC::Interpreter::resolveSkip):
+        (JSC::Interpreter::resolveGlobal):
+        (JSC::Interpreter::resolveGlobalDynamic):
+        (JSC::Interpreter::resolveBase):
+        (JSC::Interpreter::resolveBaseAndProperty):
+        (JSC::Interpreter::callEval):
+        (JSC::Interpreter::unwindCallFrame):
+        (JSC::Interpreter::throwException):
+        (JSC::Interpreter::execute):
+        (JSC::Interpreter::executeCall):
+        (JSC::Interpreter::executeConstruct):
+        (JSC::Interpreter::prepareForRepeatCall):
+        (JSC::Interpreter::createExceptionScope):
+        (JSC::Interpreter::privateExecute):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * runtime/JSActivation.cpp:
+        (JSC::JSActivation::argumentsGetter):
+
+2010-11-19  Steve Falkenburg  <sfalken@apple.com>
+
+        Reviewed by Darin Adler.
+
+        Normalize Cairo/CFLite project/solution configuration names
+        https://bugs.webkit.org/show_bug.cgi?id=49818
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.vcproj/jsc/jsc.vcproj:
+        * JavaScriptCore.vcproj/testapi/testapi.vcproj:
+
+2010-11-18  Steve Falkenburg  <sfalken@apple.com>
+
+        Reviewed by Adam Roben.
+
+        Windows vcproj configuration names should be normalized across projects
+        https://bugs.webkit.org/show_bug.cgi?id=49776
+
+        * JavaScriptCore.vcproj/JavaScriptCore.sln:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCoreGenerated.vcproj:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCoreGeneratedCommon.vsprops: Added.
+        * JavaScriptCore.vcproj/JavaScriptCoreSubmit.sln:
+
+2010-11-19  Patrick Gansterer  <paroga@webkit.org>
+
+        Unreviewed, build fix after r72360.
+
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::bytecodeOffset):
+
+2010-11-18  Gavin Barraclough  <barraclough@apple.com>
+
+        Rubber stamped by Geoff Garen.
+
+        Bug 49577 - Function.prototype should be non-configurable
+
+        Ooops, Function.prototype should not be enumerable!
+
+        * runtime/JSFunction.cpp:
+        (JSC::JSFunction::getOwnPropertySlot):
+
+2010-11-18  Gavin Barraclough  <barraclough@apple.com>
+
+        Reviewed by Oliver Hunt.
+
+        Bug 49708 - Stop recompiling functions to regenerate exception info.
+
+        Instead only hold info as necessary – keep divot info is the inspector
+        is enabled, line number info is debugging or profiling, and handler
+        info for functions with try/catch.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dumpStatistics):
+        (JSC::CodeBlock::CodeBlock):
+        (JSC::CodeBlock::lineNumberForBytecodeOffset):
+        (JSC::CodeBlock::expressionRangeForBytecodeOffset):
+        (JSC::CodeBlock::shrinkToFit):
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::bytecodeOffset):
+        (JSC::CodeBlock::addExpressionInfo):
+        (JSC::CodeBlock::addLineInfo):
+        (JSC::CodeBlock::hasExpressionInfo):
+        (JSC::CodeBlock::hasLineInfo):
+        (JSC::CodeBlock::needsCallReturnIndices):
+        (JSC::CodeBlock::callReturnIndexVector):
+        * bytecode/SamplingTool.cpp:
+        (JSC::SamplingTool::dump):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::generate):
+        (JSC::BytecodeGenerator::BytecodeGenerator):
+        * bytecompiler/BytecodeGenerator.h:
+        (JSC::BytecodeGenerator::emitNode):
+        (JSC::BytecodeGenerator::emitNodeInConditionContext):
+        (JSC::BytecodeGenerator::emitExpressionInfo):
+        (JSC::BytecodeGenerator::addLineInfo):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::unwindCallFrame):
+        (JSC::appendSourceToError):
+        (JSC::Interpreter::throwException):
+        (JSC::Interpreter::privateExecute):
+        (JSC::Interpreter::retrieveLastCaller):
+        * interpreter/Interpreter.h:
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompile):
+        * jit/JITStubs.cpp:
+        (JSC::jitThrow):
+        (JSC::DEFINE_STUB_FUNCTION):
+        * runtime/Collector.cpp:
+        (JSC::Heap::markRoots):
+        * runtime/Executable.cpp:
+        (JSC::EvalExecutable::compileInternal):
+        (JSC::ProgramExecutable::compileInternal):
+        (JSC::FunctionExecutable::compileForCallInternal):
+        (JSC::FunctionExecutable::compileForConstructInternal):
+        * runtime/Executable.h:
+        * runtime/JSGlobalData.cpp:
+        (JSC::JSGlobalData::JSGlobalData):
+        * runtime/JSGlobalData.h:
+        (JSC::JSGlobalData::usingAPI):
+        * runtime/JSGlobalObject.h:
+        (JSC::JSGlobalObject::supportsRichSourceInfo):
+        (JSC::JSGlobalObject::globalData):
+
+2010-11-18  Adam Roben  <aroben@apple.com>
+
+        Add a script to delete manifest-related files when they are older than
+        any .vsprops file
+
+        Changes to .vsprops files can cause the manifest files to become
+        invalid, and Visual Studio doesn't always figure out that it needs to
+        rebuild them.
+
+        Reviewed by Sam Weinig.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCoreGenerated.make:
+        Call the new script.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCoreGenerated.vcproj:
+        Added the new script.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/react-to-vsprops-changes.py: Added.
+        (file_modification_times): Generator to return the modification time of
+        each file in a directory hierarchy.
+        (main): Get the modification time of the newest vsprops file, then find
+        all manifest-related files in the obj directory. Delete all
+        manifest-related files that are older than the newest vsprops file.
+
+2010-11-18  Mark Rowe  <mrowe@apple.com>
+
+        Rubber-stamped by Adam Roben.
+
+        <rdar://problem/8602509&8602717&8602724> Enable compaction support.
+
+        * Configurations/JavaScriptCore.xcconfig:
+
+2010-11-18  Gavin Barraclough  <barraclough@apple.com>
+
+        Reviewed by Oliver Hunt.
+
+        Bug 49635 - Profiler implementation is fragile
+
+        The profile presently requires the exception handling mechanism to explicitly
+        remove all stack frames that are exited during the exception unwind mechanism.
+        This is fragile in a number of ways:
+          * We have to change bytecode register allocation when compiling code to run
+            when profiling, to preserve the callee function (this is also required to
+            call did_call after the call has returned).
+          * In the JIT we have to maintain additional data structures
+            (CodeBlock::RareData::m_functionRegisterInfos) to map back to the register
+            containing the callee.
+          * In the interpreter we use 'magic values' to offset into the instruction
+            stream to rediscover the register containing the function.
+
+        Instead, move profiling into the head and tail of functions.
+          * This correctly accounts the cost of the call itself to the caller.
+          * This allows us to access the callee function object from the callframe.
+          * This means that at the point a call is made we can track the stack depth
+            on the ProfileNode.
+          * When unwinding we can simply report the depth at which the exception is
+            being handled - all call frames above this level are freed.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::shrinkToFit):
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::bytecodeOffset):
+        (JSC::CodeBlock::methodCallLinkInfo):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitCall):
+        (JSC::BytecodeGenerator::emitCallVarargs):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::unwindCallFrame):
+        (JSC::Interpreter::throwException):
+        (JSC::Interpreter::execute):
+        (JSC::Interpreter::executeCall):
+        (JSC::Interpreter::executeConstruct):
+        (JSC::Interpreter::privateExecute):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * profiler/Profile.cpp:
+        (JSC::Profile::Profile):
+        * profiler/ProfileGenerator.cpp:
+        (JSC::ProfileGenerator::addParentForConsoleStart):
+        (JSC::ProfileGenerator::willExecute):
+        (JSC::ProfileGenerator::didExecute):
+        (JSC::ProfileGenerator::exceptionUnwind):
+        (JSC::ProfileGenerator::stopProfiling):
+        * profiler/ProfileGenerator.h:
+        * profiler/ProfileNode.cpp:
+        (JSC::ProfileNode::ProfileNode):
+        (JSC::ProfileNode::willExecute):
+        * profiler/ProfileNode.h:
+        (JSC::ProfileNode::create):
+        (JSC::ProfileNode::callerCallFrame):
+        * profiler/Profiler.cpp:
+        (JSC::dispatchFunctionToProfiles):
+        (JSC::Profiler::_willExecute):
+        (JSC::Profiler::_didExecute):
+        (JSC::Profiler::exceptionUnwind):
+        * profiler/Profiler.h:
+
+2010-11-18  Steve Falkenburg  <sfalken@apple.com>
+
+        Reviewed by Adam Roben.
+
+        Remove leftover Windows Debug_Internal configurations
+        https://bugs.webkit.org/show_bug.cgi?id=49758
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.vcproj/WTF/WTF.vcproj:
+        * JavaScriptCore.vcproj/jsc/jsc.vcproj:
+        * JavaScriptCore.vcproj/testapi/testapi.vcproj:
+
+2010-11-18  Chao-ying Fu  <fu@mips.com>
+
+        Reviewed by Csaba Osztrogonác.
+
+        Avoid increasing required alignment of target type warning
+        https://bugs.webkit.org/show_bug.cgi?id=43963
+
+        * runtime/UString.h:
+        (JSC::UStringHash::equal):
+        * wtf/StdLibExtras.h:
+
+2010-11-17  Sam Weinig  <sam@webkit.org>
+
+        Reviewed by Anders Carlsson.
+
+        Add stubbed out ScrollAnimator for the Mac
+        https://bugs.webkit.org/show_bug.cgi?id=49678
+
+        * wtf/Platform.h: Enable SMOOTH_SCROLLING on the Mac, this has no
+        change in behavior at the moment.
+
+2010-11-17  David Kilzer  <ddkilzer@apple.com>
+
+        <http://webkit.org/b/49634> Make overflow guards in WTF::String::utf8 explicit
+
+        Reviewed by Darin Adler.
+
+        Add an explicit overflow check prior to allocating our buffer,
+        rather than implicitly relying on the guard in convertUTF16ToUTF8.
+
+        * wtf/text/WTFString.cpp:
+        (WTF::String::utf8):
+
+2010-11-17  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r72197.
+        http://trac.webkit.org/changeset/72197
+        https://bugs.webkit.org/show_bug.cgi?id=49661
+
+        broke fast/regex/test1.html (Requested by stampho on #webkit).
+
+        * runtime/JSGlobalData.h:
+        * runtime/RegExp.cpp:
+        (JSC::RegExpRepresentation::~RegExpRepresentation):
+        (JSC::RegExp::compile):
+        (JSC::RegExp::match):
+        * tests/mozilla/expected.html:
+        * wtf/Platform.h:
+        * yarr/RegexCompiler.cpp:
+        * yarr/RegexCompiler.h:
+        * yarr/RegexInterpreter.cpp:
+        * yarr/RegexInterpreter.h:
+        * yarr/RegexJIT.cpp:
+        (JSC::Yarr::jitCompileRegex):
+        * yarr/RegexJIT.h:
+        (JSC::Yarr::RegexCodeBlock::RegexCodeBlock):
+        (JSC::Yarr::RegexCodeBlock::~RegexCodeBlock):
+        (JSC::Yarr::RegexCodeBlock::getFallback):
+        (JSC::Yarr::RegexCodeBlock::setFallback):
+        (JSC::Yarr::executeRegex):
+        * yarr/RegexParser.h:
+        * yarr/RegexPattern.h:
+
+2010-11-17  Peter Varga  <pvarga@inf.u-szeged.hu>
+
+        Reviewed by Gavin Barraclough.
+
+        YARR JIT should fallback to YARR Interpreter instead of PCRE.
+        https://bugs.webkit.org/show_bug.cgi?id=46719
+
+        Remove the ENABLE_YARR macro and the option of matching regular
+        expressions with PCRE from JavaScriptCore.
+
+        * runtime/JSGlobalData.h:
+        * runtime/RegExp.cpp:
+        (JSC::RegExp::compile):
+        (JSC::RegExp::match):
+        * tests/mozilla/expected.html:
+        * wtf/Platform.h:
+        * yarr/RegexCompiler.cpp:
+        * yarr/RegexCompiler.h:
+        * yarr/RegexInterpreter.cpp:
+        (JSC::Yarr::byteCompileRegex):
+        * yarr/RegexInterpreter.h:
+        * yarr/RegexJIT.cpp:
+        (JSC::Yarr::jitCompileRegex):
+        * yarr/RegexJIT.h:
+        (JSC::Yarr::RegexCodeBlock::RegexCodeBlock):
+        (JSC::Yarr::RegexCodeBlock::~RegexCodeBlock):
+        (JSC::Yarr::RegexCodeBlock::getFallback):
+        (JSC::Yarr::RegexCodeBlock::isFallback):
+        (JSC::Yarr::RegexCodeBlock::setFallback):
+        (JSC::Yarr::executeRegex):
+        * yarr/RegexParser.h:
+        * yarr/RegexPattern.h:
+
+2010-11-17  Peter Varga  <pvarga@inf.u-szeged.hu>
+
+        Reviewed by Gavin Barraclough.
+
+        Extend YARR Interpreter with beginning character look-up optimization
+        https://bugs.webkit.org/show_bug.cgi?id=45751
+
+        Add beginning character look-up optimization which sets the start
+        index to the first possible successful pattern match.
+        Extend YARR Interpreter with lookupForBeginChars function which
+        implements the beginning character look-up optimization.
+
+        * yarr/RegexInterpreter.cpp:
+        (JSC::Yarr::Interpreter::InputStream::readPair):
+        (JSC::Yarr::Interpreter::InputStream::isNotAvailableInput):
+        (JSC::Yarr::Interpreter::lookupForBeginChars):
+        (JSC::Yarr::Interpreter::matchDisjunction):
+        (JSC::Yarr::Interpreter::interpret):
+        * yarr/RegexInterpreter.h:
+        (JSC::Yarr::BytecodePattern::BytecodePattern):
+
+2010-11-17  Alexis Menard  <alexis.menard@nokia.com>, Simon Hausmann  <simon.hausmann@nokia.com>
+
+        Reviewed by Kenneth Christiansen, Tor Arne Vestbø.
+
+        [Qt] Add support for use GStreamer with the Qt build
+
+        Enable the build/inclusion of the wtf/QObject convenience classes.
+
+        * JavaScriptCore.pri:
+        * wtf/wtf.pri:
+
+2010-11-17  Peter Varga  <pvarga@inf.u-szeged.hu>
+
+        Reviewed by Gavin Barraclough.
+
+        Collect the beginning characters in a RegExp pattern for look-up
+        optimization
+        https://bugs.webkit.org/show_bug.cgi?id=45748
+
+        Extend the YARR's parser with an algorithm which collects the potential
+        beginning characters from a RegExp pattern for later look-up optimization.
+
+        * yarr/RegexCompiler.cpp:
+        (JSC::Yarr::BeginCharHelper::BeginCharHelper):
+        (JSC::Yarr::BeginCharHelper::addBeginChar):
+        (JSC::Yarr::BeginCharHelper::merge):
+        (JSC::Yarr::BeginCharHelper::addCharacter):
+        (JSC::Yarr::BeginCharHelper::linkHotTerms):
+        (JSC::Yarr::RegexPatternConstructor::RegexPatternConstructor):
+        (JSC::Yarr::RegexPatternConstructor::addBeginTerm):
+        (JSC::Yarr::RegexPatternConstructor::setupDisjunctionBeginTerms):
+        (JSC::Yarr::RegexPatternConstructor::setupAlternativeBeginTerms):
+        (JSC::Yarr::RegexPatternConstructor::setupBeginChars):
+        (JSC::Yarr::compileRegex):
+        * yarr/RegexPattern.h:
+        (JSC::Yarr::TermChain::TermChain):
+        (JSC::Yarr::BeginChar::BeginChar):
+        (JSC::Yarr::RegexPattern::RegexPattern):
+        (JSC::Yarr::RegexPattern::reset):
+
+2010-11-17  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r72160.
+        http://trac.webkit.org/changeset/72160
+        https://bugs.webkit.org/show_bug.cgi?id=49646
+
+        Broke lots of fast/profiler tests, among others (Requested by
+        aroben on #webkit).
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        (JSC::CodeBlock::functionRegisterForBytecodeOffset):
+        (JSC::CodeBlock::shrinkToFit):
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::addFunctionRegisterInfo):
+        * bytecode/Opcode.h:
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::BytecodeGenerator):
+        (JSC::BytecodeGenerator::emitCall):
+        (JSC::BytecodeGenerator::emitCallVarargs):
+        (JSC::BytecodeGenerator::emitReturn):
+        (JSC::BytecodeGenerator::emitConstruct):
+        * bytecompiler/BytecodeGenerator.h:
+        (JSC::CallArguments::profileHookRegister):
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::CallArguments::CallArguments):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::unwindCallFrame):
+        (JSC::Interpreter::throwException):
+        (JSC::Interpreter::execute):
+        (JSC::Interpreter::executeCall):
+        (JSC::Interpreter::executeConstruct):
+        (JSC::Interpreter::privateExecute):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompileMainPass):
+        * jit/JIT.h:
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_profile_will_call):
+        (JSC::JIT::emit_op_profile_did_call):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_profile_will_call):
+        (JSC::JIT::emit_op_profile_did_call):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * jit/JITStubs.h:
+        * profiler/Profile.cpp:
+        (JSC::Profile::Profile):
+        * profiler/ProfileGenerator.cpp:
+        (JSC::ProfileGenerator::addParentForConsoleStart):
+        (JSC::ProfileGenerator::willExecute):
+        (JSC::ProfileGenerator::didExecute):
+        (JSC::ProfileGenerator::stopProfiling):
+        * profiler/ProfileGenerator.h:
+        * profiler/ProfileNode.cpp:
+        (JSC::ProfileNode::ProfileNode):
+        (JSC::ProfileNode::willExecute):
+        * profiler/ProfileNode.h:
+        (JSC::ProfileNode::create):
+        (JSC::ProfileNode::operator==):
+        * profiler/Profiler.cpp:
+        (JSC::dispatchFunctionToProfiles):
+        (JSC::Profiler::willExecute):
+        (JSC::Profiler::didExecute):
+        * profiler/Profiler.h:
+
+2010-11-16  Gavin Barraclough  <barraclough@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        Bug 49635 - Profiler implementation is fragile
+
+        The profile presently requires the exception handling mechanism to explicitly
+        remove all stack frames that are exited during the exception unwind mechanism.
+        This is fragile in a number of ways:
+          * We have to change bytecode register allocation when compiling code to run
+            when profiling, to preserve the callee function (this is also required to
+            call did_call after the call has returned).
+          * In the JIT we have to maintain additional data structures
+            (CodeBlock::RareData::m_functionRegisterInfos) to map back to the register
+            containing the callee.
+          * In the interpreter we use 'magic values' to offset into the instruction
+            stream to rediscover the register containing the function.
+
+        Instead, move profiling into the head and tail of functions.
+          * This correctly accounts the cost of the call itself to the caller.
+          * This allows us to access the callee function object from the callframe.
+          * This means that at the point a call is made we can track the stack depth
+            on the ProfileNode.
+          * When unwinding we can simply report the depth at which the exception is
+            being handled - all call frames above this level are freed.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        (JSC::CodeBlock::shrinkToFit):
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::bytecodeOffset):
+        (JSC::CodeBlock::methodCallLinkInfo):
+        * bytecode/Opcode.h:
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::BytecodeGenerator):
+        (JSC::BytecodeGenerator::emitCall):
+        (JSC::BytecodeGenerator::emitCallVarargs):
+        (JSC::BytecodeGenerator::emitReturn):
+        (JSC::BytecodeGenerator::emitConstruct):
+        * bytecompiler/BytecodeGenerator.h:
+        (JSC::CallArguments::count):
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::CallArguments::CallArguments):
+        * interpreter/Interpreter.cpp:
+        (JSC::ProfileHostCall::ProfileHostCall):
+        (JSC::ProfileHostCall::~ProfileHostCall):
+        (JSC::Interpreter::unwindCallFrame):
+        (JSC::Interpreter::throwException):
+        (JSC::Interpreter::execute):
+        (JSC::Interpreter::executeCall):
+        (JSC::Interpreter::executeConstruct):
+        (JSC::Interpreter::privateExecute):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompileMainPass):
+        * jit/JIT.h:
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_profile_has_called):
+        (JSC::JIT::emit_op_profile_will_return):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_profile_has_called):
+        (JSC::JIT::emit_op_profile_will_return):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * jit/JITStubs.h:
+        * profiler/Profile.cpp:
+        (JSC::Profile::Profile):
+        * profiler/ProfileGenerator.cpp:
+        (JSC::ProfileGenerator::addParentForConsoleStart):
+        (JSC::ProfileGenerator::willExecute):
+        (JSC::ProfileGenerator::didExecute):
+        (JSC::ProfileGenerator::exceptionUnwind):
+        (JSC::ProfileGenerator::stopProfiling):
+        * profiler/ProfileGenerator.h:
+        * profiler/ProfileNode.cpp:
+        (JSC::ProfileNode::ProfileNode):
+        (JSC::ProfileNode::willExecute):
+        * profiler/ProfileNode.h:
+        (JSC::ProfileNode::create):
+        (JSC::ProfileNode::operator==):
+        (JSC::ProfileNode::exec):
+        * profiler/Profiler.cpp:
+        (JSC::dispatchFunctionToProfiles):
+        (JSC::Profiler::hasCalled):
+        (JSC::Profiler::willEvaluate):
+        (JSC::Profiler::willReturn):
+        (JSC::Profiler::didEvaluate):
+        (JSC::Profiler::exceptionUnwind):
+        * profiler/Profiler.h:
+
+2010-11-16  Brian Weinstein  <bweinstein@apple.com>
+
+        Reviewed by Adam Roben and Steve Falkenburg.
+
+        Touch Platform.h to force a rebuild for Windows.
+
+        * wtf/Platform.h:
+
+2010-11-16  Steve Falkenburg  <sfalken@apple.com>
+
+        Reviewed by Adam Roben.
+
+        Disable LTCG for Windows Release builds. Add new Release_LTCG configuration.
+        https://bugs.webkit.org/show_bug.cgi?id=49632
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.vcproj/WTF/WTF.vcproj:
+        * JavaScriptCore.vcproj/jsc/jsc.vcproj:
+        * JavaScriptCore.vcproj/testapi/testapi.vcproj:
+
+2010-11-16  Peter Varga  <pvarga@inf.u-szeged.hu>
+
+        Reviewed by Gavin Barraclough.
+
+        The number of recursive match calls isn't limited in YARR Interpreter
+        https://bugs.webkit.org/show_bug.cgi?id=47906
+
+        Check the number of the matchDisjunction recursive calls to avoid unbounded
+        recursion.
+        Now the matchDisjunction function returns JSRegExpResult instead of bool.
+        The JSRegExpResult enum contains the result of matching or the error code
+        of the failure (like HitLimit) which terminates the matching.
+        The error codes are based on pcre's jsRegExpExecute error codes.
+
+        * yarr/RegexInterpreter.cpp:
+        (JSC::Yarr::Interpreter::parenthesesDoBacktrack):
+        (JSC::Yarr::Interpreter::matchParentheses):
+        (JSC::Yarr::Interpreter::backtrackParentheses):
+        (JSC::Yarr::Interpreter::matchDisjunction):
+        (JSC::Yarr::Interpreter::matchNonZeroDisjunction):
+        (JSC::Yarr::Interpreter::interpret):
+        (JSC::Yarr::Interpreter::Interpreter):
+        * yarr/RegexInterpreter.h:
+
+2010-11-16  Brian Weinstein  <bweinstein@apple.com>
+
+        Rest of the Windows build fix.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+
+2010-11-16  Gavin Barraclough  <barraclough@apple.com>
+
+        Windows build fix pt 1.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+
+2010-11-16  Gavin Barraclough  <barraclough@apple.com>
+
+        Reviewed by Oliver Hunt.
+
+        https://bugs.webkit.org/show_bug.cgi?id=49606
+
+        The bug here is that we read the prototype from the RHS argument using a regular
+        op_get_by_id before op_instanceof has checked that this is an object implementing
+        HasInstance. This incorrect behaviour gives rise to further unnecessary complexity
+        in the code base, since we have additional logic (implemented using the
+        GetByIdExceptionInfo data structures on CodeBlock) to convert not an object errors
+        from the get_by_id into invalid parameter errors. Having fixed this bug this code
+        is all redundant, since in these cases the get_by_id will never have been reached.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        (JSC::CodeBlock::shrinkToFit):
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::addExpressionInfo):
+        * bytecode/Opcode.h:
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::BytecodeGenerator):
+        (JSC::BytecodeGenerator::emitCheckHasInstance):
+        * bytecompiler/BytecodeGenerator.h:
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::InstanceOfNode::emitBytecode):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::throwException):
+        (JSC::Interpreter::privateExecute):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompileMainPass):
+        (JSC::JIT::privateCompileSlowCases):
+        * jit/JIT.h:
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_check_has_instance):
+        (JSC::JIT::emit_op_instanceof):
+        (JSC::JIT::emitSlow_op_check_has_instance):
+        (JSC::JIT::emitSlow_op_instanceof):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_check_has_instance):
+        (JSC::JIT::emit_op_instanceof):
+        (JSC::JIT::emitSlow_op_check_has_instance):
+        (JSC::JIT::emitSlow_op_instanceof):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * jit/JITStubs.h:
+        * runtime/ExceptionHelpers.cpp:
+        (JSC::createInterruptedExecutionException):
+        (JSC::createTerminatedExecutionException):
+        (JSC::createUndefinedVariableError):
+        (JSC::createNotAFunctionError):
+        (JSC::createNotAnObjectError):
+        * runtime/ExceptionHelpers.h:
+        * runtime/JSGlobalData.cpp:
+        (JSC::JSGlobalData::JSGlobalData):
+        * runtime/JSGlobalData.h:
+        * runtime/JSNotAnObject.cpp:
+        (JSC::JSNotAnObject::toPrimitive):
+        (JSC::JSNotAnObject::getPrimitiveNumber):
+        (JSC::JSNotAnObject::toBoolean):
+        (JSC::JSNotAnObject::toNumber):
+        (JSC::JSNotAnObject::toString):
+        (JSC::JSNotAnObject::toObject):
+        (JSC::JSNotAnObject::getOwnPropertySlot):
+        (JSC::JSNotAnObject::getOwnPropertyDescriptor):
+        (JSC::JSNotAnObject::put):
+        (JSC::JSNotAnObject::deleteProperty):
+        (JSC::JSNotAnObject::getOwnPropertyNames):
+        * runtime/JSNotAnObject.h:
+        (JSC::JSNotAnObject::JSNotAnObject):
+        * runtime/JSObject.h:
+        (JSC::JSObject::isActivationObject):
+        * runtime/JSValue.cpp:
+        (JSC::JSValue::toObjectSlowCase):
+        (JSC::JSValue::synthesizeObject):
+        (JSC::JSValue::synthesizePrototype):
+
+2010-11-15  Darin Adler  <darin@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        Harden additional string functions against large lengths
+        https://bugs.webkit.org/show_bug.cgi?id=49574
+
+        * wtf/text/CString.cpp:
+        (WTF::CString::init): Check for length that is too large for CString.
+        (WTF::CString::newUninitialized): Ditto.
+        (WTF::CString::copyBufferIfNeeded): Fix types so the length stays
+        in a size_t.
+
+        * wtf/text/WTFString.cpp:
+        (WTF::String::append): Check for length that is too large.
+
+2010-11-15  Gavin Barraclough  <barraclough@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        Bug 49577 - Function.prototype should be non-configurable
+
+        JSC lazily allocates the prototype property of Function objects.
+
+        We check the prototype exists on 'get', but not on 'put'.
+        If you 'put' without having first done a 'get' you can end up with a configurable
+        prototype (prototype should only ever be non-configurable).
+
+        This is visible in a couple of ways:
+          * 'delete' on the property may succeed. (the next access will result in a new,
+          reset prototype object).
+          * the prototype may be set to a getter.
+
+        * runtime/JSFunction.cpp:
+        (JSC::JSFunction::getOwnPropertyNames):
+            Reify the prototype property before allowing an enumerate including don't enum properties.
+        (JSC::JSFunction::put):
+            Reify the prototype property before any put to it.
+
+2010-11-15  Gavin Barraclough  <barraclough@apple.com>
+
+        Reviewed by Geoff Garen.
+
+        Bug 49488 - Only add source specific information to exceptions in Interpreter::throwException
+
+        Three types of source location information are added to errors.
+
+        (1) Divot information.
+
+        This was added with the intention of using it to provide better source highlighting in the inspector.
+        We may still want to do so, but we probably should not be exposing these values in a manner visible to
+        user scripts – only through an internal C++ interface. The code adding divot properties to objects has
+        been removed.
+
+        (2) Line number information.
+
+        Line number information is presently sometimes added at the point the exception is created, and sometimes
+        added at the point the exception passes through throwException. Change this so that throwException has
+        the sole responsibility for adding line number and source file information.
+
+        (3) Source snippets in the message of certain type errors (e.g. 'doc' in `Result of expression 'doc' [undefined] is not an object.`).
+
+        These messages are currently created at the point the exceptions is raised. Instead reformat the message
+        such that the source snippet is located at the end (`Result of expression 'b1' [undefined] is not an object.`
+        becomes `'undefined' is not an object (evaluating 'b1.property')`), and append these to the message at
+        the in throw Exception. This presents a number of advantages:
+          * we no longer need to have source location information to create these TypeErrors.
+          * we can chose to append source location information in other error messages, including those where
+            passing source location to the point of construction would be inconvenient.
+          * we can chose in future to omit to append source location information when running in a non-debug mode.
+
+        This also cleans up some error output, e.g. removing double brackets ('[[]]') around objects in output,
+        removing double periods (..) at end of lines, and adding slightly more context to some errors.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::expressionRangeForBytecodeOffset):
+            - Separated called to access line and range information.
+
+        * bytecode/CodeBlock.h:
+            - Separated called to access line and range information.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::resolve):
+        (JSC::Interpreter::resolveSkip):
+        (JSC::Interpreter::resolveGlobal):
+        (JSC::Interpreter::resolveGlobalDynamic):
+        (JSC::Interpreter::resolveBaseAndProperty):
+        (JSC::isInvalidParamForIn):
+        (JSC::isInvalidParamForInstanceOf):
+            - Update parameters passed to error constructors.
+        (JSC::appendSourceToError):
+            - Update message property to add location information (previously added in createErrorMessage, in ExceptionHelpers)
+        (JSC::Interpreter::throwException):
+            - Updated to call appendSourceToError. 
+        (JSC::Interpreter::privateExecute):
+            - Update parameters passed to error constructors.
+
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+            - Update parameters passed to error constructors.
+
+        * runtime/Error.cpp:
+        (JSC::addErrorInfo):
+        (JSC::hasErrorInfo):
+            - Removed divot properties.
+
+        * runtime/Error.h:
+            - Removed divot properties.
+
+        * runtime/ErrorInstance.cpp:
+        (JSC::ErrorInstance::ErrorInstance):
+            - Initialize new property.
+
+        * runtime/ErrorInstance.h:
+        (JSC::ErrorInstance::appendSourceToMessage):
+        (JSC::ErrorInstance::setAppendSourceToMessage):
+        (JSC::ErrorInstance::clearAppendSourceToMessage):
+            - Added flag to check for errors needing location information appending.
+        (JSC::ErrorInstance::isErrorInstance):
+            - Added virtual method to check for ErrorInstances.
+
+        * runtime/ExceptionHelpers.cpp:
+        (JSC::createUndefinedVariableError):
+        (JSC::createInvalidParamError):
+        (JSC::createNotAConstructorError):
+        (JSC::createNotAFunctionError):
+        (JSC::createNotAnObjectError):
+            - Update parameters passed to error constructors, stopped adding line number information early, changed TypeError messages.
+
+        * runtime/ExceptionHelpers.h:
+            - Updated function signatures.
+
+        * runtime/JSFunction.cpp:
+        (JSC::callHostFunctionAsConstructor):
+            - Update parameters passed to error constructors.
+
+        * runtime/JSObject.h:
+        (JSC::JSObject::isErrorInstance):
+            - Added virtual method to check for ErrorInstances.
+
+2010-11-12  Anders Carlsson  <andersca@apple.com>
+
+        Reviewed by Adam Roben.
+
+        CString(const char*) crashes when passed a null pointer
+        https://bugs.webkit.org/show_bug.cgi?id=49450
+
+        * wtf/text/CString.cpp:
+        (WTF::CString::CString):
+        Return early if str is null.
+
+2010-11-11  Gavin Barraclough  <barraclough@apple.com>
+
+        Reviewed by Oliver Hunt.
+
+        Bug 49420 - Clean up syntax/reference error throw.
+
+        Some errors detected at compile time are thrown at runtime. We currently do so using a op_new_error/op_throw bytecode pair.
+        This is not ideal. op_throw is used for explicit user throw statements, and has different requirements in terms or meta data
+        attached to the exception (controlled by the explicitThrow parameter passed to Interpreter::throwException). To work around
+        this, op_new_error has to add the meta data at an early stage, which is unlike other VM exceptions being raised.
+
+        We can simplify this and bring into line with other exception behaviour by changing new_error from just allocating an
+        Exception instance to also throwing it – but as a regular VM throw, correctly passing explicitThrow as false.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        (JSC::CodeBlock::expressionRangeForBytecodeOffset):
+        * bytecode/Opcode.h:
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitThrowReferenceError):
+        (JSC::BytecodeGenerator::emitThrowSyntaxError):
+        (JSC::BytecodeGenerator::emitThrowExpressionTooDeepException):
+        * bytecompiler/BytecodeGenerator.h:
+        (JSC::BytecodeGenerator::emitNodeInConditionContext):
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::ThrowableExpressionData::emitThrowReferenceError):
+        (JSC::ThrowableExpressionData::emitThrowSyntaxError):
+        (JSC::RegExpNode::emitBytecode):
+        (JSC::PostfixErrorNode::emitBytecode):
+        (JSC::PrefixErrorNode::emitBytecode):
+        (JSC::AssignErrorNode::emitBytecode):
+        (JSC::ForInNode::emitBytecode):
+        (JSC::ContinueNode::emitBytecode):
+        (JSC::BreakNode::emitBytecode):
+        (JSC::ReturnNode::emitBytecode):
+        (JSC::LabelNode::emitBytecode):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::privateExecute):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompileMainPass):
+        * jit/JIT.h:
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_throw_reference_error):
+        (JSC::JIT::emit_op_throw_syntax_error):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_throw_reference_error):
+        (JSC::JIT::emit_op_throw_syntax_error):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * jit/JITStubs.h:
+        * parser/Nodes.h:
+
+2010-11-11  Darin Adler  <darin@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        Harden some string functions against large lengths
+        https://bugs.webkit.org/show_bug.cgi?id=49293
+
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::create): Fix incorrect use of PassRefPtr. Check for
+        strlen results that are too large for StringImpl.
+        (WTF::StringImpl::lower): Check for lengths that are too large for
+        int32_t.
+        (WTF::StringImpl::upper): Fix incorrect use of PassRefPtr. Check for
+        lengths that are too large for int32_t.
+        (WTF::StringImpl::secure): Fix incorect use of PassRefPtr. Use unsigned
+        rather than int and int32_t so we can handle any length.
+        (WTF::StringImpl::foldCase): Fix incorrect use of PassRefPtr. Check for
+        lengths that are too large for int32_t.
+        (WTF::StringImpl::find): Check for strlen results that are too large for
+        StringImpl.
+        (WTF::StringImpl::findIgnoringCase): Ditto.
+        (WTF::StringImpl::replace): Fix incorrect use of PassRefPtr.
+        (WTF::StringImpl::createWithTerminatingNullCharacter): Check before
+        incrementing length.
+
+2010-11-11  Dan Horák  <dan@danny.cz>
+
+        Reviewed by Andreas Kling.
+
+        Add support for the s390/s390x architectures, it's big-endian
+        with s390 being 32-bit and s390x being 64-bit.
+
+        https://bugs.webkit.org/show_bug.cgi?id=34786
+
+        * wtf/Platform.h:
+
+2010-11-10  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Reviewed by David Hyatt.
+
+        HTML5 Ruby support should be mandatory feature
+        https://bugs.webkit.org/show_bug.cgi?id=49272
+
+        Remove Ruby as optional feature.
+
+        * Configurations/FeatureDefines.xcconfig:
+        * JavaScriptCorePrefix.h:: Touch it to avoid incremental build failure on Windows.
+
+2010-11-10  Peter Rybin  <peter.rybin@gmail.com>
+
+        Reviewed by Adam Barth.
+
+        HTML parser should provide script column position within HTML document to JavaScript engine
+        https://bugs.webkit.org/show_bug.cgi?id=45271
+
+        Adds TextPosition* classes -- a structure that stores line/column/generation
+        level coordinates inside text document. Adds *BasedNumber classes -- typesafe int
+        wrappers that emphasize whether int number is used as zero-based or
+        one-based.
+
+        * GNUmakefile.am:
+        * JavaScriptCore.gypi:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * wtf/text/TextPosition.h: Added.
+        (WTF::TextPosition::TextPosition):
+        (WTF::TextPosition::minimumPosition):
+        (WTF::TextPosition::belowRangePosition):
+        (WTF::ZeroBasedNumber::fromZeroBasedInt):
+        (WTF::ZeroBasedNumber::ZeroBasedNumber):
+        (WTF::ZeroBasedNumber::zeroBasedInt):
+        (WTF::ZeroBasedNumber::base):
+        (WTF::ZeroBasedNumber::belowBase):
+        (WTF::OneBasedNumber::fromOneBasedInt):
+        (WTF::OneBasedNumber::OneBasedNumber):
+        (WTF::OneBasedNumber::oneBasedInt):
+        (WTF::OneBasedNumber::convertAsZeroBasedInt):
+        (WTF::OneBasedNumber::convertToZeroBased):
+        (WTF::OneBasedNumber::base):
+        (WTF::OneBasedNumber::belowBase):
+        (WTF::toZeroBasedTextPosition):
+        (WTF::toOneBasedTextPosition):
+        (WTF::ZeroBasedNumber::convertToOneBased):
+
+2010-11-09  Gabor Loki  <loki@webkit.org>
+
+        Reviewed by Gavin Barraclough.
+
+        ARM JIT asserts when loading http://reader.google.com in debug mode
+        https://bugs.webkit.org/show_bug.cgi?id=48912
+
+        There are several cases when the uninterrupted sequence is larger than
+        maximum required offset for pathing the same sequence. Eg.: if in a
+        uninterrupted sequence the last macroassembler's instruction is a stub
+        call, it emits store instruction(s) which should not be included in the
+        calculation of length of uninterrupted sequence. So, the insnSpace and
+        constSpace should be upper limit instead of hard limit.
+
+        * jit/JIT.h:
+        * jit/JITInlineMethods.h:
+        (JSC::JIT::endUninterruptedSequence):
+
 2010-11-09  David Kilzer  <ddkilzer@apple.com>
 
         <http://webkit.org/b/49279> Fix include statements for local headers

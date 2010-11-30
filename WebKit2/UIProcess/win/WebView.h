@@ -39,11 +39,16 @@ namespace WebKit {
 class DrawingAreaProxy;
 class WebPageNamespace;
 
+enum InjectedBundleVisibility {
+    HiddenFromInjectedBundle,
+    VisibleToInjectedBundle
+};
+
 class WebView : public APIObject, public PageClient, WebCore::WindowMessageListener {
 public:
-    static PassRefPtr<WebView> create(RECT rect, WebPageNamespace* pageNamespace, HWND parentWindow)
+    static PassRefPtr<WebView> create(RECT rect, WebPageNamespace* pageNamespace, HWND parentWindow, InjectedBundleVisibility visibility)
     {
-        return adoptRef(new WebView(rect, pageNamespace, parentWindow));
+        return adoptRef(new WebView(rect, pageNamespace, parentWindow, visibility));
     }
     ~WebView();
 
@@ -52,12 +57,13 @@ public:
     HWND window() const { return m_window; }
     void setParentWindow(HWND);
     void windowAncestryDidChange();
+    void setIsInWindow(bool);
     void setOverrideCursor(HCURSOR overrideCursor);
 
     WebPageProxy* page() const { return m_page.get(); }
 
 private:
-    WebView(RECT, WebPageNamespace*, HWND parentWindow);
+    WebView(RECT, WebPageNamespace*, HWND parentWindow, InjectedBundleVisibility);
 
     virtual Type type() const { return TypeView; }
 
@@ -112,6 +118,7 @@ private:
 #if USE(ACCELERATED_COMPOSITING)
     virtual void pageDidEnterAcceleratedCompositing();
     virtual void pageDidLeaveAcceleratedCompositing();
+    void switchToDrawingAreaTypeIfNecessary(DrawingAreaProxy::Type);
 #endif
 
     virtual HWND nativeWindow();

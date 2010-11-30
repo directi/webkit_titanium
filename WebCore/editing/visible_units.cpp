@@ -418,21 +418,6 @@ static VisiblePosition startPositionForLine(const VisiblePosition& c)
 VisiblePosition startOfLine(const VisiblePosition& c)
 {
     VisiblePosition visPos = startPositionForLine(c);
-    
-    if (visPos.isNotNull()) {
-        // Make sure the start of line is not greater than the given input position.  Else use the previous position to 
-        // obtain start of line.  This condition happens when the input position is before the space character at the end 
-        // of a soft-wrapped non-editable line. In this scenario, startPositionForLine would incorrectly hand back a position
-        // greater than the input position.  This fix is to account for the discrepancy between lines with webkit-line-break:after-white-space 
-        // style versus lines without that style, which would break before a space by default. 
-        Position p = visPos.deepEquivalent();
-        if (p.deprecatedEditingOffset() > c.deepEquivalent().deprecatedEditingOffset() && p.node()->isSameNode(c.deepEquivalent().node())) {
-            visPos = c.previous();
-            if (visPos.isNull())
-                return VisiblePosition();
-            visPos = startPositionForLine(visPos);
-        }
-    }
 
     return c.honorEditableBoundaryAtOrAfter(visPos);
 }
@@ -610,7 +595,7 @@ VisiblePosition previousLinePosition(const VisiblePosition &visiblePosition, int
         RenderObject* renderer = root->closestLeafChildForLogicalLeftPosition(x - absPos.x(), isEditablePosition(p))->renderer();
         Node* node = renderer->node();
         if (node && editingIgnoresContent(node))
-            return Position(node->parent(), node->nodeIndex());
+            return Position(node->parentNode(), node->nodeIndex());
         return renderer->positionForPoint(IntPoint(x - absPos.x(), root->lineTop()));
     }
     
@@ -715,7 +700,7 @@ VisiblePosition nextLinePosition(const VisiblePosition &visiblePosition, int x)
         RenderObject* renderer = root->closestLeafChildForLogicalLeftPosition(x - absPos.x(), isEditablePosition(p))->renderer();
         Node* node = renderer->node();
         if (node && editingIgnoresContent(node))
-            return Position(node->parent(), node->nodeIndex());
+            return Position(node->parentNode(), node->nodeIndex());
         return renderer->positionForPoint(IntPoint(x - absPos.x(), root->lineTop()));
     }    
 
@@ -780,7 +765,7 @@ VisiblePosition nextSentencePosition(const VisiblePosition &c)
     return c.honorEditableBoundaryAtOrBefore(next);
 }
 
-VisiblePosition startOfParagraph(const VisiblePosition& c, Position::EditingBoundaryCrossingRule boundaryCrossingRule)
+VisiblePosition startOfParagraph(const VisiblePosition& c, EditingBoundaryCrossingRule boundaryCrossingRule)
 {
     Position p = c.deepEquivalent();
     Node *startNode = p.node();
@@ -798,7 +783,7 @@ VisiblePosition startOfParagraph(const VisiblePosition& c, Position::EditingBoun
 
     Node *n = startNode;
     while (n) {
-        if (boundaryCrossingRule == Position::CannotCrossEditingBoundary && n->isContentEditable() != startNode->isContentEditable())
+        if (boundaryCrossingRule == CannotCrossEditingBoundary && n->isContentEditable() != startNode->isContentEditable())
             break;
         RenderObject *r = n->renderer();
         if (!r) {
@@ -839,7 +824,7 @@ VisiblePosition startOfParagraph(const VisiblePosition& c, Position::EditingBoun
     return VisiblePosition(node, offset, DOWNSTREAM);
 }
 
-VisiblePosition endOfParagraph(const VisiblePosition &c, Position::EditingBoundaryCrossingRule boundaryCrossingRule)
+VisiblePosition endOfParagraph(const VisiblePosition &c, EditingBoundaryCrossingRule boundaryCrossingRule)
 {    
     if (c.isNull())
         return VisiblePosition();
@@ -858,7 +843,7 @@ VisiblePosition endOfParagraph(const VisiblePosition &c, Position::EditingBounda
 
     Node *n = startNode;
     while (n) {
-        if (boundaryCrossingRule == Position::CannotCrossEditingBoundary && n->isContentEditable() != startNode->isContentEditable())
+        if (boundaryCrossingRule == CannotCrossEditingBoundary && n->isContentEditable() != startNode->isContentEditable())
             break;
         RenderObject *r = n->renderer();
         if (!r) {
@@ -914,12 +899,12 @@ bool inSameParagraph(const VisiblePosition &a, const VisiblePosition &b)
     return a.isNotNull() && startOfParagraph(a) == startOfParagraph(b);
 }
 
-bool isStartOfParagraph(const VisiblePosition &pos, Position::EditingBoundaryCrossingRule boundaryCrossingRule)
+bool isStartOfParagraph(const VisiblePosition &pos, EditingBoundaryCrossingRule boundaryCrossingRule)
 {
     return pos.isNotNull() && pos == startOfParagraph(pos, boundaryCrossingRule);
 }
 
-bool isEndOfParagraph(const VisiblePosition &pos, Position::EditingBoundaryCrossingRule boundaryCrossingRule)
+bool isEndOfParagraph(const VisiblePosition &pos, EditingBoundaryCrossingRule boundaryCrossingRule)
 {
     return pos.isNotNull() && pos == endOfParagraph(pos, boundaryCrossingRule);
 }

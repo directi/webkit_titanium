@@ -409,10 +409,58 @@ String validationMessageValueMissingText()
     return String();
 }
 
+String validationMessageValueMissingForCheckboxText()
+{
+    notImplemented();
+    return validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForFileText()
+{
+    notImplemented();
+    return validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForMultipleFileText()
+{
+    notImplemented();
+    return validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForRadioText()
+{
+    notImplemented();
+    return validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForSelectText()
+{
+    notImplemented();
+    return validationMessageValueMissingText();
+}
+
 String validationMessageTypeMismatchText()
 {
     notImplemented();
     return String();
+}
+
+String validationMessageTypeMismatchForEmailText()
+{
+    notImplemented();
+    return validationMessageTypeMismatchText();
+}
+
+String validationMessageTypeMismatchForMultipleEmailText()
+{
+    notImplemented();
+    return validationMessageTypeMismatchText();
+}
+
+String validationMessageTypeMismatchForURLText()
+{
+    notImplemented();
+    return validationMessageTypeMismatchText();
 }
 
 String validationMessagePatternMismatchText()
@@ -421,25 +469,25 @@ String validationMessagePatternMismatchText()
     return String();
 }
 
-String validationMessageTooLongText()
+String validationMessageTooLongText(int, int)
 {
     notImplemented();
     return String();
 }
 
-String validationMessageRangeUnderflowText()
+String validationMessageRangeUnderflowText(const String&)
 {
     notImplemented();
     return String();
 }
 
-String validationMessageRangeOverflowText()
+String validationMessageRangeOverflowText(const String&)
 {
     notImplemented();
     return String();
 }
 
-String validationMessageStepMismatchText()
+String validationMessageStepMismatchText(const String&, const String&)
 {
     notImplemented();
     return String();

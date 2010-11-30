@@ -44,6 +44,8 @@ private:
     virtual const AtomicString& formControlType() const;
     virtual bool appendFormData(FormDataList&, bool) const;
     virtual bool valueMissing(const String&) const;
+    virtual String valueMissingText() const;
+    virtual bool handleDOMActivateEvent(Event*);
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) const;
 };
 

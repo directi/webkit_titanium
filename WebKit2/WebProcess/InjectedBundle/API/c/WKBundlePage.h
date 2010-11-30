@@ -182,7 +182,7 @@ struct WKBundlePageFormClient {
 typedef struct WKBundlePageFormClient WKBundlePageFormClient;
 
 // ContextMenu client
-typedef void (*WKBundlePageGetContextMenuFromDefaultContextMenuCallback)(WKBundlePageRef page, WKBundleHitTestResultRef hitTestResult, WKArrayRef defaultMenu, WKArrayRef* newMenu, const void* clientInfo);
+typedef void (*WKBundlePageGetContextMenuFromDefaultContextMenuCallback)(WKBundlePageRef page, WKBundleHitTestResultRef hitTestResult, WKArrayRef defaultMenu, WKArrayRef* newMenu, WKTypeRef* userData, const void* clientInfo);
 
 struct WKBundlePageContextMenuClient {
     int                                                                 version;
@@ -204,7 +204,10 @@ WK_EXPORT WKBundleFrameRef WKBundlePageGetMainFrame(WKBundlePageRef page);
 WK_EXPORT WKBundleBackForwardListRef WKBundlePageGetBackForwardList(WKBundlePageRef page);
 
 WK_EXPORT void WKBundlePageInstallPageOverlay(WKBundlePageRef page, WKBundlePageOverlayRef pageOverlay);
-WK_EXPORT void WKBundlePageUninstallPageOverlay(WKBundlePageRef page);
+WK_EXPORT void WKBundlePageUninstallPageOverlay(WKBundlePageRef page, WKBundlePageOverlayRef pageOverlay);
+
+WK_EXPORT bool WKBundlePageHasLocalDataForURL(WKBundlePageRef page, WKURLRef url);
+WK_EXPORT bool WKBundlePageCanHandleRequest(WKURLRequestRef request);
 
 #ifdef __cplusplus
 }

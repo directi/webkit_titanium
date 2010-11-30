@@ -75,8 +75,6 @@ public:
     WebGLLayerChromium* platformLayer() const;
 #endif
     bool isGLES2Compliant() const;
-    bool isGLES2NPOTStrict() const;
-    bool isErrorGeneratedOnOutOfBoundsAccesses() const;
 
     //----------------------------------------------------------------------
     // Entry points for WebGL.
@@ -141,6 +139,8 @@ public:
     GraphicsContext3D::Attributes getContextAttributes();
 
     unsigned long getError();
+
+    bool isContextLost();
 
     void getFloatv(unsigned long pname, float* value);
 

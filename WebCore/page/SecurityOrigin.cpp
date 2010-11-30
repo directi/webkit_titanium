@@ -273,6 +273,21 @@ bool SecurityOrigin::taintsCanvas(const KURL& url) const
     return true;
 }
 
+bool SecurityOrigin::canReceiveDragData(const SecurityOrigin* dragInitiator) const
+{
+    if (this == dragInitiator)
+        return true;
+
+    // FIXME: Currently we treat data URLs as having a unique origin, contrary to the
+    // current (9/19/2009) draft of the HTML5 specification. We still want to allow
+    // drop across data URLs, so we special case data URLs below. If we change to
+    // match HTML5 w.r.t. data URL security, then we can remove this check.
+    if (m_protocol == "data")
+        return true;
+
+    return canAccess(dragInitiator);  
+}
+
 bool SecurityOrigin::isAccessWhiteListed(const SecurityOrigin* targetOrigin) const
 {
     if (OriginAccessWhiteList* list = originAccessMap().get(toString())) {
@@ -283,22 +298,26 @@ bool SecurityOrigin::isAccessWhiteListed(const SecurityOrigin* targetOrigin) con
     }
     return false;
 }
-  
+
 bool SecurityOrigin::canDisplay(const KURL& url) const
 {
+    RefPtr<SecurityOrigin> targetOrigin = SecurityOrigin::create(url);
+    if (isAccessWhiteListed(targetOrigin.get()))
+        return true;
+
+    if (SchemeRegistry::shouldTreatURLSchemeAsDisplayIsolated(targetOrigin->protocol()))
+        return targetOrigin->protocol() == m_protocol;
+
 #if ENABLE(BLOB)
-    if (url.protocolIs(BlobURL::blobProtocol()))
+    // FIXME: We should generalize this check.
+    if (targetOrigin->protocol() == BlobURL::blobProtocol())
         return canRequest(url);
 #endif
 
     if (!restrictAccessToLocal())
         return true;
 
-    if (!SchemeRegistry::shouldTreatURLAsLocal(url.string()))
-        return true;
-
-    RefPtr<SecurityOrigin> targetOrigin = SecurityOrigin::create(url);
-    if (isAccessWhiteListed(targetOrigin.get()))
+    if (!SchemeRegistry::shouldTreatURLSchemeAsLocal(targetOrigin->protocol()))
         return true;
 
     return canLoadLocalResources();
@@ -309,10 +328,12 @@ bool SecurityOrigin::deprecatedCanDisplay(const String& referrer, const KURL& ur
     if (!restrictAccessToLocal())
         return true;
 
-    if (!SchemeRegistry::shouldTreatURLAsLocal(url.string()))
+    // FIXME: I suspect these checks are incorrect because referrer and url
+    //        have not necessarily been canonicalized.
+    if (!SchemeRegistry::deprecatedShouldTreatURLAsLocal(url.string()))
         return true;
 
-    return SchemeRegistry::shouldTreatURLAsLocal(referrer);
+    return SchemeRegistry::deprecatedShouldTreatURLAsLocal(referrer);
 }
 
 void SecurityOrigin::grantLoadLocalResources()

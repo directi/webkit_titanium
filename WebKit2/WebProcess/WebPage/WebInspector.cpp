@@ -25,7 +25,12 @@
 
 #include "WebInspector.h"
 
+#if ENABLE(INSPECTOR)
+
+#include "WebInspectorProxyMessages.h"
 #include "WebPage.h"
+#include "WebPageCreationParameters.h"
+#include "WebProcess.h"
 #include <WebCore/InspectorController.h>
 #include <WebCore/Page.h>
 
@@ -35,7 +40,39 @@ namespace WebKit {
 
 WebInspector::WebInspector(WebPage* page)
     : m_page(page)
+    , m_inspectorPage(0)
 {
+}
+
+// Called from WebInspectorClient
+WebPage* WebInspector::createInspectorPage()
+{
+    if (!m_page)
+        return 0;
+
+    uint64_t inspectorPageID = 0;
+    WebPageCreationParameters parameters;
+
+    if (!WebProcess::shared().connection()->sendSync(Messages::WebInspectorProxy::CreateInspectorPage(),
+            Messages::WebInspectorProxy::CreateInspectorPage::Reply(inspectorPageID, parameters),
+            m_page->pageID(), CoreIPC::Connection::NoTimeout)) {
+        return 0;
+    }
+
+    if (!inspectorPageID)
+        return 0;
+
+    WebProcess::shared().createWebPage(inspectorPageID, parameters);
+    m_inspectorPage = WebProcess::shared().webPage(inspectorPageID);
+    ASSERT(m_inspectorPage);
+
+    return m_inspectorPage;
+}
+
+// Called from WebInspectorFrontendClient
+void WebInspector::didLoadInspectorPage()
+{
+    WebProcess::shared().connection()->send(Messages::WebInspectorProxy::DidLoadInspectorPage(), m_page->pageID());
 }
 
 // Called by WebInspector messages
@@ -56,24 +93,32 @@ void WebInspector::showConsole()
 
 void WebInspector::startJavaScriptDebugging()
 {
+#if ENABLE(JAVASCRIPT_DEBUGGER)
     m_page->corePage()->inspectorController()->showPanel(InspectorController::ScriptsPanel);
     m_page->corePage()->inspectorController()->enableDebugger();
+#endif
 }
 
 void WebInspector::stopJavaScriptDebugging()
 {
+#if ENABLE(JAVASCRIPT_DEBUGGER)
     m_page->corePage()->inspectorController()->disableDebugger();
+#endif
 }
 
 void WebInspector::startJavaScriptProfiling()
 {
+#if ENABLE(JAVASCRIPT_DEBUGGER)
     m_page->corePage()->inspectorController()->startUserInitiatedProfiling();
+#endif
 }
 
 void WebInspector::stopJavaScriptProfiling()
 {
+#if ENABLE(JAVASCRIPT_DEBUGGER)
     m_page->corePage()->inspectorController()->stopUserInitiatedProfiling();
     m_page->corePage()->inspectorController()->showPanel(InspectorController::ProfilesPanel);
+#endif
 }
 
 void WebInspector::startPageProfiling()
@@ -88,3 +133,5 @@ void WebInspector::stopPageProfiling()
 }
 
 } // namespace WebKit
+
+#endif // ENABLE(INSPECTOR)

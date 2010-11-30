@@ -25,6 +25,13 @@
 
 #include "WebInspectorClient.h"
 
+#if ENABLE(INSPECTOR)
+
+#include "WebInspectorFrontendClient.h"
+#include "WebInspector.h"
+#include "WebPage.h"
+#include <WebCore/Page.h>
+
 #define DISABLE_NOT_IMPLEMENTED_WARNINGS 1
 #include "NotImplemented.h"
 
@@ -39,7 +46,12 @@ void WebInspectorClient::inspectorDestroyed()
 
 void WebInspectorClient::openInspectorFrontend(InspectorController*)
 {
-    notImplemented();
+    WebPage* inspectorPage = m_page->inspector()->createInspectorPage();
+    ASSERT(inspectorPage);
+    if (!inspectorPage)
+        return;
+
+    inspectorPage->corePage()->inspectorController()->setInspectorFrontendClient(adoptPtr(new WebInspectorFrontendClient(m_page, inspectorPage)));
 }
 
 void WebInspectorClient::highlight(Node*)
@@ -62,10 +74,13 @@ void WebInspectorClient::storeSetting(const String&, const String&)
     notImplemented();
 }
 
-bool WebInspectorClient::sendMessageToFrontend(const String&)
+bool WebInspectorClient::sendMessageToFrontend(const String& message)
 {
-    notImplemented();
+    if (WebPage* inspectorPage = m_page->inspector()->inspectorPage())
+        return doDispatchMessageOnFrontendPage(inspectorPage->corePage(), message);
     return false;
 }
 
 } // namespace WebKit
+
+#endif // ENABLE(INSPECTOR)

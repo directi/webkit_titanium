@@ -272,7 +272,7 @@ static const int computedProperties[] = {
 #endif
 };
 
-const unsigned numComputedProperties = sizeof(computedProperties) / sizeof(computedProperties[0]);
+const unsigned numComputedProperties = WTF_ARRAY_LENGTH(computedProperties);
 
 static int valueForRepeatRule(int rule)
 {
@@ -1643,7 +1643,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
         case CSSPropertyWebkitTransformOriginY:
         case CSSPropertyWebkitTransformOriginZ:
         case CSSPropertyWebkitTransition:
-        case CSSPropertyWebkitVariableDeclarationBlock:
             break;
 #if ENABLE(SVG)
         case CSSPropertyClipPath:

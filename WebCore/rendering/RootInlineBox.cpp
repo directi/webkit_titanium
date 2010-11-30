@@ -47,6 +47,8 @@ RootInlineBox::RootInlineBox(RenderBlock* block)
     , m_lineBottom(0)
     , m_paginationStrut(0)
     , m_blockLogicalHeight(0)
+    , m_baselineType(AlphabeticBaseline)
+    , m_containsRuby(false)
 {
     setIsHorizontal(block->style()->isHorizontalWritingMode());
 }
@@ -198,9 +200,10 @@ bool RootInlineBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& re
 void RootInlineBox::adjustPosition(int dx, int dy)
 {
     InlineFlowBox::adjustPosition(dx, dy);
-    m_lineTop += dy;
-    m_lineBottom += dy;
-    m_blockLogicalHeight += dy;
+    int blockDirectionDelta = isHorizontal() ? dy : dx;
+    m_lineTop += blockDirectionDelta;
+    m_lineBottom += blockDirectionDelta;
+    m_blockLogicalHeight += blockDirectionDelta;
 }
 
 void RootInlineBox::childRemoved(InlineBox* box)
@@ -214,7 +217,7 @@ void RootInlineBox::childRemoved(InlineBox* box)
     }
 }
 
-int RootInlineBox::alignBoxesInBlockDirection(int heightOfBlock, GlyphOverflowAndFallbackFontsMap& textBoxDataMap)
+int RootInlineBox::alignBoxesInBlockDirection(int heightOfBlock, GlyphOverflowAndFallbackFontsMap& textBoxDataMap, VerticalPositionCache& verticalPositionCache)
 {
 #if ENABLE(SVG)
     // SVG will handle vertical alignment on its own.
@@ -226,11 +229,16 @@ int RootInlineBox::alignBoxesInBlockDirection(int heightOfBlock, GlyphOverflowAn
     int maxPositionBottom = 0;
     int maxAscent = 0;
     int maxDescent = 0;
+    bool setMaxAscent = false;
+    bool setMaxDescent = false;
 
     // Figure out if we're in no-quirks mode.
     bool noQuirksMode = renderer()->document()->inNoQuirksMode();
 
-    computeLogicalBoxHeights(maxPositionTop, maxPositionBottom, maxAscent, maxDescent, noQuirksMode, textBoxDataMap);
+    m_baselineType = requiresIdeographicBaseline(textBoxDataMap) ? IdeographicBaseline : AlphabeticBaseline;
+
+    computeLogicalBoxHeights(maxPositionTop, maxPositionBottom, maxAscent, maxDescent, setMaxAscent, setMaxDescent, noQuirksMode,
+                             textBoxDataMap, m_baselineType, verticalPositionCache);
 
     if (maxAscent + maxDescent < max(maxPositionTop, maxPositionBottom))
         adjustMaxAscentAndDescent(maxAscent, maxDescent, maxPositionTop, maxPositionBottom);
@@ -238,16 +246,45 @@ int RootInlineBox::alignBoxesInBlockDirection(int heightOfBlock, GlyphOverflowAn
     int maxHeight = maxAscent + maxDescent;
     int lineTop = heightOfBlock;
     int lineBottom = heightOfBlock;
+    int lineTopIncludingMargins = heightOfBlock;
+    int lineBottomIncludingMargins = heightOfBlock;
     bool setLineTop = false;
-    placeBoxesInBlockDirection(heightOfBlock, maxHeight, maxAscent, noQuirksMode, lineTop, lineBottom, setLineTop);
+    bool containsRuby = false;
+    placeBoxesInBlockDirection(heightOfBlock, maxHeight, maxAscent, noQuirksMode, lineTop, lineBottom, setLineTop,
+                               lineTopIncludingMargins, lineBottomIncludingMargins, containsRuby, m_baselineType);
     computeBlockDirectionOverflow(lineTop, lineBottom, noQuirksMode, textBoxDataMap);
     setLineTopBottomPositions(lineTop, lineBottom);
+
+    m_containsRuby = containsRuby;
+    
+    int rubyAdjustment = blockDirectionRubyAdjustment();
+    if (rubyAdjustment) {
+        // FIXME: Need to handle pagination here. We might have to move to the next page/column as a result of the
+        // ruby expansion.
+        adjustBlockDirectionPosition(rubyAdjustment);
+        heightOfBlock += rubyAdjustment;
+    }
 
     // Detect integer overflow.
     if (heightOfBlock > numeric_limits<int>::max() - maxHeight)
         return numeric_limits<int>::max();
 
     return heightOfBlock + maxHeight;
+}
+
+int RootInlineBox::blockDirectionRubyAdjustment() const
+{
+    if (!renderer()->style()->isFlippedLinesWritingMode()) {
+        if (!containsRuby())
+            return 0;
+        int highestAllowedPosition = prevRootBox() ? min(prevRootBox()->lineBottom(), lineTop()) : block()->borderBefore();
+        return computeBlockDirectionRubyAdjustment(highestAllowedPosition);
+    } else if (prevRootBox() && prevRootBox()->containsRuby()) {
+        // We have to compute the Ruby expansion for the previous line to see how much we should move.
+        int lowestAllowedPosition = max(prevRootBox()->lineBottom(), lineTop());
+        return prevRootBox()->computeBlockDirectionRubyAdjustment(lowestAllowedPosition);
+    }
+    return 0;
 }
 
 GapRects RootInlineBox::lineSelectionGap(RenderBlock* rootBlock, const IntPoint& rootBlockPhysicalPosition, const IntSize& offsetFromRootBlock, 

@@ -55,7 +55,6 @@ CachedImage::CachedImage(const String& url)
     : CachedResource(url, ImageResource)
     , m_image(0)
     , m_decodedDataDeletionTimer(this, &CachedImage::decodedDataDeletionTimerFired)
-    , m_httpStatusCodeErrorOccurred(false)
 {
     setStatus(Unknown);
 }
@@ -64,7 +63,6 @@ CachedImage::CachedImage(Image* image)
     : CachedResource(String(), ImageResource)
     , m_image(image)
     , m_decodedDataDeletionTimer(this, &CachedImage::decodedDataDeletionTimerFired)
-    , m_httpStatusCodeErrorOccurred(false)
 {
     setStatus(Cached);
     setLoading(false);
@@ -283,7 +281,7 @@ void CachedImage::data(PassRefPtr<SharedBuffer> data, bool allDataReceived)
         IntSize s = imageSize(1.0f);
         size_t estimatedDecodedImageSize = s.width() * s.height() * 4; // no overflow check
         if (m_image->isNull() || (maxDecodedImageSize > 0 && estimatedDecodedImageSize > maxDecodedImageSize)) {
-            error();
+            error(errorOccurred() ? status() : DecodeError);
             if (inCache())
                 cache()->remove(this);
             return;
@@ -303,10 +301,11 @@ void CachedImage::data(PassRefPtr<SharedBuffer> data, bool allDataReceived)
     }
 }
 
-void CachedImage::error()
+void CachedImage::error(CachedResource::Status status)
 {
     clear();
-    setErrorOccurred(true);
+    setStatus(status);
+    ASSERT(errorOccurred());
     m_data.clear();
     notifyObservers();
     setLoading(false);

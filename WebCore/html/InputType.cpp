@@ -41,6 +41,7 @@
 #include "HiddenInputType.h"
 #include "ImageInputType.h"
 #include "IsIndexInputType.h"
+#include "LocalizedStrings.h"
 #include "MonthInputType.h"
 #include "NumberInputType.h"
 #include "PasswordInputType.h"
@@ -120,6 +121,11 @@ bool InputType::isTextField() const
 }
 
 bool InputType::isTextType() const
+{
+    return false;
+}
+
+bool InputType::isRangeControl() const
 {
     return false;
 }
@@ -212,6 +218,11 @@ bool InputType::rangeOverflow(const String&) const
     return false;
 }
 
+double InputType::defaultValueForStepUp() const
+{
+    return 0;
+}
+
 double InputType::minimum() const
 {
     ASSERT_NOT_REACHED();
@@ -267,6 +278,31 @@ bool InputType::scaledStepValeuShouldBeInteger() const
 double InputType::acceptableError(double) const
 {
     return 0;
+}
+
+String InputType::typeMismatchText() const
+{
+    return validationMessageTypeMismatchText();
+}
+
+String InputType::valueMissingText() const
+{
+    return validationMessageValueMissingText();
+}
+
+bool InputType::handleClickEvent(MouseEvent*)
+{
+    return false;
+}
+
+bool InputType::handleDOMActivateEvent(Event*)
+{
+    return false;
+}
+
+bool InputType::handleKeydownEvent(KeyboardEvent*)
+{
+    return false;
 }
 
 RenderObject* InputType::createRenderer(RenderArena*, RenderStyle* style) const
@@ -451,4 +487,3 @@ const AtomicString& week()
 } // namespace WebCore::InpuTypeNames
 
 } // namespace WebCore
-

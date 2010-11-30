@@ -70,6 +70,7 @@
 #import <WebKit/WebView.h>
 #import <WebKit/WebViewPrivate.h>
 #import <WebKit/WebWorkersPrivate.h>
+#import <wtf/CurrentTime.h>
 #import <wtf/HashMap.h>
 #import <wtf/RetainPtr.h>
 
@@ -348,11 +349,12 @@ void LayoutTestController::setMockDeviceOrientation(bool canProvideAlpha, double
     WebDeviceOrientationProviderMock* mockProvider = static_cast<WebDeviceOrientationProviderMock*>(provider);
     WebDeviceOrientation* orientation = [[WebDeviceOrientation alloc] initWithCanProvideAlpha:canProvideAlpha alpha:alpha canProvideBeta:canProvideBeta beta:beta canProvideGamma:canProvideGamma gamma:gamma];
     [mockProvider setOrientation:orientation];
+    [orientation release];
 }
 
 void LayoutTestController::setMockGeolocationPosition(double latitude, double longitude, double accuracy)
 {
-    WebGeolocationPosition *position = [[WebGeolocationPosition alloc] initWithTimestamp:0 latitude:latitude longitude:longitude accuracy:accuracy];
+    WebGeolocationPosition *position = [[WebGeolocationPosition alloc] initWithTimestamp:currentTime() latitude:latitude longitude:longitude accuracy:accuracy];
     [[MockGeolocationProvider shared] setPosition:position];
     [position release];
 }
@@ -371,7 +373,7 @@ void LayoutTestController::setGeolocationPermission(bool allow)
     [[[mainFrame webView] UIDelegate] didSetMockGeolocationPermission];
 }
 
-void LayoutTestController::setMockSpeechInputResult(JSStringRef result, JSStringRef language)
+void LayoutTestController::addMockSpeechInputResult(JSStringRef result, double confidence, JSStringRef language)
 {
     // FIXME: Implement for speech input layout tests.
     // See https://bugs.webkit.org/show_bug.cgi?id=39485.

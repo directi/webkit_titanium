@@ -32,19 +32,6 @@ using namespace WebCore;
 
 namespace WebKit {
 
-WebContextInjectedBundleClient::WebContextInjectedBundleClient()
-{
-    initialize(0);
-}
-
-void WebContextInjectedBundleClient::initialize(const WKContextInjectedBundleClient* client)
-{
-    if (client && !client->version)
-        m_client = *client;
-    else 
-        memset(&m_client, 0, sizeof(m_client));
-}
-
 void WebContextInjectedBundleClient::didReceiveMessageFromInjectedBundle(WebContext* context, const String& messageName, APIObject* messageBody)
 {
     if (!m_client.didReceiveMessageFromInjectedBundle)

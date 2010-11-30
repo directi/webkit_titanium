@@ -66,7 +66,6 @@ CachedResource::CachedResource(const String& url, Type type)
     , m_inLiveDecodedResourcesList(false)
     , m_requestedFromNetworkingLayer(false)
     , m_sendResourceLoadCallbacks(true)
-    , m_errorOccurred(false)
     , m_inCache(false)
     , m_loading(false)
     , m_type(type)
@@ -253,8 +252,11 @@ void CachedResource::removeClient(CachedResourceClient* client)
         allClientsRemoved();
         if (response().cacheControlContainsNoStore()) {
             // RFC2616 14.9.2:
-            // "no-store: ...MUST make a best-effort attempt to remove the information from volatile storage as promptly as possible"
-            cache()->remove(this);
+            // "no-store: ... MUST make a best-effort attempt to remove the information from volatile storage as promptly as possible"
+            // "... History buffers MAY store such responses as part of their normal operation."
+            // We allow non-secure content to be reused in history, but we do not allow secure content to be reused.
+            if (protocolIs(url(), "https"))
+                cache()->remove(this);
         } else
             cache()->prune();
     }
@@ -454,7 +456,7 @@ void CachedResource::unregisterHandle(CachedResourceHandleBase* h)
 
 bool CachedResource::canUseCacheValidator() const
 {
-    if (m_loading || m_errorOccurred)
+    if (m_loading || errorOccurred())
         return false;
 
     if (m_response.cacheControlContainsNoStore())
@@ -467,7 +469,7 @@ bool CachedResource::canUseCacheValidator() const
     
 bool CachedResource::mustRevalidate(CachePolicy cachePolicy) const
 {
-    if (m_errorOccurred) {
+    if (errorOccurred()) {
         LOG(ResourceLoading, "CachedResource %p mustRevalidate because of m_errorOccurred\n", this);
         return true;
     }

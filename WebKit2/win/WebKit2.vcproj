@@ -18,7 +18,7 @@
 		<Configuration
 			Name="Debug|Win32"
 			ConfigurationType="2"
-			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefines.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug.vsprops;.\WebKit2Common.vsprops;.\WebKit2DirectX.vsprops;.\WebKit2Apple.vsprops"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;.\WebKit2Common.vsprops;.\WebKit2DirectX.vsprops;.\WebKit2Apple.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -79,69 +79,7 @@
 		<Configuration
 			Name="Release|Win32"
 			ConfigurationType="2"
-			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefines.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\release.vsprops;.\WebKit2Common.vsprops;.\WebKit2DirectX.vsprops;.\WebKit2Apple.vsprops"
-			CharacterSet="1"
-			WholeProgramOptimization="1"
-			>
-			<Tool
-				Name="VCPreBuildEventTool"
-			/>
-			<Tool
-				Name="VCCustomBuildTool"
-			/>
-			<Tool
-				Name="VCXMLDataGeneratorTool"
-			/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"
-			/>
-			<Tool
-				Name="VCMIDLTool"
-			/>
-			<Tool
-				Name="VCCLCompilerTool"
-			/>
-			<Tool
-				Name="VCManagedResourceCompilerTool"
-			/>
-			<Tool
-				Name="VCResourceCompilerTool"
-			/>
-			<Tool
-				Name="VCPreLinkEventTool"
-			/>
-			<Tool
-				Name="VCLinkerTool"
-			/>
-			<Tool
-				Name="VCALinkTool"
-			/>
-			<Tool
-				Name="VCManifestTool"
-			/>
-			<Tool
-				Name="VCXDCMakeTool"
-			/>
-			<Tool
-				Name="VCBscMakeTool"
-			/>
-			<Tool
-				Name="VCFxCopTool"
-			/>
-			<Tool
-				Name="VCAppVerifierTool"
-			/>
-			<Tool
-				Name="VCWebDeploymentTool"
-			/>
-			<Tool
-				Name="VCPostBuildEventTool"
-			/>
-		</Configuration>
-		<Configuration
-			Name="Debug_Internal|Win32"
-			ConfigurationType="2"
-			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefines.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug_internal.vsprops;.\WebKit2Common.vsprops;.\WebKit2DirectX.vsprops;.\WebKit2Apple.vsprops"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;.\WebKit2Common.vsprops;.\WebKit2DirectX.vsprops;.\WebKit2Apple.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -200,9 +138,9 @@
 			/>
 		</Configuration>
 		<Configuration
-			Name="Debug_Cairo|Win32"
+			Name="Debug_Cairo_CFLite|Win32"
 			ConfigurationType="2"
-			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefinesCairo.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug_wincairo.vsprops;$(WebKitLibrariesDir)\tools\vsprops\WinCairo.vsprops;$(WebKitLibrariesDir)\tools\vsprops\cURL.vsprops;.\WebKit2Common.vsprops;.\WebKit2CFLite.vsprops"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\FeatureDefinesCairo.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\debug_wincairo.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\cURL.vsprops;.\WebKit2Common.vsprops;.\WebKit2CFLite.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\WinCairo.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -262,10 +200,9 @@
 			/>
 		</Configuration>
 		<Configuration
-			Name="Release_Cairo|Win32"
-			OutputDirectory="$(WebKitOutputDir)\bin"
+			Name="Release_Cairo_CFLite|Win32"
 			ConfigurationType="2"
-			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefinesCairo.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\release.vsprops;$(WebKitLibrariesDir)\tools\vsprops\WinCairo.vsprops;$(WebKitLibrariesDir)\tools\vsprops\cURL.vsprops;.\WebKit2Common.vsprops;.\WebKit2CFLite.vsprops"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\FeatureDefinesCairo.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\WinCairo.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\cURL.vsprops;.\WebKit2Common.vsprops;.\WebKit2CFLite.vsprops"
 			CharacterSet="1"
 			WholeProgramOptimization="1"
 			>
@@ -327,8 +264,70 @@
 		<Configuration
 			Name="Debug_All|Win32"
 			ConfigurationType="2"
-			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefines.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug_internal.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug_all.vsprops;.\WebKit2Common.vsprops;.\WebKit2DirectX.vsprops;.\WebKit2Apple.vsprops"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\debug_all.vsprops;.\WebKit2Common.vsprops;.\WebKit2DirectX.vsprops;.\WebKit2Apple.vsprops"
 			CharacterSet="1"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
+			<Tool
+				Name="VCCLCompilerTool"
+			/>
+			<Tool
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
+			<Tool
+				Name="VCLinkerTool"
+			/>
+			<Tool
+				Name="VCALinkTool"
+			/>
+			<Tool
+				Name="VCManifestTool"
+			/>
+			<Tool
+				Name="VCXDCMakeTool"
+			/>
+			<Tool
+				Name="VCBscMakeTool"
+			/>
+			<Tool
+				Name="VCFxCopTool"
+			/>
+			<Tool
+				Name="VCAppVerifierTool"
+			/>
+			<Tool
+				Name="VCWebDeploymentTool"
+			/>
+			<Tool
+				Name="VCPostBuildEventTool"
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release_LTCG|Win32"
+			ConfigurationType="2"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;.\WebKit2Common.vsprops;.\WebKit2DirectX.vsprops;.\WebKit2Apple.vsprops"
+			CharacterSet="1"
+			WholeProgramOptimization="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -676,6 +675,18 @@
 					>
 				</File>
 				<File
+					RelativePath="..\Shared\API\c\WKContextMenuItem.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Shared\API\c\WKContextMenuItem.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Shared\API\c\WKContextMenuItemTypes.h"
+					>
+				</File>
+				<File
 					RelativePath="..\Shared\API\c\WKData.cpp"
 					>
 				</File>
@@ -822,7 +833,7 @@
 						RelativePath="..\Shared\API\c\cf\WKURLRequestCF.cpp"
 						>
 						<FileConfiguration
-							Name="Debug_Cairo|Win32"
+							Name="Debug_Cairo_CFLite|Win32"
 							ExcludedFromBuild="true"
 							>
 							<Tool
@@ -830,7 +841,7 @@
 							/>
 						</FileConfiguration>
 						<FileConfiguration
-							Name="Release_Cairo|Win32"
+							Name="Release_Cairo_CFLite|Win32"
 							ExcludedFromBuild="true"
 							>
 							<Tool
@@ -846,7 +857,7 @@
 						RelativePath="..\Shared\API\c\cf\WKURLResponseCF.cpp"
 						>
 						<FileConfiguration
-							Name="Debug_Cairo|Win32"
+							Name="Debug_Cairo_CFLite|Win32"
 							ExcludedFromBuild="true"
 							>
 							<Tool
@@ -854,7 +865,7 @@
 							/>
 						</FileConfiguration>
 						<FileConfiguration
-							Name="Release_Cairo|Win32"
+							Name="Release_Cairo_CFLite|Win32"
 							ExcludedFromBuild="true"
 							>
 							<Tool
@@ -939,7 +950,7 @@
 					RelativePath="..\Shared\win\WebURLRequestWin.cpp"
 					>
 					<FileConfiguration
-						Name="Debug_Cairo|Win32"
+						Name="Debug_Cairo_CFLite|Win32"
 						ExcludedFromBuild="true"
 						>
 						<Tool
@@ -947,7 +958,7 @@
 						/>
 					</FileConfiguration>
 					<FileConfiguration
-						Name="Release_Cairo|Win32"
+						Name="Release_Cairo_CFLite|Win32"
 						ExcludedFromBuild="true"
 						>
 						<Tool
@@ -959,7 +970,7 @@
 					RelativePath="..\Shared\win\WebURLResponseWin.cpp"
 					>
 					<FileConfiguration
-						Name="Debug_Cairo|Win32"
+						Name="Debug_Cairo_CFLite|Win32"
 						ExcludedFromBuild="true"
 						>
 						<Tool
@@ -967,7 +978,7 @@
 						/>
 					</FileConfiguration>
 					<FileConfiguration
-						Name="Release_Cairo|Win32"
+						Name="Release_Cairo_CFLite|Win32"
 						ExcludedFromBuild="true"
 						>
 						<Tool
@@ -983,7 +994,7 @@
 					RelativePath="..\Shared\cg\BackingStoreCG.cpp"
 					>
 					<FileConfiguration
-						Name="Debug_Cairo|Win32"
+						Name="Debug_Cairo_CFLite|Win32"
 						ExcludedFromBuild="true"
 						>
 						<Tool
@@ -991,7 +1002,7 @@
 						/>
 					</FileConfiguration>
 					<FileConfiguration
-						Name="Release_Cairo|Win32"
+						Name="Release_Cairo_CFLite|Win32"
 						ExcludedFromBuild="true"
 						>
 						<Tool
@@ -1023,7 +1034,7 @@
 						/>
 					</FileConfiguration>
 					<FileConfiguration
-						Name="Debug_Internal|Win32"
+						Name="Debug_All|Win32"
 						ExcludedFromBuild="true"
 						>
 						<Tool
@@ -1031,7 +1042,7 @@
 						/>
 					</FileConfiguration>
 					<FileConfiguration
-						Name="Debug_All|Win32"
+						Name="Release_LTCG|Win32"
 						ExcludedFromBuild="true"
 						>
 						<Tool
@@ -1200,6 +1211,14 @@
 					>
 				</File>
 				<File
+					RelativePath="..\WebProcess\WebPage\LayerBackedDrawingArea.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\WebProcess\WebPage\LayerBackedDrawingArea.h"
+					>
+				</File>
+				<File
 					RelativePath="..\WebProcess\WebPage\PageOverlay.cpp"
 					>
 				</File>
@@ -1268,6 +1287,14 @@
 					>
 					<File
 						RelativePath="..\WebProcess\WebPage\win\ChunkedUpdateDrawingAreaWin.cpp"
+						>
+					</File>
+					<File
+						RelativePath="..\WebProcess\WebPage\win\LayerBackedDrawingAreaWin.cpp"
+						>
+					</File>
+					<File
+						RelativePath="..\WebProcess\WebPage\win\WebInspectorWin.cpp"
 						>
 					</File>
 					<File
@@ -1341,6 +1368,14 @@
 				</File>
 				<File
 					RelativePath="..\WebProcess\InjectedBundle\InjectedBundleBackForwardListItem.h"
+					>
+				</File>
+				<File
+					RelativePath="..\WebProcess\InjectedBundle\InjectedBundleClient.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\WebProcess\InjectedBundle\InjectedBundleClient.h"
 					>
 				</File>
 				<File
@@ -1482,15 +1517,15 @@
 							>
 						</File>
 						<File
-							RelativePath="..\WebProcess\InjectedBundle\API\c\WKBundlePagePrivate.h"
-							>
-						</File>
-						<File
 							RelativePath="..\WebProcess\InjectedBundle\API\c\WKBundlePageOverlay.cpp"
 							>
 						</File>
 						<File
 							RelativePath="..\WebProcess\InjectedBundle\API\c\WKBundlePageOverlay.h"
+							>
+						</File>
+						<File
+							RelativePath="..\WebProcess\InjectedBundle\API\c\WKBundlePagePrivate.h"
 							>
 						</File>
 						<File
@@ -1685,6 +1720,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\UIProcess\LayerBackedDrawingAreaProxy.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\UIProcess\LayerBackedDrawingAreaProxy.h"
+				>
+			</File>
+			<File
 				RelativePath="..\UIProcess\PageClient.h"
 				>
 			</File>
@@ -1850,6 +1893,14 @@
 			</File>
 			<File
 				RelativePath="..\UIProcess\WebNavigationData.h"
+				>
+			</File>
+			<File
+				RelativePath="..\UIProcess\WebPageContextMenuClient.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\UIProcess\WebPageContextMenuClient.h"
 				>
 			</File>
 			<File
@@ -2047,10 +2098,6 @@
 						>
 					</File>
 					<File
-						RelativePath="..\UIProcess\API\C\WKPreferencesPrivate.cpp"
-						>
-					</File>
-					<File
 						RelativePath="..\UIProcess\API\C\WKPreferencesPrivate.h"
 						>
 					</File>
@@ -2115,10 +2162,10 @@
 					RelativePath="..\UIProcess\Downloads\DownloadProxy.h"
 					>
 				</File>
-    			<File
-    				RelativePath="..\UIProcess\Downloads\DownloadProxy.messages.in"
-    				>
-    			</File>
+				<File
+					RelativePath="..\UIProcess\Downloads\DownloadProxy.messages.in"
+					>
+				</File>
 			</Filter>
 			<Filter
 				Name="Launcher"
@@ -2160,6 +2207,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\UIProcess\win\LayerBackedDrawingAreaProxyWin.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\UIProcess\win\WebContextMenuProxyWin.cpp"
 					>
 				</File>
@@ -2169,6 +2220,10 @@
 				</File>
 				<File
 					RelativePath="..\UIProcess\win\WebContextWin.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\UIProcess\win\WebInspectorProxyWin.cpp"
 					>
 				</File>
 				<File
@@ -2505,6 +2560,14 @@
 				>
 			</File>
 			<File
+				RelativePath="$(WebKitOutputDir)\obj\$(ProjectName)\DerivedSources\WebInspectorProxyMessageReceiver.cpp"
+				>
+			</File>
+			<File
+				RelativePath="$(WebKitOutputDir)\obj\$(ProjectName)\DerivedSources\WebInspectorProxyMessages.h"
+				>
+			</File>
+			<File
 				RelativePath="$(WebKitOutputDir)\obj\$(ProjectName)\DerivedSources\WebPageMessageReceiver.cpp"
 				>
 			</File>
@@ -2591,7 +2654,7 @@
 				/>
 			</FileConfiguration>
 			<FileConfiguration
-				Name="Debug_Internal|Win32"
+				Name="Debug_Cairo_CFLite|Win32"
 				>
 				<Tool
 					Name="VCCLCompilerTool"
@@ -2600,16 +2663,7 @@
 				/>
 			</FileConfiguration>
 			<FileConfiguration
-				Name="Debug_Cairo|Win32"
-				>
-				<Tool
-					Name="VCCLCompilerTool"
-					UsePrecompiledHeader="1"
-					PrecompiledHeaderThrough="WebKit2Prefix.h"
-				/>
-			</FileConfiguration>
-			<FileConfiguration
-				Name="Release_Cairo|Win32"
+				Name="Release_Cairo_CFLite|Win32"
 				>
 				<Tool
 					Name="VCCLCompilerTool"
@@ -2619,6 +2673,15 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Debug_All|Win32"
+				>
+				<Tool
+					Name="VCCLCompilerTool"
+					UsePrecompiledHeader="1"
+					PrecompiledHeaderThrough="WebKit2Prefix.h"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
 				>
 				<Tool
 					Name="VCCLCompilerTool"

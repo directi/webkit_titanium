@@ -44,9 +44,6 @@
 #include "CSSStyleSheet.h"
 #include "CSSTimingFunctionValue.h"
 #include "CSSValueList.h"
-#include "CSSVariableDependentValue.h"
-#include "CSSVariablesDeclaration.h"
-#include "CSSVariablesRule.h"
 #include "CachedImage.h"
 #include "Counter.h"
 #include "FocusController.h"
@@ -392,6 +389,9 @@ static CSSStyleSheet* simpleDefaultStyleSheet;
 RenderStyle* CSSStyleSelector::s_styleNotYetAvailable;
 
 static void loadFullDefaultStyle();
+#if ENABLE(FULLSCREEN_API)
+static void loadFullScreenRulesIfNeeded(Document*);
+#endif
 static void loadSimpleDefaultStyle();
 // FIXME: It would be nice to use some mechanism that guarantees this is in sync with the real UA stylesheet.
 static const char* simpleUserAgentStyleSheet = "html,body,div{display:block}body{margin:8px}div:focus,span:focus{outline:auto 5px -webkit-focus-ring-color}a:-webkit-any-link{color:-webkit-link;text-decoration:underline}a:-webkit-any-link:active{color:-webkit-activelink}";
@@ -430,8 +430,12 @@ CSSStyleSelector::CSSStyleSelector(Document* document, StyleSheetList* styleShee
     if (!defaultStyle) {
         if (!root || elementCanUseSimpleDefaultStyle(root))
             loadSimpleDefaultStyle();
-        else
+        else {
             loadFullDefaultStyle();
+#if ENABLE(FULLSCREEN_API)
+            loadFullScreenRulesIfNeeded(document);
+#endif
+        }
     }
 
     // construct document root element default style. this is needed
@@ -537,15 +541,20 @@ static void loadFullDefaultStyle()
     String quirksRules = String(quirksUserAgentStyleSheet, sizeof(quirksUserAgentStyleSheet)) + RenderTheme::defaultTheme()->extraQuirksStyleSheet();
     CSSStyleSheet* quirksSheet = parseUASheet(quirksRules);
     defaultQuirksStyle->addRulesFromSheet(quirksSheet, screenEval());
-    
+}
+
 #if ENABLE(FULLSCREEN_API)
+static void loadFullScreenRulesIfNeeded(Document* document)
+{
+    if (!document->webkitFullScreen())
+        return;
     // Full-screen rules.
     String fullscreenRules = String(fullscreenUserAgentStyleSheet, sizeof(fullscreenUserAgentStyleSheet)) + RenderTheme::defaultTheme()->extraDefaultStyleSheet();
     CSSStyleSheet* fullscreenSheet = parseUASheet(fullscreenRules);
     defaultStyle->addRulesFromSheet(fullscreenSheet, screenEval());
     defaultQuirksStyle->addRulesFromSheet(fullscreenSheet, screenEval());
-#endif
 }
+#endif
 
 static void loadSimpleDefaultStyle()
 {
@@ -571,87 +580,7 @@ static void loadViewSourceStyle()
 
 void CSSStyleSelector::addMatchedDeclaration(CSSMutableStyleDeclaration* decl)
 {
-    if (!decl->hasVariableDependentValue()) {
-        m_matchedDecls.append(decl);
-        return;
-    }
-
-    // See if we have already resolved the variables in this declaration.
-    CSSMutableStyleDeclaration* resolvedDecl = m_resolvedVariablesDeclarations.get(decl).get();
-    if (resolvedDecl) {
-        m_matchedDecls.append(resolvedDecl);
-        return;
-    }
-
-    // If this declaration has any variables in it, then we need to make a cloned
-    // declaration with as many variables resolved as possible for this style selector's media.
-    RefPtr<CSSMutableStyleDeclaration> newDecl = CSSMutableStyleDeclaration::create(decl->parentRule());
-    m_matchedDecls.append(newDecl.get());
-    m_resolvedVariablesDeclarations.set(decl, newDecl);
-
-    HashSet<String> usedBlockVariables;
-    resolveVariablesForDeclaration(decl, newDecl.get(), usedBlockVariables);
-}
-
-void CSSStyleSelector::resolveVariablesForDeclaration(CSSMutableStyleDeclaration* decl, CSSMutableStyleDeclaration* newDecl, HashSet<String>& usedBlockVariables)
-{
-    // Now iterate over the properties in the original declaration.  As we resolve variables we'll end up
-    // mutating the new declaration (possibly expanding shorthands).  The new declaration has no m_node
-    // though, so it can't mistakenly call setChanged on anything.
-    CSSMutableStyleDeclaration::const_iterator end = decl->end();
-    for (CSSMutableStyleDeclaration::const_iterator it = decl->begin(); it != end; ++it) {
-        const CSSProperty& current = *it;
-        if (!current.value()->isVariableDependentValue()) {
-            // We can just add the parsed property directly.
-            newDecl->addParsedProperty(current);
-            continue;
-        }
-        CSSValueList* valueList = static_cast<CSSVariableDependentValue*>(current.value())->valueList();
-        if (!valueList)
-            continue;
-        CSSParserValueList resolvedValueList;
-        unsigned s = valueList->length();
-        bool fullyResolved = true;
-        for (unsigned i = 0; i < s; ++i) {
-            CSSValue* transformValue = valueList->item(i);
-            CSSPrimitiveValue* primitiveValue = transformValue->isPrimitiveValue() ? static_cast<CSSPrimitiveValue*>(transformValue) : 0;
-            if (primitiveValue && primitiveValue->isVariable()) {
-                CSSVariablesRule* rule = m_variablesMap.get(primitiveValue->getStringValue());
-                if (!rule || !rule->variables()) {
-                    fullyResolved = false;
-                    break;
-                }
-                
-                if (current.id() == CSSPropertyWebkitVariableDeclarationBlock && s == 1) {
-                    fullyResolved = false;
-                    if (!usedBlockVariables.contains(primitiveValue->getStringValue())) {
-                        CSSMutableStyleDeclaration* declBlock = rule->variables()->getParsedVariableDeclarationBlock(primitiveValue->getStringValue());
-                        if (declBlock) {
-                            usedBlockVariables.add(primitiveValue->getStringValue());
-                            resolveVariablesForDeclaration(declBlock, newDecl, usedBlockVariables);
-                        }
-                    }
-                }
-
-                CSSValueList* resolvedVariable = rule->variables()->getParsedVariable(primitiveValue->getStringValue());
-                if (!resolvedVariable) {
-                    fullyResolved = false;
-                    break;
-                }
-                unsigned valueSize = resolvedVariable->length();
-                for (unsigned j = 0; j < valueSize; ++j)
-                    resolvedValueList.addValue(resolvedVariable->item(j)->parserValue());
-            } else
-                resolvedValueList.addValue(transformValue->parserValue());
-        }
-        
-        if (!fullyResolved)
-            continue;
-
-        // We now have a fully resolved new value list.  We want the parser to use this value list
-        // and parse our new declaration.
-        CSSParser(m_checker.m_strictParsing).parsePropertyWithResolvedVariables(current.id(), current.isImportant(), newDecl, &resolvedValueList);
-    }
+    m_matchedDecls.append(decl);
 }
 
 void CSSStyleSelector::matchRules(CSSRuleSet* rules, int& firstRuleIndex, int& lastRuleIndex, bool includeEmptyRules)
@@ -1224,8 +1153,12 @@ PassRefPtr<RenderStyle> CSSStyleSelector::styleForElement(Element* e, RenderStyl
         m_style->setInsideLink(m_elementLinkState);
     }
     
-    if (simpleDefaultStyleSheet && !elementCanUseSimpleDefaultStyle(e))
+    if (simpleDefaultStyleSheet && !elementCanUseSimpleDefaultStyle(e)) {
         loadFullDefaultStyle();
+#if ENABLE(FULLSCREEN_API)
+        loadFullScreenRulesIfNeeded(e->document());
+#endif
+    }
 
 #if ENABLE(SVG)
     static bool loadedSVGUserAgentSheet;
@@ -2785,23 +2718,6 @@ bool CSSStyleSelector::SelectorChecker::checkScrollbarPseudoClass(CSSSelector* s
     }
 }
 
-void CSSStyleSelector::addVariables(CSSVariablesRule* variables)
-{
-    CSSVariablesDeclaration* decl = variables->variables();
-    if (!decl)
-        return;
-    unsigned size = decl->length();
-    for (unsigned i = 0; i < size; ++i) {
-        String name = decl->item(i);
-        m_variablesMap.set(name, variables);
-    }
-}
-
-CSSValue* CSSStyleSelector::resolveVariableDependentValue(CSSVariableDependentValue*)
-{
-    return 0;
-}
-
 // -----------------------------------------------------------------
 
 CSSRuleSet::CSSRuleSet()
@@ -2908,11 +2824,6 @@ void CSSRuleSet::addRulesFromSheet(CSSStyleSheet* sheet, const MediaQueryEvaluat
             // Add this font face to our set.
             const CSSFontFaceRule* fontFaceRule = static_cast<CSSFontFaceRule*>(item);
             styleSelector->fontSelector()->addFontFaceRule(fontFaceRule);
-        } else if (item->isVariablesRule()) {
-            // Evaluate the media query and make sure it matches.
-            CSSVariablesRule* variables = static_cast<CSSVariablesRule*>(item);
-            if (!variables->media() || medium.eval(variables->media(), styleSelector))
-                styleSelector->addVariables(variables);
         } else if (item->isKeyframesRule())
             styleSelector->addKeyframeStyle(static_cast<WebKitCSSKeyframesRule*>(item));
     }
@@ -5611,7 +5522,6 @@ void CSSStyleSelector::applyProperty(int id, CSSValue *value)
     case CSSPropertyWebkitFontSizeDelta:
     case CSSPropertyWebkitTextDecorationsInEffect:
     case CSSPropertyWebkitTextStroke:
-    case CSSPropertyWebkitVariableDeclarationBlock:
         return;
 #if ENABLE(WCSS)
     case CSSPropertyWapInputFormat:
@@ -6398,7 +6308,7 @@ float CSSStyleSelector::getComputedSizeFromSpecifiedSize(Document* document, Ren
     
     // Also clamp to a reasonable maximum to prevent insane font sizes from causing crashes on various
     // platforms (I'm looking at you, Windows.)
-    return min(1000000.0f, max(zoomedSize, 1.0f));
+    return min(1000000.0f, zoomedSize);
 }
 
 const int fontSizeTableMax = 16;
@@ -6965,10 +6875,12 @@ void CSSStyleSelector::loadPendingImages()
             }
             
             case CSSPropertyWebkitBoxReflect: {
-                const NinePieceImage& maskImage = m_style->boxReflect()->mask();
-                if (maskImage.image() && maskImage.image()->isPendingImage()) {
-                    CSSImageValue* imageValue = static_cast<StylePendingImage*>(maskImage.image())->cssImageValue();
-                    m_style->boxReflect()->setMask(NinePieceImage(imageValue->cachedImage(cachedResourceLoader), maskImage.slices(), maskImage.horizontalRule(), maskImage.verticalRule()));
+                if (StyleReflection* reflection = m_style->boxReflect()) {
+                    const NinePieceImage& maskImage = reflection->mask();
+                    if (maskImage.image() && maskImage.image()->isPendingImage()) {
+                        CSSImageValue* imageValue = static_cast<StylePendingImage*>(maskImage.image())->cssImageValue();
+                        reflection->setMask(NinePieceImage(imageValue->cachedImage(cachedResourceLoader), maskImage.slices(), maskImage.horizontalRule(), maskImage.verticalRule()));
+                    }
                 }
                 break;
             }

@@ -21,6 +21,7 @@
 #include "StyleSheet.h"
 
 #include "MediaList.h"
+#include "Node.h"
 
 namespace WebCore {
 

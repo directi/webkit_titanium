@@ -36,6 +36,7 @@
 #include "InjectedBundlePageUIClient.h"
 #include "MessageSender.h"
 #include "Plugin.h"
+#include "SandboxExtension.h"
 #include "WebEditCommand.h"
 #include <WebCore/FrameLoaderTypes.h>
 #include <WebCore/IntRect.h>
@@ -107,7 +108,10 @@ public:
 
     InjectedBundleBackForwardList* backForwardList();
     DrawingArea* drawingArea() const { return m_drawingArea.get(); }
+
+#if ENABLE(INSPECTOR)
     WebInspector* inspector();
+#endif
 
     // -- Called by the DrawingArea.
     // FIXME: We could genericize these into a DrawingArea client interface. Would that be beneficial?
@@ -160,7 +164,7 @@ public:
     void setPageZoomFactor(double);
     void setPageAndTextZoomFactors(double pageZoomFactor, double textZoomFactor);
 
-    void scaleWebView(double scale);
+    void scaleWebView(double scale, const WebCore::IntPoint& origin);
     double viewScaleFactor() const;
 
     void stopLoading();
@@ -184,7 +188,7 @@ public:
 #endif
 
     void installPageOverlay(PassRefPtr<PageOverlay>);
-    void uninstallPageOverlay();
+    void uninstallPageOverlay(PageOverlay*);
 
     static const WebEvent* currentEvent();
 
@@ -193,9 +197,37 @@ public:
     void pageDidScroll();
 #if ENABLE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntSize& delta);
+    void setActualVisibleContentRect(const WebCore::IntRect&);
+
+    bool resizesToContentsEnabled() const { return !m_resizesToContentsLayoutSize.isEmpty(); }
+    WebCore::IntSize resizesToContentsLayoutSize() const { return m_resizesToContentsLayoutSize; }
+    void setResizesToContentsUsingLayoutSize(const WebCore::IntSize& targetLayoutSize);
+    void resizeToContentsIfNeeded();
 #endif
 
     WebContextMenu* contextMenu();
+    
+    bool hasLocalDataForURL(const WebCore::KURL&);
+    
+    static bool canHandleRequest(const WebCore::ResourceRequest&);
+
+    class SandboxExtensionTracker {
+    public:
+        ~SandboxExtensionTracker();
+
+        void invalidate();
+
+        void beginLoad(WebFrame*, const SandboxExtension::Handle& handle);
+        void didStartProvisionalLoad(WebFrame*);
+        void didCommitProvisionalLoad(WebFrame*);
+        void didFailProvisionalLoad(WebFrame*);
+    private:
+        RefPtr<SandboxExtension> m_pendingProvisionalSandboxExtension;
+        RefPtr<SandboxExtension> m_provisionalSandboxExtension;
+        RefPtr<SandboxExtension> m_committedSandboxExtension;
+    };
+
+    SandboxExtensionTracker& sandboxExtensionTracker() { return m_sandboxExtensionTracker; }
 
 private:
     WebPage(uint64_t pageID, const WebPageCreationParameters&);
@@ -215,8 +247,8 @@ private:
 
     // Actions
     void tryClose();
-    void loadURL(const String&);
-    void loadURLRequest(const WebCore::ResourceRequest&);
+    void loadURL(const String&, const SandboxExtension::Handle& sandboxExtensionHandle);
+    void loadURLRequest(const WebCore::ResourceRequest&, const SandboxExtension::Handle& sandboxExtensionHandle);
     void loadHTMLString(const String& htmlString, const String& baseURL);
     void loadAlternateHTMLString(const String& htmlString, const String& baseURL, const String& unreachableURL);
     void loadPlainTextString(const String&);
@@ -262,6 +294,10 @@ private:
     void hideFindUI();
     void countStringMatches(const String&, bool caseInsensitive, uint32_t maxMatchCount);
 
+#if PLATFORM(QT)
+    void findZoomableAreaForPoint(const WebCore::IntPoint&);
+#endif
+
     void didChangeSelectedIndexForActivePopupMenu(int32_t newIndex);
 
 #if ENABLE(CONTEXT_MENUS)
@@ -279,6 +315,7 @@ private:
 
     bool m_isInRedo;
     bool m_isClosed;
+    bool m_isVisibleToInjectedBundle;
 
 #if PLATFORM(MAC)
     // Whether the containing window is visible or not.
@@ -304,15 +341,20 @@ private:
     InjectedBundlePageLoaderClient m_loaderClient;
     InjectedBundlePageUIClient m_uiClient;
 
+#if ENABLE(TILED_BACKING_STORE)
+    WebCore::IntSize m_resizesToContentsLayoutSize;
+#endif
+
     FindController m_findController;
     RefPtr<PageOverlay> m_pageOverlay;
 
+#if ENABLE(INSPECTOR)
     OwnPtr<WebInspector> m_inspector;
-
+#endif
     RefPtr<WebPopupMenu> m_activePopupMenu;
-
     RefPtr<WebContextMenu> m_contextMenu;
 
+    SandboxExtensionTracker m_sandboxExtensionTracker;
     uint64_t m_pageID;
 };
 

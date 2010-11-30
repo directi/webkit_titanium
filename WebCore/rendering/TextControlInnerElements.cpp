@@ -41,6 +41,7 @@
 #include "RenderTextControlSingleLine.h"
 #include "ScrollbarTheme.h"
 #include "SpeechInput.h"
+#include "SpeechInputEvent.h"
 
 namespace WebCore {
 
@@ -51,22 +52,11 @@ public:
     RenderTextControlInnerBlock(Node* node, bool isMultiLine) : RenderBlock(node), m_multiLine(isMultiLine) { }
 
 private:
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, int x, int y, int tx, int ty, HitTestAction);
+    virtual bool hasLineIfEmpty() const { return true; }
     virtual VisiblePosition positionForPoint(const IntPoint&);
 
     bool m_multiLine;
 };
-
-bool RenderTextControlInnerBlock::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, int x, int y, int tx, int ty, HitTestAction hitTestAction)
-{
-    RenderObject* renderer = node()->shadowAncestorNode()->renderer();
-
-    bool placeholderIsVisible = false;
-    if (renderer->isTextField())
-        placeholderIsVisible = toRenderTextControlSingleLine(renderer)->placeholderIsVisible();
-
-    return RenderBlock::nodeAtPoint(request, result, x, y, tx, ty, placeholderIsVisible ? HitTestBlockBackground : hitTestAction);
-}
 
 VisiblePosition RenderTextControlInnerBlock::positionForPoint(const IntPoint& point)
 {
@@ -124,11 +114,6 @@ void TextControlInnerElement::attachInnerElement(Node* parent, PassRefPtr<Render
         parent->renderer()->addChild(renderer);
 }
 
-bool TextControlInnerElement::isSpellCheckingEnabled() const
-{
-    return m_shadowParent && m_shadowParent->isSpellCheckingEnabled();
-}
-
 // ----------------------------
 
 inline TextControlInnerTextElement::TextControlInnerTextElement(Document* document, HTMLElement* shadowParent)
@@ -154,7 +139,7 @@ void TextControlInnerTextElement::defaultEventHandler(Event* event)
         if (shadowAncestor && shadowAncestor != this)
             shadowAncestor->defaultEventHandler(event);
     }
-    if (event->defaultHandled())
+    if (!event->defaultHandled())
         HTMLDivElement::defaultEventHandler(event);
 }
 
@@ -490,7 +475,7 @@ void InputFieldSpeechButtonElement::setRecognitionResult(int, const SpeechInputR
     // here, we take a temporary reference.
     RefPtr<HTMLInputElement> holdRef(input);
     input->setValue(results.isEmpty() ? "" : results[0]->utterance());
-    input->dispatchWebkitSpeechChangeEvent();
+    input->dispatchEvent(SpeechInputEvent::create(eventNames().webkitspeechchangeEvent, results));
     renderer()->repaint();
 }
 

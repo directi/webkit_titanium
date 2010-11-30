@@ -170,9 +170,6 @@ namespace WebCore {
         void setShouldPrintBackgrounds(bool);
         bool shouldPrintBackgrounds() const { return m_shouldPrintBackgrounds; }
 
-        void setShouldDelegateScrolling(bool);
-        bool shouldDelegateScrolling() const { return m_shouldDelegateScrolling; }
-
         void setTextAreasAreResizable(bool);
         bool textAreasAreResizable() const { return m_textAreasAreResizable; }
 
@@ -362,6 +359,7 @@ namespace WebCore {
         unsigned m_sessionStorageQuota;
 #endif
         unsigned m_pluginAllowedRunTime;
+        unsigned m_editingBehaviorType;
         bool m_isSpatialNavigationEnabled : 1;
         bool m_isJavaEnabled : 1;
         bool m_loadsImagesAutomatically : 1;
@@ -378,7 +376,6 @@ namespace WebCore {
         bool m_javaScriptCanOpenWindowsAutomatically : 1;
         bool m_javaScriptCanAccessClipboard : 1;
         bool m_shouldPrintBackgrounds : 1;
-        bool m_shouldDelegateScrolling : 1;
         bool m_textAreasAreResizable : 1;
 #if ENABLE(DASHBOARD_SUPPORT)
         bool m_usesDashboardBackwardCompatibilityMode : 1;
@@ -406,7 +403,6 @@ namespace WebCore {
         bool m_enforceCSSMIMETypeInNoQuirksMode : 1;
         bool m_usesEncodingDetector : 1;
         bool m_allowScriptsToCloseWindows : 1;
-        unsigned m_editingBehaviorType : 1;
         bool m_downloadableBinaryFontsEnabled : 1;
         bool m_xssAuditorEnabled : 1;
         bool m_acceleratedCompositingEnabled : 1;

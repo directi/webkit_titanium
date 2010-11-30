@@ -98,6 +98,11 @@ void QWKPagePrivate::setViewportArguments(const ViewportArguments& args)
     emit q->viewportChangeRequested();
 }
 
+void QWKPagePrivate::takeFocus(bool direction)
+{
+    emit q->focusNextPrevChild(direction);
+}
+
 void QWKPagePrivate::pageDidRequestScroll(const IntSize& delta)
 {
     emit q->scrollRequested(delta.width(), delta.height());
@@ -290,8 +295,12 @@ void QWKPagePrivate::_q_webActionTriggered(bool checked)
 
 void QWKPagePrivate::touchEvent(QTouchEvent* event)
 {
+#if ENABLE(TOUCH_EVENTS)
     WebTouchEvent touchEvent = WebEventFactory::createWebTouchEvent(event);
     page->handleTouchEvent(touchEvent);
+#else
+    event->ignore();
+#endif
 }
 
 QWKPage::QWKPage(WKPageNamespaceRef namespaceRef)
@@ -431,6 +440,11 @@ QWKPage::ViewportAttributes QWKPage::viewportAttributesForSize(const QSize& avai
     return result;
 }
 
+void QWKPage::setActualVisibleContentsRect(const QRect& rect) const
+{
+    d->page->setActualVisibleContentRect(rect);
+}
+
 void QWKPage::timerEvent(QTimerEvent* ev)
 {
     int timerId = ev->timerId();
@@ -464,6 +478,11 @@ void QWKPage::setCustomUserAgent(const QString& userAgent)
 {
     WKRetainPtr<WKStringRef> wkUserAgent(WKStringCreateWithQString(userAgent));
     WKPageSetCustomUserAgent(pageRef(), wkUserAgent.get());
+}
+
+QString QWKPage::customUserAgent() const
+{
+    return WKStringCopyQString(WKPageCopyCustomUserAgent(pageRef()));
 }
 
 void QWKPage::load(const QUrl& url)
@@ -524,6 +543,13 @@ void QWKPage::setPageAndTextZoomFactors(qreal pageZoomFactor, qreal textZoomFact
 QWKHistory* QWKPage::history() const
 {
     return d->history;
+}
+
+void QWKPage::setResizesToContentsUsingLayoutSize(const QSize& targetLayoutSize)
+{
+#if ENABLE(TILED_BACKING_STORE)
+    d->page->setResizesToContentsUsingLayoutSize(targetLayoutSize);
+#endif
 }
 
 #ifndef QT_NO_ACTION
@@ -600,5 +626,15 @@ QAction* QWKPage::action(WebAction action) const
     return a;
 }
 #endif // QT_NO_ACTION
+
+void QWKPage::findZoomableAreaForPoint(const QPoint& point)
+{
+    d->page->findZoomableAreaForPoint(point);
+}
+
+void QWKPagePrivate::didFindZoomableArea(const IntRect& area)
+{
+    emit q->zoomableAreaFound(QRect(area));
+}
 
 #include "moc_qwkpage.cpp"

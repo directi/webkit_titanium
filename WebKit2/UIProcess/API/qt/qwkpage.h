@@ -82,6 +82,10 @@ public:
     void setViewportSize(const QSize&);
     ViewportAttributes viewportAttributesForSize(const QSize& availableSize) const;
 
+    void setActualVisibleContentsRect(const QRect& rect) const;
+
+    void setResizesToContentsUsingLayoutSize(const QSize& targetLayoutSize);
+
     QAction* action(WebAction action) const;
     void triggerAction(WebAction action, bool checked = false);
 
@@ -89,6 +93,7 @@ public:
     void setCreateNewPageFunction(CreateNewPageFn function);
 
     void setCustomUserAgent(const QString&);
+    QString customUserAgent() const;
 
     qreal textZoomFactor() const;
     qreal pageZoomFactor() const;
@@ -97,6 +102,8 @@ public:
     void setPageAndTextZoomFactors(qreal pageZoomFactor, qreal textZoomFactor);
 
     QWKHistory* history() const;
+
+    void findZoomableAreaForPoint(const QPoint&);
 
 public:
     Q_SIGNAL void statusBarMessage(const QString&);
@@ -110,6 +117,9 @@ public:
     Q_SIGNAL void scrollRequested(int dx, int dy);
     Q_SIGNAL void cursorChanged(const QCursor&);
     Q_SIGNAL void viewportChangeRequested();
+    Q_SIGNAL void windowCloseRequested();
+    Q_SIGNAL void zoomableAreaFound(const QRect&);
+    Q_SIGNAL void focusNextPrevChild(bool);
 
 protected:
     void timerEvent(QTimerEvent*);

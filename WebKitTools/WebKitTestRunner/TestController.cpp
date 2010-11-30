@@ -275,6 +275,7 @@ bool TestController::resetStateToConsistentValues()
     WKPreferencesSetOfflineWebApplicationCacheEnabled(preferences, true);
     WKPreferencesSetFontSmoothingLevel(preferences, kWKFontSmoothingLevelNoSubpixelAntiAliasing);
     WKPreferencesSetXSSAuditorEnabled(preferences, false);
+    WKPreferencesSetDeveloperExtrasEnabled(preferences, true);
 
     static WKStringRef standardFontFamily = WKStringCreateWithUTF8CString("Times");
     static WKStringRef cursiveFontFamily = WKStringCreateWithUTF8CString("Apple Chancery");
@@ -388,6 +389,7 @@ void TestController::didFinishLoadForFrame(WKPageRef page, WKFrameRef frame)
         return;
 
     m_doneResetting = true;
+    shared().notifyDone();
 }
 
 } // namespace WTR

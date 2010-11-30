@@ -246,6 +246,11 @@ void GraphicsContext3DInternal::reshape(int width, int height)
 #endif // PLATFORM(CG)
 }
 
+bool GraphicsContext3DInternal::isContextLost()
+{
+    return m_impl->isContextLost();
+}
+
 // Macros to assist in delegating from GraphicsContext3DInternal to
 // WebGraphicsContext3D.
 
@@ -363,16 +368,6 @@ DELEGATE_TO_IMPL_1R(sizeInBytes, int, int)
 bool GraphicsContext3DInternal::isGLES2Compliant() const
 {
     return m_impl->isGLES2Compliant();
-}
-
-bool GraphicsContext3DInternal::isGLES2NPOTStrict() const
-{
-    return m_impl->isGLES2NPOTStrict();
-}
-
-bool GraphicsContext3DInternal::isErrorGeneratedOnOutOfBoundsAccesses() const
-{
-    return m_impl->isErrorGeneratedOnOutOfBoundsAccesses();
 }
 
 DELEGATE_TO_IMPL_1(activeTexture, unsigned long)
@@ -1049,16 +1044,6 @@ DELEGATE_TO_INTERNAL_R(getExtensions, Extensions3D*)
 bool GraphicsContext3D::isGLES2Compliant() const
 {
     return m_internal->isGLES2Compliant();
-}
-
-bool GraphicsContext3D::isGLES2NPOTStrict() const
-{
-    return m_internal->isGLES2NPOTStrict();
-}
-
-bool GraphicsContext3D::isErrorGeneratedOnOutOfBoundsAccesses() const
-{
-    return m_internal->isErrorGeneratedOnOutOfBoundsAccesses();
 }
 
 } // namespace WebCore

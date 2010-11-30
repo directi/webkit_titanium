@@ -287,12 +287,8 @@ bool HTMLObjectElement::rendererIsNeeded(RenderStyle* style)
     Frame* frame = document()->frame();
     if (!frame)
         return false;
-    
-    // Temporary Workaround for Gears plugin - see bug 24215 for details and bug 24346 to track removal.
-    // Gears expects the plugin to be instantiated even if display:none is set
-    // for the object element.
-    bool isGearsPlugin = equalIgnoringCase(getAttribute(typeAttr), "application/x-googlegears");
-    return isGearsPlugin || HTMLPlugInImageElement::rendererIsNeeded(style);
+
+    return HTMLPlugInImageElement::rendererIsNeeded(style);
 }
 
 void HTMLObjectElement::insertedIntoDocument()
@@ -346,7 +342,7 @@ void HTMLObjectElement::renderFallbackContent()
         return;
 
     // Before we give up and use fallback content, check to see if this is a MIME type issue.
-    if (m_imageLoader && m_imageLoader->image()) {
+    if (m_imageLoader && m_imageLoader->image() && m_imageLoader->image()->status() != CachedResource::LoadError) {
         m_serviceType = m_imageLoader->image()->response().mimeType();
         if (!isImageType()) {
             // If we don't think we have an image type anymore, then ditch the image loader.

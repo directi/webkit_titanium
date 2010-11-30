@@ -22,10 +22,12 @@
 #include "config.h"
 #include "FileInputType.h"
 
+#include "Event.h"
 #include "File.h"
 #include "FileList.h"
 #include "FormDataList.h"
 #include "HTMLInputElement.h"
+#include "LocalizedStrings.h"
 #include "RenderFileUploadControl.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/WTFString.h>
@@ -74,6 +76,20 @@ bool FileInputType::appendFormData(FormDataList& encoding, bool multipart) const
 bool FileInputType::valueMissing(const String& value) const
 {
     return value.isEmpty();
+}
+
+String FileInputType::valueMissingText() const
+{
+    return element()->multiple() ? validationMessageValueMissingForMultipleFileText() : validationMessageValueMissingForFileText();
+}
+
+bool FileInputType::handleDOMActivateEvent(Event* event)
+{
+    if (element()->disabled() || !element()->renderer())
+        return false;
+    toRenderFileUploadControl(element()->renderer())->click();
+    event->setDefaultHandled();
+    return true;
 }
 
 RenderObject* FileInputType::createRenderer(RenderArena* arena, RenderStyle*) const

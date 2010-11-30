@@ -435,22 +435,22 @@ String validationMessagePatternMismatchText()
     return String::fromUTF8("pattern mismatch");
 }
 
-String validationMessageRangeOverflowText()
+String validationMessageRangeOverflowText(const String&)
 {
     return String::fromUTF8("range overflow");
 }
 
-String validationMessageRangeUnderflowText()
+String validationMessageRangeUnderflowText(const String&)
 {
     return String::fromUTF8("range underflow");
 }
 
-String validationMessageStepMismatchText()
+String validationMessageStepMismatchText(const String&, const String&)
 {
     return String::fromUTF8("step mismatch");
 }
 
-String validationMessageTooLongText()
+String validationMessageTooLongText(int, int)
 {
     return String::fromUTF8("too long");
 }
@@ -460,9 +460,54 @@ String validationMessageTypeMismatchText()
     return String::fromUTF8("type mismatch");
 }
 
+String validationMessageTypeMismatchForEmailText()
+{
+    return String::fromUTF8("type mismatch");
+}
+
+String validationMessageTypeMismatchForMultipleEmailText()
+{
+    return String::fromUTF8("type mismatch");
+}
+
+String validationMessageTypeMismatchForURLText()
+{
+    return String::fromUTF8("type mismatch");
+}
+
 String validationMessageValueMissingText()
 {
     return String::fromUTF8("value missing");
+}
+
+String validationMessageValueMissingForCheckboxText()
+{
+    notImplemented();
+    return validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForFileText()
+{
+    notImplemented();
+    return validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForMultipleFileText()
+{
+    notImplemented();
+    return validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForRadioText()
+{
+    notImplemented();
+    return validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForSelectText()
+{
+    notImplemented();
+    return validationMessageValueMissingText();
 }
 
 String missingPluginText()

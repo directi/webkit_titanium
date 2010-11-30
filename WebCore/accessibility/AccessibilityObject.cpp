@@ -401,7 +401,7 @@ static bool replacedNodeNeedsCharacter(Node* replacedNode)
 // Finds a RenderListItem parent give a node.
 static RenderListItem* renderListItemContainerForNode(Node* node)
 {
-    for (; node; node = node->parent()) {
+    for (; node; node = node->parentNode()) {
         RenderBoxModelObject* renderer = node->renderBoxModelObject();
         if (renderer && renderer->isListItem())
             return toRenderListItem(renderer);
@@ -937,9 +937,8 @@ static ARIARoleMap* createARIARoleMap()
         { "treeitem", TreeItemRole }
     };
     ARIARoleMap* roleMap = new ARIARoleMap;
-    
-    const unsigned numRoles = sizeof(roles) / sizeof(roles[0]);
-    for (unsigned i = 0; i < numRoles; ++i)
+
+    for (size_t i = 0; i < WTF_ARRAY_LENGTH(roles); ++i)
         roleMap->set(roles[i].ariaRole, roles[i].webcoreRole);
     return roleMap;
 }

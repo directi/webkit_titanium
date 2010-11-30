@@ -27,6 +27,8 @@
 #define InjectedBundle_h
 
 #include "APIObject.h"
+#include "InjectedBundleClient.h"
+#include "SandboxExtension.h"
 #include "WKBundle.h"
 #include <WebCore/UserContentTypes.h>
 #include <WebCore/UserScriptTypes.h>
@@ -70,10 +72,7 @@ public:
     ~InjectedBundle();
 
     bool load(APIObject* initializationUserData);
-
-#if ENABLE(WEB_PROCESS_SANDBOX)
-    void setSandboxToken(const String& sandboxToken) { m_sandboxToken = sandboxToken; }
-#endif
+    void setSandboxExtension(PassRefPtr<SandboxExtension> sandboxExtension) { m_sandboxExtension = sandboxExtension; }
 
     // API
     void initializeClient(WKBundleClient*);
@@ -117,11 +116,9 @@ private:
     String m_path;
     PlatformBundle m_platformBundle; // This is leaked right now, since we never unload the bundle/module.
 
-#if ENABLE(WEB_PROCESS_SANDBOX)
-    String m_sandboxToken;
-#endif
+    RefPtr<SandboxExtension> m_sandboxExtension;
 
-    WKBundleClient m_client;
+    InjectedBundleClient m_client;
 };
 
 } // namespace WebKit

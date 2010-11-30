@@ -202,9 +202,6 @@ FrameLoader::FrameLoader(Frame* frame, FrameLoaderClient* client)
     , m_suppressOpenerInNewFrame(false)
     , m_sandboxFlags(SandboxAll)
     , m_forcedSandboxFlags(SandboxNone)
-#ifndef NDEBUG
-    , m_didDispatchDidCommitLoad(false)
-#endif
 {
 }
 
@@ -384,15 +381,19 @@ void FrameLoader::stopLoading(UnloadEventPolicy unloadEventPolicy, DatabasePolic
                     if (unloadEventPolicy == UnloadEventPolicyUnloadAndPageHide)
                         m_frame->domWindow()->dispatchEvent(PageTransitionEvent::create(eventNames().pagehideEvent, m_frame->document()->inPageCache()), m_frame->document());
                     if (!m_frame->document()->inPageCache()) {
-                        m_frame->domWindow()->dispatchEvent(Event::create(eventNames().unloadEvent, false, false), m_frame->domWindow()->document());
-
-                        if (m_provisionalDocumentLoader) {
-                            DocumentLoadTiming* timing = m_provisionalDocumentLoader->timing();
+                        RefPtr<Event> unloadEvent(Event::create(eventNames().unloadEvent, false, false));
+                        // The DocumentLoader (and thus its DocumentLoadTiming) might get destroyed
+                        // while dispatching the event, so protect it to prevent writing the end
+                        // time into freed memory.
+                        if (RefPtr<DocumentLoader> documentLoader = m_provisionalDocumentLoader) {
+                            DocumentLoadTiming* timing = documentLoader->timing();
                             ASSERT(timing->navigationStart);
+                            ASSERT(!timing->unloadEventStart);
                             ASSERT(!timing->unloadEventEnd);
-                            timing->unloadEventEnd = currentTime();
-                            ASSERT(timing->unloadEventEnd >= timing->navigationStart);
-                        }
+                            m_frame->domWindow()->dispatchTimedEvent(unloadEvent, m_frame->domWindow()->document(), &timing->unloadEventStart, &timing->unloadEventEnd);
+                            ASSERT(timing->unloadEventStart >= timing->navigationStart);
+                        } else
+                            m_frame->domWindow()->dispatchEvent(unloadEvent, m_frame->domWindow()->document());
                     }
                 }
                 m_pageDismissalEventBeingDispatched = false;
@@ -1511,11 +1512,6 @@ bool FrameLoader::willLoadMediaElementURL(KURL& url)
     return error.isNull();
 }
 
-ResourceError FrameLoader::interruptionForPolicyChangeError(const ResourceRequest& request)
-{
-    return m_client->interruptForPolicyChangeError(request);
-}
-
 bool FrameLoader::shouldReloadToHandleUnreachableURL(DocumentLoader* docLoader)
 {
     KURL unreachableURL = docLoader->unreachableURL();
@@ -2176,10 +2172,6 @@ void FrameLoader::finishedLoading()
     dl->setPrimaryLoadComplete(true);
     m_client->dispatchDidLoadMainResource(dl.get());
     checkLoadComplete();
-
-    DOMWindow* window = m_frame->existingDOMWindow();
-    if (window && window->printDeferred())
-        window->print();
 }
 
 bool FrameLoader::isHostedByObjectElement() const
@@ -2331,7 +2323,7 @@ CachePolicy FrameLoader::subresourceCachePolicy() const
         return CachePolicyRevalidate;
 
     if (request.cachePolicy() == ReturnCacheDataElseLoad)
-        return CachePolicyAllowStale;
+        return CachePolicyHistoryBuffer;
 
     return CachePolicyVerify;
 }
@@ -2418,9 +2410,6 @@ void FrameLoader::checkLoadCompleteForThisFrame()
                 return;
 
             const ResourceError& error = dl->mainDocumentError();
-#ifndef NDEBUG
-            m_didDispatchDidCommitLoad = false;
-#endif
             if (!error.isNull())
                 m_client->dispatchDidFailLoad(error);
             else
@@ -3304,6 +3293,11 @@ ResourceError FrameLoader::cannotShowURLError(const ResourceRequest& request) co
     return m_client->cannotShowURLError(request);
 }
 
+ResourceError FrameLoader::interruptionForPolicyChangeError(const ResourceRequest& request) const
+{
+    return m_client->interruptForPolicyChangeError(request);
+}
+
 ResourceError FrameLoader::fileDoesNotExistError(const ResourceResponse& response) const
 {
     return m_client->fileDoesNotExistError(response);    
@@ -3417,10 +3411,6 @@ void FrameLoader::dispatchDidCommitLoad()
 {
     if (m_stateMachine.creatingInitialEmptyDocument())
         return;
-
-#ifndef NDEBUG
-    m_didDispatchDidCommitLoad = true;
-#endif
 
     m_client->dispatchDidCommitLoad();
 

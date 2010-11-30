@@ -65,9 +65,6 @@ LOCAL_SRC_FILES := \
 	css/CSSTimingFunctionValue.cpp \
 	css/CSSUnicodeRangeValue.cpp \
 	css/CSSValueList.cpp \
-	css/CSSVariableDependentValue.cpp \
-	css/CSSVariablesDeclaration.cpp \
-	css/CSSVariablesRule.cpp \
 	css/FontFamilyValue.cpp \
 	css/FontValue.cpp \
 	css/Media.cpp \
@@ -132,6 +129,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	dom/EntityReference.cpp \
 	dom/ErrorEvent.cpp \
 	dom/Event.cpp \
+	dom/EventContext.cpp \
 	dom/EventNames.cpp \
 	dom/EventTarget.cpp \
 	dom/ExceptionBase.cpp \
@@ -192,6 +190,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	dom/WebKitAnimationEvent.cpp \
 	dom/WebKitTransitionEvent.cpp \
 	dom/WheelEvent.cpp \
+	dom/WindowEventContext.cpp \
 	dom/XMLDocumentParser.cpp \
 	dom/XMLDocumentParserLibxml2.cpp \
 	dom/XMLDocumentParserScope.cpp \
@@ -416,7 +415,6 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	page/History.cpp \
 	page/Location.cpp \
 	page/MouseEventWithHitTestResults.cpp \
-	page/Navigation.cpp \
 	page/Navigator.cpp \
 	page/NavigatorBase.cpp \
 	page/OriginAccessEntry.cpp \
@@ -424,6 +422,8 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	page/PageGroup.cpp \
 	page/PageGroupLoadDeferrer.cpp \
 	page/Performance.cpp \
+	page/PerformanceNavigation.cpp \
+	page/PerformanceTiming.cpp \
 	page/PluginHalter.cpp \
 	page/PrintContext.cpp \
 	page/Screen.cpp \
@@ -433,7 +433,6 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	page/SpeechInput.cpp \
 	page/SpeechInputResult.cpp \
 	page/SuspendableTimer.cpp \
-	page/Timing.cpp \
 	page/UserContentURLPattern.cpp \
 	page/WindowFeatures.cpp \
 	page/WorkerNavigator.cpp \
@@ -579,6 +578,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	platform/image-decoders/gif/GIFImageReader.cpp \
 	\
 	platform/mock/DeviceOrientationClientMock.cpp \
+	platform/mock/GeolocationClientMock.cpp \
 	platform/mock/GeolocationServiceMock.cpp \
 	platform/mock/SpeechInputClientMock.cpp \
 	\
@@ -862,7 +862,6 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	svg/SVGAnimateElement.cpp \
 	svg/SVGAnimateMotionElement.cpp \
 	svg/SVGAnimateTransformElement.cpp \
-	svg/SVGAnimatedPathData.cpp \
 	svg/SVGAnimationElement.cpp \
 	svg/SVGCircleElement.cpp \
 	svg/SVGClipPathElement.cpp \
@@ -941,20 +940,9 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	svg/SVGPathElement.cpp \
 	svg/SVGPathParser.cpp \
 	svg/SVGPathParserFactory.cpp \
-	svg/SVGPathSeg.cpp \
-	svg/SVGPathSegArc.cpp \
-	svg/SVGPathSegClosePath.cpp \
-	svg/SVGPathSegCurvetoCubic.cpp \
-	svg/SVGPathSegCurvetoCubicSmooth.cpp \
-	svg/SVGPathSegCurvetoQuadratic.cpp \
-	svg/SVGPathSegCurvetoQuadraticSmooth.cpp \
-	svg/SVGPathSegLineto.cpp \
-	svg/SVGPathSegLinetoHorizontal.cpp \
-	svg/SVGPathSegLinetoVertical.cpp \
 	svg/SVGPathSegList.cpp \
 	svg/SVGPathSegListBuilder.cpp \
 	svg/SVGPathSegListSource.cpp \
-	svg/SVGPathSegMoveto.cpp \
 	svg/SVGPathStringBuilder.cpp \
 	svg/SVGPathStringSource.cpp \
 	svg/SVGPathTraversalStateBuilder.cpp \

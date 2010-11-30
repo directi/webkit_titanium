@@ -26,6 +26,8 @@
 #ifndef WebInspectorFrontendClient_h
 #define WebInspectorFrontendClient_h
 
+#if ENABLE(INSPECTOR)
+
 #include <WebCore/InspectorFrontendClientLocal.h>
 
 namespace WebKit {
@@ -37,6 +39,8 @@ public:
     WebInspectorFrontendClient(WebPage* page, WebPage* inspectorPage);
 
 private:
+    virtual void frontendLoaded();
+
     virtual String localizedStringsURL();
     virtual String hiddenPanels();
 
@@ -56,5 +60,7 @@ private:
 };
 
 } // namespace WebKit
+
+#endif // ENABLE(INSPECTOR)
 
 #endif // WebInspectorFrontendClient_h

@@ -87,7 +87,6 @@ my (
     $notificationsSupport,
     $offlineWebApplicationSupport,
     $progressTagSupport,
-    $rubySupport,
     $sharedWorkersSupport,
     $svgSupport,
     $svgAnimationSupport,
@@ -101,6 +100,7 @@ my (
     $videoSupport,
     $wcssSupport,
     $webAudioSupport,
+    $webInspectorSupport,
     $webSocketsSupport,
     $webTimingSupport,
     $wmlSupport,
@@ -177,6 +177,9 @@ my @features = (
     { option => "input-speech", desc => "Speech Input API support",
       define => "ENABLE_INPUT_SPEECH", default => 0, value => \$inputSpeechSupport },
 
+    { option => "inspector", desc => "Toggle Web Inspector support",
+      define => "ENABLE_INSPECTOR", default => 1, value => \$webInspectorSupport },
+
     { option => "javascript-debugger", desc => "Toggle JavaScript Debugger/Profiler support",
       define => "ENABLE_JAVASCRIPT_DEBUGGER", default => 1, value => \$javaScriptDebuggerSupport },
 
@@ -197,9 +200,6 @@ my @features = (
 
     { option => "progress-tag", desc => "Progress Tag support",
       define => "ENABLE_PROGRESS_TAG", default => 1, value => \$progressTagSupport },
-
-    { option => "ruby", desc => "Toggle HTML5 Ruby support",
-      define => "ENABLE_RUBY", default => 1, value => \$rubySupport },
 
     { option => "system-malloc", desc => "Toggle system allocator instead of TCmalloc",
       define => "USE_SYSTEM_MALLOC", default => 0, value => \$systemMallocSupport },

@@ -38,6 +38,12 @@ enum Kind {
 #if USE(ACCELERATED_COMPOSITING)
     AttachCompositingContext,
 #endif
+#if ENABLE(TILED_BACKING_STORE)
+    Invalidate,
+    TileUpdated,
+    AllTileUpdatesProcessed,
+    SnapshotTaken,
+#endif
 };
 
 }

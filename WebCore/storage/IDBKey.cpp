@@ -93,9 +93,9 @@ String IDBKey::whereSyntax(String qualifiedTableName) const
 {
     switch (m_type) {
     case IDBKey::StringType:
-        return qualifiedTableName + "keyString = ?  ";
+        return qualifiedTableName + "keyString = ?  AND  " + qualifiedTableName + "keyDate IS NULL  AND  " + qualifiedTableName + "keyNumber IS NULL  ";
     case IDBKey::NumberType:
-        return qualifiedTableName + "keyNumber = ?  ";
+        return qualifiedTableName + "keyString IS NULL  AND  " + qualifiedTableName + "keyDate IS NULL  AND  " + qualifiedTableName + "keyNumber = ?  ";
     // FIXME: Implement date.
     case IDBKey::NullType:
         return qualifiedTableName + "keyString IS NULL  AND  " + qualifiedTableName + "keyDate IS NULL  AND  " + qualifiedTableName + "keyNumber IS NULL  ";
@@ -105,7 +105,7 @@ String IDBKey::whereSyntax(String qualifiedTableName) const
     return "";
 }
 
-String IDBKey::leftCursorWhereFragment(String comparisonOperator, String qualifiedTableName)
+String IDBKey::lowerCursorWhereFragment(String comparisonOperator, String qualifiedTableName)
 {
     switch (m_type) {
     case StringType:
@@ -122,7 +122,7 @@ String IDBKey::leftCursorWhereFragment(String comparisonOperator, String qualifi
     return "";
 }
 
-String IDBKey::rightCursorWhereFragment(String comparisonOperator, String qualifiedTableName)
+String IDBKey::upperCursorWhereFragment(String comparisonOperator, String qualifiedTableName)
 {
     switch (m_type) {
     case StringType:

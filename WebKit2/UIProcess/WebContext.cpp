@@ -44,10 +44,6 @@
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassOwnArrayPtr.h>
 
-#if ENABLE(WEB_PROCESS_SANDBOX)
-#include <sandbox.h>
-#endif
-
 #ifndef NDEBUG
 #include <wtf/RefCountedLeakCounter.h>
 #endif
@@ -161,16 +157,7 @@ void WebContext::ensureWebProcess()
     if (!injectedBundlePath().isEmpty()) {
         parameters.injectedBundlePath = injectedBundlePath();
 
-#if ENABLE(WEB_PROCESS_SANDBOX)
-        char* sandboxBundleTokenUTF8 = 0;
-        CString injectedBundlePathUTF8 = injectedBundlePath().utf8();
-        sandbox_issue_extension(injectedBundlePathUTF8.data(), &sandboxBundleTokenUTF8);
-        String sandboxBundleToken = String::fromUTF8(sandboxBundleTokenUTF8);
-        if (sandboxBundleTokenUTF8)
-            free(sandboxBundleTokenUTF8);
-
-        parameters.injectedBundlePathToken = sandboxBundleToken;
-#endif
+        SandboxExtension::createHandle(parameters.injectedBundlePath, SandboxExtension::ReadOnly, parameters.injectedBundlePathExtensionHandle);
     }
 
     parameters.shouldTrackVisitedLinks = m_historyClient.shouldTrackVisitedLinks();
@@ -210,8 +197,11 @@ void WebContext::processDidClose(WebProcessProxy* process)
     m_visitedLinkProvider.processDidClose();
 
     // Invalidate all outstanding downloads.
-    for (HashMap<uint64_t, RefPtr<DownloadProxy> >::iterator::Values it = m_downloads.begin().values(), end = m_downloads.end().values(); it != end; ++it)
+    for (HashMap<uint64_t, RefPtr<DownloadProxy> >::iterator::Values it = m_downloads.begin().values(), end = m_downloads.end().values(); it != end; ++it) {
+        (*it)->processDidClose();
         (*it)->invalidate();
+    }
+
     m_downloads.clear();
 
     m_process = 0;
@@ -437,6 +427,14 @@ uint64_t WebContext::createDownloadProxy()
     return downloadID;
 }
 
+void WebContext::downloadFinished(DownloadProxy* downloadProxy)
+{
+    ASSERT(m_downloads.contains(downloadProxy->downloadID()));
+
+    downloadProxy->invalidate();
+    m_downloads.remove(downloadProxy->downloadID());
+}
+
 void WebContext::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
 {
     if (messageID.is<CoreIPC::MessageClassWebContext>()) {
@@ -474,6 +472,13 @@ CoreIPC::SyncReplyMode WebContext::didReceiveSyncMessage(CoreIPC::Connection* co
     if (messageID.is<CoreIPC::MessageClassWebContext>())
         return didReceiveSyncWebContextMessage(connection, messageID, arguments, reply);
 
+    if (messageID.is<CoreIPC::MessageClassDownloadProxy>()) {
+        if (DownloadProxy* downloadProxy = m_downloads.get(arguments->destinationID()).get())
+            return downloadProxy->didReceiveSyncDownloadProxyMessage(connection, messageID, arguments, reply);
+
+        return CoreIPC::AutomaticReply;
+    }
+    
     switch (messageID.get<WebContextLegacyMessage::Kind>()) {
         case WebContextLegacyMessage::PostSynchronousMessage: {
             // FIXME: We should probably encode something in the case that the arguments do not decode correctly.
@@ -494,6 +499,16 @@ CoreIPC::SyncReplyMode WebContext::didReceiveSyncMessage(CoreIPC::Connection* co
     }
 
     return CoreIPC::AutomaticReply;
+}
+
+void WebContext::clearResourceCaches()
+{
+    m_process->send(Messages::WebProcess::ClearResourceCaches(), 0);
+}
+
+void WebContext::clearApplicationCache()
+{
+    m_process->send(Messages::WebProcess::ClearApplicationCache(), 0);
 }
 
 } // namespace WebKit

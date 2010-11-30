@@ -83,9 +83,8 @@ IDL_BINDINGS += \
     css/CSSStyleSheet.idl \
     css/CSSValue.idl \
     css/CSSValueList.idl \
-    css/CSSVariablesDeclaration.idl \
-    css/CSSVariablesRule.idl \
     css/MediaList.idl \
+    css/MediaQueryList.idl \
     css/Rect.idl \
     css/RGBColor.idl \
     css/StyleMedia.idl \
@@ -183,6 +182,7 @@ IDL_BINDINGS += \
     fileapi/MetadataCallback.idl \
     html/canvas/ArrayBufferView.idl \
     html/canvas/ArrayBuffer.idl \
+    html/canvas/DataView.idl \
     html/canvas/Int8Array.idl \
     html/canvas/Float32Array.idl \
     html/canvas/CanvasGradient.idl \
@@ -307,12 +307,15 @@ IDL_BINDINGS += \
     page/History.idl \
     page/Location.idl \
     page/MemoryInfo.idl \
-    page/Navigation.idl \
     page/Navigator.idl \
     page/Performance.idl \
+    page/PerformanceNavigation.idl \
+    page/PerformanceTiming.idl \
     page/PositionError.idl \
     page/Screen.idl \
-    page/Timing.idl \
+    page/SpeechInputEvent.idl \
+    page/SpeechInputResult.idl \
+    page/SpeechInputResultList.idl \
     page/WebKitPoint.idl \
     page/WorkerNavigator.idl \
     plugins/DOMPlugin.idl \

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2010 Peter Varga (pvarga@inf.u-szeged.hu), University of Szeged
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,12 +27,8 @@
 #ifndef RegexPattern_h
 #define RegexPattern_h
 
-
-#if ENABLE(YARR)
-
 #include <wtf/Vector.h>
 #include <wtf/unicode/Unicode.h>
-
 
 namespace JSC { namespace Yarr {
 
@@ -41,6 +38,7 @@ namespace JSC { namespace Yarr {
 #define RegexStackSpaceForBackTrackInfoAlternative 1 // One per alternative.
 #define RegexStackSpaceForBackTrackInfoParentheticalAssertion 1
 #define RegexStackSpaceForBackTrackInfoParenthesesOnce 1 // Only for !fixed quantifiers.
+#define RegexStackSpaceForBackTrackInfoParenthesesTerminal 1
 #define RegexStackSpaceForBackTrackInfoParentheses 4
 
 struct PatternDisjunction;
@@ -115,6 +113,7 @@ struct PatternTerm {
             unsigned subpatternId;
             unsigned lastSubpatternId;
             bool isCopy;
+            bool isTerminal;
         } parentheses;
     };
     QuantifierType quantityType;
@@ -146,6 +145,7 @@ struct PatternTerm {
         parentheses.disjunction = disjunction;
         parentheses.subpatternId = subpatternId;
         parentheses.isCopy = false;
+        parentheses.isTerminal = false;
         quantityType = QuantifierFixedCount;
         quantityCount = 1;
     }
@@ -283,11 +283,36 @@ CharacterClass* nondigitsCreate();
 CharacterClass* nonspacesCreate();
 CharacterClass* nonwordcharCreate();
 
+struct TermChain {
+    TermChain(PatternTerm term)
+        : term(term)
+    {}
+
+    PatternTerm term;
+    Vector<TermChain> hotTerms;
+};
+
+struct BeginChar {
+    BeginChar()
+        : value(0)
+        , mask(0)
+    {}
+
+    BeginChar(unsigned value, unsigned mask)
+        : value(value)
+        , mask(mask)
+    {}
+
+    unsigned value;
+    unsigned mask;
+};
+
 struct RegexPattern {
     RegexPattern(bool ignoreCase, bool multiline)
         : m_ignoreCase(ignoreCase)
         , m_multiline(multiline)
         , m_containsBackreferences(false)
+        , m_containsBeginChars(false)
         , m_containsBOL(false)
         , m_numSubpatterns(0)
         , m_maxBackReference(0)
@@ -313,6 +338,7 @@ struct RegexPattern {
         m_maxBackReference = 0;
 
         m_containsBackreferences = false;
+        m_containsBeginChars = false;
         m_containsBOL = false;
 
         newlineCached = 0;
@@ -327,6 +353,7 @@ struct RegexPattern {
         m_disjunctions.clear();
         deleteAllValues(m_userCharacterClasses);
         m_userCharacterClasses.clear();
+        m_beginChars.clear();
     }
 
     bool containsIllegalBackReference()
@@ -380,12 +407,14 @@ struct RegexPattern {
     bool m_ignoreCase : 1;
     bool m_multiline : 1;
     bool m_containsBackreferences : 1;
+    bool m_containsBeginChars : 1;
     bool m_containsBOL : 1;
     unsigned m_numSubpatterns;
     unsigned m_maxBackReference;
     PatternDisjunction* m_body;
     Vector<PatternDisjunction*, 4> m_disjunctions;
     Vector<CharacterClass*> m_userCharacterClasses;
+    Vector<BeginChar> m_beginChars;
 
 private:
     CharacterClass* newlineCached;
@@ -398,7 +427,5 @@ private:
 };
 
 } } // namespace JSC::Yarr
-
-#endif
 
 #endif // RegexPattern_h

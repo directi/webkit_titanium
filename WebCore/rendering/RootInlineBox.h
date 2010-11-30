@@ -57,7 +57,7 @@ public:
     int selectionBottom() const;
     int selectionHeight() const { return max(0, selectionBottom() - selectionTop()); }
 
-    int alignBoxesInBlockDirection(int heightOfBlock, GlyphOverflowAndFallbackFontsMap&);
+    int alignBoxesInBlockDirection(int heightOfBlock, GlyphOverflowAndFallbackFontsMap&, VerticalPositionCache&);
     void setLineTopBottomPositions(int top, int bottom);
 
     virtual RenderLineBoxList* rendererLineBoxes() const;
@@ -88,7 +88,7 @@ public:
 
     virtual void clearTruncation();
 
-    virtual int baselinePosition() const { return boxModelObject()->baselinePosition(m_firstLine, isHorizontal() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes); }
+    virtual int baselinePosition(FontBaseline baselineType) const { return boxModelObject()->baselinePosition(baselineType, m_firstLine, isHorizontal() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes); }
     virtual int lineHeight() const { return boxModelObject()->lineHeight(m_firstLine, isHorizontal() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes); }
 
 #if PLATFORM(MAC)
@@ -125,10 +125,16 @@ public:
     virtual void extractLineBoxFromRenderObject();
     virtual void attachLineBoxToRenderObject();
     virtual void removeLineBoxFromRenderObject();
+    
+    FontBaseline baselineType() const { return m_baselineType; }
+
+    bool containsRuby() const { return m_containsRuby; }
 
 private:
     bool hasEllipsisBox() const { return m_hasEllipsisBoxOrHyphen; }
     void setHasEllipsisBox(bool hasEllipsisBox) { m_hasEllipsisBoxOrHyphen = hasEllipsisBox; }
+
+    int blockDirectionRubyAdjustment() const;
 
     // Where this line ended.  The exact object and the position within that object are stored so that
     // we can create an InlineIterator beginning just after the end of this line.
@@ -147,6 +153,12 @@ private:
 
     // The logical height of the block at the end of this line.  This is where the next line starts.
     int m_blockLogicalHeight;
+
+    // Whether or not this line uses alphabetic or ideographic baselines by default.
+    FontBaseline m_baselineType;
+    
+    // If the line contains any ruby runs, then this will be true.
+    bool m_containsRuby : 1;
 
     WTF::Unicode::Direction m_lineBreakBidiStatusEor : 5;
     WTF::Unicode::Direction m_lineBreakBidiStatusLastStrong : 5;

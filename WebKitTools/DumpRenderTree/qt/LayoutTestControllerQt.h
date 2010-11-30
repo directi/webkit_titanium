@@ -71,6 +71,7 @@ public:
     bool shouldDumpTitleChanges() const { return m_dumpTitleChanges; }
     bool waitForPolicy() const { return m_waitForPolicy; }
     bool ignoreReqestForPermission() const { return m_ignoreDesktopNotification; }
+    bool isPrinting() { return m_isPrinting; }
 
     void reset();
 
@@ -95,6 +96,7 @@ public slots:
     void dumpDatabaseCallbacks() { m_dumpDatabaseCallbacks = true; }
     void dumpStatusCallbacks() { m_dumpStatusCallbacks = true; }
     void setCanOpenWindows() { m_canOpenWindows = true; }
+    void setPrinting() { m_isPrinting = true; }
     void waitUntilDone();
     QString counterValueForElementById(const QString& id);
     int webHistoryItemCount();
@@ -216,7 +218,7 @@ public slots:
     bool isGeolocationPermissionSet() const { return m_isGeolocationPermissionSet; }
     bool geolocationPermission() const { return m_geolocationPermission; }
 
-    void setMockSpeechInputResult(const QString& result, const QString& language);
+    void addMockSpeechInputResult(const QString& result, double confidence, const QString& language);
 
     // Empty stub method to keep parity with object model exposed by global LayoutTestController.
     void abortModal() {}
@@ -267,6 +269,7 @@ private:
     bool m_globalFlag;
     bool m_userStyleSheetEnabled;
     bool m_isGeolocationPermissionSet;
+    bool m_isPrinting;
     bool m_geolocationPermission;
 
     QUrl m_userStyleSheetLocation;

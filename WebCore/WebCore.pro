@@ -2,10 +2,6 @@
 CONFIG += building-libs
 CONFIG += depend_includepath
 
-meegotouch {
-    DEFINES += WTF_USE_MEEGOTOUCH=1
-}
-
 v8:exists($$[QT_INSTALL_PREFIX]/src/3rdparty/v8/include/v8.h) {
     message(Using V8 with QtScript)
     QT += script
@@ -471,7 +467,6 @@ v8 {
         bindings/v8/custom/V8SVGDocumentCustom.cpp \
         bindings/v8/custom/V8SVGElementCustom.cpp \
         bindings/v8/custom/V8SVGLengthCustom.cpp \
-        bindings/v8/custom/V8SVGMatrixCustom.cpp \
         bindings/v8/custom/V8SVGPathSegCustom.cpp \
         \
         bindings/v8/specialization/V8BindingState.cpp\
@@ -483,25 +478,42 @@ v8 {
         bindings/v8/V8WorkerContextErrorHandler.cpp
 } else {
     SOURCES += \
-        bindings/js/GCController.cpp \
+        bindings/ScriptControllerBase.cpp \
         bindings/js/DOMObjectHashTableMap.cpp \
         bindings/js/DOMWrapperWorld.cpp \
-        bindings/js/JSCallbackData.cpp \
+        bindings/js/GCController.cpp \
         bindings/js/JSAttrCustom.cpp \
         bindings/js/JSCDATASectionCustom.cpp \
-        bindings/js/JSCanvasRenderingContextCustom.cpp \
-        bindings/js/JSCanvasRenderingContext2DCustom.cpp \
-        bindings/js/JSClipboardCustom.cpp \
-        bindings/js/JSConsoleCustom.cpp \
+        bindings/js/JSCSSFontFaceRuleCustom.cpp \
+        bindings/js/JSCSSImportRuleCustom.cpp \
+        bindings/js/JSCSSMediaRuleCustom.cpp \
+        bindings/js/JSCSSPageRuleCustom.cpp \
         bindings/js/JSCSSRuleCustom.cpp \
         bindings/js/JSCSSRuleListCustom.cpp \
         bindings/js/JSCSSStyleDeclarationCustom.cpp \
+        bindings/js/JSCSSStyleRuleCustom.cpp \
         bindings/js/JSCSSValueCustom.cpp \
+        bindings/js/JSCallbackData.cpp \
+        bindings/js/JSCanvasRenderingContext2DCustom.cpp \
+        bindings/js/JSCanvasRenderingContextCustom.cpp \
+        bindings/js/JSClipboardCustom.cpp \
+        bindings/js/JSConsoleCustom.cpp \
         bindings/js/JSCoordinatesCustom.cpp \
         bindings/js/JSCustomPositionCallback.cpp \
         bindings/js/JSCustomPositionErrorCallback.cpp \
         bindings/js/JSCustomVoidCallback.cpp \
         bindings/js/JSCustomXPathNSResolver.cpp \
+        bindings/js/JSDOMBinding.cpp \
+        bindings/js/JSDOMFormDataCustom.cpp \
+        bindings/js/JSDOMGlobalObject.cpp \
+        bindings/js/JSDOMMimeTypeArrayCustom.cpp \
+        bindings/js/JSDOMPluginArrayCustom.cpp \
+        bindings/js/JSDOMPluginCustom.cpp \
+        bindings/js/JSDOMStringMapCustom.cpp \
+        bindings/js/JSDOMWindowBase.cpp \
+        bindings/js/JSDOMWindowCustom.cpp \
+        bindings/js/JSDOMWindowShell.cpp \
+        bindings/js/JSDOMWrapper.cpp \
         bindings/js/JSDataGridColumnListCustom.cpp \
         bindings/js/JSDataGridDataSource.cpp \
         bindings/js/JSDebugWrapperSet.cpp \
@@ -509,24 +521,17 @@ v8 {
         bindings/js/JSDeviceMotionEventCustom.cpp \
         bindings/js/JSDeviceOrientationEventCustom.cpp \
         bindings/js/JSDocumentCustom.cpp \
-        bindings/js/JSDOMFormDataCustom.cpp \
-        bindings/js/JSDOMGlobalObject.cpp \
-        bindings/js/JSDOMStringMapCustom.cpp \
-        bindings/js/JSDOMWindowBase.cpp \
-        bindings/js/JSDOMWindowCustom.cpp \
-        bindings/js/JSDOMWindowShell.cpp \
-        bindings/js/JSDOMWrapper.cpp \
         bindings/js/JSElementCustom.cpp \
         bindings/js/JSEventCustom.cpp \
+        bindings/js/JSEventListener.cpp \
         bindings/js/JSEventSourceCustom.cpp \
         bindings/js/JSEventTarget.cpp \
         bindings/js/JSExceptionBase.cpp \
         bindings/js/JSFileReaderCustom.cpp \
         bindings/js/JSGeolocationCustom.cpp \
-        bindings/js/JSHistoryCustom.cpp \
+        bindings/js/JSHTMLAllCollectionCustom.cpp \
         bindings/js/JSHTMLAppletElementCustom.cpp \
         bindings/js/JSHTMLCanvasElementCustom.cpp \
-        bindings/js/JSHTMLAllCollectionCustom.cpp \
         bindings/js/JSHTMLCollectionCustom.cpp \
         bindings/js/JSHTMLDataGridElementCustom.cpp \
         bindings/js/JSHTMLDocumentCustom.cpp \
@@ -536,15 +541,24 @@ v8 {
         bindings/js/JSHTMLFrameElementCustom.cpp \
         bindings/js/JSHTMLFrameSetElementCustom.cpp \
         bindings/js/JSHTMLInputElementCustom.cpp \
+        bindings/js/JSHTMLLinkElementCustom.cpp \
         bindings/js/JSHTMLObjectElementCustom.cpp \
         bindings/js/JSHTMLOptionsCollectionCustom.cpp \
         bindings/js/JSHTMLOutputElementCustom.cpp \
         bindings/js/JSHTMLSelectElementCustom.cpp \
+        bindings/js/JSHTMLStyleElementCustom.cpp \
+        bindings/js/JSHistoryCustom.cpp \
         bindings/js/JSImageConstructor.cpp \
         bindings/js/JSImageDataCustom.cpp \
         bindings/js/JSInjectedScriptHostCustom.cpp \
         bindings/js/JSInspectorFrontendHostCustom.cpp \
+        bindings/js/JSLazyEventListener.cpp \
         bindings/js/JSLocationCustom.cpp \
+        bindings/js/JSMainThreadExecState.cpp \
+        bindings/js/JSMessageChannelCustom.cpp \
+        bindings/js/JSMessageEventCustom.cpp \
+        bindings/js/JSMessagePortCustom.cpp \
+        bindings/js/JSMessagePortCustom.h \
         bindings/js/JSNamedNodeMapCustom.cpp \
         bindings/js/JSNavigatorCustom.cpp  \
         bindings/js/JSNodeCustom.cpp \
@@ -553,6 +567,9 @@ v8 {
         bindings/js/JSNodeIteratorCustom.cpp \
         bindings/js/JSNodeListCustom.cpp \
         bindings/js/JSOptionConstructor.cpp \
+        bindings/js/JSPluginElementFunctions.cpp \
+        bindings/js/JSPopStateEventCustom.cpp \
+        bindings/js/JSProcessingInstructionCustom.cpp \
         bindings/js/JSScriptProfileNodeCustom.cpp \
         bindings/js/JSStyleSheetCustom.cpp \
         bindings/js/JSStyleSheetListCustom.cpp \
@@ -560,24 +577,14 @@ v8 {
         bindings/js/JSTouchCustom.cpp \
         bindings/js/JSTouchListCustom.cpp \
         bindings/js/JSTreeWalkerCustom.cpp \
+        bindings/js/JSWebKitCSSKeyframeRuleCustom.cpp \
+        bindings/js/JSWebKitCSSKeyframesRuleCustom.cpp \
         bindings/js/JSWebKitCSSMatrixCustom.cpp \
         bindings/js/JSWebKitPointCustom.cpp \
+        bindings/js/JSWorkerContextErrorHandler.cpp \
         bindings/js/JSXMLHttpRequestCustom.cpp \
         bindings/js/JSXMLHttpRequestUploadCustom.cpp \
-        bindings/js/JSDOMPluginCustom.cpp \
-        bindings/js/JSDOMPluginArrayCustom.cpp \
-        bindings/js/JSMessageChannelCustom.cpp \
-        bindings/js/JSMessageEventCustom.cpp \
-        bindings/js/JSMessagePortCustom.cpp \
-        bindings/js/JSMessagePortCustom.h \
-        bindings/js/JSDOMMimeTypeArrayCustom.cpp \
-        bindings/js/JSDOMBinding.cpp \
-        bindings/js/JSEventListener.cpp \
-        bindings/js/JSLazyEventListener.cpp \
-        bindings/js/JSMainThreadExecState.cpp \
-        bindings/js/JSPluginElementFunctions.cpp \
-        bindings/js/JSPopStateEventCustom.cpp \
-        bindings/js/JSWorkerContextErrorHandler.cpp \
+        bindings/js/ScheduledAction.cpp \
         bindings/js/ScriptCachedFrameData.cpp \
         bindings/js/ScriptCallStackFactory.cpp \
         bindings/js/ScriptController.cpp \
@@ -589,23 +596,21 @@ v8 {
         bindings/js/ScriptProfile.cpp \
         bindings/js/ScriptState.cpp \
         bindings/js/ScriptValue.cpp \
-        bindings/js/ScheduledAction.cpp \
         bindings/js/SerializedScriptValue.cpp \
         bindings/js/specialization/JSBindingState.cpp \
-        bindings/ScriptControllerBase.cpp \
         bridge/IdentifierRep.cpp \
         bridge/NP_jsobject.cpp \
-        bridge/npruntime.cpp \
-        bridge/runtime_array.cpp \
-        bridge/runtime_method.cpp \
-        bridge/runtime_object.cpp \
-        bridge/runtime_root.cpp \
         bridge/c/CRuntimeObject.cpp \
         bridge/c/c_class.cpp \
         bridge/c/c_instance.cpp \
         bridge/c/c_runtime.cpp \
         bridge/c/c_utility.cpp \
-        bridge/jsc/BridgeJSC.cpp
+        bridge/jsc/BridgeJSC.cpp \
+        bridge/npruntime.cpp \
+        bridge/runtime_array.cpp \
+        bridge/runtime_method.cpp \
+        bridge/runtime_object.cpp \
+        bridge/runtime_root.cpp
 }
 
 SOURCES += \
@@ -649,9 +654,6 @@ SOURCES += \
     css/CSSTimingFunctionValue.cpp \
     css/CSSUnicodeRangeValue.cpp \
     css/CSSValueList.cpp \
-    css/CSSVariableDependentValue.cpp \
-    css/CSSVariablesDeclaration.cpp \
-    css/CSSVariablesRule.cpp \
     css/FontFamilyValue.cpp \
     css/FontValue.cpp \
     css/MediaFeatureNames.cpp \
@@ -659,6 +661,9 @@ SOURCES += \
     css/MediaQuery.cpp \
     css/MediaQueryEvaluator.cpp \
     css/MediaQueryExp.cpp \
+    css/MediaQueryList.cpp \
+    css/MediaQueryListListener.cpp \
+    css/MediaQueryMatcher.cpp \
     css/RGBColor.cpp \
     css/ShadowValue.cpp \
     css/StyleBase.cpp \
@@ -714,6 +719,7 @@ SOURCES += \
     dom/EntityReference.cpp \
     dom/ErrorEvent.cpp \
     dom/Event.cpp \
+    dom/EventContext.cpp \
     dom/EventNames.cpp \
     dom/EventTarget.cpp \
     dom/ExceptionBase.cpp \
@@ -774,6 +780,7 @@ SOURCES += \
     dom/WebKitAnimationEvent.cpp \
     dom/WebKitTransitionEvent.cpp \
     dom/WheelEvent.cpp \
+    dom/WindowEventContext.cpp \
     dom/XMLDocumentParser.cpp \
     dom/XMLDocumentParserQt.cpp \
     dom/default/PlatformMessagePortChannel.cpp \
@@ -1089,7 +1096,6 @@ SOURCES += \
     page/DOMSelection.cpp \
     page/DOMTimer.cpp \
     page/DOMWindow.cpp \
-    page/Navigation.cpp \
     page/Navigator.cpp \
     page/NavigatorBase.cpp \
     page/DragController.cpp \
@@ -1112,6 +1118,8 @@ SOURCES += \
     page/PageGroup.cpp \
     page/PageGroupLoadDeferrer.cpp \
     page/Performance.cpp \
+    page/PerformanceNavigation.cpp \
+    page/PerformanceTiming.cpp \
     page/PluginHalter.cpp \
     page/PrintContext.cpp \
     page/SecurityOrigin.cpp \
@@ -1119,7 +1127,6 @@ SOURCES += \
     page/Settings.cpp \
     page/SpatialNavigation.cpp \
     page/SuspendableTimer.cpp \
-    page/Timing.cpp \
     page/UserContentURLPattern.cpp \
     page/WindowFeatures.cpp \
     page/XSSAuditor.cpp \
@@ -1195,6 +1202,7 @@ SOURCES += \
     platform/Logging.cpp \
     platform/MIMETypeRegistry.cpp \
     platform/mock/DeviceOrientationClientMock.cpp \
+    platform/mock/GeolocationClientMock.cpp \
     platform/mock/GeolocationServiceMock.cpp \
     platform/mock/SpeechInputClientMock.cpp \
     platform/network/AuthenticationChallengeBase.cpp \
@@ -1438,7 +1446,6 @@ v8 {
         bindings/v8/V8NPObject.h \
         bindings/v8/V8NPUtils.h \
         bindings/v8/V8Proxy.h \
-        bindings/v8/V8SVGPODTypeWrapper.h \
         bindings/v8/V8Utilities.h \
         bindings/v8/V8WorkerContextEventListener.h \
         bindings/v8/WorkerContextExecutionProxy.h \
@@ -1566,16 +1573,16 @@ HEADERS += \
     css/CSSTimingFunctionValue.h \
     css/CSSUnicodeRangeValue.h \
     css/CSSValueList.h \
-    css/CSSVariableDependentValue.h \
-    css/CSSVariablesDeclaration.h \
-    css/CSSVariablesRule.h \
     css/FontFamilyValue.h \
     css/FontValue.h \
     css/MediaFeatureNames.h \
     css/MediaList.h \
+    css/MediaQuery.h \
     css/MediaQueryEvaluator.h \
     css/MediaQueryExp.h \
-    css/MediaQuery.h \
+    css/MediaQueryList.h \
+    css/MediaQueryListListener.h \
+    css/MediaQueryMatcher.h \
     css/RGBColor.h \
     css/ShadowValue.h \
     css/StyleBase.h \
@@ -1703,6 +1710,7 @@ HEADERS += \
     editing/EditCommand.h \
     editing/EditingStyle.h \
     editing/EditingBehavior.h \
+    editing/EditingBoundary.h \
     editing/Editor.h \
     editing/FormatBlockCommand.h \
     editing/htmlediting.h \
@@ -2018,8 +2026,10 @@ HEADERS += \
     page/SpatialNavigation.h \
     page/SpeechInput.h \
     page/SpeechInputClient.h \
+    page/SpeechInputEvent.h \
     page/SpeechInputListener.h \
     page/SpeechInputResult.h \
+    page/SpeechInputResultList.h \
     page/WindowFeatures.h \
     page/WorkerNavigator.h \
     page/XSSAuditor.h \
@@ -2040,6 +2050,7 @@ HEADERS += \
     platform/GeolocationService.h \
     platform/image-decoders/ImageDecoder.h \
     platform/mock/DeviceOrientationClientMock.h \
+    platform/mock/GeolocationClientMock.cpp \
     platform/mock/GeolocationServiceMock.h \
     platform/mock/SpeechInputClientMock.h \
     platform/graphics/BitmapImage.h \
@@ -2136,10 +2147,10 @@ HEADERS += \
     platform/network/qt/QNetworkReplyHandler.h \
     platform/network/ResourceErrorBase.h \
     platform/network/ResourceHandle.h \
+    platform/network/ResourceLoadInfo.h \
     platform/network/ResourceLoadTiming.h \
     platform/network/ResourceRequestBase.h \
     platform/network/ResourceResponseBase.h \
-    platform/network/ResourceRawHeaders.h \
     platform/PlatformTouchEvent.h \
     platform/PlatformTouchPoint.h \
     platform/PopupMenu.h \
@@ -2357,27 +2368,29 @@ HEADERS += \
     svg/animation/SMILTime.h \
     svg/animation/SVGSMILElement.h \
     svg/ColorDistance.h \
-    svg/DeprecatedSVGAnimatedProperty.h \
-    svg/DeprecatedSVGAnimatedPropertyTraits.h \
-    svg/DeprecatedSVGAnimatedTemplate.h \
     svg/graphics/filters/SVGFEImage.h \
     svg/graphics/filters/SVGFilterBuilder.h \
     svg/graphics/filters/SVGFilter.h \
     svg/graphics/SVGImage.h \
     svg/properties/SVGAnimatedListPropertyTearOff.h \
+    svg/properties/SVGAnimatedPathSegListPropertyTearOff.h \
     svg/properties/SVGAnimatedProperty.h \
     svg/properties/SVGAnimatedPropertyDescription.h \
     svg/properties/SVGAnimatedPropertyMacros.h \
     svg/properties/SVGAnimatedPropertySynchronizer.h \
     svg/properties/SVGAnimatedPropertyTearOff.h \
     svg/properties/SVGAnimatedStaticPropertyTearOff.h \
+    svg/properties/SVGAnimatedTransformListPropertyTearOff.h \
     svg/properties/SVGListProperty.h \
     svg/properties/SVGListPropertyTearOff.h \
+    svg/properties/SVGPathSegListPropertyTearOff.h \
     svg/properties/SVGProperty.h \
     svg/properties/SVGPropertyTearOff.h \
     svg/properties/SVGPropertyTraits.h \
     svg/properties/SVGStaticListPropertyTearOff.h \
     svg/properties/SVGStaticPropertyTearOff.h \
+    svg/properties/SVGStaticPropertyWithParentTearOff.h \
+    svg/properties/SVGTransformListPropertyTearOff.h \
     svg/SVGAElement.h \
     svg/SVGAltGlyphElement.h \
     svg/SVGAngle.h \
@@ -2390,10 +2403,10 @@ HEADERS += \
     svg/SVGAnimatedLengthList.h \
     svg/SVGAnimatedNumber.h \
     svg/SVGAnimatedNumberList.h \
-    svg/SVGAnimatedPathData.h \
     svg/SVGAnimatedPreserveAspectRatio.h \
     svg/SVGAnimatedRect.h \
     svg/SVGAnimatedString.h \
+    svg/SVGAnimatedTransformList.h \
     svg/SVGAnimateElement.h \
     svg/SVGAnimateMotionElement.h \
     svg/SVGAnimateTransformElement.h \
@@ -2463,6 +2476,7 @@ HEADERS += \
     svg/SVGLocatable.h \
     svg/SVGMarkerElement.h \
     svg/SVGMaskElement.h \
+    svg/SVGMatrix.h \
     svg/SVGMetadataElement.h \
     svg/SVGMissingGlyphElement.h \
     svg/SVGMPathElement.h \
@@ -3052,6 +3066,8 @@ contains(DEFINES, ENABLE_FILE_SYSTEM=1) {
         fileapi/FileSystemCallback.h \
         fileapi/FileSystemCallbacks.h \
         fileapi/FileWriter.h \
+        fileapi/FileWriterBase.h \
+        fileapi/FileWriterBaseCallback.h \
         fileapi/FileWriterCallback.h \
         fileapi/FileWriterClient.h \
         fileapi/FileWriterSync.h \
@@ -3084,6 +3100,7 @@ contains(DEFINES, ENABLE_FILE_SYSTEM=1) {
         fileapi/FileEntrySync.cpp \
         fileapi/FileSystemCallbacks.cpp \
         fileapi/FileWriter.cpp \
+        fileapi/FileWriterBase.cpp \
         fileapi/FileWriterSync.cpp \
         fileapi/LocalFileSystem.cpp \
         platform/AsyncFileSystem.cpp
@@ -3138,7 +3155,9 @@ contains(DEFINES, ENABLE_SHARED_WORKERS=1) {
 contains(DEFINES, ENABLE_INPUT_SPEECH=1) {
     SOURCES += \
         page/SpeechInput.cpp \
+        page/SpeechInputEvent.cpp \
         page/SpeechInputResult.cpp \
+        page/SpeechInputResultList.cpp \
         rendering/RenderInputSpeech.cpp
 }
 
@@ -3159,31 +3178,58 @@ contains(DEFINES, ENABLE_VIDEO=1) {
             bindings/js/JSAudioConstructor.cpp
     }
 
-         contains(MOBILITY_CONFIG, multimedia) {
-            HEADERS += platform/graphics/qt/MediaPlayerPrivateQt.h
-            SOURCES += platform/graphics/qt/MediaPlayerPrivateQt.cpp
+    contains(DEFINES, USE_GSTREAMER=1) {
+        HEADERS += \
+            platform/graphics/gstreamer/DataSourceGStreamer.h \
+            platform/graphics/gstreamer/GOwnPtrGStreamer.h \
+            platform/graphics/gstreamer/GStreamerGWorld.h \
+            platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h \
+            platform/graphics/gstreamer/VideoSinkGStreamer.h \
+            platform/graphics/gstreamer/WebKitWebSourceGStreamer.h \
+            platform/graphics/gstreamer/PlatformVideoWindow.h \
+            platform/graphics/gstreamer/PlatformVideoWindowPrivate.h \
+            platform/graphics/gstreamer/ImageGStreamer.h
+        SOURCES += \
+            platform/graphics/gstreamer/DataSourceGStreamer.cpp \
+            platform/graphics/gstreamer/GOwnPtrGStreamer.cpp \
+            platform/graphics/gstreamer/GStreamerGWorld.cpp \
+            platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp \
+            platform/graphics/gstreamer/VideoSinkGStreamer.cpp \
+            platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp \
+            platform/graphics/gstreamer/PlatformVideoWindowQt.cpp \
+            platform/graphics/gstreamer/ImageGStreamerQt.cpp
 
-            CONFIG *= mobility
-            MOBILITY += multimedia
-            DEFINES += WTF_USE_QT_MULTIMEDIA
-         } else:contains(QT_CONFIG, phonon) {
-            HEADERS += \
-                platform/graphics/qt/MediaPlayerPrivatePhonon.h
+        DEFINES += WTF_USE_GSTREAMER=1
+        DEFINES += ENABLE_GLIB_SUPPORT=1
 
-            SOURCES += \
-                platform/graphics/qt/MediaPlayerPrivatePhonon.cpp
+        INCLUDEPATH += $$PWD/platform/graphics/gstreamer
 
-            # Add phonon manually to prevent it from coming first in
-            # the include paths, as Phonon's path.h conflicts with
-            # WebCore's Path.h on case-insensitive filesystems.
-            qtAddLibrary(phonon)
-            INCLUDEPATH -= $$QMAKE_INCDIR_QT/phonon
-            INCLUDEPATH += $$QMAKE_INCDIR_QT/phonon
-            mac {
-                INCLUDEPATH -= $$QMAKE_LIBDIR_QT/phonon.framework/Headers
-                INCLUDEPATH += $$QMAKE_LIBDIR_QT/phonon.framework/Headers
-            }
+        PKGCONFIG += glib-2.0 gio-2.0 gstreamer-0.10 gstreamer-app-0.10 gstreamer-base-0.10 gstreamer-interfaces-0.10 gstreamer-pbutils-0.10 gstreamer-plugins-base-0.10 gstreamer-video-0.10
+     } else:contains(MOBILITY_CONFIG, multimedia) {
+        HEADERS += platform/graphics/qt/MediaPlayerPrivateQt.h
+        SOURCES += platform/graphics/qt/MediaPlayerPrivateQt.cpp
+
+        CONFIG *= mobility
+        MOBILITY += multimedia
+        DEFINES += WTF_USE_QT_MULTIMEDIA
+     } else:contains(QT_CONFIG, phonon) {
+        HEADERS += \
+            platform/graphics/qt/MediaPlayerPrivatePhonon.h
+
+        SOURCES += \
+            platform/graphics/qt/MediaPlayerPrivatePhonon.cpp
+
+        # Add phonon manually to prevent it from coming first in
+        # the include paths, as Phonon's path.h conflicts with
+        # WebCore's Path.h on case-insensitive filesystems.
+        qtAddLibrary(phonon)
+        INCLUDEPATH -= $$QMAKE_INCDIR_QT/phonon
+        INCLUDEPATH += $$QMAKE_INCDIR_QT/phonon
+        mac {
+            INCLUDEPATH -= $$QMAKE_LIBDIR_QT/phonon.framework/Headers
+            INCLUDEPATH += $$QMAKE_LIBDIR_QT/phonon.framework/Headers
         }
+    }
 }
 
 contains(DEFINES, ENABLE_XPATH=1) {
@@ -3369,9 +3415,7 @@ contains(DEFINES, ENABLE_SVG=1) {
     # TODO: this-one-is-not-auto-added! FIXME! tmp/SVGElementFactory.cpp \
             bindings/js/JSSVGElementInstanceCustom.cpp \
             bindings/js/JSSVGLengthCustom.cpp \
-            bindings/js/JSSVGMatrixCustom.cpp \
-            bindings/js/JSSVGPathSegCustom.cpp \
-            bindings/js/JSSVGPathSegListCustom.cpp
+            bindings/js/JSSVGPathSegCustom.cpp
     }
 
     SOURCES += \
@@ -3406,7 +3450,6 @@ contains(DEFINES, ENABLE_SVG=1) {
         svg/SVGAltGlyphElement.cpp \
         svg/SVGAngle.cpp \
         svg/SVGAnimateColorElement.cpp \
-        svg/SVGAnimatedPathData.cpp \
         svg/SVGAnimateElement.cpp \
         svg/SVGAnimateMotionElement.cpp \
         svg/SVGAnimateTransformElement.cpp \
@@ -3487,20 +3530,9 @@ contains(DEFINES, ENABLE_SVG=1) {
         svg/SVGPathElement.cpp \
         svg/SVGPathParser.cpp \
         svg/SVGPathParserFactory.cpp \
-        svg/SVGPathSeg.cpp \
-        svg/SVGPathSegArc.cpp \
-        svg/SVGPathSegClosePath.cpp \
-        svg/SVGPathSegCurvetoCubic.cpp \
-        svg/SVGPathSegCurvetoCubicSmooth.cpp \
-        svg/SVGPathSegCurvetoQuadratic.cpp \
-        svg/SVGPathSegCurvetoQuadraticSmooth.cpp \
-        svg/SVGPathSegLineto.cpp \
-        svg/SVGPathSegLinetoHorizontal.cpp \
-        svg/SVGPathSegLinetoVertical.cpp \
         svg/SVGPathSegList.cpp \
         svg/SVGPathSegListBuilder.cpp \
         svg/SVGPathSegListSource.cpp \
-        svg/SVGPathSegMoveto.cpp \
         svg/SVGPathStringBuilder.cpp \
         svg/SVGPathStringSource.cpp \
         svg/SVGPathTraversalStateBuilder.cpp \
@@ -3550,6 +3582,7 @@ contains(DEFINES, ENABLE_SVG=1) {
         svg/graphics/filters/SVGFilter.cpp \
         svg/graphics/filters/SVGFilterBuilder.cpp \
         svg/graphics/SVGImage.cpp \
+        svg/properties/SVGPathSegListPropertyTearOff.cpp \
         rendering/RenderForeignObject.cpp \
         rendering/RenderSVGBlock.cpp \
         rendering/RenderSVGContainer.cpp \
@@ -3668,6 +3701,7 @@ HEADERS += \
         html/canvas/WebGLActiveInfo.h \
         html/canvas/ArrayBuffer.h \
         html/canvas/ArrayBufferView.h \
+        html/canvas/DataView.h \
         html/canvas/WebGLBuffer.h \
         html/canvas/Int8Array.h \
         html/canvas/WebGLContextAttributes.h \
@@ -3692,7 +3726,7 @@ HEADERS += \
     !v8 {
         SOURCES += \
                 bindings/js/JSArrayBufferCustom.cpp \
-                bindings/js/JSArrayBufferViewCustom.cpp \
+                bindings/js/JSDataViewCustom.cpp \
                 bindings/js/JSInt8ArrayCustom.cpp \
                 bindings/js/JSFloat32ArrayCustom.cpp \
                 bindings/js/JSInt32ArrayCustom.cpp \
@@ -3707,6 +3741,7 @@ SOURCES += \
         html/canvas/WebGLObject.cpp \
         html/canvas/ArrayBuffer.cpp \
         html/canvas/ArrayBufferView.cpp \
+        html/canvas/DataView.cpp \
         html/canvas/WebGLBuffer.cpp \
         html/canvas/Int8Array.cpp \
         html/canvas/WebGLContextAttributes.cpp \

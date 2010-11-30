@@ -150,7 +150,7 @@ LayoutTestController::LayoutTestController(TestShell* shell)
     bindMethod("setMockDeviceOrientation", &LayoutTestController::setMockDeviceOrientation);
     bindMethod("setMockGeolocationError", &LayoutTestController::setMockGeolocationError);
     bindMethod("setMockGeolocationPosition", &LayoutTestController::setMockGeolocationPosition);
-    bindMethod("setMockSpeechInputResult", &LayoutTestController::setMockSpeechInputResult);
+    bindMethod("addMockSpeechInputResult", &LayoutTestController::addMockSpeechInputResult);
     bindMethod("setPopupBlockingEnabled", &LayoutTestController::setPopupBlockingEnabled);
     bindMethod("setPOSIXLocale", &LayoutTestController::setPOSIXLocale);
     bindMethod("setScrollbarPolicy", &LayoutTestController::setScrollbarPolicy);
@@ -1492,7 +1492,7 @@ void LayoutTestController::setEditingBehavior(const CppArgumentList& arguments, 
         m_shell->preferences()->editingBehavior = WebSettings::EditingBehaviorUnix;
         m_shell->applyPreferences();
     } else
-        logErrorToConsole("Passed invalid editing behavior. Should be 'mac' or 'win'.");
+        logErrorToConsole("Passed invalid editing behavior. Should be 'mac', 'win', or 'unix'.");
 }
 
 void LayoutTestController::setMockDeviceOrientation(const CppArgumentList& arguments, CppVariant* result)
@@ -1502,9 +1502,10 @@ void LayoutTestController::setMockDeviceOrientation(const CppArgumentList& argum
         return;
 
     WebDeviceOrientation orientation(arguments[0].toBoolean(), arguments[1].toDouble(), arguments[2].toBoolean(), arguments[3].toDouble(), arguments[4].toBoolean(), arguments[5].toDouble());
-
-    ASSERT(m_deviceOrientationClientMock);
-    m_deviceOrientationClientMock->setOrientation(orientation);
+    // Note that we only call setOrientation on the main page's mock since this is all that the
+    // tests require. If necessary, we could get a list of WebViewHosts from the TestShell and
+    // call setOrientation on each DeviceOrientationClientMock.
+    m_shell->webViewHost()->deviceOrientationClientMock()->setOrientation(orientation);
 }
 
 void LayoutTestController::setGeolocationPermission(const CppArgumentList& arguments, CppVariant* result)
@@ -1536,20 +1537,13 @@ void LayoutTestController::abortModal(const CppArgumentList& arguments, CppVaria
     result->setNull();
 }
 
-void LayoutTestController::setMockSpeechInputResult(const CppArgumentList& arguments, CppVariant* result)
+void LayoutTestController::addMockSpeechInputResult(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
-    if (arguments.size() < 2 || !arguments[0].isString() || !arguments[1].isString())
+    if (arguments.size() < 3 || !arguments[0].isString() || !arguments[1].isNumber() || !arguments[2].isString())
         return;
 
-    m_speechInputControllerMock->setMockRecognitionResult(cppVariantToWebString(arguments[0]), cppVariantToWebString(arguments[1]));
-}
-
-WebKit::WebSpeechInputController* LayoutTestController::speechInputController(WebKit::WebSpeechInputListener* listener)
-{
-    if (!m_speechInputControllerMock.get())
-        m_speechInputControllerMock.set(WebSpeechInputControllerMock::create(listener));
-    return m_speechInputControllerMock.get();
+    m_shell->webViewHost()->speechInputControllerMock()->addMockRecognitionResult(cppVariantToWebString(arguments[0]), arguments[1].toDouble(), cppVariantToWebString(arguments[2]));
 }
 
 void LayoutTestController::layerTreeAsText(const CppArgumentList& args, CppVariant* result)
@@ -1564,13 +1558,6 @@ void LayoutTestController::markerTextForListItem(const CppArgumentList& args, Cp
         result->setNull();
     else
         result->set(element.document().frame()->markerTextForListItem(element).utf8());
-}
-
-WebDeviceOrientationClient* LayoutTestController::deviceOrientationClient()
-{
-    if (!m_deviceOrientationClientMock.get())
-        m_deviceOrientationClientMock.set(WebDeviceOrientationClientMock::create());
-    return m_deviceOrientationClientMock.get();
 }
 
 void LayoutTestController::hasSpellingMarker(const CppArgumentList& arguments, CppVariant* result)

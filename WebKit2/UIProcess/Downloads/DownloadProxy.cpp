@@ -25,10 +25,14 @@
 
 #include "DownloadProxy.h"
 
-#include "NotImplemented.h"
+#include "DataReference.h"
 #include "WebContext.h"
+#include "WebData.h"
+#include "WebProcessMessages.h"
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
+
+using namespace WebCore;
 
 namespace WebKit {
 
@@ -51,6 +55,15 @@ DownloadProxy::DownloadProxy(WebContext* webContext)
 
 DownloadProxy::~DownloadProxy()
 {
+    ASSERT(!m_webContext);
+}
+
+void DownloadProxy::cancel()
+{
+    if (!m_webContext)
+        return;
+
+    m_webContext->process()->send(Messages::WebProcess::CancelDownload(m_downloadID), 0);
 }
 
 void DownloadProxy::invalidate()
@@ -59,12 +72,57 @@ void DownloadProxy::invalidate()
     m_webContext = 0;
 }
 
-void DownloadProxy::didStart()
+void DownloadProxy::processDidClose()
 {
     if (!m_webContext)
         return;
 
+    m_webContext->downloadClient().processDidCrash(m_webContext, this);
+}
+
+void DownloadProxy::didStart(const ResourceRequest& request)
+{
+    m_request = request;
+
+    if (!m_webContext)
+        return;
+
     m_webContext->downloadClient().didStart(m_webContext, this);
+}
+
+void DownloadProxy::didReceiveResponse(const ResourceResponse& response)
+{
+    if (!m_webContext)
+        return;
+
+    m_webContext->downloadClient().didReceiveResponse(m_webContext, this, response);
+}
+
+void DownloadProxy::didReceiveData(uint64_t length)
+{
+    if (!m_webContext)
+        return;
+
+    m_webContext->downloadClient().didReceiveData(m_webContext, this, length);
+}
+
+void DownloadProxy::shouldDecodeSourceDataOfMIMEType(const String& mimeType, bool& result)
+{
+    if (!m_webContext)
+        return;
+
+    result = m_webContext->downloadClient().shouldDecodeSourceDataOfMIMEType(m_webContext, this, mimeType);
+}
+
+void DownloadProxy::decideDestinationWithSuggestedFilename(const String& filename, String& destination, bool& allowOverwrite, SandboxExtension::Handle& sandboxExtensionHandle)
+{
+    if (!m_webContext)
+        return;
+
+    destination = m_webContext->downloadClient().decideDestinationWithSuggestedFilename(m_webContext, this, filename, allowOverwrite);
+
+    if (!destination.isNull())
+        SandboxExtension::createHandle(destination, SandboxExtension::WriteOnly, sandboxExtensionHandle);
 }
 
 void DownloadProxy::didCreateDestination(const String& path)
@@ -81,6 +139,40 @@ void DownloadProxy::didFinish()
         return;
 
     m_webContext->downloadClient().didFinish(m_webContext, this);
+
+    // This can cause the DownloadProxy object to be deleted.
+    m_webContext->downloadFinished(this);
+}
+
+static PassRefPtr<WebData> createWebData(const CoreIPC::DataReference& data)
+{
+    if (data.isEmpty())
+        return 0;
+
+    return WebData::create(data.data(), data.size());
+}
+
+void DownloadProxy::didFail(const ResourceError& error, const CoreIPC::DataReference& resumeData)
+{
+    if (!m_webContext)
+        return;
+
+    m_resumeData = createWebData(resumeData);
+
+    m_webContext->downloadClient().didFail(m_webContext, this, error);
+
+    // This can cause the DownloadProxy object to be deleted.
+    m_webContext->downloadFinished(this);
+}
+
+void DownloadProxy::didCancel(const CoreIPC::DataReference& resumeData)
+{
+    m_resumeData = createWebData(resumeData);
+
+    m_webContext->downloadClient().didCancel(m_webContext, this);
+
+    // This can cause the DownloadProxy object to be deleted.
+    m_webContext->downloadFinished(this);
 }
 
 } // namespace WebKit

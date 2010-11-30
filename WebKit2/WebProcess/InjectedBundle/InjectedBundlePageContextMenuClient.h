@@ -26,6 +26,7 @@
 #ifndef InjectedBundlePageContextMenuClient_h
 #define InjectedBundlePageContextMenuClient_h
 
+#include "APIClient.h"
 #include "WKBundlePage.h"
 #include <wtf/Vector.h>
 
@@ -35,18 +36,14 @@ namespace WebCore {
 
 namespace WebKit {
 
+class APIObject;
+class InjectedBundleHitTestResult;
 class WebContextMenuItemData;
 class WebPage;
 
-class InjectedBundlePageContextMenuClient {
+class InjectedBundlePageContextMenuClient : public APIClient<WKBundlePageContextMenuClient> {
 public:
-    InjectedBundlePageContextMenuClient();
-    void initialize(WKBundlePageContextMenuClient*);
-
-    bool getCustomMenuFromDefaultItems(WebPage*, WebCore::ContextMenu* defaultMenu, Vector<WebContextMenuItemData>& newMenu);
-
-private:
-    WKBundlePageContextMenuClient m_client;
+    bool getCustomMenuFromDefaultItems(WebPage*, InjectedBundleHitTestResult*, const Vector<WebContextMenuItemData>& defaultMenu, Vector<WebContextMenuItemData>& newMenu, RefPtr<APIObject>& userData);
 };
 
 } // namespace WebKit

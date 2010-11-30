@@ -91,7 +91,6 @@ BUGWK45991 : canvas/philip/tests/2d.imageData.object.round.html = TEXT
 BUGWK45991 : canvas/philip/tests/2d.imageData.object.wrap.html = TEXT
 BUGWK45991 : canvas/philip/tests/2d.missingargs.html = TEXT
 BUGWK45991 : canvas/philip/tests/2d.pattern.image.broken.html = TEXT
-BUGWK45991 : canvas/philip/tests/2d.pattern.image.incomplete.html = TEXT
 BUGWK45991 LINUX WIN : canvas/philip/tests/2d.shadow.enable.blur.html = TEXT
 BUGWK45991 LINUX WIN : canvas/philip/tests/2d.text.draw.baseline.ideographic.html = TEXT
 BUGWK45991 : canvas/philip/tests/type.prototype.html = TEXT
@@ -103,7 +102,6 @@ BUGWK45991 LINUX WIN : canvas/philip/tests/2d.gradient.radial.cone.shape2.html =
 BUGWK45991 LINUX WIN : canvas/philip/tests/2d.gradient.radial.outside3.html = TEXT
 BUGWK45991 LINUX WIN : canvas/philip/tests/2d.gradient.radial.touch1.html = TEXT
 BUGWK45991 LINUX WIN : canvas/philip/tests/2d.gradient.radial.touch3.html = TEXT
-BUGWK45991 LINUX WIN : canvas/philip/tests/2d.imageData.put.unchanged.html = TEXT
 BUGWK45991 LINUX WIN : canvas/philip/tests/2d.line.width.basic.html = TEXT
 BUGWK45991 LINUX WIN : canvas/philip/tests/2d.line.width.transformed.html = TEXT
 BUGWK45991 LINUX WIN : canvas/philip/tests/2d.path.arc.angle.3.html = TEXT
@@ -193,6 +191,7 @@ BUGWK43086 : fast/canvas/canvas-ImageData-behaviour.html = TEXT
 BUGWEBGL : fast/canvas/webgl/css-webkit-canvas-repaint.html = IMAGE
 BUGWEBGL : fast/canvas/webgl/css-webkit-canvas.html = IMAGE
 BUGWEBGL WIN MAC : fast/canvas/webgl/tex-image-and-sub-image-2d-with-video.html = TEXT PASS
+BUGWEBGL WIN : fast/canvas/webgl/tex-image-and-sub-image-2d-with-array-buffer-view.html = CRASH PASS
 BUGWEBGL : fast/canvas/webgl/gl-uniform-arrays.html = TEXT
 BUGWEBGL : fast/canvas/webgl/point-size.html = TEXT
 BUG60651 : fast/canvas/webgl/gl-object-get-calls.html = TEXT PASS
@@ -201,7 +200,6 @@ BUG60651 WIN : fast/canvas/webgl/glsl-conformance.html = TIMEOUT FAIL
 BUG_AUTO WIN DEBUG : canvas/philip/tests/2d.text.draw.align.center.html = PASS TEXT
 BUGWK47901 MAC : fast/canvas/canvas-getImageData-negative-source.html = TEXT
 BUGJAPHET WIN LINUX : fast/canvas/canvas-currentColor.html = TEXT
-BUGWK48142 : fast/canvas/webgl/tex-image-and-sub-image-2d-with-array-buffer-view.html = CRASH PASS
 BUGWK71000 MAC : canvas/philip/tests/2d.imageData.get.source.negative.html = TEXT
 BUG61824 : canvas/philip/tests/2d.pattern.image.string.html = TEXT
 // Update canvas/philip in WK r71481
@@ -224,11 +222,6 @@ BUG62301 MAC LINUX WIN :  canvas/philip/tests/2d.pattern.image.null.html = TEXT
 BUG62301 LINUX WIN :  canvas/philip/tests/2d.shadow.enable.x.html = TEXT
 BUG62301 LINUX WIN :  canvas/philip/tests/2d.shadow.enable.y.html = TEXT
 BUG62301 LINUX WIN :  canvas/philip/tests/2d.strokeRect.zero.4.html = TEXT
-BUG62301 MAC LINUX WIN :  canvas/philip/tests/security.drawImage.canvas.html = TEXT
-BUG62301 MAC LINUX WIN :  canvas/philip/tests/security.drawImage.image.html = TEXT
-BUG62301 MAC LINUX WIN :  canvas/philip/tests/security.pattern.canvas.fillStyle.html = TEXT
-BUG62301 MAC LINUX WIN :  canvas/philip/tests/security.pattern.canvas.strokeStyle.html = TEXT
-BUG62301 MAC LINUX WIN :  canvas/philip/tests/security.reset.html = TEXT
 BUG62301 LINUX WIN :  canvas/philip/tests/toDataURL.jpeg.alpha.html = TEXT
 
 // END OF DUPLICATED SECTION
@@ -267,8 +260,13 @@ BUGWK47924 MAC : compositing/iframes/composited-iframe-alignment.html = TIMEOUT 
 // Chromium does not support PDF content in <img> tags.
 WONTFIX : compositing/color-matching/pdf-image-match.html = FAIL
 WONTFIX : compositing/images/direct-pdf-image.html = FAIL
+
 // Chromium does not support PDF or plugin content in layers right now.
-BUGWK47925 : compositing/plugins/composited-plugin.html = FAIL
+BUGWK47925 WIN LINUX : compositing/plugins/composited-plugin.html = FAIL
+BUGWK47925 MAC : compositing/plugins/composited-plugin.html = CRASH
+BUGWK47925 MAC : compositing/plugins/small-to-large-composited-plugin.html = CRASH
+BUGWK47925 MAC : compositing/plugins/1x1-composited-plugin.html = CRASH
+BUGWK47925 MAC : compositing/plugins/large-to-small-composited-plugin.html = CRASH
 
 // The word "compositing" appears in Chromium's pixel results and not
 // in Safari's; this should probably be fixed.
@@ -353,7 +351,7 @@ BUGWK48018 LINUX DEBUG : compositing/geometry/outline-change.html = FAIL PASS
 BUGWK48020 LINUX DEBUG : compositing/geometry/object-clip-rects-assertion.html = FAIL
 
 // The following tests are failing on Mac.
-BUGWK48029 MAC : compositing/plugins/small-to-large-composited-plugin.html = TEXT
+//BUGWK48029 MAC : compositing/plugins/small-to-large-composited-plugin.html = TEXT
 BUGWK48029 MAC : compositing/tiling/crash-reparent-tiled-layer.html = TEXT
 BUGWK48029 MAC : compositing/tiling/huge-layer-img.html = TEXT
 BUGWK48029 MAC : compositing/tiling/huge-layer-resize.html = TEXT
@@ -369,5 +367,13 @@ BUG58534 WIN LINUX : canvas/philip/tests/2d.composite.globalAlpha.fill.html = TE
 BUG58536 WIN LINUX : canvas/philip/tests/2d.imageData.put.alpha.html = TEXT
 BUG60965 WIN LINUX : fast/canvas/setWidthResetAfterForcedRender.html = IMAGE+TEXT
 
-// This test probably just needs new results (not sure why it doesn't have any on any platform).
-BUGNONE : compositing/layer-creation/many-layers.html = MISSING
+BUGWK49477 WIN LINUX : fast/canvas/canvas-arc-360-winding.html = TEXT
+
+// New test added with http://trac.webkit.org/changeset/72472
+BUGCR63921 LINUX WIN : fast/canvas/canvas-fillPath-shadow.html = TEXT
+
+// Unknown reason. Was introduced at r72588
+BUG_LOISLO : fast/canvas/canvas-drawImage-shadow.html = TEXT
+BUGWK50112 WIN LINUX : fast/canvas/canvas-createPattern-fillRect-shadow.html = TEXT
+
+

@@ -28,8 +28,10 @@
 
 #include "CacheModel.h"
 #include "FindOptions.h"
+#include "FontSmoothingLevel.h"
 #include "WKContext.h"
 #include "WKPage.h"
+#include "WKPreferencesPrivate.h"
 #include "WKSharedAPICast.h"
 #include <WebCore/FrameLoaderTypes.h>
 
@@ -55,7 +57,9 @@ WK_ADD_API_MAPPING(WKDownloadRef, DownloadProxy)
 WK_ADD_API_MAPPING(WKFormSubmissionListenerRef, WebFormSubmissionListenerProxy)
 WK_ADD_API_MAPPING(WKFramePolicyListenerRef, WebFramePolicyListenerProxy)
 WK_ADD_API_MAPPING(WKFrameRef, WebFrameProxy)
+#if ENABLE(INSPECTOR)
 WK_ADD_API_MAPPING(WKInspectorRef, WebInspectorProxy)
+#endif
 WK_ADD_API_MAPPING(WKNavigationDataRef, WebNavigationData)
 WK_ADD_API_MAPPING(WKPageNamespaceRef, WebPageNamespace)
 WK_ADD_API_MAPPING(WKPageRef, WebPageProxy)
@@ -147,6 +151,49 @@ inline FindOptions toFindOptions(WKFindOptions wkFindOptions)
         findOptions |= FindOptionsShowFindIndicator;
 
     return static_cast<FindOptions>(findOptions);
+}
+
+inline FontSmoothingLevel toFontSmoothingLevel(WKFontSmoothingLevel wkLevel)
+{
+    switch (wkLevel) {
+    case kWKFontSmoothingLevelNoSubpixelAntiAliasing:
+        return FontSmoothingLevelNoSubpixelAntiAliasing;
+    case kWKFontSmoothingLevelLight:
+        return FontSmoothingLevelLight;
+    case kWKFontSmoothingLevelMedium:
+        return FontSmoothingLevelMedium;
+    case kWKFontSmoothingLevelStrong:
+        return FontSmoothingLevelStrong;
+#if PLATFORM(WIN)
+    case kWKFontSmoothingLevelWindows:
+        return FontSmoothingLevelWindows;
+#endif
+    }
+
+    ASSERT_NOT_REACHED();
+    return FontSmoothingLevelMedium;
+}
+
+
+inline WKFontSmoothingLevel toAPI(FontSmoothingLevel level)
+{
+    switch (level) {
+    case FontSmoothingLevelNoSubpixelAntiAliasing:
+        return kWKFontSmoothingLevelNoSubpixelAntiAliasing;
+    case FontSmoothingLevelLight:
+        return kWKFontSmoothingLevelLight;
+    case FontSmoothingLevelMedium:
+        return kWKFontSmoothingLevelMedium;
+    case FontSmoothingLevelStrong:
+        return kWKFontSmoothingLevelStrong;
+#if PLATFORM(WIN)
+    case FontSmoothingLevelWindows:
+        return kWKFontSmoothingLevelWindows;
+#endif
+    }
+
+    ASSERT_NOT_REACHED();
+    return kWKFontSmoothingLevelMedium;
 }
 
 } // namespace WebKit

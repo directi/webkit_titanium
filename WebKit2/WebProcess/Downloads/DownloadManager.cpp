@@ -26,7 +26,7 @@
 #include "DownloadManager.h"
 
 #include "Download.h"
-#include "NotImplemented.h"
+#include "WebProcess.h"
 #include <wtf/StdLibExtras.h>
 
 using namespace WebCore;
@@ -43,13 +43,41 @@ DownloadManager::DownloadManager()
 {
 }
 
-void DownloadManager::startDownload(uint64_t downloadID, const ResourceRequest& request)
+void DownloadManager::startDownload(uint64_t downloadID, WebPage* initiatingPage, const ResourceRequest& request)
 {
     OwnPtr<Download> download = Download::create(downloadID, request);
-    download->start();
+    download->start(initiatingPage);
 
     ASSERT(!m_downloads.contains(downloadID));
     m_downloads.set(downloadID, download.leakPtr());
+}
+
+void DownloadManager::convertHandleToDownload(uint64_t downloadID, WebPage* initiatingPage, ResourceHandle* handle, const ResourceRequest& request, const ResourceRequest& initialRequest, const ResourceResponse& response)
+{
+    OwnPtr<Download> download = Download::create(downloadID, request);
+
+    download->startWithHandle(initiatingPage, handle, initialRequest, response);
+    ASSERT(!m_downloads.contains(downloadID));
+    m_downloads.set(downloadID, download.leakPtr());
+}
+
+void DownloadManager::cancelDownload(uint64_t downloadID)
+{
+    Download* download = m_downloads.get(downloadID);
+    if (!download)
+        return;
+
+    download->cancel();
+}
+
+void DownloadManager::downloadFinished(Download* download)
+{
+    ASSERT(m_downloads.contains(download->downloadID()));
+    m_downloads.remove(download->downloadID());
+
+    delete download;
+
+    WebProcess::shared().shutdownIfPossible();
 }
 
 } // namespace WebKit

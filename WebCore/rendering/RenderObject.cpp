@@ -31,6 +31,7 @@
 #include "Chrome.h"
 #include "CSSStyleSelector.h"
 #include "DashArray.h"
+#include "EditingBoundary.h"
 #include "FloatQuad.h"
 #include "Frame.h"
 #include "FrameView.h"
@@ -117,7 +118,6 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
         return image;
     }
 
-#if ENABLE(RUBY)
     if (node->hasTagName(rubyTag)) {
         if (style->display() == INLINE)
             return new (arena) RenderRubyAsInline(node);
@@ -127,7 +127,6 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
     // treat <rt> as ruby text ONLY if it still has its default treatment of block
     if (node->hasTagName(rtTag) && style->display() == BLOCK)
         return new (arena) RenderRubyText(node);
-#endif
 
     switch (style->display()) {
         case NONE:
@@ -255,6 +254,15 @@ bool RenderObject::isBody() const
 bool RenderObject::isHR() const
 {
     return node() && node()->hasTagName(hrTag);
+}
+
+bool RenderObject::isLegend() const
+{
+    return node() && (node()->hasTagName(legendTag)
+#if ENABLE(WML)
+                      || node()->hasTagName(WMLNames::insertedLegendTag)
+#endif
+                     );
 }
 
 bool RenderObject::isHTMLMarquee() const
@@ -2632,10 +2640,10 @@ VisiblePosition RenderObject::createVisiblePosition(int offset, EAffinity affini
         if (!node->isContentEditable()) {
             // If it can be found, we prefer a visually equivalent position that is editable. 
             Position position(node, offset);
-            Position candidate = position.downstream(Position::CanCrossEditingBoundary);
+            Position candidate = position.downstream(CanCrossEditingBoundary);
             if (candidate.node()->isContentEditable())
                 return VisiblePosition(candidate, affinity);
-            candidate = position.upstream(Position::CanCrossEditingBoundary);
+            candidate = position.upstream(CanCrossEditingBoundary);
             if (candidate.node()->isContentEditable())
                 return VisiblePosition(candidate, affinity);
         }

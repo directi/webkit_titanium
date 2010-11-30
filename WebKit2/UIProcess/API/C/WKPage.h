@@ -203,6 +203,18 @@ enum {
     kWKMoreThanMaximumMatchCount = -1
 };
 
+// ContextMenu client
+typedef void (*WKPageGetContextMenuFromProposedContextMenuCallback)(WKPageRef page, WKArrayRef proposedMenu, WKArrayRef* newMenu, WKTypeRef userData, const void* clientInfo);
+typedef void (*WKPageCustomContextMenuItemSelectedCallback)(WKPageRef page, WKContextMenuItemRef contextMenuItem, const void* clientInfo);
+
+struct WKPageContextMenuClient {
+    int                                                                 version;
+    const void *                                                        clientInfo;
+    WKPageGetContextMenuFromProposedContextMenuCallback                 getContextMenuFromProposedMenu;
+    WKPageCustomContextMenuItemSelectedCallback                         customContextMenuItemSelected;
+};
+typedef struct WKPageContextMenuClient WKPageContextMenuClient;
+
 WK_EXPORT WKTypeID WKPageGetTypeID();
 
 WK_EXPORT WKPageNamespaceRef WKPageGetPageNamespace(WKPageRef page);
@@ -228,13 +240,17 @@ WK_EXPORT bool WKPageCanGoBack(WKPageRef page);
 WK_EXPORT void WKPageGoToBackForwardListItem(WKPageRef page, WKBackForwardListItemRef item);
 WK_EXPORT WKBackForwardListRef WKPageGetBackForwardList(WKPageRef page);
 
+WK_EXPORT bool WKPageCanShowMIMEType(WKPageRef page, WKStringRef mimeType);
+
 WK_EXPORT WKStringRef WKPageCopyTitle(WKPageRef page);
 
 WK_EXPORT WKFrameRef WKPageGetMainFrame(WKPageRef page);
 WK_EXPORT WKFrameRef WKPageGetFocusedFrame(WKPageRef page); // The focused frame may be inactive.
 WK_EXPORT double WKPageGetEstimatedProgress(WKPageRef page);
 
+#if defined(ENABLE_INSPECTOR) && ENABLE_INSPECTOR
 WK_EXPORT WKInspectorRef WKPageGetInspector(WKPageRef page);
+#endif
 
 WK_EXPORT WKStringRef WKPageCopyCustomUserAgent(WKPageRef page);
 WK_EXPORT void WKPageSetCustomUserAgent(WKPageRef page, WKStringRef userAgent);
@@ -253,7 +269,7 @@ WK_EXPORT double WKPageGetPageZoomFactor(WKPageRef page);
 WK_EXPORT void WKPageSetPageZoomFactor(WKPageRef page, double zoomFactor);
 WK_EXPORT void WKPageSetPageAndTextZoomFactors(WKPageRef page, double pageZoomFactor, double textZoomFactor);
 
-WK_EXPORT void WKPageScaleWebView(WKPageRef page, double scale);
+WK_EXPORT void WKPageScaleWebView(WKPageRef page, double scale, WKPoint origin);
 WK_EXPORT double WKPageGetViewScaleFactor(WKPageRef page);
 
 // Find.
@@ -275,11 +291,12 @@ WK_EXPORT void WKPageFindString(WKPageRef page, WKStringRef string, WKFindDirect
 WK_EXPORT void WKPageHideFindUI(WKPageRef page);
 WK_EXPORT void WKPageCountStringMatches(WKPageRef page, WKStringRef string, bool caseInsensitive, unsigned maxMatchCount);
 
+WK_EXPORT void WKPageSetPageContextMenuClient(WKPageRef page, const WKPageContextMenuClient* client);
+WK_EXPORT void WKPageSetPageFindClient(WKPageRef page, const WKPageFindClient* client);
+WK_EXPORT void WKPageSetPageFormClient(WKPageRef page, const WKPageFormClient* client);
 WK_EXPORT void WKPageSetPageLoaderClient(WKPageRef page, const WKPageLoaderClient* client);
 WK_EXPORT void WKPageSetPagePolicyClient(WKPageRef page, const WKPagePolicyClient* client);
-WK_EXPORT void WKPageSetPageFormClient(WKPageRef page, const WKPageFormClient* client);
 WK_EXPORT void WKPageSetPageUIClient(WKPageRef page, const WKPageUIClient* client);
-WK_EXPORT void WKPageSetPageFindClient(WKPageRef page, const WKPageFindClient* client);
 
 typedef void (*WKPageRunJavaScriptFunction)(WKStringRef, WKErrorRef, void*);
 WK_EXPORT void WKPageRunJavaScriptInMainFrame(WKPageRef page, WKStringRef script, void* context, WKPageRunJavaScriptFunction function);

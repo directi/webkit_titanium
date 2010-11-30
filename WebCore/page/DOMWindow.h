@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006, 2007, 2009 Apple Inc.  All rights reserved.
+ * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,10 +59,11 @@ namespace WebCore {
     class History;
     class IDBFactory;
     class Location;
-    class StyleMedia;
+    class MediaQueryList;
     class Navigator;
     class Node;
     class NotificationCenter;
+    class StyleMedia;
 
 #if ENABLE(WEB_TIMING)
     class Performance;
@@ -91,11 +93,12 @@ namespace WebCore {
         virtual DOMWindow* toDOMWindow() { return this; }
         virtual ScriptExecutionContext* scriptExecutionContext() const;
 
-        bool printDeferred() const { return m_printDeferred; }
         Frame* frame() const { return m_frame; }
         void disconnectFrame();
 
         void clear();
+
+        PassRefPtr<MediaQueryList> matchMedia(const String&);
 
 #if ENABLE(ORIENTATION_EVENTS)
         // This is the interface orientation in degrees. Some examples are:
@@ -276,6 +279,7 @@ namespace WebCore {
         using EventTarget::dispatchEvent;
         bool dispatchEvent(PassRefPtr<Event> prpEvent, PassRefPtr<EventTarget> prpTarget);
         void dispatchLoadEvent();
+        void dispatchTimedEvent(PassRefPtr<Event> event, Document* target, double* startTime, double* endTime);
 
         DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(beforeunload);
@@ -366,6 +370,8 @@ namespace WebCore {
         void captureEvents();
         void releaseEvents();
 
+        void finishedLoading();
+
         // These methods are used for GC marking. See JSDOMWindow::markChildren(MarkStack&) in
         // JSDOMWindowCustom.cpp.
         Screen* optionalScreen() const { return m_screen.get(); }
@@ -410,7 +416,7 @@ namespace WebCore {
         RefPtr<SecurityOrigin> m_securityOrigin;
         KURL m_url;
 
-        bool m_printDeferred;
+        bool m_shouldPrintWhenFinishedLoading;
         Frame* m_frame;
         mutable RefPtr<Screen> m_screen;
         mutable RefPtr<DOMSelection> m_selection;

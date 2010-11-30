@@ -104,13 +104,18 @@ public:
     virtual void setCanHaveScrollbars(bool);
     bool canHaveScrollbars() const { return horizontalScrollbarMode() != ScrollbarAlwaysOff || verticalScrollbarMode() != ScrollbarAlwaysOff; }
 
-    virtual bool delegatesScrolling() { return false; }
-    virtual bool avoidScrollbarCreation() { return false; }
+    virtual bool avoidScrollbarCreation() const { return false; }
 
     // By default you only receive paint events for the area that is visible. In the case of using a
     // tiled backing store, this function can be set, so that the view paints the entire contents.
     bool paintsEntireContents() const { return m_paintsEntireContents; }
     void setPaintsEntireContents(bool);
+
+    // By default programmatic scrolling is handled by WebCore and not by the UI application.
+    // In the case of using a tiled backing store, this mode can be set, so that the scroll requests
+    // are delegated to the UI application.
+    bool delegatesScrolling() const { return m_delegatesScrolling; }
+    void setDelegatesScrolling(bool);
 
     // Overridden by FrameView to create custom CSS scrollbars if applicable.
     virtual PassRefPtr<Scrollbar> createScrollbar(ScrollbarOrientation);
@@ -127,7 +132,11 @@ public:
     // The visible content rect has a location that is the scrolled offset of the document. The width and height are the viewport width
     // and height. By default the scrollbars themselves are excluded from this rectangle, but an optional boolean argument allows them to be
     // included.
+    // In the situation the client is responsible for the scrolling (ie. with a tiled backing store) it is possible to use
+    // the actualVisibleContentRect instead, though this must be updated manually, e.g after panning ends.
     IntRect visibleContentRect(bool includeScrollbars = false) const;
+    IntRect actualVisibleContentRect() const { return m_actualVisibleContentRect.isEmpty() ? visibleContentRect() : m_actualVisibleContentRect; }
+    void setActualVisibleContentRect(const IntRect& actualVisibleContentRect) { m_actualVisibleContentRect = actualVisibleContentRect; }
     int visibleWidth() const { return visibleContentRect().width(); }
     int visibleHeight() const { return visibleContentRect().height(); }
 
@@ -151,6 +160,9 @@ public:
     IntPoint scrollPosition() const { return visibleContentRect().location(); }
     IntSize scrollOffset() const { return visibleContentRect().location() - IntPoint(); } // Gets the scrolled position as an IntSize. Convenient for adding to other sizes.
     IntPoint maximumScrollPosition() const; // The maximum position we can be scrolled to.
+    IntPoint minimumScrollPosition() const; // The minimum position we can be scrolled to.
+    // Adjust the pass in scroll position within the minimum and maximum positions.
+    IntPoint adjustScrollPositionWithinRange(const IntPoint&) const; 
     int scrollX() const { return scrollPosition().x(); }
     int scrollY() const { return scrollPosition().y(); }
     
@@ -270,6 +282,10 @@ protected:
     // Scroll the content by invalidating everything.
     virtual void scrollContentsSlowPath(const IntRect& updateRect);
 
+    void setScrollOriginX(int);
+    int scrollOriginX() { return m_scrollOriginX; }
+    void updateScrollbars();
+
 private:
     RefPtr<Scrollbar> m_horizontalScrollbar;
     RefPtr<Scrollbar> m_verticalScrollbar;
@@ -287,6 +303,7 @@ private:
     // whether it is safe to blit on scroll.
     bool m_canBlitOnScroll;
 
+    IntRect m_actualVisibleContentRect;
     IntSize m_scrollOffset; // FIXME: Would rather store this as a position, but we will wait to make this change until more code is shared.
     IntSize m_fixedLayoutSize;
     IntSize m_contentsSize;
@@ -302,6 +319,12 @@ private:
     bool m_useFixedLayout;
 
     bool m_paintsEntireContents;
+    bool m_delegatesScrolling;
+
+    // m_scrollOriginX is 0 for LTR page. And it is negative of left layout
+    // overflow for RTL page. It is mainly used to set the horizontal scrollbar
+    // position for RTL page.
+    int m_scrollOriginX;
 
     void init();
     void destroy();
@@ -330,6 +353,8 @@ private:
     void platformSetScrollbarsSuppressed(bool repaintOnUnsuppress);
     void platformRepaintContentRectangle(const IntRect&, bool now);
     bool platformIsOffscreen() const;
+   
+    void platformSetScrollOriginX(int);
 
 #if PLATFORM(MAC) && defined __OBJC__
 public:

@@ -56,6 +56,9 @@ PassRefPtr<ProcessingInstruction> ProcessingInstruction::create(Document* docume
 
 ProcessingInstruction::~ProcessingInstruction()
 {
+    if (m_sheet)
+        m_sheet->clearOwnerNode();
+
     if (m_cachedSheet)
         m_cachedSheet->removeClient(this);
 }
@@ -140,7 +143,7 @@ void ProcessingInstruction::checkStyleSheet()
             // to kick off import/include loads that can hang off some parent sheet.
             if (m_isXSL) {
                 KURL finalURL(ParsedURLString, m_localHref);
-                m_sheet = XSLStyleSheet::createInline(this, finalURL);
+                m_sheet = XSLStyleSheet::createEmbedded(this, finalURL);
                 m_loading = false;
             }
 #endif
@@ -200,6 +203,11 @@ bool ProcessingInstruction::sheetLoaded()
 
 void ProcessingInstruction::setCSSStyleSheet(const String& href, const KURL& baseURL, const String& charset, const CachedCSSStyleSheet* sheet)
 {
+    if (!inDocument()) {
+        ASSERT(!m_sheet);
+        return;
+    }
+
 #if ENABLE(XSLT)
     ASSERT(!m_isXSL);
 #endif
@@ -273,6 +281,12 @@ void ProcessingInstruction::removedFromDocument()
     ContainerNode::removedFromDocument();
 
     document()->removeStyleSheetCandidateNode(this);
+
+    if (m_sheet) {
+        ASSERT(m_sheet->ownerNode() == this);
+        m_sheet->clearOwnerNode();
+        m_sheet = 0;
+    }
 
     if (m_cachedSheet)
         document()->styleSelectorChanged(DeferRecalcStyle);

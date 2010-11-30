@@ -26,6 +26,8 @@
 #ifndef WebInspector_h
 #define WebInspector_h
 
+#if ENABLE(INSPECTOR)
+
 #include "Connection.h"
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
@@ -33,6 +35,7 @@
 namespace WebKit {
 
 class WebPage;
+struct WebPageCreationParameters;
 
 class WebInspector {
     WTF_MAKE_NONCOPYABLE(WebInspector);
@@ -41,11 +44,24 @@ public:
     explicit WebInspector(WebPage*);
 
     WebPage* page() const { return m_page; }
+    WebPage* inspectorPage() const { return m_inspectorPage; }
 
     // Implemented in generated WebInspectorMessageReceiver.cpp
     void didReceiveWebInspectorMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
 
 private:
+    friend class WebInspectorClient;
+    friend class WebInspectorFrontendClient;
+
+    // Called from WebInspectorClient
+    WebPage* createInspectorPage();
+
+    // Called from WebInspectorFrontendClient
+    void didLoadInspectorPage();
+
+    // Implemented in platform WebInspector file
+    String localizedStringsURL() const;
+
     // Called by WebInspector messages
     void show();
     void close();
@@ -62,8 +78,11 @@ private:
     void stopPageProfiling();
 
     WebPage* m_page;
+    WebPage* m_inspectorPage;
 };
 
 } // namespace WebKit
+
+#endif // ENABLE(INSPECTOR)
 
 #endif // WebInspector_h

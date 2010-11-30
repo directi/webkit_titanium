@@ -35,6 +35,8 @@
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include <limits>
+#include <wtf/CurrentTime.h>
+#include <wtf/DateMath.h>
 #include <wtf/MathExtras.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/WTFString.h>
@@ -91,6 +93,15 @@ bool BaseDateAndTimeInputType::rangeOverflow(const String& value) const
     return isfinite(doubleValue) && doubleValue > maximum();
 }
 
+double BaseDateAndTimeInputType::defaultValueForStepUp() const
+{
+    double ms = currentTimeMS();
+    double utcOffset = calculateUTCOffset();
+    double dstOffset = calculateDSTOffset(ms, utcOffset);
+    int offset = static_cast<int>((utcOffset + dstOffset) / msPerMinute);
+    return ms + (offset * msPerMinute);
+}
+
 bool BaseDateAndTimeInputType::stepMismatch(const String& value, double step) const
 {
     const double nan = numeric_limits<double>::quiet_NaN();
@@ -106,6 +117,11 @@ bool BaseDateAndTimeInputType::stepMismatch(const String& value, double step) co
 double BaseDateAndTimeInputType::stepBase() const
 {
     return parseToDouble(element()->fastGetAttribute(minAttr), defaultStepBase());
+}
+
+bool BaseDateAndTimeInputType::handleKeydownEvent(KeyboardEvent* event)
+{
+    return handleKeydownEventForSpinButton(event) || TextFieldInputType::handleKeydownEvent(event);
 }
 
 double BaseDateAndTimeInputType::parseToDouble(const String& src, double defaultValue) const

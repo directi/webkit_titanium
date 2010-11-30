@@ -751,13 +751,13 @@ bool Position::isCandidate() const
         return false;
 
     if (renderer->isBR())
-        return m_offset == 0 && !nodeIsUserSelectNone(node()->parent());
+        return !m_offset && !nodeIsUserSelectNone(node()->parentNode());
 
     if (renderer->isText())
         return !nodeIsUserSelectNone(node()) && inRenderedText();
 
     if (isTableElement(node()) || editingIgnoresContent(node()))
-        return (atFirstEditingPositionForNode() || atLastEditingPositionForNode()) && !nodeIsUserSelectNone(node()->parent());
+        return (atFirstEditingPositionForNode() || atLastEditingPositionForNode()) && !nodeIsUserSelectNone(node()->parentNode());
 
     if (m_anchorNode->hasTagName(htmlTag))
         return false;
@@ -1006,7 +1006,7 @@ static Position downstreamIgnoringEditingBoundaries(Position position)
     Position lastPosition;
     while (position != lastPosition) {
         lastPosition = position;
-        position = position.downstream(Position::CanCrossEditingBoundary);
+        position = position.downstream(CanCrossEditingBoundary);
     }
     return position;
 }
@@ -1016,7 +1016,7 @@ static Position upstreamIgnoringEditingBoundaries(Position position)
     Position lastPosition;
     while (position != lastPosition) {
         lastPosition = position;
-        position = position.upstream(Position::CanCrossEditingBoundary);
+        position = position.upstream(CanCrossEditingBoundary);
     }
     return position;
 }

@@ -71,15 +71,29 @@ typedef struct WKContextHistoryClient WKContextHistoryClient;
 
 // Download Client
 typedef void (*WKContextDownloadDidStartCallback)(WKContextRef context, WKDownloadRef download, const void *clientInfo);
-typedef void (*WKContextDownloadDidFinishCallback)(WKContextRef context, WKDownloadRef download, const void *clientInfo);
+typedef void (*WKContextDownloadDidReceiveResponseCallback)(WKContextRef context, WKDownloadRef download, WKURLResponseRef response, const void *clientInfo);
+typedef void (*WKContextDownloadDidReceiveDataCallback)(WKContextRef context, WKDownloadRef download, uint64_t length, const void *clientInfo);
+typedef bool (*WKContextDownloadShouldDecodeSourceDataOfMIMETypeCallback)(WKContextRef context, WKDownloadRef download, WKStringRef mimeType, const void *clientInfo);
+typedef WKStringRef (*WKContextDownloadDecideDestinationWithSuggestedFilenameCallback)(WKContextRef context, WKDownloadRef download, WKStringRef filename, bool* allowOverwrite, const void *clientInfo);
 typedef void (*WKContextDownloadDidCreateDestinationCallback)(WKContextRef context, WKDownloadRef download, WKStringRef path, const void *clientInfo);
+typedef void (*WKContextDownloadDidFinishCallback)(WKContextRef context, WKDownloadRef download, const void *clientInfo);
+typedef void (*WKContextDownloadDidFailCallback)(WKContextRef context, WKDownloadRef download, WKErrorRef error, const void *clientInfo);
+typedef void (*WKContextDownloadDidCancel)(WKContextRef context, WKDownloadRef download, const void *clientInfo);
+typedef void (*WKContextDownloadProcessDidCrashCallback)(WKContextRef context, WKDownloadRef download, const void *clientInfo);
 
 struct WKContextDownloadClient {
     int                                                                 version;
     const void *                                                        clientInfo;
     WKContextDownloadDidStartCallback                                   didStart;
+    WKContextDownloadDidReceiveResponseCallback                         didReceiveResponse;
+    WKContextDownloadDidReceiveDataCallback                             didReceiveData;
+    WKContextDownloadShouldDecodeSourceDataOfMIMETypeCallback           shouldDecodeSourceDataOfMIMEType;
+    WKContextDownloadDecideDestinationWithSuggestedFilenameCallback     decideDestinationWithSuggestedFilename;
     WKContextDownloadDidCreateDestinationCallback                       didCreateDestination;
     WKContextDownloadDidFinishCallback                                  didFinish;
+    WKContextDownloadDidFailCallback                                    didFail;
+    WKContextDownloadDidCancel                                          didCancel;
+    WKContextDownloadProcessDidCrashCallback                            processDidCrash;
 };
 typedef struct WKContextDownloadClient WKContextDownloadClient;
 
@@ -103,6 +117,9 @@ WK_EXPORT void WKContextAddVisitedLink(WKContextRef context, WKStringRef visited
 
 WK_EXPORT void WKContextSetCacheModel(WKContextRef context, WKCacheModel cacheModel);
 WK_EXPORT WKCacheModel WKContextGetCacheModel(WKContextRef context);
+
+WK_EXPORT void WKContextClearResourceCaches(WKContextRef context);
+WK_EXPORT void WKContextClearApplicationCache(WKContextRef context);
 
 #ifdef __cplusplus
 }

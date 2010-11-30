@@ -43,12 +43,8 @@ void WebContextMenuClient::contextMenuDestroyed()
 
 PlatformMenuDescription WebContextMenuClient::getCustomMenuFromDefaultItems(ContextMenu* menu)
 {
-    Vector<WebContextMenuItemData> newMenu;
-    if (!m_page->injectedBundleContextMenuClient().getCustomMenuFromDefaultItems(m_page, menu, newMenu))
-        return menu->platformDescription();
-    
-    Vector<ContextMenuItem> coreItemVector = coreItems(newMenu);
-    return platformMenuDescription(coreItemVector);
+    // WebKit2 ignores this client callback and does context menu customization when it is told to show the menu.
+    return menu->platformDescription();
 }
 
 void WebContextMenuClient::contextMenuItemSelected(ContextMenuItem*, const ContextMenu*)

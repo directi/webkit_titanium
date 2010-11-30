@@ -24,6 +24,7 @@
  */
 
 #include "WKPreferences.h"
+#include "WKPreferencesPrivate.h"
 
 #include "WKAPICast.h"
 #include "WebPreferences.h"
@@ -119,12 +120,12 @@ bool WKPreferencesGetPluginsEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->pluginsEnabled();
 }
 
-void WKPReferencesSetJavaEnabled(WKPreferencesRef preferencesRef, bool javaEnabled)
+void WKPreferencesSetJavaEnabled(WKPreferencesRef preferencesRef, bool javaEnabled)
 {
     toImpl(preferencesRef)->setJavaEnabled(javaEnabled);
 }
 
-bool WKPReferencesGetJavaEnabled(WKPreferencesRef preferencesRef)
+bool WKPreferencesGetJavaEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->javaEnabled();
 }
@@ -217,4 +218,64 @@ void WKPreferencesSetDeveloperExtrasEnabled(WKPreferencesRef preferencesRef, boo
 bool WKPreferencesGetDeveloperExtrasEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->developerExtrasEnabled();
+}
+
+void WKPreferencesSetTextAreasAreResizable(WKPreferencesRef preferencesRef, bool resizable)
+{
+    toImpl(preferencesRef)->setTextAreasAreResizable(resizable);
+}
+
+bool WKPreferencesGetTextAreasAreResizable(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->textAreasAreResizable();
+}
+
+void WKPreferencesSetFontSmoothingLevel(WKPreferencesRef preferencesRef, WKFontSmoothingLevel wkLevel)
+{
+    toImpl(preferencesRef)->setFontSmoothingLevel(toFontSmoothingLevel(wkLevel));
+}
+
+WKFontSmoothingLevel WKPreferencesGetFontSmoothingLevel(WKPreferencesRef preferencesRef)
+{
+    return toAPI(toImpl(preferencesRef)->fontSmoothingLevel());
+}
+
+void WKPreferencesSetAcceleratedCompositingEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setAcceleratedCompositingEnabled(flag);
+}
+
+bool WKPreferencesGetAcceleratedCompositingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->acceleratedCompositingEnabled();
+}
+
+void WKPreferencesSetCompositingBordersVisible(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setCompositingBordersVisible(flag);
+}
+
+bool WKPreferencesGetCompositingBordersVisible(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->compositingBordersVisible();
+}
+
+void WKPreferencesSetCompositingRepaintCountersVisible(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setCompositingRepaintCountersVisible(flag);
+}
+
+bool WKPreferencesGetCompositingRepaintCountersVisible(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->compositingRepaintCountersVisible();
+}
+
+void WKPreferencesSetNeedsSiteSpecificQuirks(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setNeedsSiteSpecificQuirks(flag);
+}
+
+bool WKPreferencesGetNeedsSiteSpecificQuirks(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->needsSiteSpecificQuirks();
 }

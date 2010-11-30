@@ -83,9 +83,11 @@ public:
 
     static WebCore::PageGroup* sharedPageGroup();
 
+    // Will shut down the web process if there are no live pages or downloads.
+    void shutdownIfPossible();
+
 private:
     WebProcess();
-    void shutdown();
 
     void initializeWebProcess(const WebProcessCreationParameters&, CoreIPC::ArgumentDecoder*);
     void setShouldTrackVisitedLinks(bool);
@@ -106,6 +108,11 @@ private:
     static void calculateCacheSizes(CacheModel cacheModel, uint64_t memorySize, uint64_t diskFreeSize,
         unsigned& cacheTotalCapacity, unsigned& cacheMinDeadCapacity, unsigned& cacheMaxDeadCapacity, double& deadDecodedDataDeletionInterval,
         unsigned& pageCacheCapacity, unsigned long& urlCacheMemoryCapacity, unsigned long& urlCacheDiskCapacity);
+    void clearResourceCaches();
+    void platformClearResourceCaches();
+    void clearApplicationCache();
+
+    void cancelDownload(uint64_t downloadID);
 
     // CoreIPC::Connection::Client
     void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);

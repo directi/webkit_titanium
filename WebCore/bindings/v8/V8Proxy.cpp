@@ -43,7 +43,6 @@
 #include "Page.h"
 #include "PageGroup.h"
 #include "PlatformBridge.h"
-#include "SVGElement.h"
 #include "ScriptController.h"
 #include "Settings.h"
 #include "StorageNamespace.h"
@@ -123,42 +122,6 @@ void batchConfigureConstants(v8::Handle<v8::FunctionTemplate> functionDescriptor
 
 typedef HashMap<Node*, v8::Object*> DOMNodeMap;
 typedef HashMap<void*, v8::Object*> DOMObjectMap;
-
-#if ENABLE(SVG)
-// Map of SVG objects with contexts to their contexts
-static HashMap<void*, SVGElement*>& svgObjectToContextMap()
-{
-    typedef HashMap<void*, SVGElement*> SvgObjectToContextMap;
-    DEFINE_STATIC_LOCAL(SvgObjectToContextMap, staticSvgObjectToContextMap, ());
-    return staticSvgObjectToContextMap;
-}
-
-void V8Proxy::setSVGContext(void* object, SVGElement* context)
-{
-    if (!object)
-        return;
-
-    SVGElement* oldContext = svgObjectToContextMap().get(object);
-
-    if (oldContext == context)
-        return;
-
-    if (oldContext)
-        oldContext->deref();
-
-    if (context)
-        context->ref();
-
-    svgObjectToContextMap().set(object, context);
-}
-
-SVGElement* V8Proxy::svgContext(void* object)
-{
-    return svgObjectToContextMap().get(object);
-}
-
-#endif
-
 typedef HashMap<int, v8::FunctionTemplate*> FunctionTemplateMap;
 
 bool AllowAllocation::m_current = false;
@@ -236,12 +199,13 @@ V8Proxy::~V8Proxy()
     windowShell()->destroyGlobal();
 }
 
-v8::Handle<v8::Script> V8Proxy::compileScript(v8::Handle<v8::String> code, const String& fileName, int baseLine, v8::ScriptData* scriptData)
+v8::Handle<v8::Script> V8Proxy::compileScript(v8::Handle<v8::String> code, const String& fileName, const TextPosition0& scriptStartPosition, v8::ScriptData* scriptData)
 {
     const uint16_t* fileNameString = fromWebCoreString(fileName);
     v8::Handle<v8::String> name = v8::String::New(fileNameString, fileName.length());
-    v8::Handle<v8::Integer> line = v8::Integer::New(baseLine);
-    v8::ScriptOrigin origin(name, line);
+    v8::Handle<v8::Integer> line = v8::Integer::New(scriptStartPosition.m_line.zeroBasedInt());
+    v8::Handle<v8::Integer> column = v8::Integer::New(scriptStartPosition.m_column.zeroBasedInt());
+    v8::ScriptOrigin origin(name, line, column);
     v8::Handle<v8::Script> script = v8::Script::Compile(code, &origin, scriptData);
     return script;
 }
@@ -394,7 +358,7 @@ v8::Local<v8::Value> V8Proxy::evaluate(const ScriptSourceCode& source, Node* nod
 
         // NOTE: For compatibility with WebCore, ScriptSourceCode's line starts at
         // 1, whereas v8 starts at 0.
-        v8::Handle<v8::Script> script = compileScript(code, source.url(), source.startLine() - 1, scriptData.get());
+        v8::Handle<v8::Script> script = compileScript(code, source.url(), WTF::toZeroBasedTextPosition(source.startPosition()), scriptData.get());
 #if PLATFORM(CHROMIUM)
         PlatformBridge::traceEventEnd("v8.compile", node, "");
 
@@ -426,7 +390,7 @@ v8::Local<v8::Value> V8Proxy::runScript(v8::Handle<v8::Script> script, bool isIn
         // FIXME: Ideally, we should be able to re-use the origin of the
         // script passed to us as the argument instead of using an empty string
         // and 0 baseLine.
-        script = compileScript(code, "", 0);
+        script = compileScript(code, "", TextPosition0::minimumPosition());
     }
 
     if (handleOutOfMemory())

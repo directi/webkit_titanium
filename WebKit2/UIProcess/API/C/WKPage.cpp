@@ -132,6 +132,11 @@ WKBackForwardListRef WKPageGetBackForwardList(WKPageRef pageRef)
     return toAPI(toImpl(pageRef)->backForwardList());
 }
 
+bool WKPageCanShowMIMEType(WKPageRef pageRef, WKStringRef mimeTypeRef)
+{
+    return toImpl(pageRef)->canShowMIMEType(toWTFString(mimeTypeRef));
+}
+
 WKStringRef WKPageCopyTitle(WKPageRef pageRef)
 {
     return toCopiedAPI(toImpl(pageRef)->pageTitle());
@@ -147,10 +152,12 @@ WKFrameRef WKPageGetFocusedFrame(WKPageRef pageRef)
     return toAPI(toImpl(pageRef)->focusedFrame());
 }
 
+#if defined(ENABLE_INSPECTOR) && ENABLE_INSPECTOR
 WKInspectorRef WKPageGetInspector(WKPageRef pageRef)
 {
     return toAPI(toImpl(pageRef)->inspector());
 }
+#endif
 
 double WKPageGetEstimatedProgress(WKPageRef pageRef)
 {
@@ -213,9 +220,9 @@ void WKPageSetPageAndTextZoomFactors(WKPageRef pageRef, double pageZoomFactor, d
     toImpl(pageRef)->setPageAndTextZoomFactors(pageZoomFactor, textZoomFactor);
 }
 
-void WKPageScaleWebView(WKPageRef pageRef, double scale)
+void WKPageScaleWebView(WKPageRef pageRef, double scale, WKPoint origin)
 {
-    toImpl(pageRef)->scaleWebView(scale);
+    toImpl(pageRef)->scaleWebView(scale, toImpl(origin));
 }
 
 double WKPageGetViewScaleFactor(WKPageRef pageRef)
@@ -238,6 +245,27 @@ void WKPageCountStringMatches(WKPageRef pageRef, WKStringRef string, bool caseIn
     toImpl(pageRef)->countStringMatches(toImpl(string)->string(), caseInsensitive, maxMatchCount);
 }
 
+void WKPageSetPageContextMenuClient(WKPageRef pageRef, const WKPageContextMenuClient* wkClient)
+{
+    if (wkClient && wkClient->version)
+        return;
+    toImpl(pageRef)->initializeContextMenuClient(wkClient);
+}
+
+void WKPageSetPageFindClient(WKPageRef pageRef, const WKPageFindClient* wkClient)
+{
+    if (wkClient && wkClient->version)
+        return;
+    toImpl(pageRef)->initializeFindClient(wkClient);
+}
+
+void WKPageSetPageFormClient(WKPageRef pageRef, const WKPageFormClient* wkClient)
+{
+    if (wkClient && wkClient->version)
+        return;
+    toImpl(pageRef)->initializeFormClient(wkClient);
+}
+
 void WKPageSetPageLoaderClient(WKPageRef pageRef, const WKPageLoaderClient* wkClient)
 {
     if (wkClient && wkClient->version)
@@ -252,25 +280,11 @@ void WKPageSetPagePolicyClient(WKPageRef pageRef, const WKPagePolicyClient* wkCl
     toImpl(pageRef)->initializePolicyClient(wkClient);
 }
 
-void WKPageSetPageFormClient(WKPageRef pageRef, const WKPageFormClient* wkClient)
-{
-    if (wkClient && wkClient->version)
-        return;
-    toImpl(pageRef)->initializeFormClient(wkClient);
-}
-
 void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClient* wkClient)
 {
     if (wkClient && wkClient->version)
         return;
     toImpl(pageRef)->initializeUIClient(wkClient);
-}
-
-void WKPageSetPageFindClient(WKPageRef pageRef, const WKPageFindClient* wkClient)
-{
-    if (wkClient && wkClient->version)
-        return;
-    toImpl(pageRef)->initializeFindClient(wkClient);
 }
 
 void WKPageRunJavaScriptInMainFrame(WKPageRef pageRef, WKStringRef scriptRef, void* context, WKPageRunJavaScriptFunction callback)

@@ -94,7 +94,13 @@ media/video-aspect-ratio.html
 media/video-play-pause-events.html
 media/video-width-height.html
 
+# https://bugs.webkit.org/show_bug.cgi?id=49390
+media/video-played-collapse.html
+media/video-played-ranges-1.html
+media/video-played-reset.html
+
 # Disable spelling tests for autocorrection panel
+platform/mac/editing/spelling/autocorrection-contraction.html
 platform/mac/editing/spelling/autocorrection-delete.html
 platform/mac/editing/spelling/autocorrection-removing-underline-after-paste.html
 platform/mac/editing/spelling/autocorrection-removing-underline.html
@@ -167,11 +173,11 @@ canvas/philip/tests/2d.fillStyle.parse.rgba-eof.html
 canvas/philip/tests/2d.imageData.put.wrongtype.html
 canvas/philip/tests/2d.pattern.image.incomplete.empty.html
 canvas/philip/tests/2d.pattern.image.incomplete.omitted.html
-canvas/philip/tests/security.drawImage.canvas.html
-canvas/philip/tests/security.drawImage.image.html
-canvas/philip/tests/security.pattern.canvas.fillStyle.html
-canvas/philip/tests/security.pattern.canvas.strokeStyle.html
-canvas/philip/tests/security.reset.html
 
-# Disable the following test temporarily due to bug 49295 -- Regression in ATSUI handling.
-fast/text/international/bidi-control-chars-treated-as-ZWS.html
+# plugins/refcount-leaks.html fails on 'Leopard Intel Release (Tests)'
+# https://bugs.webkit.org/show_bug.cgi?id=49809
+plugins/refcount-leaks.html
+
+# fast/profiler/throw-exception-from-eval.html fails on Leopard bots
+# https://bugs.webkit.org/show_bug.cgi?id=49801
+fast/profiler/throw-exception-from-eval.html

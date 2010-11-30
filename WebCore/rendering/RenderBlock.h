@@ -58,7 +58,7 @@ public:
 
     // These two functions are overridden for inline-block.
     virtual int lineHeight(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
-    virtual int baselinePosition(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
+    virtual int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
 
     RenderLineBoxList* lineBoxes() { return &m_lineBoxes; }
     const RenderLineBoxList* lineBoxes() const { return &m_lineBoxes; }
@@ -298,6 +298,8 @@ protected:
     }
 #endif
 
+    void addOverflowFromBlockChildren();
+
 private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }
     virtual const RenderObjectChildList* virtualChildren() const { return children(); }
@@ -336,8 +338,8 @@ private:
 
     virtual RootInlineBox* createRootInlineBox(); // Subclassed by SVG and Ruby.
 
-    // Called to lay out the legend for a fieldset.
-    virtual RenderObject* layoutLegend(bool /*relayoutChildren*/) { return 0; }
+    // Called to lay out the legend for a fieldset or the ruby text of a ruby run.
+    virtual RenderObject* layoutSpecialExcludedChild(bool /*relayoutChildren*/) { return 0; }
 
     struct FloatWithRect {
         FloatWithRect(RenderBox* f)
@@ -458,7 +460,7 @@ private:
     RootInlineBox* constructLine(unsigned runCount, BidiRun* firstRun, BidiRun* lastRun, bool firstLine, bool lastLine, RenderObject* endObject);
     InlineFlowBox* createLineBoxes(RenderObject*, bool firstLine);
     void computeInlineDirectionPositionsForLine(RootInlineBox*, bool firstLine, BidiRun* firstRun, BidiRun* trailingSpaceRun, bool reachedEnd, GlyphOverflowAndFallbackFontsMap&);
-    void computeBlockDirectionPositionsForLine(RootInlineBox*, BidiRun*, GlyphOverflowAndFallbackFontsMap&);
+    void computeBlockDirectionPositionsForLine(RootInlineBox*, BidiRun*, GlyphOverflowAndFallbackFontsMap&, VerticalPositionCache&);
     void deleteEllipsisLineBoxes();
     void checkLinesForTextOverflow();
     void addOverflowFromInlineChildren();
@@ -468,7 +470,6 @@ private:
     int afterSideLayoutOverflowForLine(RootInlineBox*) const;
     // End of functions defined in RenderBlockLineLayout.cpp.
 
-    void addOverflowFromBlockChildren();
     void addOverflowFromFloats();
 
     void paintFloats(PaintInfo&, int tx, int ty, bool preservePhase = false);

@@ -120,6 +120,13 @@ public:
         else
             adjustPosition(0, delta);
     }
+    void adjustBlockDirectionPosition(int delta)
+    {
+        if (isHorizontal())
+            adjustPosition(0, delta);
+        else
+            adjustPosition(delta, 0);
+    }
 
     virtual void paint(PaintInfo&, int tx, int ty);
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, int x, int y, int tx, int ty);
@@ -255,7 +262,7 @@ public:
     // The logical height is our extent in the block flow direction, i.e., height for horizontal text and width for vertical text.
     int logicalHeight() const;
 
-    virtual int baselinePosition() const { return boxModelObject()->baselinePosition(m_firstLine, isHorizontal() ? HorizontalLine : VerticalLine, PositionOnContainingLine); }
+    virtual int baselinePosition(FontBaseline baselineType) const { return boxModelObject()->baselinePosition(baselineType, m_firstLine, isHorizontal() ? HorizontalLine : VerticalLine, PositionOnContainingLine); }
     virtual int lineHeight() const { return boxModelObject()->lineHeight(m_firstLine, isHorizontal() ? HorizontalLine : VerticalLine, PositionOnContainingLine); }
     
 

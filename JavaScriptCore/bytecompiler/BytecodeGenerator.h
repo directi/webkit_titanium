@@ -93,9 +93,9 @@ namespace JSC {
         static void setDumpsGeneratedCode(bool dumpsGeneratedCode);
         static bool dumpsGeneratedCode();
 
-        BytecodeGenerator(ProgramNode*, const Debugger*, const ScopeChain&, SymbolTable*, ProgramCodeBlock*);
-        BytecodeGenerator(FunctionBodyNode*, const Debugger*, const ScopeChain&, SymbolTable*, CodeBlock*);
-        BytecodeGenerator(EvalNode*, const Debugger*, const ScopeChain&, SymbolTable*, EvalCodeBlock*);
+        BytecodeGenerator(ProgramNode*, const ScopeChain&, SymbolTable*, ProgramCodeBlock*);
+        BytecodeGenerator(FunctionBodyNode*, const ScopeChain&, SymbolTable*, CodeBlock*);
+        BytecodeGenerator(EvalNode*, const ScopeChain&, SymbolTable*, EvalCodeBlock*);
 
         JSGlobalData* globalData() const { return m_globalData; }
         const CommonIdentifiers& propertyNames() const { return *m_globalData->propertyNames; }
@@ -207,10 +207,8 @@ namespace JSC {
         {
             // Node::emitCode assumes that dst, if provided, is either a local or a referenced temporary.
             ASSERT(!dst || dst == ignoredResult() || !dst->isTemporary() || dst->refCount());
-            if (!m_codeBlock->numberOfLineInfos() || m_codeBlock->lastLineInfo().lineNumber != n->lineNo()) {
-                LineInfo info = { instructions().size(), n->lineNo() };
-                m_codeBlock->addLineInfo(info);
-            }
+            addLineInfo(n->lineNo());
+
             if (m_emitNodeDepth >= s_maxEmitNodeDepth)
                 return emitThrowExpressionTooDeepException();
             ++m_emitNodeDepth;
@@ -226,19 +224,21 @@ namespace JSC {
 
         void emitNodeInConditionContext(ExpressionNode* n, Label* trueTarget, Label* falseTarget, bool fallThroughMeansTrue)
         {
-            if (!m_codeBlock->numberOfLineInfos() || m_codeBlock->lastLineInfo().lineNumber != n->lineNo()) {
-                LineInfo info = { instructions().size(), n->lineNo() };
-                m_codeBlock->addLineInfo(info);
-            }
-            if (m_emitNodeDepth >= s_maxEmitNodeDepth)
+            addLineInfo(n->lineNo());
+            if (m_emitNodeDepth >= s_maxEmitNodeDepth) {
                 emitThrowExpressionTooDeepException();
+                return;
+            }
             ++m_emitNodeDepth;
             n->emitBytecodeInConditionContext(*this, trueTarget, falseTarget, fallThroughMeansTrue);
             --m_emitNodeDepth;
         }
 
         void emitExpressionInfo(unsigned divot, unsigned startOffset, unsigned endOffset)
-        { 
+        {
+            if (!m_shouldEmitRichSourceInfo)
+                return;
+
             divot -= m_codeBlock->sourceOffset();
             if (divot > ExpressionRangeInfo::MaxDivot) {
                 // Overflow has occurred, we can only give line number info for errors for this region
@@ -266,17 +266,6 @@ namespace JSC {
             m_codeBlock->addExpressionInfo(info);
         }
 
-        void emitGetByIdExceptionInfo(OpcodeID opcodeID)
-        {
-            // Only op_construct and op_instanceof need exception info for
-            // a preceding op_get_by_id.
-            ASSERT(opcodeID == op_create_this || opcodeID == op_instanceof);
-            GetByIdExceptionInfo info;
-            info.bytecodeOffset = instructions().size();
-            info.isOpCreateThis = (opcodeID == op_create_this);
-            m_codeBlock->addGetByIdExceptionInfo(info);
-        }
-        
         ALWAYS_INLINE bool leftHandSideNeedsCopy(bool rightHasAssignments, bool rightIsPure)
         {
             return (m_codeType != FunctionCode || m_codeBlock->needsFullScopeChain() || rightHasAssignments) && !rightIsPure;
@@ -320,6 +309,7 @@ namespace JSC {
         RegisterID* emitPostInc(RegisterID* dst, RegisterID* srcDst);
         RegisterID* emitPostDec(RegisterID* dst, RegisterID* srcDst);
 
+        void emitCheckHasInstance(RegisterID* base);
         RegisterID* emitInstanceOf(RegisterID* dst, RegisterID* value, RegisterID* base, RegisterID* basePrototype);
         RegisterID* emitTypeOf(RegisterID* dst, RegisterID* src) { return emitUnaryOp(op_typeof, dst, src); }
         RegisterID* emitIn(RegisterID* dst, RegisterID* property, RegisterID* base) { return emitBinaryOp(op_in, dst, property, base, OperandTypes()); }
@@ -380,7 +370,9 @@ namespace JSC {
             emitUnaryNoDstOp(op_throw, exc);
         }
 
-        RegisterID* emitNewError(RegisterID* dst, bool isReferenceError, JSValue message);
+        void emitThrowReferenceError(const UString& message);
+        void emitThrowSyntaxError(const UString& message);
+
         void emitPushNewScope(RegisterID* dst, const Identifier& property, RegisterID* value);
 
         RegisterID* emitPushScope(RegisterID* scope);
@@ -510,6 +502,14 @@ namespace JSC {
             return FunctionExecutable::create(globalData, body->ident(), body->source(), body->usesArguments(), body->parameters(), body->isStrictMode(), body->lineNo(), body->lastLine());
         }
 
+        void addLineInfo(unsigned lineNo)
+        {
+#if !ENABLE(OPCODE_SAMPLING)
+            if (m_shouldEmitRichSourceInfo)
+#endif
+                m_codeBlock->addLineInfo(instructions().size(), lineNo);
+        }
+
         RegisterID* emitInitLazyRegister(RegisterID*);
 
         Vector<Instruction>& instructions() { return m_codeBlock->instructions(); }
@@ -526,6 +526,7 @@ namespace JSC {
 
         bool m_shouldEmitDebugHooks;
         bool m_shouldEmitProfileHooks;
+        bool m_shouldEmitRichSourceInfo;
 
         const ScopeChain* m_scopeChain;
         SymbolTable* m_symbolTable;

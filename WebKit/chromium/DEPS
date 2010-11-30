@@ -32,7 +32,7 @@
 
 vars = {
   'chromium_svn': 'http://src.chromium.org/svn/trunk/src',
-  'chromium_rev': '65502'
+  'chromium_rev': '67532'
 }
 
 deps = {
@@ -87,6 +87,8 @@ deps = {
     Var('chromium_svn')+'/app@'+Var('chromium_rev'), # needed by appcache
   'gpu':
     Var('chromium_svn')+'/gpu@'+Var('chromium_rev'),
+  'ipc':
+    Var('chromium_svn')+'/ipc@'+Var('chromium_rev'),
   'media':
     Var('chromium_svn')+'/media@'+Var('chromium_rev'),
   'printing':
@@ -95,6 +97,8 @@ deps = {
     Var('chromium_svn')+'/ppapi@'+Var('chromium_rev'),
   'third_party/angle':  # needed by the gpu process
     From('chromium_deps', 'src/third_party/angle'),
+  'third_party/libvpx': # needed by webkit/media
+    From('chromium_deps', 'src/third_party/libvpx'),
   'third_party/ffmpeg': # needed by webkit/media
     From('chromium_deps', 'src/third_party/ffmpeg'),
   'third_party/libwebp':
@@ -117,8 +121,6 @@ deps_os = {
   'win': {
     'third_party/cygwin':
       From('chromium_deps', 'src/third_party/cygwin'),
-    'third_party/python_24':
-      From('chromium_deps', 'src/third_party/python_24'),
     'third_party/ffmpeg/binaries/chromium/win/ia32':
       From('chromium_deps', 'src/third_party/ffmpeg/binaries/chromium/win/ia32'),
     'third_party/lighttpd':
@@ -139,6 +141,8 @@ deps_os = {
       Var('chromium_svn')+'/tools/xdisplaycheck@'+Var('chromium_rev'),
     'third_party/yasm/source/patched-yasm':
       From('chromium_deps', 'src/third_party/yasm/source/patched-yasm'),
+    'third_party/openssl':
+      From('chromium_deps', 'src/third_party/openssl'),
   },
 }
 

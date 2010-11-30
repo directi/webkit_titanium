@@ -82,6 +82,9 @@ void SVGEllipseElement::svgAttributeChanged(const QualifiedName& attrName)
 
     if (isLengthAttribute)
         updateRelativeLengthsInformation();
+ 
+    if (SVGTests::handleAttributeChange(this, attrName))
+        return;
 
     RenderSVGPath* renderer = static_cast<RenderSVGPath*>(this->renderer());
     if (!renderer)
@@ -99,8 +102,7 @@ void SVGEllipseElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    if (SVGTests::isKnownAttribute(attrName)
-        || SVGLangSpace::isKnownAttribute(attrName)
+    if (SVGLangSpace::isKnownAttribute(attrName)
         || SVGExternalResourcesRequired::isKnownAttribute(attrName))
         RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer);
 }
@@ -115,6 +117,7 @@ void SVGEllipseElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeRx();
         synchronizeRy();
         synchronizeExternalResourcesRequired();
+        SVGTests::synchronizeProperties(this, attrName);
         return;
     }
 
@@ -128,6 +131,8 @@ void SVGEllipseElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeRy();
     else if (SVGExternalResourcesRequired::isKnownAttribute(attrName))
         synchronizeExternalResourcesRequired();
+    else if (SVGTests::isKnownAttribute(attrName))
+        SVGTests::synchronizeProperties(this, attrName);
 }
 
 void SVGEllipseElement::toPathData(Path& path) const

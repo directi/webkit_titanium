@@ -17,14 +17,12 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="$(WebKitOutputDir)\include\WebKit"
 			ConfigurationType="4"
-			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefines.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\debug.vsprops"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;.\InterfacesCommon.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="%SystemDrive%\cygwin\bin\which.exe bash&#x0D;&#x0A;if errorlevel 1 set PATH=%SystemDrive%\cygwin\bin;%PATH%&#x0D;&#x0A;cmd /c&#x0D;&#x0A;if exist &quot;$(WebKitOutputDir)\buildfailed&quot; grep XX$(ProjectName)XX &quot;$(WebKitOutputDir)\buildfailed&quot;&#x0D;&#x0A;if errorlevel 1 exit 1&#x0D;&#x0A;echo XX$(ProjectName)XX &gt; &quot;$(WebKitOutputDir)\buildfailed&quot;&#x0D;&#x0A;&#x0D;&#x0A;mkdir 2&gt;NUL &quot;$(WebKitOutputDir)\obj\WebKit\$(ProjectName)&quot;&#x0D;&#x0A;bash &quot;$(WebKitLibrariesDir)\tools\scripts\auto-version.sh&quot; &quot;$(IntDir)&quot;&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -37,21 +35,9 @@
 			/>
 			<Tool
 				Name="VCMIDLTool"
-				AdditionalIncludeDirectories="&quot;$(WebKitOutputDir)\obj\WebKit\DerivedSources&quot;;..\Interfaces;&quot;$(IntDir)\include&quot;"
-				TypeLibraryName="$(WebKitOutputDir)\lib\WebKit.tlb"
-				OutputDirectory="$(WebKitOutputDir)\obj\WebKit\$(ProjectName)"
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="0"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS"
-				MinimalRebuild="true"
-				BasicRuntimeChecks="3"
-				RuntimeLibrary="3"
-				UsePrecompiledHeader="0"
-				WarningLevel="3"
-				Detect64BitPortabilityProblems="true"
-				DebugInformationFormat="4"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -79,20 +65,69 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="%SystemDrive%\cygwin\bin\which.exe bash&#x0D;&#x0A;if errorlevel 1 set PATH=%SystemDrive%\cygwin\bin;%PATH%&#x0D;&#x0A;cmd /c&#x0D;&#x0A;&#x0D;&#x0A;perl FixMIDLHeaders.pl &quot;$(WebkitOutputDir)/include/webkit/&quot;&#x0D;&#x0A;&#x0D;&#x0A;if exist &quot;$(WebKitOutputDir)\buildfailed&quot; del &quot;$(WebKitOutputDir)\buildfailed&quot;&#x0D;&#x0A;"
 			/>
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="$(WebKitOutputDir)\include\WebKit"
 			ConfigurationType="4"
-			InheritedPropertySheets="$(WebKitLibrariesDir)\tools\vsprops\FeatureDefines.vsprops;$(WebKitLibrariesDir)\tools\vsprops\common.vsprops;$(WebKitLibrariesDir)\tools\vsprops\release.vsprops"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;.\InterfacesCommon.vsprops"
+			CharacterSet="1"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
+			<Tool
+				Name="VCCLCompilerTool"
+			/>
+			<Tool
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
+			<Tool
+				Name="VCLibrarianTool"
+			/>
+			<Tool
+				Name="VCALinkTool"
+			/>
+			<Tool
+				Name="VCXDCMakeTool"
+			/>
+			<Tool
+				Name="VCBscMakeTool"
+			/>
+			<Tool
+				Name="VCFxCopTool"
+			/>
+			<Tool
+				Name="VCPostBuildEventTool"
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release_LTCG|Win32"
+			ConfigurationType="4"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;.\InterfacesCommon.vsprops"
 			CharacterSet="1"
 			WholeProgramOptimization="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				CommandLine="%SystemDrive%\cygwin\bin\which.exe bash&#x0D;&#x0A;if errorlevel 1 set PATH=%SystemDrive%\cygwin\bin;%PATH%&#x0D;&#x0A;cmd /c&#x0D;&#x0A;if exist &quot;$(WebKitOutputDir)\buildfailed&quot; grep XX$(ProjectName)XX &quot;$(WebKitOutputDir)\buildfailed&quot;&#x0D;&#x0A;if errorlevel 1 exit 1&#x0D;&#x0A;echo XX$(ProjectName)XX &gt; &quot;$(WebKitOutputDir)\buildfailed&quot;&#x0D;&#x0A;&#x0D;&#x0A;mkdir 2&gt;NUL &quot;$(WebKitOutputDir)\obj\WebKit\$(ProjectName)&quot;&#x0D;&#x0A;bash &quot;$(WebKitLibrariesDir)\tools\scripts\auto-version.sh&quot; &quot;$(IntDir)&quot;&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -105,18 +140,9 @@
 			/>
 			<Tool
 				Name="VCMIDLTool"
-				AdditionalIncludeDirectories="&quot;$(WebKitOutputDir)\obj\WebKit\DerivedSources&quot;;..\Interfaces;&quot;$(IntDir)\include&quot;"
-				TypeLibraryName="$(WebKitOutputDir)\lib\WebKit.tlb"
-				OutputDirectory="$(WebKitOutputDir)\obj\WebKit\$(ProjectName)"
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS"
-				RuntimeLibrary="2"
-				UsePrecompiledHeader="0"
-				WarningLevel="3"
-				Detect64BitPortabilityProblems="true"
-				DebugInformationFormat="3"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -144,7 +170,163 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="%SystemDrive%\cygwin\bin\which.exe bash&#x0D;&#x0A;if errorlevel 1 set PATH=%SystemDrive%\cygwin\bin;%PATH%&#x0D;&#x0A;cmd /c&#x0D;&#x0A;&#x0D;&#x0A;perl FixMIDLHeaders.pl &quot;$(WebkitOutputDir)/include/webkit/&quot;&#x0D;&#x0A;&#x0D;&#x0A;if exist &quot;$(WebKitOutputDir)\buildfailed&quot; del &quot;$(WebKitOutputDir)\buildfailed&quot;&#x0D;&#x0A;"
+			/>
+		</Configuration>
+		<Configuration
+			Name="Debug_All|Win32"
+			ConfigurationType="4"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;.\InterfacesCommon.vsprops"
+			CharacterSet="1"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
+			<Tool
+				Name="VCCLCompilerTool"
+			/>
+			<Tool
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
+			<Tool
+				Name="VCLibrarianTool"
+			/>
+			<Tool
+				Name="VCALinkTool"
+			/>
+			<Tool
+				Name="VCXDCMakeTool"
+			/>
+			<Tool
+				Name="VCBscMakeTool"
+			/>
+			<Tool
+				Name="VCFxCopTool"
+			/>
+			<Tool
+				Name="VCPostBuildEventTool"
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release_Cairo_CFLite|Win32"
+			ConfigurationType="4"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefinesCairo.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\WinCairo.vsprops;.\InterfacesCommon.vsprops"
+			CharacterSet="1"
+			WholeProgramOptimization="1"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
+			<Tool
+				Name="VCCLCompilerTool"
+			/>
+			<Tool
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
+			<Tool
+				Name="VCLibrarianTool"
+			/>
+			<Tool
+				Name="VCALinkTool"
+			/>
+			<Tool
+				Name="VCXDCMakeTool"
+			/>
+			<Tool
+				Name="VCBscMakeTool"
+			/>
+			<Tool
+				Name="VCFxCopTool"
+			/>
+			<Tool
+				Name="VCPostBuildEventTool"
+			/>
+		</Configuration>
+		<Configuration
+			Name="Debug_Cairo_CFLite|Win32"
+			ConfigurationType="4"
+			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefinesCairo.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\debug_wincairo.vsprops;.\InterfacesCommon.vsprops"
+			CharacterSet="1"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
+			<Tool
+				Name="VCCLCompilerTool"
+			/>
+			<Tool
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
+			<Tool
+				Name="VCLibrarianTool"
+			/>
+			<Tool
+				Name="VCALinkTool"
+			/>
+			<Tool
+				Name="VCXDCMakeTool"
+			/>
+			<Tool
+				Name="VCBscMakeTool"
+			/>
+			<Tool
+				Name="VCFxCopTool"
+			/>
+			<Tool
+				Name="VCPostBuildEventTool"
 			/>
 		</Configuration>
 	</Configurations>
@@ -164,6 +346,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -190,6 +404,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\DOMCSS.idl"
@@ -204,6 +450,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -230,6 +508,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\DOMExtensions.idl"
@@ -244,6 +554,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -270,6 +612,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\DOMPrivate.idl"
@@ -284,6 +658,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -310,6 +716,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\DOMWindow.idl"
@@ -324,6 +762,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -350,6 +820,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebArchive.idl"
@@ -364,6 +866,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -390,6 +924,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebBackForwardListPrivate.idl"
@@ -404,6 +970,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -430,6 +1028,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebCookieManager.idl"
@@ -444,6 +1074,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -470,6 +1132,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebDatabaseManager.idl"
@@ -484,6 +1178,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -510,12 +1236,60 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebDesktopNotificationsDelegate.idl"
 			>
 			<FileConfiguration
 				Name="Debug|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -542,6 +1316,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebDownload.idl"
@@ -556,6 +1362,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -582,6 +1420,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebEmbeddedView.idl"
@@ -596,6 +1466,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -622,6 +1524,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebErrorPrivate.idl"
@@ -636,6 +1570,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -662,6 +1628,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebFrame.idl"
@@ -676,6 +1674,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -702,6 +1732,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebFrameLoadDelegatePrivate.idl"
@@ -716,6 +1778,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -742,6 +1836,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebFramePrivate.idl"
@@ -756,6 +1882,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -782,6 +1940,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebGeolocationPolicyListener.idl"
@@ -796,6 +1986,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -822,6 +2044,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebGeolocationProvider.idl"
@@ -836,6 +2090,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -862,6 +2148,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebHistoryDelegate.idl"
@@ -876,6 +2194,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -902,6 +2252,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebHistoryItemPrivate.idl"
@@ -916,6 +2298,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -942,6 +2356,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebHTMLRepresentation.idl"
@@ -956,6 +2402,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -982,6 +2460,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebIconDatabase.idl"
@@ -996,6 +2506,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1022,6 +2564,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebInspectorPrivate.idl"
@@ -1036,6 +2610,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1062,6 +2668,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebKitStatistics.idl"
@@ -1076,6 +2714,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1102,6 +2772,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebMutableURLRequestPrivate.idl"
@@ -1116,6 +2818,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1142,6 +2876,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebNotification.idl"
@@ -1156,6 +2922,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1182,6 +2980,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebNotificationObserver.idl"
@@ -1196,6 +3026,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1222,6 +3084,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebPolicyDelegate.idl"
@@ -1236,6 +3130,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1262,6 +3188,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebPreferences.idl"
@@ -1276,6 +3234,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1302,6 +3292,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebResource.idl"
@@ -1316,6 +3338,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1342,6 +3396,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebResourceLoadDelegatePrivate.idl"
@@ -1356,6 +3442,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1382,6 +3500,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebScriptWorld.idl"
@@ -1396,6 +3546,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1422,6 +3604,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebScrollBarPrivate.idl"
@@ -1436,6 +3650,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1462,6 +3708,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebSerializedJSValue.idl"
@@ -1476,6 +3754,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1502,6 +3812,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebTextRenderer.idl"
@@ -1516,6 +3858,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1542,6 +3916,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebUIDelegatePrivate.idl"
@@ -1556,6 +3962,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1582,6 +4020,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebUndoTarget.idl"
@@ -1596,6 +4066,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1622,6 +4124,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebURLRequest.idl"
@@ -1636,6 +4170,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1662,6 +4228,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebURLResponsePrivate.idl"
@@ -1676,6 +4274,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1702,6 +4332,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebView.idl"
@@ -1716,6 +4378,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1742,6 +4436,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\IWebWorkersPrivate.idl"
@@ -1756,6 +4482,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool
@@ -1782,6 +4540,38 @@
 					Name="VCMIDLTool"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\WebKit.idl"
@@ -1802,6 +4592,38 @@
 					GenerateTypeLibrary="true"
 				/>
 			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				>
+				<Tool
+					Name="VCMIDLTool"
+					GenerateTypeLibrary="true"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				>
+				<Tool
+					Name="VCMIDLTool"
+					GenerateTypeLibrary="true"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				>
+				<Tool
+					Name="VCMIDLTool"
+					GenerateTypeLibrary="true"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				>
+				<Tool
+					Name="VCMIDLTool"
+					GenerateTypeLibrary="true"
+				/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="..\Interfaces\WebScrollbarTypes.idl"
@@ -1816,6 +4638,38 @@
 			</FileConfiguration>
 			<FileConfiguration
 				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCMIDLTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
 				ExcludedFromBuild="true"
 				>
 				<Tool

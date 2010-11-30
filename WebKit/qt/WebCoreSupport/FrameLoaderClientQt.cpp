@@ -274,12 +274,23 @@ void FrameLoaderClientQt::transitionToCommittedForNewPage()
     bool hLock = hScrollbar != ScrollbarAuto;
     bool vLock = vScrollbar != ScrollbarAuto;
 
+    IntSize currentVisibleContentSize = m_frame->view() ? m_frame->view()->actualVisibleContentRect().size() : IntSize();
+
     m_frame->createView(m_webFrame->page()->viewportSize(),
                         backgroundColor, !backgroundColor.alpha(),
                         preferredLayoutSize.isValid() ? IntSize(preferredLayoutSize) : IntSize(),
                         preferredLayoutSize.isValid(),
                         hScrollbar, hLock,
                         vScrollbar, vLock);
+
+    bool isMainFrame = m_frame == m_frame->page()->mainFrame();
+    if (isMainFrame && page->d->client) {
+        m_frame->view()->setPaintsEntireContents(page->d->client->viewResizesToContentsEnabled());
+        m_frame->view()->setDelegatesScrolling(page->d->client->viewResizesToContentsEnabled());
+    }
+
+    // The HistoryController will update the scroll position later if needed.
+    m_frame->view()->setActualVisibleContentRect(IntRect(IntPoint::zero(), currentVisibleContentSize));
 }
 
 void FrameLoaderClientQt::dispatchDidBecomeFrameset(bool)
@@ -892,6 +903,7 @@ enum {
     WebKitErrorCannotFindPlugIn =                               200,
     WebKitErrorCannotLoadPlugIn =                               201,
     WebKitErrorJavaUnavailable =                                202,
+    WebKitErrorPluginWillHandleLoad =                           203
 };
 
 WebCore::ResourceError FrameLoaderClientQt::blockedError(const WebCore::ResourceRequest& request)
@@ -925,10 +937,10 @@ WebCore::ResourceError FrameLoaderClientQt::fileDoesNotExistError(const WebCore:
             QCoreApplication::translate("QWebFrame", "File does not exist", 0, QCoreApplication::UnicodeUTF8));
 }
 
-WebCore::ResourceError FrameLoaderClientQt::pluginWillHandleLoadError(const WebCore::ResourceResponse&)
+WebCore::ResourceError FrameLoaderClientQt::pluginWillHandleLoadError(const WebCore::ResourceResponse& response)
 {
-    notImplemented();
-    return ResourceError();
+    return ResourceError("WebKit", WebKitErrorPluginWillHandleLoad, response.url().string(),
+                         QCoreApplication::translate("QWebFrame", "Loading is handled by the media engine", 0, QCoreApplication::UnicodeUTF8));
 }
 
 bool FrameLoaderClientQt::shouldFallBack(const WebCore::ResourceError&)

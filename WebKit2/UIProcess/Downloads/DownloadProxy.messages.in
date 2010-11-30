@@ -21,7 +21,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 messages -> DownloadProxy {
-    DidStart()
+    DidStart(WebCore::ResourceRequest request)
+    DidReceiveResponse(WebCore::ResourceResponse response)
+    DidReceiveData(uint64_t length)
+    ShouldDecodeSourceDataOfMIMEType(String mimeType) -> (bool result)
+    DecideDestinationWithSuggestedFilename(String filename) -> (String destination, bool allowOverwrite, WebKit::SandboxExtension::Handle sandboxExtensionHandle)
     DidCreateDestination(WTF::String path)
     DidFinish()
+    DidFail(WebCore::ResourceError error, CoreIPC::DataReference resumeData)
+    DidCancel(CoreIPC::DataReference resumeData)
 }

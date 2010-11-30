@@ -19,17 +19,20 @@
  */
 
 #include "config.h"
-#if ENABLE(SVG)
 
+#if ENABLE(SVG)
+#include "SVGTransform.h"
+
+#include "FloatConversion.h"
 #include "FloatPoint.h"
 #include "FloatSize.h"
 #include "SVGAngle.h"
 #include "SVGSVGElement.h"
-#include "SVGTransform.h"
+#include <wtf/MathExtras.h>
+#include <wtf/text/StringBuilder.h>
+#include <wtf/text/StringConcatenate.h>
 
-#include <math.h>
-
-using namespace WebCore;
+namespace WebCore {
 
 SVGTransform::SVGTransform()
     : m_type(SVG_TRANSFORM_UNKNOWN)
@@ -40,8 +43,6 @@ SVGTransform::SVGTransform()
 SVGTransform::SVGTransform(SVGTransformType type)
     : m_type(type)
     , m_angle(0)
-    , m_center(FloatPoint())
-    , m_matrix(AffineTransform())
 {
 }
 
@@ -52,37 +53,20 @@ SVGTransform::SVGTransform(const AffineTransform& matrix)
 {
 }
 
-bool SVGTransform::isValid()
-{
-    return (m_type != SVG_TRANSFORM_UNKNOWN);
-}
-
-SVGTransform::SVGTransformType SVGTransform::type() const
-{
-    return m_type;
-}
-
-AffineTransform SVGTransform::matrix() const
-{
-    return m_matrix;
-}
-
-float SVGTransform::angle() const
-{
-    return m_angle;
-}
-
-FloatPoint SVGTransform::rotationCenter() const
-{
-    return m_center;
-}
-
-void SVGTransform::setMatrix(AffineTransform matrix)
+void SVGTransform::setMatrix(const AffineTransform& matrix)
 {
     m_type = SVG_TRANSFORM_MATRIX;
     m_angle = 0;
-
     m_matrix = matrix;
+}
+
+void SVGTransform::updateMatrix()
+{
+    // The underlying matrix has been changed, alter the transformation type.
+    // Spec: In case the matrix object is changed directly (i.e., without using the methods on the SVGTransform interface itself)
+    // then the type of the SVGTransform changes to SVG_TRANSFORM_MATRIX.
+    m_type = SVG_TRANSFORM_MATRIX;
+    m_angle = 0;
 }
 
 void SVGTransform::setTranslate(float tx, float ty)
@@ -145,5 +129,41 @@ void SVGTransform::setSkewY(float angle)
     m_matrix.skewY(angle);
 }
 
-#endif // ENABLE(SVG)
+String SVGTransform::valueAsString() const
+{
+    switch (m_type) {
+    case SVG_TRANSFORM_UNKNOWN:
+        return String();
+    case SVG_TRANSFORM_MATRIX: {
+        StringBuilder builder;
+        builder.append(makeString("matrix(", String::number(m_matrix.a()), ' ', String::number(m_matrix.b()), ' ', String::number(m_matrix.c()), ' '));
+        builder.append(makeString(String::number(m_matrix.d()), ' ', String::number(m_matrix.e()), ' ', String::number(m_matrix.f()), ')'));
+        return builder.toString();
+    }
+    case SVG_TRANSFORM_TRANSLATE:
+        return makeString("translate(", String::number(m_matrix.e()), ' ', String::number(m_matrix.f()), ')');
+    case SVG_TRANSFORM_SCALE:
+        return makeString("scale(", String::number(m_matrix.xScale()), ' ', String::number(m_matrix.yScale()), ')');
+    case SVG_TRANSFORM_ROTATE: {
+        double angleInRad = deg2rad(m_angle);
+        double cosAngle = cos(angleInRad);
+        double sinAngle = sin(angleInRad);
+        float cx = narrowPrecisionToFloat(cosAngle != 1 ? (m_matrix.e() * (1 - cosAngle) - m_matrix.f() * sinAngle) / (1 - cosAngle) / 2 : 0);
+        float cy = narrowPrecisionToFloat(cosAngle != 1 ? (m_matrix.e() * sinAngle / (1 - cosAngle) + m_matrix.f()) / 2 : 0);
+        if (cx || cy)
+            return makeString("rotate(", String::number(m_angle), ' ', String::number(cx), ' ', String::number(cy), ')');
+        return makeString("rotate(", String::number(m_angle), ')');
+    }    
+    case SVG_TRANSFORM_SKEWX:
+        return makeString("skewX(", String::number(m_angle), ')');
+    case SVG_TRANSFORM_SKEWY:
+        return makeString("skewY(", String::number(m_angle), ')');
+    }
 
+    ASSERT_NOT_REACHED();
+    return String();
+}
+
+} // namespace WebCore
+
+#endif // ENABLE(SVG)

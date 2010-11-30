@@ -105,11 +105,6 @@ public:
 
     // Query whether it is built on top of compliant GLES2 implementation.
     virtual bool isGLES2Compliant() = 0;
-    // Query whether it is built on top of GLES2 NPOT strict implementation.
-    virtual bool isGLES2NPOTStrict() = 0;
-    // Query whether it is built on top of implementation that generates errors
-    // on out-of-bounds buffer accesses.
-    virtual bool isErrorGeneratedOnOutOfBoundsAccesses() = 0;
 
     // Helper for software compositing path. Reads back the frame buffer into
     // the memory region pointed to by "pixels" with size "bufferSize". It is
@@ -207,6 +202,8 @@ public:
     virtual Attributes getContextAttributes() = 0;
 
     virtual unsigned long getError() = 0;
+
+    virtual bool isContextLost() = 0;
 
     virtual void getFloatv(unsigned long pname, float* value) = 0;
 

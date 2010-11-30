@@ -140,8 +140,7 @@ JSValueRef LayoutTestController::computedStyleIncludingVisitedInfo(JSContextRef 
 
 JSValueRef LayoutTestController::nodesFromRect(JSContextRef context, JSValueRef value, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping)
 {
-    // FIXME: Implement this.
-    return JSValueMakeUndefined(context);
+    return DumpRenderTreeSupportGtk::nodesFromRect(context, value, x, y, top, right, bottom, left, ignoreClipping);
 }
 
 JSRetainPtr<JSStringRef> LayoutTestController::layerTreeAsText() const
@@ -501,7 +500,7 @@ void LayoutTestController::setGeolocationPermission(bool allow)
     setGeolocationPermissionCommon(allow);
 }
 
-void LayoutTestController::setMockSpeechInputResult(JSStringRef result, JSStringRef language)
+void LayoutTestController::addMockSpeechInputResult(JSStringRef result, double confidence, JSStringRef language)
 {
     // FIXME: Implement for speech input layout tests.
     // See https://bugs.webkit.org/show_bug.cgi?id=39485.

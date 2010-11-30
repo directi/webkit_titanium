@@ -108,6 +108,7 @@ void SVGAElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeSVGTarget();
         synchronizeHref();
         synchronizeExternalResourcesRequired();
+        SVGTests::synchronizeProperties(this, attrName);
         return;
     }
 
@@ -117,11 +118,13 @@ void SVGAElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeHref();
     else if (SVGExternalResourcesRequired::isKnownAttribute(attrName))
         synchronizeExternalResourcesRequired();
+    else if (SVGTests::isKnownAttribute(attrName))
+        SVGTests::synchronizeProperties(this, attrName);
 }
 
 RenderObject* SVGAElement::createRenderer(RenderArena* arena, RenderStyle*)
 {
-    if (static_cast<SVGElement*>(parent())->isTextContent())
+    if (static_cast<SVGElement*>(parentNode())->isTextContent())
         return new (arena) RenderSVGInline(this);
 
     return new (arena) RenderSVGTransformableContainer(this);
@@ -207,8 +210,8 @@ bool SVGAElement::childShouldCreateRenderer(Node* child) const
     // The 'a' element may contain any element that its parent may contain, except itself.
     if (child->hasTagName(SVGNames::aTag))
         return false;
-    if (parent() && parent()->isSVGElement())
-        return parent()->childShouldCreateRenderer(child);
+    if (parentNode() && parentNode()->isSVGElement())
+        return parentNode()->childShouldCreateRenderer(child);
 
     return SVGElement::childShouldCreateRenderer(child);
 }

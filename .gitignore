@@ -40,7 +40,9 @@ WebKit/chromium/.gclient_entries
 WebKit/chromium/base/
 WebKit/chromium/gfx/
 WebKit/chromium/googleurl/
+WebKit/chromium/ipc/
 WebKit/chromium/net/
+WebKit/chromium/ppapi/
 WebKit/chromium/sdch/
 WebKit/chromium/skia/
 WebKit/chromium/testing/
@@ -57,6 +59,10 @@ WebKit/chromium/media/
 WebKit/chromium/webkit/
 WebKit/chromium/printing/
 WebKit/chromium/depot_tools/
+
+# Ignore files that Chromium port generates
+/Makefile.chromium
+/out
 
 # Ignore compiled java tests:
 LayoutTests/java/*.class

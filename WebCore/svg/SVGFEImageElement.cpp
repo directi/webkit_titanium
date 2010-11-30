@@ -90,6 +90,14 @@ void SVGFEImageElement::parseMappedAttribute(Attribute* attr)
     }
 }
 
+void SVGFEImageElement::svgAttributeChanged(const QualifiedName& attrName)
+{
+    SVGFilterPrimitiveStandardAttributes::svgAttributeChanged(attrName);
+
+    if (attrName == SVGNames::preserveAspectRatioAttr)
+        invalidate();
+}
+
 void SVGFEImageElement::synchronizeProperty(const QualifiedName& attrName)
 {
     SVGFilterPrimitiveStandardAttributes::synchronizeProperty(attrName);
@@ -123,7 +131,7 @@ void SVGFEImageElement::notifyFinished(CachedResource*)
     RenderSVGResource::markForLayoutAndParentResourceInvalidation(parent->renderer());
 }
 
-PassRefPtr<FilterEffect> SVGFEImageElement::build(SVGFilterBuilder*)
+PassRefPtr<FilterEffect> SVGFEImageElement::build(SVGFilterBuilder*, Filter* filter)
 {
     if (!m_cachedImage && !m_targetImage) {
         Element* hrefElement = document()->getElementById(SVGURIReference::getTarget(href()));
@@ -141,7 +149,7 @@ PassRefPtr<FilterEffect> SVGFEImageElement::build(SVGFilterBuilder*)
         SVGImageBufferTools::renderSubtreeToImageBuffer(m_targetImage.get(), renderer, contentTransformation);
     }
 
-    return FEImage::create(m_targetImage ? m_targetImage->copyImage() : m_cachedImage->image(), preserveAspectRatio());
+    return FEImage::create(filter, m_targetImage ? m_targetImage->copyImage() : m_cachedImage->image(), preserveAspectRatio());
 }
 
 void SVGFEImageElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const

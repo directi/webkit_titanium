@@ -129,6 +129,9 @@ namespace WebCore {
         virtual bool isIDBErrorEvent() const;
         virtual bool isIDBSuccessEvent() const;
 #endif
+#if ENABLE(WEB_AUDIO)
+        virtual bool isAudioProcessingEvent() const;
+#endif
 #if ENABLE(WORKERS)
         virtual bool isErrorEvent() const;
 #endif
@@ -138,6 +141,9 @@ namespace WebCore {
 #if ENABLE(DEVICE_ORIENTATION)
         virtual bool isDeviceMotionEvent() const;
         virtual bool isDeviceOrientationEvent() const;
+#endif
+#if ENABLE(INPUT_SPEECH)
+        virtual bool isSpeechInputEvent() const;
 #endif
         bool fromUserGesture();
         

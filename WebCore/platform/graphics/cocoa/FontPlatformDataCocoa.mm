@@ -31,22 +31,21 @@
 namespace WebCore {
 
 #if PLATFORM(MAC)
-void FontPlatformData::loadFont(NSFont* nsFont, float, NSFont*& outNSFont, CGFontRef& cgFont, ATSUFontID& fontID)
+void FontPlatformData::loadFont(NSFont* nsFont, float, NSFont*& outNSFont, CGFontRef& cgFont)
 {
     outNSFont = nsFont;
 #ifndef BUILDING_ON_TIGER
     cgFont = CTFontCopyGraphicsFont(toCTFontRef(nsFont), 0);
-    fontID = CTFontGetPlatformFont(toCTFontRef(nsFont), 0);
 #else
     cgFont = wkGetCGFontFromNSFont(nsFont);
-    fontID = wkGetNSFontATSUFontId(nsFont);
 #endif
 }
 #endif  // PLATFORM(MAC)
 
-FontPlatformData::FontPlatformData(NSFont *nsFont, bool syntheticBold, bool syntheticOblique, FontOrientation orientation)
+FontPlatformData::FontPlatformData(NSFont *nsFont, float size, bool syntheticBold, bool syntheticOblique, FontOrientation orientation)
     : m_syntheticBold(syntheticBold)
     , m_syntheticOblique(syntheticOblique)
+    , m_size(size)
     , m_font(nsFont)
 #if !defined(BUILDING_ON_TIGER) && !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
     // FIXME: Chromium: The following code isn't correct for the Chromium port since the sandbox might
@@ -58,28 +57,8 @@ FontPlatformData::FontPlatformData(NSFont *nsFont, bool syntheticBold, bool synt
 {
     ASSERT_ARG(nsFont, nsFont);
 
-    m_size = [nsFont pointSize];
-    
     CGFontRef cgFont = 0;
-    loadFont(nsFont, m_size, m_font, cgFont, m_atsuFontID);
-    
-    if (orientation == Vertical) {
-        // Ignore vertical orientation when the font doesn't support vertical metrics.
-        // The check doesn't look neat but this is what AppKit does for vertical writing...
-        RetainPtr<CFArrayRef> tableTags(AdoptCF, CTFontCopyAvailableTables(ctFont(), kCTFontTableOptionExcludeSynthetic));
-        CFIndex numTables = CFArrayGetCount(tableTags.get());
-        bool found = false;
-        for (CFIndex index = 0; index < numTables; ++index) {
-            CTFontTableTag tag = (CTFontTableTag)(uintptr_t)CFArrayGetValueAtIndex(tableTags.get(), index);
-            if (tag == kCTFontTableVhea || tag == kCTFontTableVORG) {
-                found = true;
-                break;
-            }
-        }
-
-        if (found == false)
-            orientation = Horizontal;
-    }
+    loadFont(nsFont, size, m_font, cgFont);
 
     m_orientation = orientation;
 
@@ -101,7 +80,6 @@ FontPlatformData::FontPlatformData(const FontPlatformData& f)
     m_syntheticOblique = f.m_syntheticOblique;
     m_size = f.m_size;
     m_cgFont = f.m_cgFont;
-    m_atsuFontID = f.m_atsuFontID;
     m_isColorBitmapFont = f.m_isColorBitmapFont;
     m_orientation = f.m_orientation;
     m_CTFont = f.m_CTFont;
@@ -122,7 +100,6 @@ const FontPlatformData& FontPlatformData::operator=(const FontPlatformData& f)
     m_syntheticOblique = f.m_syntheticOblique;
     m_size = f.m_size;
     m_cgFont = f.m_cgFont;
-    m_atsuFontID = f.m_atsuFontID;
     if (m_font == f.m_font)
         return *this;
     if (f.m_font && f.m_font != reinterpret_cast<NSFont *>(-1))
@@ -155,7 +132,7 @@ void FontPlatformData::setFont(NSFont *font)
     
     CGFontRef cgFont = 0;
     NSFont* loadedFont = 0;
-    loadFont(m_font, m_size, loadedFont, cgFont, m_atsuFontID);
+    loadFont(m_font, m_size, loadedFont, cgFont);
     
 #if PLATFORM(CHROMIUM) && OS(DARWIN)
     // If loadFont replaced m_font with a fallback font, then release the
@@ -185,7 +162,7 @@ bool FontPlatformData::roundsGlyphAdvances() const
 
 bool FontPlatformData::allowsLigatures() const
 {
-    return m_orientation == Horizontal && ![[m_font coveredCharacterSet] characterIsMember:'a'];
+    return ![[m_font coveredCharacterSet] characterIsMember:'a'];
 }
 
 CTFontRef FontPlatformData::ctFont() const

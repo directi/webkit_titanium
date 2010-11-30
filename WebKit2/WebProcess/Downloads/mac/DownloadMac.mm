@@ -25,7 +25,23 @@
 
 #include "Download.h"
 
+#include <WebCore/BackForwardController.h>
+#include <WebCore/HistoryItem.h>
+#include <WebCore/Page.h>
+#include <WebCore/ResourceHandle.h>
+#include <WebCore/ResourceResponse.h>
+#include "DataReference.h"
 #include "NotImplemented.h"
+#include "WebPage.h"
+
+@interface NSURLDownload (WebNSURLDownloadDetails)
++(id)_downloadWithLoadingConnection:(NSURLConnection *)connection
+                            request:(NSURLRequest *)request
+                           response:(NSURLResponse *)r
+                           delegate:(id)delegate
+                              proxy:(id)proxy;
+- (void)_setOriginatingURL:(NSURL *)originatingURL;
+@end
 
 @interface WKDownloadAsDelegate : NSObject <NSURLConnectionDelegate> {
     WebKit::Download* _download;
@@ -34,18 +50,108 @@
 - (void)invalidate;
 @end
 
-
 using namespace WebCore;
 
 namespace WebKit {
 
-void Download::start()
+static KURL originatingURLFromBackForwardList(WebPage *webPage)
+{
+    if (!webPage)
+        return KURL();
+
+    Page* page = webPage->corePage();
+    if (!page)
+        return KURL();
+
+    KURL originalURL;
+    int backCount = page->backForward()->backCount();
+    for (int backIndex = 0; backIndex <= backCount; backIndex++) {
+        // FIXME: At one point we had code here to check a "was user gesture" flag.
+        // Do we need to restore that logic?
+        originalURL = page->backForward()->itemAtIndex(-backIndex)->originalURL(); 
+        if (!originalURL.isNull()) 
+            return originalURL;
+    }
+
+    return KURL();
+}
+
+static void setOriginalURLForDownload(WebPage *webPage, NSURLDownload *download, const ResourceRequest& initialRequest)
+{
+    KURL originalURL;
+    
+    // If there was no referrer, don't traverse the back/forward history
+    // since this download was initiated directly. <rdar://problem/5294691>
+    if (!initialRequest.httpReferrer().isNull()) {
+        // find the first item in the history that was originated by the user
+        originalURL = originatingURLFromBackForwardList(webPage);
+    }
+
+    if (originalURL.isNull())
+        originalURL = initialRequest.url();
+
+    NSURL *originalNSURL = originalURL;
+
+    NSString *scheme = [originalNSURL scheme];
+    NSString *host = [originalNSURL host];
+    if (scheme && host && [scheme length] && [host length]) {
+        NSNumber *port = [originalNSURL port];
+        if (port && [port intValue] < 0)
+            port = nil;
+        RetainPtr<NSString> hostOnlyURLString;
+        if (port)
+            hostOnlyURLString.adoptNS([[NSString alloc] initWithFormat:@"%@://%@:%d", scheme, host, [port intValue]]);
+        else
+            hostOnlyURLString.adoptNS([[NSString alloc] initWithFormat:@"%@://%@", scheme, host]);
+
+        RetainPtr<NSURL> hostOnlyURL = [[NSURL alloc] initWithString:hostOnlyURLString.get()];
+
+        ASSERT([download respondsToSelector:@selector(_setOriginatingURL:)]);
+        [download _setOriginatingURL:hostOnlyURL.get()];
+    }
+}
+
+void Download::start(WebPage* initiatingPage)
 {
     ASSERT(!m_nsURLDownload);
     ASSERT(!m_delegate);
 
     m_delegate.adoptNS([[WKDownloadAsDelegate alloc] initWithDownload:this]);
     m_nsURLDownload.adoptNS([[NSURLDownload alloc] initWithRequest:m_request.nsURLRequest() delegate:m_delegate.get()]);
+
+    // FIXME: Allow this to be changed by the client.
+    [m_nsURLDownload.get() setDeletesFileUponFailure:NO];
+
+    setOriginalURLForDownload(initiatingPage, m_nsURLDownload.get(), m_request);
+}
+
+void Download::startWithHandle(WebPage* initiatingPage, ResourceHandle* handle, const ResourceRequest& initialRequest, const ResourceResponse& response)
+{
+    ASSERT(!m_nsURLDownload);
+    ASSERT(!m_delegate);
+
+    id proxy = handle->releaseProxy();
+    ASSERT(proxy);
+
+    m_delegate.adoptNS([[WKDownloadAsDelegate alloc] initWithDownload:this]);
+    m_nsURLDownload = [NSURLDownload _downloadWithLoadingConnection:handle->connection()
+                                                            request:m_request.nsURLRequest()
+                                                           response:response.nsURLResponse()
+                                                            delegate:m_delegate.get()
+                                                               proxy:proxy];
+
+    // FIXME: Allow this to be changed by the client.
+    [m_nsURLDownload.get() setDeletesFileUponFailure:NO];
+                                                            
+    setOriginalURLForDownload(initiatingPage, m_nsURLDownload.get(), initialRequest);
+}
+
+void Download::cancel()
+{
+    [m_nsURLDownload.get() cancel];
+
+    RetainPtr<NSData> resumeData = [m_nsURLDownload.get() resumeData];
+    didCancel(CoreIPC::DataReference(reinterpret_cast<const uint8_t*>([resumeData.get() bytes]), [resumeData.get() length]));
 }
 
 void Download::platformInvalidate()
@@ -116,8 +222,8 @@ void Download::platformInvalidate()
 
 - (void)download:(NSURLDownload *)download didReceiveResponse:(NSURLResponse *)response
 {
-    // FIXME: Implement.
-    notImplemented();
+    if (_download)
+        _download->didReceiveResponse(response);
 }
 
 - (void)download:(NSURLDownload *)download willResumeWithResponse:(NSURLResponse *)response fromByte:(long long)startingByte
@@ -134,15 +240,21 @@ void Download::platformInvalidate()
 
 - (BOOL)download:(NSURLDownload *)download shouldDecodeSourceDataOfMIMEType:(NSString *)encodingType
 {
-    // FIXME: Implement.
-    notImplemented();
+    if (_download)
+        return _download->shouldDecodeSourceDataOfMIMEType(encodingType);
+
     return YES;
 }
 
 - (void)download:(NSURLDownload *)download decideDestinationWithSuggestedFilename:(NSString *)filename
 {
-    // FIXME: Implement.
-    notImplemented();
+    String destination;
+    bool allowOverwrite;
+    if (_download)
+        destination = _download->decideDestinationWithSuggestedFilename(filename, allowOverwrite);
+
+    if (!destination.isNull())
+        [download setDestination:destination allowOverwrite:allowOverwrite];
 }
 
 - (void)download:(NSURLDownload *)download didCreateDestination:(NSString *)path
@@ -159,8 +271,13 @@ void Download::platformInvalidate()
 
 - (void)download:(NSURLDownload *)download didFailWithError:(NSError *)error
 {
-    // FIXME: Implement.
-    notImplemented();
+    if (!_download)
+        return;
+
+    RetainPtr<NSData> resumeData = [download resumeData];
+    CoreIPC::DataReference dataReference(reinterpret_cast<const uint8_t*>([resumeData.get() bytes]), [resumeData.get() length]);
+
+    _download->didFail(error, dataReference);
 }
 
 @end

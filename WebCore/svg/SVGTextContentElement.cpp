@@ -190,6 +190,7 @@ void SVGTextContentElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeLengthAdjust();
         synchronizeTextLength();
         synchronizeExternalResourcesRequired();
+        SVGTests::synchronizeProperties(this, attrName);
         return;
     }
 
@@ -199,13 +200,24 @@ void SVGTextContentElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeTextLength();
     else if (SVGExternalResourcesRequired::isKnownAttribute(attrName))
         synchronizeExternalResourcesRequired();
+    else if (SVGTests::isKnownAttribute(attrName))
+        SVGTests::synchronizeProperties(this, attrName);
+}
+
+void SVGTextContentElement::svgAttributeChanged(const QualifiedName& attrName)
+{
+    SVGStyledElement::svgAttributeChanged(attrName);
+
+    if (SVGTests::handleAttributeChange(this, attrName))
+        return;
+
+    // FIXME: also handle attribute changes for lengthAdjust and textLength
 }
 
 bool SVGTextContentElement::isKnownAttribute(const QualifiedName& attrName)
 {
     return (attrName.matches(SVGNames::lengthAdjustAttr) ||
             attrName.matches(SVGNames::textLengthAttr) ||
-            SVGTests::isKnownAttribute(attrName) ||
             SVGLangSpace::isKnownAttribute(attrName) ||
             SVGExternalResourcesRequired::isKnownAttribute(attrName) ||
             SVGStyledElement::isKnownAttribute(attrName));

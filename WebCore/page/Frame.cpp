@@ -711,10 +711,11 @@ void Frame::transferChildFrameToNewDocument()
 {
     ASSERT(m_ownerElement);
     Frame* newParent = m_ownerElement->document()->frame();
+    ASSERT(newParent);
     bool didTransfer = false;
 
     // Switch page.
-    Page* newPage = newParent ? newParent->page() : 0;
+    Page* newPage = newParent->page();
     Page* oldPage = m_page;
     if (m_page != newPage) {
         if (m_page) {
@@ -733,16 +734,7 @@ void Frame::transferChildFrameToNewDocument()
     }
 
     // Update the frame tree.
-    Frame* oldParent = tree()->parent();
-    if (oldParent != newParent) {
-        if (oldParent)
-            oldParent->tree()->removeChild(this);
-        if (newParent) {
-            newParent->tree()->appendChild(this);
-            m_ownerElement->setName();
-        }
-        didTransfer = true;
-    }
+    didTransfer = newParent->tree()->transferChild(this) || didTransfer;
 
     // Avoid unnecessary calls to client and frame subtree if the frame ended
     // up on the same page and under the same parent frame.
@@ -969,16 +961,13 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
     }
 }
 
-void Frame::scalePage(float scale)
+void Frame::scalePage(float scale, const IntPoint& origin)
 {
-    if (m_pageScaleFactor == scale)
-        return;
-
-    m_pageScaleFactor = scale;
-
     Document* document = this->document();
     if (!document)
         return;
+
+    m_pageScaleFactor = scale;
 
     if (document->renderer())
         document->renderer()->setNeedsLayout(true);
@@ -988,6 +977,7 @@ void Frame::scalePage(float scale)
     if (FrameView* view = this->view()) {
         if (document->renderer() && document->renderer()->needsLayout() && view->didFirstLayout())
             view->layout();
+        view->setScrollPosition(origin);
     }
 }
 

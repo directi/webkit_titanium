@@ -25,6 +25,7 @@
 
 #include "WebProcess.h"
 
+#include "DownloadManager.h"
 #include "InjectedBundle.h"
 #include "InjectedBundleMessageKinds.h"
 #include "InjectedBundleUserMessageCoders.h"
@@ -40,6 +41,7 @@
 #include "WebProcessMessages.h"
 #include "WebProcessProxyMessages.h"
 #include <WebCore/ApplicationCacheStorage.h>
+#include <WebCore/CrossOriginPreflightResultCache.h>
 #include <WebCore/Language.h>
 #include <WebCore/Page.h>
 #include <WebCore/PageGroup.h>
@@ -127,9 +129,8 @@ void WebProcess::initializeWebProcess(const WebProcessCreationParameters& parame
 
     if (!parameters.injectedBundlePath.isEmpty()) {
         m_injectedBundle = InjectedBundle::create(parameters.injectedBundlePath);
-#if ENABLE(WEB_PROCESS_SANDBOX)
-        m_injectedBundle->setSandboxToken(parameters.injectedBundlePathToken);
-#endif
+        m_injectedBundle->setSandboxExtension(SandboxExtension::create(parameters.injectedBundlePathExtensionHandle));
+
         if (!m_injectedBundle->load(injectedBundleInitializationUserData.get())) {
             // Don't keep around the InjectedBundle reference if the load fails.
             m_injectedBundle.clear();
@@ -410,9 +411,7 @@ void WebProcess::removeWebPage(uint64_t pageID)
 {
     m_pageMap.remove(pageID);
 
-    // If we don't have any pages left, shut down.
-    if (m_pageMap.isEmpty() && !m_inDidClose)
-        shutdown();
+    shutdownIfPossible();
 }
 
 bool WebProcess::isSeparateProcess() const
@@ -421,11 +420,22 @@ bool WebProcess::isSeparateProcess() const
     return m_runLoop == RunLoop::main();
 }
  
-void WebProcess::shutdown()
+void WebProcess::shutdownIfPossible()
 {
+    if (!m_pageMap.isEmpty())
+        return;
+
+    if (m_inDidClose)
+        return;
+
+    if (DownloadManager::shared().isDownloading())
+        return;
+
     // Keep running forever if we're running in the same process.
     if (!isSeparateProcess())
         return;
+
+    // Actually shut down the process.
 
 #ifndef NDEBUG
     gcController().garbageCollectNow();
@@ -514,6 +524,33 @@ void WebProcess::removeWebFrame(uint64_t frameID)
         return;
 
     m_connection->send(Messages::WebProcessProxy::DidDestroyFrame(frameID), 0);
+}
+
+void WebProcess::clearResourceCaches()
+{
+    platformClearResourceCaches();
+
+    // Toggling the cache model like this forces the cache to evict all its in-memory resources.
+    // FIXME: We need a better way to do this.
+    CacheModel cacheModel = m_cacheModel;
+    setCacheModel(CacheModelDocumentViewer);
+    setCacheModel(cacheModel);
+
+    // Empty the cross-origin preflight cache.
+    CrossOriginPreflightResultCache::shared().empty();
+}
+
+void WebProcess::clearApplicationCache()
+{
+#if ENABLE(OFFLINE_WEB_APPLICATIONS)
+    // Empty the application cache.
+    cacheStorage().empty();
+#endif
+}
+
+void WebProcess::cancelDownload(uint64_t downloadID)
+{
+    DownloadManager::shared().cancelDownload(downloadID);
 }
 
 } // namespace WebKit

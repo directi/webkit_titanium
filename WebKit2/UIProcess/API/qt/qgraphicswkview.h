@@ -45,8 +45,13 @@ public:
     virtual QSizeF sizeHint(Qt::SizeHint, const QSizeF&) const;
     virtual QVariant inputMethodQuery(Qt::InputMethodQuery) const;
 
+    void takeSnapshot(const QSize& size, const QRect& documentRect);
+
     // FIXME: should not be public
     virtual QRectF visibleRect() const;
+
+    void prepareScaleChange();
+    void commitScaleChange();
 
 public:
     Q_SIGNAL void titleChanged(const QString& title);
@@ -55,6 +60,7 @@ public:
     Q_SIGNAL void loadProgress(int progress);
     Q_SIGNAL void initialLayoutCompleted();
     Q_SIGNAL void urlChanged(const QUrl&);
+    Q_SIGNAL void snapshotTaken(const QImage&);
 
 public Q_SLOTS:
     void back();
@@ -75,13 +81,18 @@ protected:
     virtual void hoverMoveEvent(QGraphicsSceneHoverEvent*);
 
     Q_SLOT void updateCursor(const QCursor&);
+    Q_SLOT void focusNextPrevChildCallback(bool next);
 
+    virtual bool focusNextPrevChild(bool next);
     virtual void focusInEvent(QFocusEvent*);
     virtual void focusOutEvent(QFocusEvent*);
 
 private:
+    Q_PRIVATE_SLOT(d, void onScaleChanged());
+
     QGraphicsWKViewPrivate* d;
     friend class QGraphicsWKViewPrivate;
+    friend class TiledDrawingAreaProxy;
 };
 
 #endif /* qgraphicswkview_h */

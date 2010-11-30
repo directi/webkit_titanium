@@ -139,6 +139,27 @@
 
 using namespace WebCore;
 
+namespace {
+
+GraphicsContext3D::Attributes getCompositorContextAttributes()
+{
+    // Explicitly disable antialiasing for the compositor. As of the time of
+    // this writing, the only platform that supported antialiasing for the
+    // compositor was Mac OS X, because the on-screen OpenGL context creation
+    // code paths on Windows and Linux didn't yet have multisampling support.
+    // Mac OS X essentially always behaves as though it's rendering offscreen.
+    // Multisampling has a heavy cost especially on devices with relatively low
+    // fill rate like most notebooks, and the Mac implementation would need to
+    // be optimized to resolve directly into the IOSurface shared between the
+    // GPU and browser processes. For these reasons and to avoid platform
+    // disparities we explicitly disable antialiasing.
+    GraphicsContext3D::Attributes attributes;
+    attributes.antialias = false;
+    return attributes;
+}
+
+} // anonymous namespace
+
 namespace WebKit {
 
 // Change the text zoom level by kTextSizeMultiplierRatio each time the user
@@ -178,7 +199,7 @@ static const PopupContainerSettings autoFillPopupSettings = {
     false, // acceptOnAbandon
     true,  // loopSelectionNavigation
     false, // restrictWidthOfListBox (For security reasons show the entire entry
-           // so the user doesn't enter information it did not intend to.)
+           // so the user doesn't enter information he did not intend to.)
     // For suggestions, we use the direction of the input field as the direction
     // of the popup items. The main reason is to keep the display of items in
     // drop-down the same as the items in the input field.
@@ -571,13 +592,13 @@ bool WebViewImpl::keyEvent(const WebKeyboardEvent& event)
         WebInputEvent::RawKeyDown;
 #endif
 
-    if (((!event.modifiers && (event.windowsKeyCode == VKEY_APPS))
-        || ((event.modifiers == WebInputEvent::ShiftKey) && (event.windowsKeyCode == VKEY_F10)))
-        && event.type == contextMenuTriggeringEventType) {
+    bool isUnmodifiedMenuKey = !(event.modifiers & WebInputEvent::InputModifiers) && event.windowsKeyCode == VKEY_APPS;
+    bool isShiftF10 = event.modifiers == WebInputEvent::ShiftKey && event.windowsKeyCode == VKEY_F10;
+    if ((isUnmodifiedMenuKey || isShiftF10) && event.type == contextMenuTriggeringEventType) {
         sendContextMenuEvent(event);
         return true;
     }
-#endif
+#endif // OS(WINDOWS) || OS(LINUX) || OS(FREEBSD)
 
     // It's not clear if we should continue after detecting a capslock keypress.
     // I'll err on the side of continuing, which is the pre-existing behaviour.
@@ -936,10 +957,10 @@ void WebViewImpl::resize(const WebSize& newSize)
             m_client->didInvalidateRect(damagedRect);
     }
 
-#if USE(ACCELERATED_COMPOSITING) && OS(DARWIN)
-    if (m_layerRenderer) {
-        m_layerRenderer->resizeOnscreenContent(WebCore::IntSize(std::max(1, m_size.width),
-                                                                std::max(1, m_size.height)));
+#if USE(ACCELERATED_COMPOSITING)
+    if (m_layerRenderer && isAcceleratedCompositingActive()) {
+        m_layerRenderer->resizeOnscreenContent(IntSize(std::max(1, m_size.width),
+                                                       std::max(1, m_size.height)));
     }
 #endif
 }
@@ -1016,10 +1037,6 @@ void WebViewImpl::paint(WebCanvas* canvas, const WebRect& rect)
             resizeRect.intersect(IntRect(IntPoint(), m_layerRenderer->rootLayerTextureSize()));
             doPixelReadbackToCanvas(canvas, resizeRect);
         }
-
-        // Temporarily present so the downstream Chromium renderwidget still renders.
-        // FIXME: remove this call once the changes to Chromium's renderwidget have landed.
-        m_layerRenderer->present();
 #endif
     } else {
         WebFrameImpl* webframe = mainFrameImpl();
@@ -1100,7 +1117,7 @@ bool WebViewImpl::handleInputEvent(const WebInputEvent& inputEvent)
 
         node->dispatchMouseEvent(
               PlatformMouseEventBuilder(mainFrameImpl()->frameView(), *static_cast<const WebMouseEvent*>(&inputEvent)),
-              eventType);
+              eventType, static_cast<const WebMouseEvent*>(&inputEvent)->clickCount);
         m_currentInputEvent = 0;
         return true;
     }
@@ -1943,12 +1960,9 @@ void WebViewImpl::applyAutoFillSuggestions(
     }
 
     if (m_autoFillPopupShowing) {
-        m_autoFillPopupClient->setSuggestions(
-            names, labels, icons, uniqueIDs, separatorIndex);
         refreshAutoFillPopup();
     } else {
-        m_autoFillPopup->show(focusedNode->getRect(),
-                                 focusedNode->ownerDocument()->view(), 0);
+        m_autoFillPopup->show(focusedNode->getRect(), focusedNode->ownerDocument()->view(), 0);
         m_autoFillPopupShowing = true;
     }
 
@@ -2274,22 +2288,11 @@ void WebViewImpl::setRootGraphicsLayer(WebCore::PlatformLayer* layer)
 void WebViewImpl::setRootLayerNeedsDisplay()
 {
     m_client->scheduleComposite();
-    // FIXME: To avoid breaking the downstream Chrome render_widget while downstream
-    // changes land, we also have to pass a 1x1 invalidate up to the client
-    {
-        WebRect damageRect(0, 0, 1, 1);
-        m_client->didInvalidateRect(damageRect);
-    }
 }
 
 
 void WebViewImpl::scrollRootLayerRect(const IntSize& scrollDelta, const IntRect& clipRect)
 {
-    // FIXME: To avoid breaking the Chrome render_widget when the new compositor render
-    // path is not checked in, we must still pass scroll damage up to the client. This
-    // code will be backed out in a followup CL once the Chromium changes have landed.
-    m_client->didScrollRect(scrollDelta.width(), scrollDelta.height(), clipRect);
-
     ASSERT(m_layerRenderer);
     // Compute the damage rect in viewport space.
     WebFrameImpl* webframe = mainFrameImpl();
@@ -2336,6 +2339,9 @@ void WebViewImpl::scrollRootLayerRect(const IntSize& scrollDelta, const IntRect&
         }
     }
 
+    // Move the previous damage
+    m_rootLayerScrollDamage.move(scrollDelta.width(), scrollDelta.height());
+    // Union with the new damage rect.
     m_rootLayerScrollDamage.unite(damagedContentsRect);
 
     // Scroll any existing damage that intersects with clip rect
@@ -2346,7 +2352,7 @@ void WebViewImpl::scrollRootLayerRect(const IntSize& scrollDelta, const IntRect&
 
         // Move the damage
         innerDamage.move(scrollDelta.width(), scrollDelta.height());
-        
+
         // Merge it back into the damaged rect
         m_rootLayerDirtyRect.unite(innerDamage);
     }
@@ -2356,17 +2362,12 @@ void WebViewImpl::scrollRootLayerRect(const IntSize& scrollDelta, const IntRect&
 
 void WebViewImpl::invalidateRootLayerRect(const IntRect& rect)
 {
-    // FIXME: To avoid breaking the Chrome render_widget when the new compositor render
-    // path is not checked in, we must still pass damage up to the client. This
-    // code will be backed out in a followup CL once the Chromium changes have landed.
-    m_client->didInvalidateRect(rect);
-
     ASSERT(m_layerRenderer);
 
     if (!page())
         return;
 
-    // FIXME: add a smarter damage aggregation logic and/or unify with 
+    // FIXME: add a smarter damage aggregation logic and/or unify with
     // LayerChromium's damage logic
     m_rootLayerDirtyRect.unite(rect);
     setRootLayerNeedsDisplay();
@@ -2380,26 +2381,34 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
 
     if (!active) {
         m_isAcceleratedCompositingActive = false;
+        m_layerRenderer->finish(); // finish all GL rendering before we hide the window?
+        m_client->didActivateAcceleratedCompositing(false);
         return;
     }
 
     if (m_layerRenderer) {
         m_isAcceleratedCompositingActive = true;
+        m_layerRenderer->resizeOnscreenContent(WebCore::IntSize(std::max(1, m_size.width),
+                                                                std::max(1, m_size.height)));
+
+        m_client->didActivateAcceleratedCompositing(true);
         return;
     }
 
     RefPtr<GraphicsContext3D> context = m_temporaryOnscreenGraphicsContext3D.release();
     if (!context) {
-        context = GraphicsContext3D::create(GraphicsContext3D::Attributes(), m_page->chrome(), GraphicsContext3D::RenderDirectlyToHostWindow);
+        context = GraphicsContext3D::create(getCompositorContextAttributes(), m_page->chrome(), GraphicsContext3D::RenderDirectlyToHostWindow);
         if (context)
             context->reshape(std::max(1, m_size.width), std::max(1, m_size.height));
     }
     m_layerRenderer = LayerRendererChromium::create(context.release());
     if (m_layerRenderer) {
+        m_client->didActivateAcceleratedCompositing(true);
         m_isAcceleratedCompositingActive = true;
         m_compositorCreationFailed = false;
     } else {
         m_isAcceleratedCompositingActive = false;
+        m_client->didActivateAcceleratedCompositing(false);
         m_compositorCreationFailed = true;
     }
 }
@@ -2509,6 +2518,7 @@ void WebViewImpl::reallocateRenderer()
     m_layerRenderer = layerRenderer;
 
     // Enable or disable accelerated compositing and request a refresh.
+    m_isAcceleratedCompositingActive = false;
     setRootGraphicsLayer(m_layerRenderer ? m_layerRenderer->rootLayer() : 0);
 }
 #endif
@@ -2524,8 +2534,7 @@ WebGraphicsContext3D* WebViewImpl::graphicsContext3D()
         else if (m_temporaryOnscreenGraphicsContext3D)
             context = m_temporaryOnscreenGraphicsContext3D.get();
         else {
-            GraphicsContext3D::Attributes attributes;
-            m_temporaryOnscreenGraphicsContext3D = GraphicsContext3D::create(GraphicsContext3D::Attributes(), m_page->chrome(), GraphicsContext3D::RenderDirectlyToHostWindow);
+            m_temporaryOnscreenGraphicsContext3D = GraphicsContext3D::create(getCompositorContextAttributes(), m_page->chrome(), GraphicsContext3D::RenderDirectlyToHostWindow);
             if (m_temporaryOnscreenGraphicsContext3D)
                 m_temporaryOnscreenGraphicsContext3D->reshape(std::max(1, m_size.width), std::max(1, m_size.height));
             context = m_temporaryOnscreenGraphicsContext3D.get();

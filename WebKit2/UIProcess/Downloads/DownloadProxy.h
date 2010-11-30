@@ -27,18 +27,21 @@
 #define DownloadProxy_h
 
 #include "APIObject.h"
+#include "Connection.h"
+#include "SandboxExtension.h"
+#include <WebCore/ResourceRequest.h>
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 
-namespace CoreIPC {
-    class ArgumentDecoder;
-    class Connection;
-    class MessageID;
+namespace WebCore {
+    class ResourceError;
+    class ResourceResponse;
 }
 
 namespace WebKit {
 
 class WebContext;
+class WebData;
 
 class DownloadProxy : public APIObject {
 public:
@@ -48,10 +51,16 @@ public:
     ~DownloadProxy();
 
     uint64_t downloadID() const { return m_downloadID; }
+    const WebCore::ResourceRequest& request() const { return m_request; }
+    WebData* resumeData() const { return m_resumeData.get(); }
+
+    void cancel();
 
     void invalidate();
+    void processDidClose();
 
     void didReceiveDownloadProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    CoreIPC::SyncReplyMode didReceiveSyncDownloadProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
 
 private:
     explicit DownloadProxy(WebContext*);
@@ -59,12 +68,21 @@ private:
     virtual Type type() const { return APIType; }
 
     // Message handlers.
-    void didStart();
+    void didStart(const WebCore::ResourceRequest&);
+    void didReceiveResponse(const WebCore::ResourceResponse&);
+    void didReceiveData(uint64_t length);
+    void shouldDecodeSourceDataOfMIMEType(const String& mimeType, bool& result);
+    void decideDestinationWithSuggestedFilename(const String& filename, String& destination, bool& allowOverwrite, SandboxExtension::Handle& sandboxExtensionHandle);
     void didCreateDestination(const String& path);
     void didFinish();
+    void didFail(const WebCore::ResourceError&, const CoreIPC::DataReference& resumeData);
+    void didCancel(const CoreIPC::DataReference& resumeData);
 
     WebContext* m_webContext;
     uint64_t m_downloadID;
+
+    RefPtr<WebData> m_resumeData;
+    WebCore::ResourceRequest m_request;
 };
 
 } // namespace WebKit

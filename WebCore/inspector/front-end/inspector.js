@@ -223,9 +223,8 @@ var WebInspector = {
         var hiddenPanels = (InspectorFrontendHost.hiddenPanels() || "").split(',');
         if (hiddenPanels.indexOf("elements") === -1)
             this.panels.elements = new WebInspector.ElementsPanel();
-
-        if (hiddenPanels.indexOf("storage") === -1 && hiddenPanels.indexOf("databases") === -1)
-            this.panels.storage = new WebInspector.StoragePanel();
+        if (hiddenPanels.indexOf("resources") === -1)
+            this.panels.resources = new WebInspector.ResourcesPanel();
         if (hiddenPanels.indexOf("network") === -1)
             this.panels.network = new WebInspector.NetworkPanel();
         if (hiddenPanels.indexOf("scripts") === -1)
@@ -546,10 +545,6 @@ WebInspector.doLoadedDone = function()
     for (var panelName in this.panels)
         previousToolbarItem = WebInspector.addPanelToolbarIcon(toolbarElement, this.panels[panelName], previousToolbarItem);
 
-    // FIXME: fix this once renamed StoragePanel.js to ResourcesPanel.js
-    this.panels.storage._toolbarItem.removeStyleClass("storage");
-    this.panels.storage._toolbarItem.addStyleClass("resources");
-
     this.Tips = {
         ResourceNotCompressed: {id: 0, message: WebInspector.UIString("You could save bandwidth by having your web server compress this transfer with gzip or zlib.")}
     };
@@ -642,11 +637,11 @@ var windowLoaded = function()
     } else
         WebInspector.loaded();
 
-    window.removeEventListener("load", windowLoaded, false);
+    window.removeEventListener("DOMContentLoaded", windowLoaded, false);
     delete windowLoaded;
 };
 
-window.addEventListener("load", windowLoaded, false);
+window.addEventListener("DOMContentLoaded", windowLoaded, false);
 
 WebInspector.dispatch = function(message) {
     // We'd like to enforce asynchronous interaction between the inspector controller and the frontend.
@@ -663,6 +658,9 @@ WebInspector.dispatch = function(message) {
 // This function is purposely put into the global scope for easy access.
 WebInspector_syncDispatch = function(message)
 {
+    if (window.dumpInspectorProtocolMessages)
+        console.log("backend: " + ((typeof message === "string") ? message : JSON.stringify(message)));
+
     var messageObject = (typeof message === "string") ? JSON.parse(message) : message;
 
     var arguments = [];
@@ -810,8 +808,8 @@ WebInspector.openResource = function(resourceURL, inResourcesPanel)
 {
     var resource = WebInspector.resourceForURL(resourceURL);
     if (inResourcesPanel && resource) {
-        WebInspector.panels.storage.showResource(resource);
-        WebInspector.showPanel("storage");
+        WebInspector.panels.resources.showResource(resource);
+        WebInspector.showPanel("resources");
     } else
         InspectorBackend.openInInspectedWindow(resource ? resource.url : resourceURL);
 }
@@ -1206,10 +1204,6 @@ WebInspector.showChanges = function()
 
 WebInspector.showPanel = function(panel)
 {
-    // FIXME: fix this once renamed StoragePanel.js to ResourcesPanel.js
-    if (panel === "resources")
-        panel = "storage";
-
     if (!(panel in this.panels))
         panel = "elements";
     this.currentPanel = this.panels[panel];
@@ -1217,8 +1211,8 @@ WebInspector.showPanel = function(panel)
 
 WebInspector.selectDatabase = function(o)
 {
-    WebInspector.showPanel("storage");
-    WebInspector.panels.storage.selectDatabase(o);
+    WebInspector.showPanel("resources");
+    WebInspector.panels.resources.selectDatabase(o);
 }
 
 WebInspector.consoleMessagesCleared = function()
@@ -1228,8 +1222,8 @@ WebInspector.consoleMessagesCleared = function()
 
 WebInspector.selectDOMStorage = function(o)
 {
-    WebInspector.showPanel("storage");
-    WebInspector.panels.storage.selectDOMStorage(o);
+    WebInspector.showPanel("resources");
+    WebInspector.panels.resources.selectDOMStorage(o);
 }
 
 WebInspector.domContentEventFired = function(time)
@@ -1237,6 +1231,7 @@ WebInspector.domContentEventFired = function(time)
     this.panels.audits.mainResourceDOMContentTime = time;
     if (this.panels.network)
         this.panels.network.mainResourceDOMContentTime = time;
+    this.extensionServer.notifyPageDOMContentLoaded((time - WebInspector.mainResource.startTime) * 1000);
     this.mainResourceDOMContentTime = time;
 }
 
@@ -1245,60 +1240,61 @@ WebInspector.loadEventFired = function(time)
     this.panels.audits.mainResourceLoadTime = time;
     if (this.panels.network)
         this.panels.network.mainResourceLoadTime = time;
+    this.extensionServer.notifyPageLoaded((time - WebInspector.mainResource.startTime) * 1000);
     this.mainResourceLoadTime = time;
 }
 
 WebInspector.addDatabase = function(payload)
 {
-    if (!this.panels.storage)
+    if (!this.panels.resources)
         return;
     var database = new WebInspector.Database(
         payload.id,
         payload.domain,
         payload.name,
         payload.version);
-    this.panels.storage.addDatabase(database);
+    this.panels.resources.addDatabase(database);
 }
 
 WebInspector.addDOMStorage = function(payload)
 {
-    if (!this.panels.storage)
+    if (!this.panels.resources)
         return;
     var domStorage = new WebInspector.DOMStorage(
         payload.id,
         payload.host,
         payload.isLocalStorage);
-    this.panels.storage.addDOMStorage(domStorage);
+    this.panels.resources.addDOMStorage(domStorage);
 }
 
 WebInspector.updateDOMStorage = function(storageId)
 {
-    this.panels.storage.updateDOMStorage(storageId);
+    this.panels.resources.updateDOMStorage(storageId);
 }
 
 WebInspector.updateApplicationCacheStatus = function(status)
 {
-    this.panels.storage.updateApplicationCacheStatus(status);
+    this.panels.resources.updateApplicationCacheStatus(status);
 }
 
 WebInspector.didGetFileSystemPath = function(root, type, origin)
 {
-    this.panels.storage.updateFileSystemPath(root, type, origin);
+    this.panels.resources.updateFileSystemPath(root, type, origin);
 }
 
 WebInspector.didGetFileSystemError = function(type, origin)
 {
-    this.panels.storage.updateFileSystemError(type, origin);
+    this.panels.resources.updateFileSystemError(type, origin);
 }
 
 WebInspector.didGetFileSystemDisabled = function()
 {
-    this.panels.storage.setFileSystemDisabled();
+    this.panels.resources.setFileSystemDisabled();
 }
 
 WebInspector.updateNetworkState = function(isNowOnline)
 {
-    this.panels.storage.updateNetworkState(isNowOnline);
+    this.panels.resources.updateNetworkState(isNowOnline);
 }
 
 WebInspector.searchingForNodeWasEnabled = function()
@@ -1409,7 +1405,6 @@ WebInspector.didCommitLoad = function()
 {
     // Cleanup elements panel early on inspected page refresh.
     WebInspector.setDocument(null);
-    this.extensionServer.notifyInspectedPageLoaded();
 }
 
 WebInspector.updateConsoleMessageExpiredCount = function(count)
@@ -1550,6 +1545,16 @@ WebInspector.setRecordingProfile = function(isProfiling)
     this.panels.profiles.updateProfileTypeButtons();
 }
 
+WebInspector.addHeapSnapshotChunk = function(uid, chunk)
+{
+    this.panels.profiles.addHeapSnapshotChunk(uid, chunk);
+}
+
+WebInspector.finishHeapSnapshot = function(uid)
+{
+    this.panels.profiles.finishHeapSnapshot(uid);
+}
+
 WebInspector.drawLoadingPieChart = function(canvas, percent) {
     var g = canvas.getContext("2d");
     var darkColor = "rgb(122, 168, 218)";
@@ -1612,14 +1617,11 @@ WebInspector.displayNameForURL = function(url)
 WebInspector._choosePanelToShowSourceLine = function(url, line, preferredPanel)
 {
     preferredPanel = preferredPanel || "resources";
-    // FIXME: remove this once StoragePanel renamed to ResourcesPanel
-    if (preferredPanel === "resources")
-        preferredPanel = "storage";
 
     var panel = this.panels[preferredPanel];
     if (panel && panel.canShowSourceLine(url, line))
         return panel;
-    panel = this.panels.storage;
+    panel = this.panels.resources;
     return panel.canShowSourceLine(url, line) ? panel : null;
 }
 

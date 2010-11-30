@@ -71,6 +71,7 @@
 #include "config.h"
 #include "WebFrameImpl.h"
 
+#include "AssociatedURLLoader.h"
 #include "Chrome.h"
 #include "ChromiumBridge.h"
 #include "ClipboardUtilitiesChromium.h"
@@ -287,11 +288,11 @@ public:
     {
     }
 
-    virtual void begin(float width)
+    virtual void begin(float width, float height)
     {
         ASSERT(!m_printedPageWidth);
         m_printedPageWidth = width;
-        PrintContext::begin(m_printedPageWidth);
+        PrintContext::begin(m_printedPageWidth, height);
     }
 
     virtual void end()
@@ -753,8 +754,9 @@ void WebFrameImpl::bindToWindowObject(const WebString& name, NPObject* object)
 
 void WebFrameImpl::executeScript(const WebScriptSource& source)
 {
+    TextPosition1 position(WTF::OneBasedNumber::fromOneBasedInt(source.startLine), WTF::OneBasedNumber::base());
     m_frame->script()->executeScript(
-        ScriptSourceCode(source.code, source.url, source.startLine));
+        ScriptSourceCode(source.code, source.url, position));
 }
 
 void WebFrameImpl::executeScriptInIsolatedWorld(
@@ -764,8 +766,9 @@ void WebFrameImpl::executeScriptInIsolatedWorld(
     Vector<ScriptSourceCode> sources;
 
     for (unsigned i = 0; i < numSources; ++i) {
+        TextPosition1 position(WTF::OneBasedNumber::fromOneBasedInt(sourcesIn[i].startLine), WTF::OneBasedNumber::base());
         sources.append(ScriptSourceCode(
-            sourcesIn[i].code, sourcesIn[i].url, sourcesIn[i].startLine));
+            sourcesIn[i].code, sourcesIn[i].url, position));
     }
 
     m_frame->script()->evaluateInIsolatedWorld(worldId, sources, extensionGroup);
@@ -817,8 +820,9 @@ void WebFrameImpl::collectGarbage()
 v8::Handle<v8::Value> WebFrameImpl::executeScriptAndReturnValue(
     const WebScriptSource& source)
 {
+    TextPosition1 position(WTF::OneBasedNumber::fromOneBasedInt(source.startLine), WTF::OneBasedNumber::base());
     return m_frame->script()->executeScript(
-        ScriptSourceCode(source.code, source.url, source.startLine)).v8Value();
+        ScriptSourceCode(source.code, source.url, position)).v8Value();
 }
 
 // Returns the V8 context for this frame, or an empty handle if there is none.
@@ -845,7 +849,7 @@ bool WebFrameImpl::insertStyleText(
     if (!id.isEmpty()) {
         Element* oldElement = document->getElementById(id);
         if (oldElement) {
-            Node* parent = oldElement->parent();
+            Node* parent = oldElement->parentNode();
             if (!parent)
                 return false;
             parent->removeChild(oldElement, err);
@@ -1032,6 +1036,11 @@ void WebFrameImpl::dispatchWillSendRequest(WebURLRequest& request)
     ResourceResponse response;
     m_frame->loader()->client()->dispatchWillSendRequest(
         0, 0, request.toMutableResourceRequest(), response);
+}
+
+WebURLLoader* WebFrameImpl::createAssociatedURLLoader()
+{
+    return new AssociatedURLLoader(this);
 }
 
 void WebFrameImpl::commitDocumentData(const char* data, size_t length)
@@ -1283,7 +1292,7 @@ int WebFrameImpl::printBegin(const WebSize& pageSize, int printerDPI, bool *useB
 
     FloatRect rect(0, 0, static_cast<float>(pageSize.width),
                          static_cast<float>(pageSize.height));
-    m_printContext->begin(rect.width());
+    m_printContext->begin(rect.width(), rect.height());
     float pageHeight;
     // We ignore the overlays calculation for now since they are generated in the
     // browser. pageHeight is actually an output parameter.
@@ -2003,7 +2012,7 @@ void WebFrameImpl::setFindEndstateFocusAndSelection()
         // example, focus links if we have found text within the link.
         Node* node = m_activeMatch->firstNode();
         while (node && !node->isFocusable() && node != frame()->document())
-            node = node->parent();
+            node = node->parentNode();
 
         if (node && node != frame()->document()) {
             // Found a focusable parent node. Set focus to it.

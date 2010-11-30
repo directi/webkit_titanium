@@ -114,7 +114,7 @@ void FindController::findString(const String& string, FindDirection findDirectio
     if (!shouldShowOverlay) {
         if (m_findPageOverlay) {
             // Get rid of the overlay.
-            m_webPage->uninstallPageOverlay();
+            m_webPage->uninstallPageOverlay(m_findPageOverlay);
         }
         
         ASSERT(!m_findPageOverlay);
@@ -134,7 +134,7 @@ void FindController::findString(const String& string, FindDirection findDirectio
 void FindController::hideFindUI()
 {
     if (m_findPageOverlay)
-        m_webPage->uninstallPageOverlay();
+        m_webPage->uninstallPageOverlay(m_findPageOverlay);
 
     hideFindIndicator();
 }
@@ -254,9 +254,6 @@ void FindController::drawRect(PageOverlay*, GraphicsContext& graphicsContext, co
     Vector<IntRect> rects = rectsForTextMatches();
     ASSERT(!rects.isEmpty());
 
-    graphicsContext.beginTransparencyLayer(1);
-    graphicsContext.setCompositeOperation(CompositeCopy);
-
     // Draw the background.
     graphicsContext.fillRect(dirtyRect, overlayBackgroundColor(), ColorSpaceSRGB);
 
@@ -275,15 +272,11 @@ void FindController::drawRect(PageOverlay*, GraphicsContext& graphicsContext, co
 
     graphicsContext.restore();
 
-    graphicsContext.save();
     graphicsContext.setFillColor(Color::transparent, ColorSpaceSRGB);
 
     // Clear out the holes.
     for (size_t i = 0; i < rects.size(); ++i)
         graphicsContext.fillRect(rects[i]);
-
-    graphicsContext.restore();
-    graphicsContext.endTransparencyLayer();
 }
 
 bool FindController::mouseEvent(PageOverlay* pageOverlay, const WebMouseEvent& mouseEvent)

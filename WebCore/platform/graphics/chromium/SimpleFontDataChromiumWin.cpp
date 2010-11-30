@@ -53,6 +53,18 @@ static inline float scaleEmToUnits(float x, int unitsPerEm)
 
 void SimpleFontData::platformInit()
 {
+    if (!m_platformData.size()) {
+        m_ascent = 0;
+        m_descent = 0;
+        m_lineGap = 0;
+        m_lineSpacing = 0;
+        m_avgCharWidth = 0;
+        m_maxCharWidth = 0;
+        m_xHeight = 0;
+        m_unitsPerEm = 0;
+        return;
+    }
+
     HDC dc = GetDC(0);
     HGDIOBJ oldFont = SelectObject(dc, m_platformData.hfont());
 
@@ -98,9 +110,6 @@ void SimpleFontData::platformCharWidthInit()
 
 void SimpleFontData::platformDestroy()
 {
-    // We don't hash this on Win32, so it's effectively owned by us.
-    delete m_smallCapsFontData;
-    m_smallCapsFontData = 0;
 }
 
 SimpleFontData* SimpleFontData::smallCapsFontData(const FontDescription& fontDescription) const
@@ -114,7 +123,7 @@ SimpleFontData* SimpleFontData::smallCapsFontData(const FontDescription& fontDes
         winFont.lfHeight = -lroundf(smallCapsSize);
         HFONT hfont = CreateFontIndirect(&winFont);
         m_smallCapsFontData =
-            new SimpleFontData(FontPlatformData(hfont, smallCapsSize));
+            new SimpleFontData(FontPlatformData(hfont, smallCapsSize), isCustomFont(), false);
     }
     return m_smallCapsFontData;
 }
@@ -158,6 +167,9 @@ FloatRect SimpleFontData::platformBoundsForGlyph(Glyph) const
 
 float SimpleFontData::platformWidthForGlyph(Glyph glyph) const
 {
+    if (!m_platformData.size())
+        return 0;
+
     HDC dc = GetDC(0);
     HGDIOBJ oldFont = SelectObject(dc, m_platformData.hfont());
 

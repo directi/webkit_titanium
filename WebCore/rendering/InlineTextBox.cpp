@@ -43,11 +43,11 @@ using namespace std;
 
 namespace WebCore {
 
-int InlineTextBox::baselinePosition() const
+int InlineTextBox::baselinePosition(FontBaseline baselineType) const
 {
     if (!isText() || !parent())
         return 0;
-    return parent()->baselinePosition();
+    return parent()->baselinePosition(baselineType);
 }
     
 int InlineTextBox::lineHeight() const
@@ -171,9 +171,7 @@ IntRect InlineTextBox::selectionRect(int tx, int ty, int startPos, int endPos)
     int width = isHorizontal() ? logicalWidth : selHeight;
     int height = isHorizontal() ? selHeight : logicalWidth;
     
-    IntRect result = IntRect(topPoint, IntSize(width, height));
-    flipForWritingMode(result);
-    return result;
+    return IntRect(topPoint, IntSize(width, height));
 }
 
 void InlineTextBox::deleteLine(RenderArena* arena)
@@ -1087,10 +1085,11 @@ unsigned InlineTextBox::caretMaxRenderedOffset() const
 
 int InlineTextBox::textPos() const
 {
+    // When computing the width of a text run, RenderBlock::computeInlineDirectionPositionsForLine() doesn't include the actual offset
+    // from the containing block edge in its measurement. textPos() should be consistent so the text are rendered in the same width.
     if (logicalLeft() == 0)
         return 0;
-    RenderBlock* blockElement = renderer()->containingBlock();
-    return logicalLeft() - blockElement->borderStart() - blockElement->paddingStart();
+    return logicalLeft() - root()->logicalLeft();
 }
 
 int InlineTextBox::offsetForPosition(int lineOffset, bool includePartialGlyphs) const

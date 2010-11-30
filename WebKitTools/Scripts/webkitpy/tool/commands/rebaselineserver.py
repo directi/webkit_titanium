@@ -45,20 +45,32 @@ import BaseHTTPServer
 from optparse import make_option
 from wsgiref.handlers import format_date_time
 
+from webkitpy.common import system
+from webkitpy.layout_tests.port import factory
+from webkitpy.layout_tests.port.webkit import WebKitPort
 from webkitpy.tool.multicommandtool import AbstractDeclarativeCommand
+from webkitpy.thirdparty import simplejson
 
+STATE_NEEDS_REBASELINE = 'needs_rebaseline'
+STATE_REBASELINE_FAILED = 'rebaseline_failed'
+STATE_REBASELINE_SUCCEEDED = 'rebaseline_succeeded'
 
 class RebaselineHTTPServer(BaseHTTPServer.HTTPServer):
-    def __init__(self, httpd_port, results_directory):
+    def __init__(self, httpd_port, results_directory, results_json, platforms_json):
         BaseHTTPServer.HTTPServer.__init__(self, ("", httpd_port), RebaselineHTTPRequestHandler)
         self.results_directory = results_directory
+        self.results_json = results_json
+        self.platforms_json = platforms_json
 
 
 class RebaselineHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     STATIC_FILE_NAMES = frozenset([
         "index.html",
+        "loupe.js",
         "main.js",
         "main.css",
+        "queue.js",
+        "util.js",
     ])
 
     STATIC_FILE_DIRECTORY = os.path.join(
@@ -111,6 +123,44 @@ class RebaselineHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # otherwise there's a deadlock
         threading.Thread(target=lambda: self.server.shutdown()).start()
 
+    def test_result(self):
+        test_name, _ = os.path.splitext(self.query['test'][0])
+        mode = self.query['mode'][0]
+        if mode == 'expected-image':
+            file_name = test_name + '-expected.png'
+        elif mode == 'actual-image':
+            file_name = test_name + '-actual.png'
+        if mode == 'expected-checksum':
+            file_name = test_name + '-expected.checksum'
+        elif mode == 'actual-checksum':
+            file_name = test_name + '-actual.checksum'
+        elif mode == 'diff-image':
+            file_name = test_name + '-diff.png'
+        if mode == 'expected-text':
+            file_name = test_name + '-expected.txt'
+        elif mode == 'actual-text':
+            file_name = test_name + '-actual.txt'
+        elif mode == 'diff-text':
+            file_name = test_name + '-diff.txt'
+
+        file_path = os.path.join(self.server.results_directory, file_name)
+
+        # Let results be cached for 60 seconds, so that they can be pre-fetched
+        # by the UI
+        self._serve_file(file_path, cacheable_seconds=60)
+
+    def results_json(self):
+        self._serve_json(self.server.results_json)
+
+    def platforms_json(self):
+        self._serve_json(self.server.platforms_json)
+
+    def _serve_json(self, json):
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        simplejson.dump(json, self.wfile)
+
     def _serve_file(self, file_path, cacheable_seconds=0):
         if not os.path.exists(file_path):
             self.send_error(404, "File not found")
@@ -133,6 +183,43 @@ class RebaselineHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             shutil.copyfileobj(static_file, self.wfile)
 
 
+def _get_test_baselines(test_file, layout_tests_directory, platforms, filesystem):
+    class AllPlatformsPort(WebKitPort):
+        def __init__(self):
+            WebKitPort.__init__(self, filesystem=filesystem)
+            self._platforms_by_directory = dict(
+                [(self._webkit_baseline_path(p), p) for p in platforms])
+
+        def baseline_search_path(self):
+            return self._platforms_by_directory.keys()
+
+        def platform_from_directory(self, directory):
+            return self._platforms_by_directory[directory]
+
+    all_platforms_port = AllPlatformsPort()
+
+    test_baselines = {}
+    for baseline_extension in ('.txt', '.checksum', '.png'):
+        test_path = filesystem.join(layout_tests_directory, test_file)
+        baselines = all_platforms_port.expected_baselines(
+            test_path, baseline_extension, all_baselines=True)
+        for platform_directory, expected_filename in baselines:
+            if not platform_directory:
+                continue
+            if platform_directory == layout_tests_directory:
+                platform = 'base'
+            else:
+                platform = all_platforms_port.platform_from_directory(
+                    platform_directory)
+            if platform not in test_baselines:
+                test_baselines[platform] = []
+            test_baselines[platform].append(baseline_extension)
+        
+    for platform, extensions in test_baselines.items():
+        test_baselines[platform] = tuple(extensions)
+
+    return test_baselines
+
 class RebaselineServer(AbstractDeclarativeCommand):
     name = "rebaseline-server"
     help_text = __doc__
@@ -146,6 +233,25 @@ class RebaselineServer(AbstractDeclarativeCommand):
 
     def execute(self, options, args, tool):
         results_directory = args[0]
+        filesystem = system.filesystem.FileSystem()
+
+        print 'Parsing unexpected_results.json...'
+        results_json_path = filesystem.join(
+            results_directory, 'unexpected_results.json')
+        with codecs.open(results_json_path, "r") as results_json_file:
+            results_json_file = file(results_json_path)
+            results_json = simplejson.load(results_json_file)
+
+        port = factory.get()
+        layout_tests_directory = port.layout_tests_dir()
+        platforms = filesystem.listdir(
+            filesystem.join(layout_tests_directory, 'platform'))
+
+        print 'Gathering current baselines...'
+        for test_file, test_json in results_json['tests'].items():
+            test_json['state'] = STATE_NEEDS_REBASELINE
+            test_json['baselines'] = _get_test_baselines(
+                test_file, layout_tests_directory, platforms, filesystem)
 
         print "Starting server at http://localhost:%d/" % options.httpd_port
         print ("Use the 'Exit' link in the UI, http://localhost:%d/"
@@ -153,5 +259,10 @@ class RebaselineServer(AbstractDeclarativeCommand):
 
         httpd = RebaselineHTTPServer(
             httpd_port=options.httpd_port,
-            results_directory=results_directory)
+            results_directory=results_directory,
+            results_json=results_json,
+            platforms_json={
+                'platforms': platforms,
+                'defaultPlatform': port.name(),
+            })
         httpd.serve_forever()

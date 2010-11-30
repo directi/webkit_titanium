@@ -291,7 +291,6 @@ void WebFrameLoaderClient::dispatchDidStartProvisionalLoad()
     WebPage* webPage = m_frame->page();
     if (!webPage)
         return;
-
     webPage->findController().hideFindUI();
     
     DocumentLoader* provisionalLoader = m_frame->coreFrame()->loader()->provisionalDocumentLoader();
@@ -301,8 +300,9 @@ void WebFrameLoaderClient::dispatchDidStartProvisionalLoad()
     // Notify the bundle client.
     webPage->injectedBundleLoaderClient().didStartProvisionalLoadForFrame(webPage, m_frame, userData);
 
-
     bool loadingSubstituteDataForUnreachableURL = !provisionalLoader->unreachableURL().isNull();
+
+    webPage->sandboxExtensionTracker().didStartProvisionalLoad(m_frame);
 
     // Notify the UIProcess.
     webPage->send(Messages::WebPageProxy::DidStartProvisionalLoadForFrame(m_frame->frameID(), url, loadingSubstituteDataForUnreachableURL, InjectedBundleUserMessageEncoder(userData.get())));
@@ -340,6 +340,8 @@ void WebFrameLoaderClient::dispatchDidCommitLoad()
     // Notify the bundle client.
     webPage->injectedBundleLoaderClient().didCommitLoadForFrame(webPage, m_frame, userData);
 
+    webPage->sandboxExtensionTracker().didCommitProvisionalLoad(m_frame);
+
     // Notify the UIProcess.
     webPage->send(Messages::WebPageProxy::DidCommitLoadForFrame(m_frame->frameID(), response.mimeType(), PlatformCertificateInfo(response), InjectedBundleUserMessageEncoder(userData.get())));
 }
@@ -354,6 +356,8 @@ void WebFrameLoaderClient::dispatchDidFailProvisionalLoad(const ResourceError& e
 
     // Notify the bundle client.
     webPage->injectedBundleLoaderClient().didFailProvisionalLoadWithErrorForFrame(webPage, m_frame, error, userData);
+
+    webPage->sandboxExtensionTracker().didFailProvisionalLoad(m_frame);
 
     // Notify the UIProcess.
     webPage->send(Messages::WebPageProxy::DidFailProvisionalLoadForFrame(m_frame->frameID(), error, InjectedBundleUserMessageEncoder(userData.get())));
@@ -523,7 +527,15 @@ void WebFrameLoaderClient::dispatchDecidePolicyForMIMEType(FramePolicyFunction f
     uint64_t listenerID = m_frame->setUpPolicyListener(function);
     const String& url = request.url().string(); // FIXME: Pass entire request.
 
-    webPage->send(Messages::WebPageProxy::DecidePolicyForMIMEType(m_frame->frameID(), MIMEType, url, listenerID));
+    bool receivedPolicyAction;
+    uint64_t policyAction;
+    uint64_t downloadID;
+    if (!webPage->sendSync(Messages::WebPageProxy::DecidePolicyForMIMEType(m_frame->frameID(), MIMEType, url, listenerID), Messages::WebPageProxy::DecidePolicyForMIMEType::Reply(receivedPolicyAction, policyAction, downloadID)))
+        return;
+
+    // We call this synchronously because CFNetwork can only convert a loading connection to a download from its didReceiveResponse callback.
+    if (receivedPolicyAction)
+        m_frame->didReceivePolicyDecision(listenerID, static_cast<PolicyAction>(policyAction), downloadID);
 }
 
 void WebFrameLoaderClient::dispatchDecidePolicyForNewWindowAction(FramePolicyFunction function, const NavigationAction& navigationAction, const ResourceRequest& request, PassRefPtr<FormState>, const String& frameName)
@@ -942,7 +954,24 @@ void WebFrameLoaderClient::transitionToCommittedFromCachedFrame(CachedFrame*)
 
 void WebFrameLoaderClient::transitionToCommittedForNewPage()
 {
+#if ENABLE(TILED_BACKING_STORE)
+    WebPage* webPage = m_frame->page();
+    bool isMainFrame = webPage->mainFrame() == m_frame;
+
+    IntSize currentVisibleContentSize = m_frame->coreFrame()->view() ? m_frame->coreFrame()->view()->actualVisibleContentRect().size() : IntSize();
+
+    m_frame->coreFrame()->createView(m_frame->page()->size(), Color::white, false, webPage->resizesToContentsLayoutSize(), isMainFrame && webPage->resizesToContentsEnabled());
+
+    if (isMainFrame && webPage->resizesToContentsEnabled()) {
+        m_frame->coreFrame()->view()->setDelegatesScrolling(true);
+        m_frame->coreFrame()->view()->setPaintsEntireContents(true);
+    }
+
+    // The HistoryController will update the scroll position later if needed.
+    m_frame->coreFrame()->view()->setActualVisibleContentRect(IntRect(IntPoint::zero(), currentVisibleContentSize));
+#else
     m_frame->coreFrame()->createView(m_frame->page()->size(), Color::white, false, IntSize(), false);
+#endif
 }
 
 void WebFrameLoaderClient::dispatchDidBecomeFrameset(bool value)
@@ -960,9 +989,9 @@ bool WebFrameLoaderClient::canCachePage() const
     return false;
 }
 
-void WebFrameLoaderClient::download(ResourceHandle*, const ResourceRequest&, const ResourceRequest&, const ResourceResponse&)
+void WebFrameLoaderClient::download(ResourceHandle* handle, const ResourceRequest& request, const ResourceRequest& initialRequest, const ResourceResponse& response)
 {
-    notImplemented();
+    m_frame->convertHandleToDownload(handle, request, initialRequest, response);
 }
 
 PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const KURL& url, const String& name, HTMLFrameOwnerElement* ownerElement,

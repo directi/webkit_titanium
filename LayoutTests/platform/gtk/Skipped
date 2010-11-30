@@ -21,7 +21,6 @@
 # These tests are not failing locally, but fail on the bot: Most of
 # the media/video tests fail if you remove some of them.
 #
-# editing/selection/extend-selection.html
 # fast/dom/Window/window-screen-properties.html
 # fast/dom/null-document-location-href-put-crash.html
 # fast/dom/null-document-location-put-crash.html
@@ -669,7 +668,6 @@ editing/deleting/delete-br-009.html
 editing/deleting/delete-br-011.html
 editing/deleting/delete-br-012.html
 editing/deleting/delete-br-in-last-table-cell.html
-editing/deleting/delete-by-word-002.html
 editing/deleting/delete-character-001.html
 editing/deleting/delete-first-list-item.html
 editing/deleting/delete-hr.html
@@ -1043,23 +1041,6 @@ fast/dom/client-width-height.html
 fast/dom/cssTarget-crash.html
 fast/dom/DeviceMotion
 fast/dom/DeviceOrientation
-fast/dom/Geolocation/callback-exception.html
-fast/dom/Geolocation/delayed-permission-allowed.html
-fast/dom/Geolocation/delayed-permission-denied.html
-fast/dom/Geolocation/delayed-permission-allowed-for-multiple-requests.html
-fast/dom/Geolocation/delayed-permission-denied-for-multiple-requests.html
-fast/dom/Geolocation/error.html
-fast/dom/Geolocation/multiple-requests.html
-fast/dom/Geolocation/no-page-cache.html
-fast/dom/Geolocation/permission-denied-already-clear-watch.html
-fast/dom/Geolocation/position-string.html
-fast/dom/Geolocation/reentrant-error.html
-fast/dom/Geolocation/reentrant-permission-denied.html
-fast/dom/Geolocation/reentrant-success.html
-fast/dom/Geolocation/success.html
-fast/dom/Geolocation/timeout-clear-watch.html
-fast/dom/Geolocation/timeout.html
-fast/dom/Geolocation/watch.html
 fast/dom/Element/getBoundingClientRect.html
 fast/dom/Range/getBoundingClientRect.html
 fast/dom/Range/getClientRects.html
@@ -1122,6 +1103,13 @@ fast/text/international/thai-baht-space.html
 fast/text/international/thai-offsetForPosition-inside-character.html
 fast/backgrounds/background-clip-text.html
 fast/overflow/scrollbar-restored.html
+
+# These fast XMLHttpRequest tests fail because 3D_CANVAS is not enabled.
+fast/xmlhttprequest/xmlhttprequest-responsetype-abort.html
+fast/xmlhttprequest/xmlhttprequest-responsetype-arraybuffer.html
+fast/xmlhttprequest/xmlhttprequest-responsetype-document.html
+fast/xmlhttprequest/xmlhttprequest-responsetype-text.html
+http/tests/xmlhttprequest/send-array-buffer.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=30508
 # All these tests fail because WebKit does not work correctly with
@@ -1694,25 +1682,6 @@ fast/css/namespaces/namespaces-comments.xml
 fast/css/namespaces/namespaces-empty.xml
 fast/css/namespaces/namespaces-escapes.xml
 fast/css/namespaces/namespaces-invalid-at.xml
-fast/css/variables/block-cycle-test.html
-fast/css/variables/colors-test.html
-fast/css/variables/declaration-block-test.html
-fast/css/variables/font-test.html
-fast/css/variables/image-test.html
-fast/css/variables/import-test.html
-fast/css/variables/inline-style-test.html
-fast/css/variables/invalid-variable-test.html
-fast/css/variables/margin-test.html
-fast/css/variables/misplaced-import-test.html
-fast/css/variables/misplaced-variables-test.html
-fast/css/variables/multiple-blocks-test.html
-fast/css/variables/multiple-term-test.html
-fast/css/variables/override-test.html
-fast/css/variables/print-test.html
-fast/css/variables/remove-variable-test.html
-fast/css/variables/set-variable-test.html
-fast/css/variables/shorthand-test.html
-fast/css/variables/variable-iteration-test.html
 fast/doctypes/001.html
 fast/doctypes/002.html
 fast/doctypes/003.html
@@ -2555,6 +2524,7 @@ fast/text/atsui-pointtooffset-calls-cg.html
 fast/text/atsui-rtl-override-selection.html
 fast/text/atsui-small-caps-punctuation-size.html
 fast/text/atsui-spacing-features.html
+fast/text/atsui-negative-spacing-features.html
 fast/text/bidi-embedding-pop-and-push-same.html
 fast/text/break-word.html
 fast/text/capitalize-boundaries.html
@@ -2885,6 +2855,11 @@ media/media-captions.html
 
 # Test specific to QuickTime media engine
 media/video-does-not-loop.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=50155
+# crashes on GStreamer side when loading one of the media elements of
+# the test
+fast/events/tabindex-focus-blur-all.html
 
 # Tests in plugins/ directory
 #   Tests failing, need to implement NPP_HandleEvent() in TestNetscapePlugin
@@ -4619,105 +4594,6 @@ webarchive/test-xml-stylesheet.xml
 editing/input/scroll-viewport-page-up-down.html
 http/tests/plugins/plugin-document-has-focus.html
 
-# Tests that require editing callbacks (and possibly Glib DOM bindings)
-editing/text-iterator/thai-cursor-movement.html
-editing/undo/redo-style.html
-editing/undo/undo-indent.html
-editing/execCommand/indent-with-style.html
-editing/execCommand/4641880-1.html
-editing/execCommand/4641880-2.html
-editing/execCommand/create-list-from-range-selection.html
-editing/execCommand/create-list-with-hr.html
-editing/execCommand/find-after-replace.html
-editing/execCommand/findString-2.html
-editing/execCommand/findString.html
-editing/execCommand/format-block-from-range-selection.html
-editing/execCommand/format-block-with-braces.html
-editing/execCommand/format-block-with-trailing-br.html
-editing/execCommand/format-block.html
-editing/execCommand/hilitecolor.html
-editing/execCommand/indent-empty-root.html
-editing/execCommand/indent-list-item.html
-editing/execCommand/indent-selection.html
-editing/execCommand/insert-list-and-stitch.html
-editing/execCommand/insertHorizontalRule.html
-editing/execCommand/insertImage.html
-editing/execCommand/nsresponder-indent.html
-editing/execCommand/nsresponder-outdent.html
-editing/execCommand/outdent-selection.html
-editing/execCommand/paste-1.html
-editing/execCommand/paste-2.html
-editing/execCommand/print.html
-editing/execCommand/remove-formatting-2.html
-editing/execCommand/remove-formatting.html
-editing/execCommand/remove-list-from-range-selection.html
-editing/execCommand/remove-list-item-1.html
-editing/execCommand/selectAll.html
-editing/execCommand/createLink.html
-editing/execCommand/enabling-and-selection-2.html
-editing/execCommand/findString-diacriticals.html
-editing/execCommand/indent-nested-lists-1.html
-editing/execCommand/indent-nested-lists-2.html
-editing/execCommand/indent-nested-lists-3.html
-editing/execCommand/indent-nested-lists-4.html
-editing/execCommand/indent-nested-lists-5.html
-editing/execCommand/indent-nested-lists-6.html
-editing/execCommand/indent-nested-lists-7.html
-editing/execCommand/insertHTML.html
-editing/execCommand/outdent-blockquote-test1.html
-editing/execCommand/outdent-blockquote-test2.html
-editing/execCommand/outdent-blockquote-test3.html
-editing/execCommand/outdent-blockquote-test4.html
-editing/execCommand/outdent-nested-lists-1.html
-editing/execCommand/outdent-nested-lists-2.html
-editing/execCommand/outdent-nested-lists-3.html
-editing/execCommand/outdent-nested-lists-4.html
-editing/execCommand/queryCommandState-01.html
-editing/execCommand/remove-list-1.html
-editing/execCommand/remove-list-items.html
-editing/execCommand/switch-list-type.html
-editing/execCommand/unlink.html
-editing/selection/4947387.html
-editing/selection/5195166-2.html
-editing/selection/legal-positions.html
-editing/deleting/5546763.html
-editing/deleting/delete-all-text-in-text-field-assertion.html
-editing/deleting/delete-ligature-001.html
-editing/deleting/delete-ligature-002.html
-editing/deleting/delete-ligature-003.html
-editing/deleting/pruning-after-merge-1.html
-editing/deleting/skip-virama-001.html
-editing/inserting/insert-thai-characters-001.html
-editing/inserting/space-after-removeformat.html
-editing/pasteboard/4744008.html
-editing/pasteboard/5368833.html
-editing/pasteboard/copy-in-password-field.html
-editing/pasteboard/paste-into-anchor-text.html
-editing/pasteboard/paste-plaintext-user-select-none.html
-editing/pasteboard/paste-table-002.html
-editing/pasteboard/paste-text-013.html
-editing/selection/after-line-break.html
-editing/selection/anchor-focus1.html
-editing/selection/anchor-focus2.html
-editing/selection/anchor-focus3.html
-editing/selection/click-before-and-after-table.html
-editing/selection/extend-selection-bidi.html
-editing/selection/getRangeAt.html
-editing/selection/move-begin-end.html
-editing/selection/removeAllRanges.html
-editing/selection/select-all-textarea.html
-editing/selection/skip-non-editable-1.html
-editing/selection/skip-non-editable-2.html
-editing/selection/toString-1.html
-editing/selection/toString.html
-editing/style/remove-underline-from-stylesheet.html
-editing/pasteboard/drop-link.html
-editing/style/typing-style-003.html
-editing/style/style-3690704-fix.html
-editing/pasteboard/paste-table-001.html
-fast/forms/focus-selection-input.html
-fast/forms/focus-selection-textarea.html
-
 # Requires expected results that we don't have atm
 editing/inserting/break-blockquote-after-delete.html
 fast/backgrounds/size/backgroundSize20.html
@@ -4835,6 +4711,7 @@ fast/forms/input-maxlength-ime-completed.html
 fast/forms/input-maxlength-ime-preedit.html
 fast/text/international/thai-cursor-position.html
 fast/events/ime-composition-events-001.html
+fast/dom/tab-in-right-alignment.html
 
 # No User Scripts
 userscripts
@@ -4964,11 +4841,6 @@ scrollbars/scrollbar-middleclick-nopaste.html
 # Relies on WebKit API [WebView _loadBackForwardListFromOtherView:]
 fast/loader/crash-copying-backforwardlist.html
 
-# Spatial Navigation
-# https://bugs.webkit.org/show_bug.cgi?id=49056
-fast/events/spatial-navigation/snav-input.html
-fast/events/spatial-navigation/snav-textarea.html
-
 # Implement LayoutTestController::callShouldCloseOnWebView()
 fast/events/onbeforeunload-focused-iframe.html
 
@@ -4999,13 +4871,6 @@ http/tests/loading/307-after-303-after-post.html
 # DumpRenderTree code to enable Java is currently a no-op
 java
 
-# We're not quite ready to run these tests, because of slave configuration
-# See https://bugs.webkit.org/show_bug.cgi?id=35674
-fast/dom/Geolocation/permission-denied-already-error.html
-fast/dom/Geolocation/permission-denied-already-success.html
-fast/dom/Geolocation/permission-denied-stops-watches.html
-fast/dom/Geolocation/permission-denied.html
-
 # https://bugs.webkit.org/show_bug.cgi?id=35824 - Doesn't apply to platforms that don't enforce the CFNetwork-style 3rd party cookie policy
 http/tests/cookies/third-party-cookie-relaxing.html
 
@@ -5020,19 +4885,39 @@ fast/events/continuous-platform-wheelevent-in-scrolling-div.html
 
 # meter element is not supported
 # http://bugs.webkit.org/show_bug.cgi?id=48713
-fast/dom/HTMLMeterElement/meter-element.html
-fast/dom/HTMLMeterElement/set-meter-properties.html
-fast/dom/HTMLMeterElement/meter-appearances-capacity.html
-fast/dom/HTMLMeterElement/meter-appearances-rating-relevancy.html
-fast/dom/HTMLMeterElement/meter-optimums.html
-fast/dom/HTMLMeterElement/meter-percent-size.html
-fast/dom/HTMLMeterElement/meter-styles.html
-fast/dom/HTMLMeterElement/meter-styles-changing-pseudo.html
-fast/dom/HTMLMeterElement/meter-element-with-child-crash.html
+fast/dom/HTMLMeterElement
+fast/forms/form-attribute.html
 
 # Needs mock support, and build slave Geolocation service
 # See https://bugs.webkit.org/show_bug.cgi?id=36053
+fast/dom/Geolocation/callback-exception.html
+fast/dom/Geolocation/delayed-permission-allowed-for-multiple-requests.html
+fast/dom/Geolocation/delayed-permission-allowed.html
+fast/dom/Geolocation/delayed-permission-denied-for-multiple-requests.html
+fast/dom/Geolocation/delayed-permission-denied.html
+fast/dom/Geolocation/error.html
 fast/dom/Geolocation/maximum-age.html
+fast/dom/Geolocation/multiple-requests.html
+fast/dom/Geolocation/no-page-cache.html
+fast/dom/Geolocation/permission-denied-already-clear-watch.html
+fast/dom/Geolocation/position-string.html
+fast/dom/Geolocation/reentrant-error.html
+fast/dom/Geolocation/reentrant-permission-denied.html
+fast/dom/Geolocation/reentrant-success.html
+fast/dom/Geolocation/success.html
+fast/dom/Geolocation/timeout-clear-watch.html
+fast/dom/Geolocation/timeout.html
+fast/dom/Geolocation/timestamp.html
+fast/dom/Geolocation/watch.html
+
+# We're not quite ready to run these tests, because the slaves need
+# Geoclue support. If we implement support for the mock geolocation service
+# maybe we can avoid this.
+# See https://bugs.webkit.org/show_bug.cgi?id=35674
+fast/dom/Geolocation/permission-denied-already-error.html
+fast/dom/Geolocation/permission-denied-already-success.html
+fast/dom/Geolocation/permission-denied-stops-watches.html
+fast/dom/Geolocation/permission-denied.html
 
 # As explained in https://bugs.webkit.org/show_bug.cgi?id=34372 this
 # test seems to suffer from a race condition that just turned to the
@@ -5157,6 +5042,7 @@ inspector/timeline-layout.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=37613
 printing
+editing/execCommand/print.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=37616
 fast/workers/shared-worker-frame-lifecycle.html
@@ -5234,11 +5120,6 @@ fast/dom/Geolocation/disconnected-frame.html
 fast/dom/Geolocation/disconnected-frame-already.html
 fast/dom/Geolocation/disconnected-frame-permission-denied.html
 
-# GTK+ theme-rendered widgets do not support CSS transforms
-# https://bugs.webkit.org/show_bug.cgi?id=40139
-fast/forms/slider-transformed.html
-fast/forms/slider-transformed.html
-
 # Some input type=range tests fail because of the size 
 # of the slider thumb in GTK+ themes.
 fast/forms/slider-mouse-events.html
@@ -5264,6 +5145,7 @@ fast/events/mouse-click-events.html
 fast/events/right-click-focus.html
 editing/selection/5354455-1.html
 editing/selection/5354455-2.html
+media/controls-right-click-on-timebar.html
 
 # Gtk doesn't implement dumpResourceResponseMIMETypes which is required for the
 # preloader tests.
@@ -5396,16 +5278,6 @@ canvas/philip/tests/2d.fillStyle.parse.rgba-eof.html
 canvas/philip/tests/2d.imageData.put.wrongtype.html
 canvas/philip/tests/2d.pattern.image.incomplete.empty.html
 canvas/philip/tests/2d.pattern.image.incomplete.omitted.html
-canvas/philip/tests/security.drawImage.canvas.html
-canvas/philip/tests/security.drawImage.image.html
-canvas/philip/tests/security.pattern.canvas.fillStyle.html
-canvas/philip/tests/security.pattern.canvas.strokeStyle.html
-canvas/philip/tests/security.reset.html
-canvas/philip/tests/security.pattern.canvas.timing.html
-canvas/philip/tests/security.pattern.create.html
-canvas/philip/tests/security.pattern.cross.html
-canvas/philip/tests/security.pattern.image.fillStyle.html
-canvas/philip/tests/security.pattern.image.strokeStyle.html
 
 # Setting CSS properties such as padding and margin does not work properly
 # on form elements: https://bugs.webkit.org/show_bug.cgi?id=40855
@@ -5509,8 +5381,7 @@ fast/events/drag-to-navigate.html
 fast/events/prevent-drag-to-navigate.html
 fast/forms/input-file-re-render.html
 http/tests/local/formdata
-http/tests/local/send-dragged-file.html
-http/tests/local/send-sliced-dragged-file.html
+http/tests/local/fileapi
 http/tests/security/clipboard/clipboard-file-access.html
 
 # Still failing, looks like a bug in the EventSender drag-and-drop
@@ -5523,6 +5394,7 @@ http/tests/security/drag-over-remote-content-iframe.html
 fast/events/drag-in-frames.html
 http/tests/misc/bubble-drag-events.html
 fast/events/content-changed-during-drop.html
+editing/pasteboard/drop-link.html
 
 # The feature was disabled due to a compatibility issue.
 # https://bugs.webkit.org/show_bug.cgi?id=40520
@@ -5640,8 +5512,7 @@ fast/parser/pre-html5-parser-quirks.html
 # FileSystem API is not supported.
 fast/filesystem
 
-# LayoutTestController::nodesFromRect is not supported.
-fast/dom/nodesFromRect-basic.html
+# Needs more investigation like QT
 fast/dom/nodesFromRect-links-and-text.html
 fast/dom/nodesFromRect-inner-documents.html
 
@@ -5666,9 +5537,6 @@ fast/images/webp-image-decoding.html
 # https://bugs.webkit.org/show_bug.cgi?id=47832
 http/tests/inspector/console-xhr-logging.html
 
-# https://bugs.webkit.org/show_bug.cgi?id=47727
-mathml/presentation
-
 # This test passes locally, but does not pass on the bots. Perhaps
 # it is an issue with the version of Cairo on the bots.
 # https://bugs.webkit.org/show_bug.cgi?id=49052
@@ -5679,3 +5547,33 @@ fast/events/scroll-after-click-on-tab-index.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=49179
 animations/stop-animation-on-suspend.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=49529
+svg/dynamic-updates/SVGLineElement-dom-requiredFeatures.html
+svg/dynamic-updates/SVGLineElement-svgdom-requiredFeatures.html
+
+# computedStyleIncludingVisitedInfo is not implemented
+# https://bugs.webkit.org/show_bug.cgi?id=37336
+fast/history/nested-visited-test.html
+fast/history/self-is-visited.html
+fast/history/sibling-visited-test.html
+
+# [gtk] Zero-sized font does not yet work
+# https://bugs.webkit.org/show_bug.cgi?id=49793
+fast/text/font-size-zero.html
+
+# REGRESSION (r72351): fast/profiler/throw-exception-from-eval.html fails
+# https://bugs.webkit.org/show_bug.cgi?id=49801
+fast/profiler/throw-exception-from-eval.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=49964
+fast/canvas/canvas-fillPath-shadow.html
+fast/canvas/canvas-strokePath-shadow.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=47727
+mathml/presentation
+
+# REGRESSION(r72861): editing/selection/click-left-of-rtl-wrapping-text.html and modify-up-on-rtl-wrapping-text.html fail on all but Mac platform
+# https://bugs.webkit.org/show_bug.cgi?id=50204
+editing/selection/click-left-of-rtl-wrapping-text.html
+editing/selection/modify-up-on-rtl-wrapping-text.html

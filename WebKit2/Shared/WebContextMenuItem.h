@@ -31,6 +31,8 @@
 
 namespace WebKit {
 
+class ImmutableArray;
+
 class WebContextMenuItem : public APIObject {
 public:
     static const Type APIType = TypeContextMenuItem;
@@ -39,6 +41,13 @@ public:
     {
         return adoptRef(new WebContextMenuItem(data));
     }
+    static PassRefPtr<WebContextMenuItem> create(const String& title, bool enabled, ImmutableArray* submenuItems);
+    static WebContextMenuItem* separatorItem();
+    
+    PassRefPtr<ImmutableArray> submenuItemsAsImmutableArray() const;
+    
+    APIObject* userData() const;
+    void setUserData(APIObject*);
     
     WebContextMenuItemData* data() { return &m_webContextMenuItemData; }
 

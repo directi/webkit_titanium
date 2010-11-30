@@ -288,7 +288,7 @@ namespace WebCore {
         void clearShadow();
 
         void drawFocusRing(const Vector<IntRect>&, int width, int offset, const Color&);
-        void drawFocusRing(const Vector<Path>&, int width, int offset, const Color&);
+        void drawFocusRing(const Path&, int width, int offset, const Color&);
 
         void setLineCap(LineCap);
         void setLineDash(const DashArray&, float dashOffset);
@@ -395,6 +395,7 @@ namespace WebCore {
         bool inTransparencyLayer() const;
         PlatformPath* currentPath();
         void pushTransparencyLayerInternal(const QRect &rect, qreal opacity, QPixmap& alphaMask);
+        void takeOwnershipOfPlatformContext();
         static QPainter::CompositionMode toQtCompositionMode(CompositeOperator op);
 #endif
 

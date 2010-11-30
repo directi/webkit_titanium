@@ -114,6 +114,8 @@ public:
 
     void setCacheModel(CacheModel);
     CacheModel cacheModel() const { return m_cacheModel; }
+    void clearResourceCaches();
+    void clearApplicationCache();
 
 #if PLATFORM(WIN)
     void setShouldPaintNativeControls(bool);
@@ -122,6 +124,7 @@ public:
     // Downloads.
     uint64_t createDownloadProxy();
     WebDownloadClient& downloadClient() { return m_downloadClient; }
+    void downloadFinished(DownloadProxy*);
 
 private:
     WebContext(ProcessModel, const String& injectedBundlePath);

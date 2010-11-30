@@ -79,6 +79,9 @@ void SVGLineElement::svgAttributeChanged(const QualifiedName& attrName)
     if (isLengthAttribute)
         updateRelativeLengthsInformation();
 
+    if (SVGTests::handleAttributeChange(this, attrName))
+        return;
+
     RenderSVGPath* renderer = static_cast<RenderSVGPath*>(this->renderer());
     if (!renderer)
         return;
@@ -95,8 +98,7 @@ void SVGLineElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    if (SVGTests::isKnownAttribute(attrName)
-        || SVGLangSpace::isKnownAttribute(attrName)
+    if (SVGLangSpace::isKnownAttribute(attrName)
         || SVGExternalResourcesRequired::isKnownAttribute(attrName))
         RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer);
 }
@@ -111,6 +113,7 @@ void SVGLineElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeX2();
         synchronizeY2();
         synchronizeExternalResourcesRequired();
+        SVGTests::synchronizeProperties(this, attrName);
         return;
     }
 
@@ -124,6 +127,8 @@ void SVGLineElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeY2();
     else if (SVGExternalResourcesRequired::isKnownAttribute(attrName))
         synchronizeExternalResourcesRequired();
+    else if (SVGTests::isKnownAttribute(attrName))
+        SVGTests::synchronizeProperties(this, attrName);
 }
 
 void SVGLineElement::toPathData(Path& path) const

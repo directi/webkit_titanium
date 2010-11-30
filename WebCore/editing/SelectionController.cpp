@@ -970,8 +970,11 @@ IntRect SelectionController::absoluteBoundsForLocalRect(const IntRect& rect) con
     RenderObject* caretPainter = caretRenderer();
     if (!caretPainter)
         return IntRect();
-        
-    return caretPainter->localToAbsoluteQuad(FloatRect(rect)).enclosingBoundingBox();
+    
+    IntRect localRect(rect);
+    if (caretPainter->isBox())
+        toRenderBox(caretPainter)->flipForWritingMode(localRect);
+    return caretPainter->localToAbsoluteQuad(FloatRect(localRect)).enclosingBoundingBox();
 }
 
 IntRect SelectionController::absoluteCaretBounds()
@@ -1085,6 +1088,8 @@ void SelectionController::paintCaret(GraphicsContext* context, int tx, int ty, c
         return;
 
     IntRect drawingRect = localCaretRectForPainting();
+    if (caretRenderer() && caretRenderer()->isBox())
+        toRenderBox(caretRenderer())->flipForWritingMode(drawingRect);
     drawingRect.move(tx, ty);
     IntRect caret = intersection(drawingRect, clipRect);
     if (caret.isEmpty())
@@ -1550,6 +1555,7 @@ void SelectionController::setFocusedNodeIfNeeded()
 
         // Walk up the render tree to search for a node to focus.
         // Walking up the DOM tree wouldn't work for shadow trees, like those behind the engine-based text fields.
+        // FIXME: Combine with the same traversal code in EventHandle::dispatchMouseEvent.
         while (renderer) {
             // We don't want to set focus on a subframe when selecting in a parent frame,
             // so add the !isFrameElement check here. There's probably a better way to make this

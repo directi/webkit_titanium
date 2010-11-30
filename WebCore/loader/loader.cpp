@@ -130,17 +130,16 @@ void Loader::load(CachedResourceLoader* cachedResourceLoader, CachedResource* re
 
     RefPtr<SubresourceLoader> loader = resourceLoadScheduler()->scheduleSubresourceLoad(cachedResourceLoader->document()->frame(),
         this, resourceRequest, determinePriority(resource), request->shouldDoSecurityCheck(), request->sendResourceLoadCallbacks());
-    if (loader) {
+    if (loader && !loader->reachedTerminalState())
         m_requestsLoading.add(loader.release(), request);
-        request->cachedResource()->setRequestedFromNetworkingLayer();
-    } else {
-        // FIXME: What if resources in other frames were waiting for this revalidation? 
+    else {
+        // FIXME: What if resources in other frames were waiting for this revalidation?
         LOG(ResourceLoading, "Cannot start loading '%s'", request->cachedResource()->url().latin1().data());             
         cachedResourceLoader->decrementRequestCount(request->cachedResource());
         cachedResourceLoader->setLoadInProgress(true);
         if (resource->resourceToRevalidate()) 
             cache()->revalidationFailed(resource); 
-        resource->error();
+        resource->error(CachedResource::LoadError);
         cachedResourceLoader->setLoadInProgress(false);
         delete request;
     }
@@ -162,6 +161,16 @@ void Loader::cancelRequests(CachedResourceLoader* cachedResourceLoader)
         SubresourceLoader* loader = loadersToCancel[i];
         didFail(loader, true);
     }
+}
+
+void Loader::willSendRequest(SubresourceLoader* loader, ResourceRequest&, const ResourceResponse&)
+{
+    RequestMap::iterator i = m_requestsLoading.find(loader);
+    if (i == m_requestsLoading.end())
+        return;
+    
+    Request* request = i->second;
+    request->cachedResource()->setRequestedFromNetworkingLayer();
 }
 
 void Loader::didFinishLoading(SubresourceLoader* loader)
@@ -189,7 +198,8 @@ void Loader::didFinishLoading(SubresourceLoader* loader)
     if (!resource->errorOccurred()) {
         cachedResourceLoader->setLoadInProgress(true);
         resource->data(loader->resourceData(), true);
-        resource->finish();
+        if (!resource->errorOccurred())
+            resource->finish();
     }
 
     delete request;
@@ -228,7 +238,7 @@ void Loader::didFail(SubresourceLoader* loader, bool cancelled)
 
     if (!cancelled) {
         cachedResourceLoader->setLoadInProgress(true);
-        resource->error();
+        resource->error(CachedResource::LoadError);
     }
     
     cachedResourceLoader->setLoadInProgress(false);
@@ -311,9 +321,10 @@ void Loader::didReceiveData(SubresourceLoader* loader, const char* data, int siz
     
     if (resource->errorOccurred())
         return;
-        
+
     if (resource->response().httpStatusCode() >= 400) {
-        resource->httpStatusCodeError();
+        if (!resource->shouldIgnoreHTTPStatusCodeErrors())
+            resource->error(CachedResource::LoadError);
         return;
     }
 
@@ -326,7 +337,7 @@ void Loader::didReceiveData(SubresourceLoader* loader, const char* data, int siz
     } else if (request->isIncremental())
         resource->data(loader->resourceData(), false);
 }
-    
+
 void Loader::didReceiveCachedMetadata(SubresourceLoader* loader, const char* data, int size)
 {
     Request* request = m_requestsLoading.get(loader);

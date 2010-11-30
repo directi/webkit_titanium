@@ -119,7 +119,7 @@ static void initializeSupportedImageMIMETypes()
         "image/x-icon",    // ico
         "image/x-xbitmap"  // xbm
     };
-    for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); ++i) {
+    for (size_t i = 0; i < WTF_ARRAY_LENGTH(types); ++i) {
         supportedImageMIMETypes->add(types[i]);
         supportedImageResourceMIMETypes->add(types[i]);
     }
@@ -187,7 +187,7 @@ static void initializeSupportedJavaScriptMIMETypes()
         "text/jscript",
         "text/livescript",
     };
-    for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); ++i)
+    for (size_t i = 0; i < WTF_ARRAY_LENGTH(types); ++i)
       supportedJavaScriptMIMETypes->add(types[i]);
 }
 
@@ -222,7 +222,7 @@ static void initializeSupportedNonImageMimeTypes()
     COMPILE_ASSERT(sizeof(types) / sizeof(types[0]) <= 16,
                    nonimage_mime_types_must_be_less_than_or_equal_to_16);
 
-    for (size_t i = 0; i < sizeof(types)/sizeof(types[0]); ++i)
+    for (size_t i = 0; i < WTF_ARRAY_LENGTH(types); ++i)
         supportedNonImageMIMETypes->add(types[i]);
 
     ArchiveFactory::registerKnownArchiveMIMETypes();
@@ -345,17 +345,34 @@ static MediaMIMETypeMap& mediaMIMETypeMap()
 
 String MIMETypeRegistry::getMediaMIMETypeForExtension(const String& ext)
 {
-    if (mediaMIMETypeMap().contains(ext))
-        return (*mediaMIMETypeMap().get(ext))[0];
+    // Look in the system-specific registry first.
+    String type = getMIMETypeForExtension(ext);
+    if (!type.isEmpty())
+        return type;
+
+    Vector<String>* typeList = mediaMIMETypeMap().get(ext);
+    if (typeList)
+        return (*typeList)[0];
     
     return String();
 }
     
 Vector<String> MIMETypeRegistry::getMediaMIMETypesForExtension(const String& ext)
 {
-    if (mediaMIMETypeMap().contains(ext))
-        return *mediaMIMETypeMap().get(ext);
+    Vector<String>* typeList = mediaMIMETypeMap().get(ext);
+    if (typeList)
+        return *typeList;
 
+    // Only need to look in the system-specific registry if mediaMIMETypeMap() doesn't contain
+    // the extension at all, because it always contains the system-specific type if the
+    // extension is in the static mapping table.
+    String type = getMIMETypeForExtension(ext);
+    if (!type.isEmpty()) {
+        Vector<String> typeList;
+        typeList.append(type);
+        return typeList;
+    }
+    
     return Vector<String>();
 }
 

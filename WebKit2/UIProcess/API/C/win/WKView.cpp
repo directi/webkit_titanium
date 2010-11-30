@@ -37,7 +37,7 @@ WKTypeID WKViewGetTypeID()
 
 WKViewRef WKViewCreate(RECT rect, WKPageNamespaceRef pageNamespaceRef, HWND parentWindow)
 {
-    RefPtr<WebView> view = WebView::create(rect, toImpl(pageNamespaceRef), parentWindow);
+    RefPtr<WebView> view = WebView::create(rect, toImpl(pageNamespaceRef), parentWindow, VisibleToInjectedBundle);
     return toAPI(view.release().releaseRef());
 }
 
@@ -59,4 +59,9 @@ void WKViewSetParentWindow(WKViewRef viewRef, HWND hostWindow)
 void WKViewWindowAncestryDidChange(WKViewRef viewRef)
 {
     toImpl(viewRef)->windowAncestryDidChange();
+}
+
+void WKViewSetIsInWindow(WKViewRef viewRef, bool isInWindow)
+{
+    toImpl(viewRef)->setIsInWindow(isInWindow);
 }

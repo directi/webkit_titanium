@@ -46,7 +46,9 @@ var Preferences = {
     nativeInstrumentationEnabled: false,
     resourceExportEnabled: false,
     fileSystemEnabled: false,
-    useDataURLForResourceImageIcons: true
+    useDataURLForResourceImageIcons: true,
+    showTimingTab: false,
+    debugMode: false
 }
 
 WebInspector.Settings = function()

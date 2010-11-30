@@ -38,7 +38,7 @@ using namespace std;
 
 namespace WTR {
 
-#if !defined(NDEBUG) && (!defined(DEBUG_INTERNAL) || defined(DEBUG_ALL))
+#ifdef DEBUG_ALL
 const LPWSTR testPluginDirectoryName = L"TestNetscapePlugin_Debug";
 const char* injectedBundleDLL = "\\InjectedBundle_debug.dll";
 #else
@@ -88,6 +88,10 @@ static LONG WINAPI exceptionFilter(EXCEPTION_POINTERS*)
     fputs("#CRASHED\n", stderr);
     fflush(stderr);
     return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void TestController::notifyDone()
+{
 }
 
 void TestController::platformInitialize()

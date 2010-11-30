@@ -306,9 +306,6 @@ fast/events/dragging-mouse-moves.html
 # Crash beneath SocketStream::readStreamCallback http://webkit.org/b/44138
 http/tests/websocket/tests/workers/worker-handshake-challenge-randomness.html
 
-# http://webkit.org/b/46911
-accessibility/aria-hidden-update.html
-
 # Causes next test to time out http://webkit.org/b/46975
 http/tests/xmlhttprequest/xmlhttprequest-sync-vs-async-assertion-failure.html
 
@@ -317,6 +314,9 @@ fast/js/sputnik/Conformance/11_Expressions/11.7_Bitwise_Shift_Operators/11.7.3_T
 
 # Timing out http://webkit.org/b/46977
 inspector/debugger-pause-on-breakpoint.html
+
+# Sometimes fails https://webkit.org/b/49412
+inspector/timeline-network-resource.html
 
 # Sometimes fails http://webkit.org/b/46998
 svg/dom/SVGScriptElement/script-load-and-error-events.svg
@@ -379,6 +379,9 @@ fast/workers/storage/change-version-handle-reuse-sync.html
 
 # Sometimes fails http://webkit.org/b/49182
 animations/stop-animation-on-suspend.html
+
+# Crashing in AccessibilityUIElement::parentElement http://webkit.org/b/49379
+accessibility/iframe-bastardization.html
 
 ################################################################################
 ####################### No bugs filed about the below yet#######################
@@ -481,7 +484,6 @@ accessibility/button-press-action.html
 accessibility/canvas.html
 accessibility/document-attributes.html
 accessibility/editable-webarea-context-menu-point.html
-accessibility/iframe-bastardization.html
 accessibility/ignore-spacer-elements.html
 accessibility/image-link.html
 accessibility/image-map1.html
@@ -631,26 +633,6 @@ plugins/npruntime/npruntime.html
 ######################### End list of r41995 failures ##########################
 ################################################################################
 
-# Bug 25038: [Windows] Implement layoutTestController.waitForPolicyDelegate <https://bugs.webkit.org/show_bug.cgi?id=25038>
-fast/encoding/mailto-always-utf-8.html
-fast/forms/mailto/advanced-get.html
-fast/forms/mailto/advanced-put.html
-fast/forms/mailto/get-multiple-items-text-plain.html
-fast/forms/mailto/get-multiple-items-x-www-form-urlencoded.html
-fast/forms/mailto/get-multiple-items.html
-fast/forms/mailto/get-non-ascii-always-utf-8.html
-fast/forms/mailto/get-non-ascii-text-plain-latin-1.html
-fast/forms/mailto/get-non-ascii-text-plain.html
-fast/forms/mailto/get-non-ascii.html
-fast/forms/mailto/get-overwrite-query.html
-fast/forms/mailto/post-append-query.html
-fast/forms/mailto/post-multiple-items-multipart-form-data.html
-fast/forms/mailto/post-multiple-items-text-plain.html
-fast/forms/mailto/post-multiple-items-x-www-form-urlencoded.html
-fast/forms/mailto/post-multiple-items.html
-fast/forms/mailto/post-text-plain-with-accept-charset.html
-fast/forms/mailto/post-text-plain.html
-
 # <rdar://6772112> Cookies expire 1 hour too early
 fast/cookies/local-file-can-set-cookies.html
 
@@ -763,8 +745,7 @@ editing/pasteboard/files-during-page-drags.html
 fast/forms/input-selectedoption.html
 
 # <https://bugs.webkit.org/show_bug.cgi?id=29287>
-http/tests/local/send-dragged-file.html
-http/tests/local/send-sliced-dragged-file.html
+http/tests/local/fileapi
 http/tests/local/blob/send-hybrid-blob.html
 http/tests/local/formdata
 
@@ -881,7 +862,7 @@ plugins/plugin-initiate-popup-window.html
 java
 
 # Need to add functionality to DumpRenderTree to handle enable/disable Spatial Navigation
-fast/events/spatial-navigation
+fast/spatial-navigation
 
 # For some reason crashes when run with all tests. Passes individually.
 fast/forms/multiple-form-submission-protection-mouse.html
@@ -902,13 +883,21 @@ fast/media/print-restores-previous-mediatype.html
 # https://bugs.webkit.org/show_bug.cgi?id=35973
 fast/multicol/hit-test-above-or-below.html
 
-# renderTheme is not ready to draw progress element
+# Needs progress element support
+# https://bugs.webkit.org/show_bug.cgi?id=49769
 fast/dom/HTMLProgressElement/progress-element.html
 fast/dom/HTMLProgressElement/set-progress-properties.html
 fast/dom/HTMLProgressElement/progress-bar-value-pseudo-element.html
+fast/forms/form-attribute.html
 
 # view mode media feature
 fast/media/view-mode-media-feature.html
+fast/media/media-query-list-02.html
+fast/media/media-query-list-03.html
+fast/media/media-query-list-04.html
+fast/media/media-query-list-05.html
+fast/media/media-query-list-06.html
+fast/media/media-query-list-07.html
 
 # Need expectations. See https://bugs.webkit.org/show_bug.cgi?id=36461
 fast/repaint/overflow-scroll-body-appear.html
@@ -934,6 +923,12 @@ canvas/philip
 # Need to dump context menu items on eventSender.contextClick(true). TODO: add bug number
 # https://bugs.webkit.org/show_bug.cgi?id=39104
 editing/spelling/context-menu-suggestions.html
+
+# https://webkit.org/b/32021 - DRT's textInputController is unimplemented on Windows
+editing/selection/5825350-1.html
+editing/selection/5825350-2.html
+fast/text/international/thai-cursor-position.html
+fast/dom/tab-in-right-alignment.html
 
 # textInputController.hasSpellingMarkers() is not implemented.
 editing/spelling/spelling-backspace-between-lines.html
@@ -1073,3 +1068,12 @@ plugins/iframe-shims.html
 
 # Requires WebP support.
 fast/images/webp-image-decoding.html
+
+#temporary skipped due to bug 50203.
+fast/dom/horizontal-scrollbar-in-rtl.html
+fast/dom/horizontal-scrollbar-when-dir-change.html
+
+# REGRESSION(r72861): editing/selection/click-left-of-rtl-wrapping-text.html and modify-up-on-rtl-wrapping-text.html fail on all but Mac platform
+# https://bugs.webkit.org/show_bug.cgi?id=50204
+editing/selection/click-left-of-rtl-wrapping-text.html
+editing/selection/modify-up-on-rtl-wrapping-text.html

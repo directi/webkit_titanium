@@ -71,6 +71,9 @@ WebGraphicsContext3DDefaultImpl::WebGraphicsContext3DDefaultImpl()
     : m_initialized(false)
     , m_renderDirectlyToWebView(false)
     , m_isGLES2(false)
+    , m_haveEXTFramebufferObject(false)
+    , m_haveEXTFramebufferMultisample(false)
+    , m_haveANGLEFramebufferMultisample(false)
     , m_texture(0)
     , m_fbo(0)
     , m_depthStencilBuffer(0)
@@ -168,9 +171,15 @@ bool WebGraphicsContext3DDefaultImpl::initialize(WebGraphicsContext3D::Attribute
     if (renderDirectlyToWebView)
         m_attributes.antialias = false;
 
+    m_isGLES2 = gfx::GetGLImplementation() == gfx::kGLImplementationEGLGLES2;
+    const char* extensions = reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS));
+    m_haveEXTFramebufferObject = strstr(extensions, "GL_EXT_framebuffer_object");
+    m_haveEXTFramebufferMultisample = strstr(extensions, "GL_EXT_framebuffer_multisample");
+    m_haveANGLEFramebufferMultisample = strstr(extensions, "GL_ANGLE_framebuffer_multisample");
+
     validateAttributes();
 
-    if (gfx::GetGLImplementation() != gfx::kGLImplementationEGLGLES2) {
+    if (!m_isGLES2) {
         glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
         glEnable(GL_POINT_SPRITE);
     }
@@ -183,7 +192,6 @@ bool WebGraphicsContext3DDefaultImpl::initialize(WebGraphicsContext3D::Attribute
     glGenFramebuffersEXT(1, &m_copyTextureToParentTextureFBO);
 
     m_initialized = true;
-    m_isGLES2 = gfx::GetGLImplementation() == gfx::kGLImplementationEGLGLES2;
     return true;
 }
 
@@ -208,9 +216,8 @@ void WebGraphicsContext3DDefaultImpl::validateAttributes()
             isValidVendor = false;
 #endif
         if (!(isValidVendor
-              && (strstr(extensions, "GL_EXT_framebuffer_multisample")
-                  || (strstr(extensions, "GL_ANGLE_framebuffer_multisample")
-                      && strstr(extensions, "GL_OES_rgb8_rgba8")))))
+              && (m_haveEXTFramebufferMultisample
+                  || (m_haveANGLEFramebufferMultisample && strstr(extensions, "GL_OES_rgb8_rgba8")))))
             m_attributes.antialias = false;
 
         // Don't antialias when using Mesa to ensure more reliable testing and
@@ -229,10 +236,10 @@ void WebGraphicsContext3DDefaultImpl::resolveMultisampledFramebuffer(unsigned x,
     if (m_attributes.antialias) {
         glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, m_multisampleFBO);
         glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, m_fbo);
-        if (glBlitFramebufferEXT)
+        if (m_haveEXTFramebufferMultisample)
             glBlitFramebufferEXT(x, y, x + width, y + height, x, y, x + width, y + height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         else {
-            ASSERT(glBlitFramebufferANGLE);
+            ASSERT(m_haveANGLEFramebufferMultisample);
             glBlitFramebufferANGLE(x, y, x + width, y + height, x, y, x + width, y + height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         }
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_boundFBO);
@@ -278,16 +285,6 @@ int WebGraphicsContext3DDefaultImpl::sizeInBytes(int type)
 bool WebGraphicsContext3DDefaultImpl::isGLES2Compliant()
 {
     return m_isGLES2;
-}
-
-bool WebGraphicsContext3DDefaultImpl::isGLES2NPOTStrict()
-{
-    return false;
-}
-
-bool WebGraphicsContext3DDefaultImpl::isErrorGeneratedOnOutOfBoundsAccesses()
-{
-    return false;
 }
 
 unsigned int WebGraphicsContext3DDefaultImpl::getPlatformTextureId()
@@ -360,7 +357,7 @@ void WebGraphicsContext3DDefaultImpl::reshape(int width, int height)
         if (m_attributes.stencil && m_attributes.depth)
             internalDepthStencilFormat = GL_DEPTH24_STENCIL8_EXT;
         else {
-            if (gfx::GetGLImplementation() == gfx::kGLImplementationEGLGLES2)
+            if (m_isGLES2)
                 internalDepthStencilFormat = GL_DEPTH_COMPONENT16;
             else
                 internalDepthStencilFormat = GL_DEPTH_COMPONENT;
@@ -379,19 +376,19 @@ void WebGraphicsContext3DDefaultImpl::reshape(int width, int height)
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_multisampleFBO);
         }
         glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, m_multisampleColorBuffer);
-        if (glRenderbufferStorageMultisampleEXT)
+        if (m_haveEXTFramebufferMultisample)
             glRenderbufferStorageMultisampleEXT(GL_RENDERBUFFER_EXT, sampleCount, internalMultisampledColorFormat, width, height);
         else {
-            ASSERT(glRenderbufferStorageMultisampleANGLE);
+            ASSERT(m_haveANGLEFramebufferMultisample);
             glRenderbufferStorageMultisampleANGLE(GL_RENDERBUFFER_EXT, sampleCount, internalMultisampledColorFormat, width, height);
         }
         glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, m_multisampleColorBuffer);
         if (m_attributes.stencil || m_attributes.depth) {
             glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, m_multisampleDepthStencilBuffer);
-            if (glRenderbufferStorageMultisampleEXT)
+            if (m_haveEXTFramebufferMultisample)
                 glRenderbufferStorageMultisampleEXT(GL_RENDERBUFFER_EXT, sampleCount, internalDepthStencilFormat, width, height);
             else {
-                ASSERT(glRenderbufferStorageMultisampleANGLE);
+                ASSERT(m_haveANGLEFramebufferMultisample);
                 glRenderbufferStorageMultisampleANGLE(GL_RENDERBUFFER_EXT, sampleCount, internalDepthStencilFormat, width, height);
             }
             if (m_attributes.stencil)
@@ -442,20 +439,29 @@ void WebGraphicsContext3DDefaultImpl::reshape(int width, int height)
     }
 
     // Initialize renderbuffers to 0.
-    GLboolean colorMask[] = {GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE}, depthMask = GL_TRUE, stencilMask = GL_TRUE;
+    GLfloat clearColor[] = {0, 0, 0, 0}, clearDepth = 0;
+    GLint clearStencil = 0;
+    GLboolean colorMask[] = {GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE}, depthMask = GL_TRUE;
+    GLuint stencilMask = 0xffffffff;
     GLboolean isScissorEnabled = GL_FALSE;
     GLboolean isDitherEnabled = GL_FALSE;
     GLbitfield clearMask = GL_COLOR_BUFFER_BIT;
+    glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+    glClearColor(0, 0, 0, 0);
     glGetBooleanv(GL_COLOR_WRITEMASK, colorMask);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     if (m_attributes.depth) {
+        glGetFloatv(GL_DEPTH_CLEAR_VALUE, &clearDepth);
+        glClearDepth(1);
         glGetBooleanv(GL_DEPTH_WRITEMASK, &depthMask);
         glDepthMask(GL_TRUE);
         clearMask |= GL_DEPTH_BUFFER_BIT;
     }
     if (m_attributes.stencil) {
-        glGetBooleanv(GL_STENCIL_WRITEMASK, &stencilMask);
-        glStencilMask(GL_TRUE);
+        glGetIntegerv(GL_STENCIL_CLEAR_VALUE, &clearStencil);
+        glClearStencil(0);
+        glGetIntegerv(GL_STENCIL_WRITEMASK, reinterpret_cast<GLint*>(&stencilMask));
+        glStencilMaskSeparate(GL_FRONT, 0xffffffff);
         clearMask |= GL_STENCIL_BUFFER_BIT;
     }
     isScissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
@@ -465,11 +471,16 @@ void WebGraphicsContext3DDefaultImpl::reshape(int width, int height)
 
     glClear(clearMask);
 
+    glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
     glColorMask(colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
-    if (m_attributes.depth)
+    if (m_attributes.depth) {
+        glClearDepth(clearDepth);
         glDepthMask(depthMask);
-    if (m_attributes.stencil)
-        glStencilMask(stencilMask);
+    }
+    if (m_attributes.stencil) {
+        glClearStencil(clearStencil);
+        glStencilMaskSeparate(GL_FRONT, stencilMask);
+    }
     if (isScissorEnabled)
         glEnable(GL_SCISSOR_TEST);
     else
@@ -540,7 +551,7 @@ bool WebGraphicsContext3DDefaultImpl::readBackFramebuffer(unsigned char* pixels,
         mustRestorePackAlignment = true;
     }
 
-    if (gfx::GetGLImplementation() == gfx::kGLImplementationEGLGLES2) {
+    if (m_isGLES2) {
         // FIXME: consider testing for presence of GL_OES_read_format
         // and GL_EXT_read_format_bgra, and using GL_BGRA_EXT here
         // directly.
@@ -883,7 +894,7 @@ DELEGATE_TO_GL_1(frontFace, FrontFace, unsigned long)
 void WebGraphicsContext3DDefaultImpl::generateMipmap(unsigned long target)
 {
     makeContextCurrent();
-    if (glGenerateMipmapEXT)
+    if (m_isGLES2 || m_haveEXTFramebufferObject)
         glGenerateMipmapEXT(target);
     // FIXME: provide alternative code path? This will be unpleasant
     // to implement if glGenerateMipmapEXT is not available -- it will
@@ -976,6 +987,11 @@ unsigned long WebGraphicsContext3DDefaultImpl::getError()
     return glGetError();
 }
 
+bool WebGraphicsContext3DDefaultImpl::isContextLost()
+{
+    return false;
+}
+
 DELEGATE_TO_GL_2(getFloatv, GetFloatv, unsigned long, float*)
 
 void WebGraphicsContext3DDefaultImpl::getFramebufferAttachmentParameteriv(unsigned long target, unsigned long attachment,
@@ -990,7 +1006,7 @@ void WebGraphicsContext3DDefaultImpl::getFramebufferAttachmentParameteriv(unsign
 void WebGraphicsContext3DDefaultImpl::getIntegerv(unsigned long pname, int* value)
 {
     makeContextCurrent();
-    if (gfx::GetGLImplementation() == gfx::kGLImplementationEGLGLES2) {
+    if (m_isGLES2) {
         glGetIntegerv(pname, value);
         return;
     }
@@ -1138,10 +1154,10 @@ WebString WebGraphicsContext3DDefaultImpl::getString(unsigned long name)
     StringBuilder result;
     result.append(reinterpret_cast<const char*>(glGetString(name)));
     if (name == GL_EXTENSIONS) {
-        // GL_CHROMIUM_copy_texture_to_parent_texture requires this
-        // desktopGL-only function (GLES2 doesn't support it), so
-        // check for its existence here.
-        if (glGetTexLevelParameteriv)
+        // GL_CHROMIUM_copy_texture_to_parent_texture requires the
+        // desktopGL-only function glGetTexLevelParameteriv (GLES2
+        // doesn't support it).
+        if (!m_isGLES2)
             result.append(" GL_CHROMIUM_copy_texture_to_parent_texture");
     }
     return WebString(result.toString());

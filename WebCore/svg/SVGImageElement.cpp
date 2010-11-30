@@ -98,6 +98,9 @@ void SVGImageElement::svgAttributeChanged(const QualifiedName& attrName)
     if (isLengthAttribute)
         updateRelativeLengthsInformation();
 
+    if (SVGTests::handleAttributeChange(this, attrName))
+        return;
+
     RenderObject* renderer = this->renderer();
     if (!renderer)
         return;
@@ -115,7 +118,6 @@ void SVGImageElement::svgAttributeChanged(const QualifiedName& attrName)
     }
 
     if (attrName == SVGNames::preserveAspectRatioAttr
-        || SVGTests::isKnownAttribute(attrName)
         || SVGLangSpace::isKnownAttribute(attrName)
         || SVGExternalResourcesRequired::isKnownAttribute(attrName))
         RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer);
@@ -133,6 +135,7 @@ void SVGImageElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizePreserveAspectRatio();
         synchronizeExternalResourcesRequired();
         synchronizeHref();
+        SVGTests::synchronizeProperties(this, attrName);
         return;
     }
 
@@ -150,6 +153,8 @@ void SVGImageElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeExternalResourcesRequired();
     else if (SVGURIReference::isKnownAttribute(attrName))
         synchronizeHref();
+    else if (SVGTests::isKnownAttribute(attrName))
+        SVGTests::synchronizeProperties(this, attrName);
 }
 
 bool SVGImageElement::selfHasRelativeLengths() const

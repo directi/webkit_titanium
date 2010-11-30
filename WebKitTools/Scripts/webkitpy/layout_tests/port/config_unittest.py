@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import sys
 import unittest
 
 from webkitpy.common.system import executive
@@ -37,38 +38,57 @@ from webkitpy.common.system import outputcapture
 
 import config
 
+
+def mock_run_command(arg_list):
+    # Set this to True to test actual output (where possible).
+    integration_test = False
+    if integration_test:
+        return executive.Executive().run_command(arg_list)
+
+    if 'webkit-build-directory' in arg_list[1]:
+        return mock_webkit_build_directory(arg_list[2:])
+    return 'Error'
+
+
+def mock_webkit_build_directory(arg_list):
+    if arg_list == ['--top-level']:
+        return '/WebKitBuild'
+    elif arg_list == ['--configuration', '--debug']:
+        return '/WebKitBuild/Debug'
+    elif arg_list == ['--configuration', '--release']:
+        return '/WebKitBuild/Release'
+    return 'Error'
+
+
 class ConfigTest(unittest.TestCase):
     def tearDown(self):
         config.clear_cached_configuration()
 
-    def make_config(self, output='', files={}, exit_code=0):
-        e = executive_mock.MockExecutive2(output=output, exit_code=exit_code)
+    def make_config(self, output='', files={}, exit_code=0, exception=None,
+                    run_command_fn=None):
+        e = executive_mock.MockExecutive2(output=output, exit_code=exit_code,
+                                          exception=exception,
+                                          run_command_fn=run_command_fn)
         fs = filesystem_mock.MockFileSystem(files)
         return config.Config(e, fs)
 
     def assert_configuration(self, contents, expected):
         # This tests that a configuration file containing
-        # _contents_ endsd up being interpreted as _expected_.
+        # _contents_ ends up being interpreted as _expected_.
         c = self.make_config('foo', {'foo/Configuration': contents})
         self.assertEqual(c.default_configuration(), expected)
 
-    def test_build_directory_toplevel(self):
-        c = self.make_config('toplevel')
-        self.assertEqual(c.build_directory(None), 'toplevel')
+    def test_build_directory(self):
+        # --top-level
+        c = self.make_config(run_command_fn=mock_run_command)
+        self.assertTrue(c.build_directory(None).endswith('WebKitBuild'))
 
         # Test again to check caching
-        self.assertEqual(c.build_directory(None), 'toplevel')
+        self.assertTrue(c.build_directory(None).endswith('WebKitBuild'))
 
-    def test_build_directory__release(self):
-        c = self.make_config('release')
-        self.assertEqual(c.build_directory('Release'), 'release')
-
-    def test_build_directory__debug(self):
-        c = self.make_config('debug')
-        self.assertEqual(c.build_directory('Debug'), 'debug')
-
-    def test_build_directory__unknown(self):
-        c = self.make_config("unknown")
+        # Test other values
+        self.assertTrue(c.build_directory('Release').endswith('/Release'))
+        self.assertTrue(c.build_directory('Debug').endswith('/Debug'))
         self.assertRaises(KeyError, c.build_directory, 'Unknown')
 
     def test_build_dumprendertree__success(self):
@@ -118,6 +138,41 @@ class ConfigTest(unittest.TestCase):
         oc.capture_output()
         self.assert_configuration('Unknown', 'Unknown')
         oc.restore_output()
+
+    def test_default_configuration__standalone(self):
+        # FIXME: This test runs a standalone python script to test
+        # reading the default configuration to work around any possible
+        # caching / reset bugs. See https://bugs.webkit.org/show_bug?id=49360
+        # for the motivation. We can remove this test when we remove the
+        # global configuration cache in config.py.
+        e = executive.Executive()
+        fs = filesystem.FileSystem()
+        c = config.Config(e, fs)
+        script = c.path_from_webkit_base('WebKitTools', 'Scripts',
+            'webkitpy', 'layout_tests', 'port', 'config_standalone.py')
+
+        # Note: don't use 'Release' here, since that's the normal default.
+        expected = 'Debug'
+
+        args = [sys.executable, script, '--mock', expected]
+        actual = e.run_command(args).rstrip()
+        self.assertEqual(actual, expected)
+
+    def test_default_configuration__no_perl(self):
+        # We need perl to run webkit-build-directory to find out where the
+        # default configuration file is. See what happens if perl isn't
+        # installed. (We should get the default value, 'Release').
+        c = self.make_config(exception=OSError)
+        actual = c.default_configuration()
+        self.assertEqual(actual, 'Release')
+
+    def test_default_configuration__scripterror(self):
+        # We run webkit-build-directory to find out where the default
+        # configuration file is. See what happens if that script fails.
+        # (We should get the default value, 'Release').
+        c = self.make_config(exception=executive.ScriptError())
+        actual = c.default_configuration()
+        self.assertEqual(actual, 'Release')
 
     def test_path_from_webkit_base(self):
         # FIXME: We use a real filesystem here. Should this move to a

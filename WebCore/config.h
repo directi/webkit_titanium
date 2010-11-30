@@ -17,7 +17,7 @@
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  *
- */
+ */ 
 
 #if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H
 #ifdef BUILDING_WITH_CMAKE
@@ -152,7 +152,7 @@
 #ifndef _WINSOCKAPI_
 #define _WINSOCKAPI_ // Prevent inclusion of winsock.h in windows.h
 #endif
-#else
+#elif !OS(WINCE)
 #define WTF_PLATFORM_CG 1
 #undef WTF_PLATFORM_CAIRO
 #define WTF_USE_CFNETWORK 1

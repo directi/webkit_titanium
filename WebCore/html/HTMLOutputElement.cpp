@@ -40,7 +40,7 @@ inline HTMLOutputElement::HTMLOutputElement(const QualifiedName& tagName, Docume
     : HTMLFormControlElement(tagName, document, form)
     , m_isDefaultValueMode(true)
     , m_isSetTextContentInProgress(false)
-    , m_defaultValue()
+    , m_defaultValue("")
     , m_tokens(DOMSettableTokenList::create())
 {
 }
@@ -58,7 +58,6 @@ const AtomicString& HTMLOutputElement::formControlType() const
 
 void HTMLOutputElement::parseMappedAttribute(Attribute* attr)
 {
-    // FIXME: Should handle the 'form' attribute here.
     if (attr->name() == HTMLNames::forAttr)
         setFor(attr->value());
     else
@@ -73,11 +72,6 @@ DOMSettableTokenList* HTMLOutputElement::htmlFor() const
 void HTMLOutputElement::setFor(const String& value)
 {
     m_tokens->setValue(value);
-}
-
-void HTMLOutputElement::setForm(const String& /*id*/)
-{
-    // FIXME: Implement this function.
 }
 
 void HTMLOutputElement::childrenChanged(bool createdByParser, Node*, Node*, int)
@@ -97,6 +91,8 @@ void HTMLOutputElement::reset()
     // value mode flag to "default" and then to set the element's textContent
     // attribute to the default value.
     m_isDefaultValueMode = true;
+    if (m_defaultValue == value())
+        return;
     setTextContentInternal(m_defaultValue);
 }
 
@@ -109,6 +105,8 @@ void HTMLOutputElement::setValue(const String& value)
 {
     // The value mode flag set to "value" when the value attribute is set.
     m_isDefaultValueMode = false;
+    if (value == this->value())
+        return;
     setTextContentInternal(value);
 }
 
@@ -119,11 +117,13 @@ String HTMLOutputElement::defaultValue() const
 
 void HTMLOutputElement::setDefaultValue(const String& value)
 {
-     m_defaultValue = value;
-     // The spec requires the value attribute set to the default value
-     // when the element's value mode flag to "default".
-     if (m_isDefaultValueMode)
-         setTextContentInternal(value);
+    if (m_defaultValue == value)
+        return;
+    m_defaultValue = value;
+    // The spec requires the value attribute set to the default value
+    // when the element's value mode flag to "default".
+    if (m_isDefaultValueMode)
+        setTextContentInternal(value);
 }
 
 void HTMLOutputElement::setTextContentInternal(const String& value)

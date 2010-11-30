@@ -3,15 +3,22 @@ TARGET = dummy
 
 CONFIG -= debug_and_release
 
-WEBCORE_GENERATED_HEADERS_FOR_WEBKIT2 += \
-    $$OUTPUT_DIR/WebCore/generated/HTMLNames.h \
-    $$OUTPUT_DIR/WebCore/generated/JSCSSStyleDeclaration.h \
-    $$OUTPUT_DIR/WebCore/generated/JSDOMWindow.h \
-    $$OUTPUT_DIR/WebCore/generated/JSElement.h \
-    $$OUTPUT_DIR/WebCore/generated/JSHTMLElement.h \
-    $$OUTPUT_DIR/WebCore/generated/JSNode.h \
-    $$OUTPUT_DIR/WebCore/generated/JSRange.h \
+CONFIG(standalone_package) {
+    isEmpty(WEBKIT2_GENERATED_SOURCES_DIR):WEBKIT2_GENERATED_SOURCES_DIR = $$PWD/generated
+    isEmpty(WC_GENERATED_SOURCES_DIR):WC_GENERATED_SOURCES_DIR = $$PWD/../WebCore/generated
+} else {
+    isEmpty(WEBKIT2_GENERATED_SOURCES_DIR):WEBKIT2_GENERATED_SOURCES_DIR = generated
+    isEmpty(WC_GENERATED_SOURCES_DIR):WC_GENERATED_SOURCES_DIR = ../WebCore/generated
+}
 
+WEBCORE_GENERATED_HEADERS_FOR_WEBKIT2 += \
+    $$WC_GENERATED_SOURCES_DIR/HTMLNames.h \
+    $$WC_GENERATED_SOURCES_DIR/JSCSSStyleDeclaration.h \
+    $$WC_GENERATED_SOURCES_DIR/JSDOMWindow.h \
+    $$WC_GENERATED_SOURCES_DIR/JSElement.h \
+    $$WC_GENERATED_SOURCES_DIR/JSHTMLElement.h \
+    $$WC_GENERATED_SOURCES_DIR/JSNode.h \
+    $$WC_GENERATED_SOURCES_DIR/JSRange.h \
 
 QUOTE = ""
 DOUBLE_ESCAPED_QUOTE = ""
@@ -36,10 +43,7 @@ SBOX_CHECK = $$(_SBOX_DIR)
 
 
 DIRS = \
-    $$OUTPUT_DIR/include/JavaScriptCore \
-    $$OUTPUT_DIR/include/WebCore \
-    $$OUTPUT_DIR/include/WebKit2 \
-    $$OUTPUT_DIR/WebKit2/generated
+    $$OUTPUT_DIR/WebKitTools/MiniBrowser/qt
 
 for(DIR, DIRS) {
     !exists($$DIR): system($$QMAKE_MKDIR $$DIR)
@@ -71,12 +75,12 @@ defineTest(addExtraCompiler) {
 
 defineReplace(message_header_generator_output) {
   FILENAME=$$basename(1)
-  return($$OUTPUT_DIR/WebKit2/generated/$$replace(FILENAME, ".messages.in","Messages.h"))
+  return($$WEBKIT2_GENERATED_SOURCES_DIR/$$replace(FILENAME, ".messages.in","Messages.h"))
 }
 
 defineReplace(message_receiver_generator_output) {
   FILENAME=$$basename(1)
-  return($$OUTPUT_DIR/WebKit2/generated/$$replace(FILENAME, ".messages.in","MessageReceiver.cpp"))
+  return($$WEBKIT2_GENERATED_SOURCES_DIR/$$replace(FILENAME, ".messages.in","MessageReceiver.cpp"))
 }
 
 VPATH = \
@@ -95,6 +99,7 @@ MESSAGE_RECEIVERS = \
     PluginProcessProxy.messages.in \
     PluginProxy.messages.in \
     WebContext.messages.in \
+    WebInspectorProxy.messages.in \
     WebPage/WebInspector.messages.in \
     WebPage/WebPage.messages.in \
     WebPageProxy.messages.in \
@@ -108,13 +113,27 @@ SCRIPTS = \
     $$PWD/Scripts/webkit2/__init__.py \
     $$PWD/Scripts/webkit2/messages.py
 
-message_header_generator.commands = python $${SRC_ROOT_DIR}WebKit2/Scripts/generate-messages-header.py ${QMAKE_FILE_IN} > ${QMAKE_FILE_OUT}
+ualist_copier.commands = $(COPY_FILE) $${SRC_ROOT_DIR}/WebKitTools/QtTestBrowser/useragentlist.txt $$OUTPUT_DIR/WebKitTools/MiniBrowser/qt/useragentlist.txt
+ualist_copier.depends = $${SRC_ROOT_DIR}/WebKitTools/QtTestBrowser/useragentlist.txt
+ualist_copier.input = $${SRC_ROOT_DIR}/WebKitTools/QtTestBrowser/useragentlist.txt
+ualist_copier.output = $$OUTPUT_DIR/WebKitTools/MiniBrowser/qt/useragentlist.txt
+generated_files.depends += ualist_copier
+QMAKE_EXTRA_TARGETS += ualist_copier
+
+qrc_copier.commands = $(COPY_FILE) $${SRC_ROOT_DIR}/WebKitTools/MiniBrowser/MiniBrowser.qrc $$OUTPUT_DIR/WebKitTools/MiniBrowser/qt/MiniBrowser.qrc
+qrc_copier.depends = ualist_copier $${SRC_ROOT_DIR}/WebKitTools/MiniBrowser/MiniBrowser.qrc
+qrc_copier.input = $${SRC_ROOT_DIR}/WebKitTools/MiniBrowser/MiniBrowser.qrc
+qrc_copier.output = $$OUTPUT_DIR/WebKitTools/MiniBrowser/qt/MiniBrowser.qrc
+generated_files.depends += qrc_copier
+QMAKE_EXTRA_TARGETS += qrc_copier
+
+message_header_generator.commands = $${PYTHON} $${SRC_ROOT_DIR}WebKit2/Scripts/generate-messages-header.py ${QMAKE_FILE_IN} > ${QMAKE_FILE_OUT}
 message_header_generator.input = MESSAGE_RECEIVERS
 message_header_generator.depends = $$SCRIPTS
 message_header_generator.output_function = message_header_generator_output
 addExtraCompiler(message_header_generator)
 
-message_receiver_generator.commands = python $${SRC_ROOT_DIR}WebKit2/Scripts/generate-message-receiver.py  ${QMAKE_FILE_IN} > ${QMAKE_FILE_OUT}
+message_receiver_generator.commands = $${PYTHON} $${SRC_ROOT_DIR}WebKit2/Scripts/generate-message-receiver.py  ${QMAKE_FILE_IN} > ${QMAKE_FILE_OUT}
 message_receiver_generator.input = MESSAGE_RECEIVERS
 message_receiver_generator.depends = $$SCRIPTS
 message_receiver_generator.output_function = message_receiver_generator_output

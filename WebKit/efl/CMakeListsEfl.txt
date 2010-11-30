@@ -11,6 +11,7 @@ LIST(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBKIT_DIR}/efl/ewk"
     "${WEBKIT_DIR}/efl/WebCoreSupport"
     "${WEBCORE_DIR}/platform/efl"
+    "${WEBCORE_DIR}/platform/graphics/cairo"
     ${Cairo_INCLUDE_DIRS}
     ${ECORE_X_INCLUDE_DIRS}
     ${EDJE_INCLUDE_DIRS}
@@ -31,6 +32,22 @@ LIST(APPEND WebKit_INCLUDE_DIRECTORIES
 )
 ENDIF()
 
+IF (WTF_USE_FREETYPE)
+  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
+    "${WEBCORE_DIR}/platform/graphics/freetype"
+  )
+ENDIF ()
+
+IF (WTF_USE_PANGO)
+  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
+    "${WEBCORE_DIR}/platform/graphics/pango"
+    ${Pango_INCLUDE_DIRS}
+  )
+  LIST(APPEND WebKit_LIBRARIES
+    ${Pango_LIBRARIES}
+  )
+ENDIF ()
+
 LIST(APPEND WebKit_SOURCES
     efl/WebCoreSupport/ChromeClientEfl.cpp
     efl/WebCoreSupport/ContextMenuClientEfl.cpp
@@ -46,9 +63,13 @@ LIST(APPEND WebKit_SOURCES
     efl/ewk/ewk_history.cpp
     efl/ewk/ewk_main.cpp
     efl/ewk/ewk_settings.cpp
+    efl/ewk/ewk_tiled_backing_store.c
+    efl/ewk/ewk_tiled_matrix.c
+    efl/ewk/ewk_tiled_model.c
     efl/ewk/ewk_util.cpp
     efl/ewk/ewk_view.cpp
     efl/ewk/ewk_view_single.c
+    efl/ewk/ewk_view_tiled.c
     efl/ewk/ewk_window_features.cpp
 )
 
@@ -58,7 +79,6 @@ LIST(APPEND WebKit_LIBRARIES
     ${EFLDEPS_LIBRARIES}
     ${Freetype_LIBRARIES}
     ${LIBXML2_LIBRARIES}
-    ${Pango_LIBRARIES}
     ${SQLITE_LIBRARIES}
     ${FONTCONFIG_LIBRARIES}
     ${PNG_LIBRARY}

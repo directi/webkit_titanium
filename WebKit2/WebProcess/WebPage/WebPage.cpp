@@ -76,8 +76,12 @@
 #include <runtime/JSValue.h>
 
 #if ENABLE(PLUGIN_PROCESS)
-// FIXME: This is currently mac specific!
+// FIXME: This is currently Mac-specific!
 #include "MachPort.h"
+#endif
+
+#if PLATFORM(QT)
+#include "HitTestResult.h"
 #endif
 
 #ifndef NDEBUG
@@ -97,7 +101,7 @@ PassRefPtr<WebPage> WebPage::create(uint64_t pageID, const WebPageCreationParame
 {
     RefPtr<WebPage> page = adoptRef(new WebPage(pageID, parameters));
 
-    if (WebProcess::shared().injectedBundle())
+    if (parameters.visibleToInjectedBundle && WebProcess::shared().injectedBundle())
         WebProcess::shared().injectedBundle()->didCreatePage(page.get());
 
     return page.release();
@@ -105,9 +109,9 @@ PassRefPtr<WebPage> WebPage::create(uint64_t pageID, const WebPageCreationParame
 
 WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     : m_viewSize(parameters.viewSize)
-    , m_drawingArea(DrawingArea::create(parameters.drawingAreaInfo.type, parameters.drawingAreaInfo.id, this))
     , m_isInRedo(false)
     , m_isClosed(false)
+    , m_isVisibleToInjectedBundle(parameters.visibleToInjectedBundle)
 #if PLATFORM(MAC)
     , m_windowIsVisible(false)
 #elif PLATFORM(WIN)
@@ -123,16 +127,28 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     pageClients.contextMenuClient = new WebContextMenuClient(this);
     pageClients.editorClient = new WebEditorClient(this);
     pageClients.dragClient = new WebDragClient(this);
+#if ENABLE(INSPECTOR)
     pageClients.inspectorClient = new WebInspectorClient(this);
+#endif
     pageClients.backForwardClient = WebBackForwardListProxy::create(this);
     m_page = adoptPtr(new Page(pageClients));
+
+    // Qt does not yet call setIsInWindow. Until it does, just leave
+    // this line out so plug-ins and video will work. Eventually all platforms
+    // should call setIsInWindow and this comment and #if should be removed,
+    // leaving behind the setCanStartMedia call.
+#if !PLATFORM(QT)
+    m_page->setCanStartMedia(false);
+#endif
 
     updatePreferences(parameters.store);
 
     m_page->setGroupName("WebKit2Group");
-    
+
     platformInitialize();
     Settings::setMinDOMTimerInterval(0.004);
+
+    m_drawingArea = DrawingArea::create(parameters.drawingAreaInfo.type, parameters.drawingAreaInfo.id, this);
 
     m_mainFrame = WebFrame::createMainFrame(this);
 
@@ -147,6 +163,8 @@ WebPage::~WebPage()
         m_backForwardList->detach();
 
     ASSERT(!m_page);
+
+    m_sandboxExtensionTracker.invalidate();
 
 #if PLATFORM(MAC)
     ASSERT(m_pluginViews.isEmpty());
@@ -256,7 +274,8 @@ void WebPage::changeAcceleratedCompositingMode(WebCore::GraphicsLayer* layer)
     // drawing area types.
     DrawingArea::DrawingAreaInfo newDrawingAreaInfo;
 
-    WebProcess::shared().connection()->sendSync(Messages::WebPageProxy::DidChangeAcceleratedCompositing(compositing), Messages::WebPageProxy::DidChangeAcceleratedCompositing::Reply(newDrawingAreaInfo), m_pageID);
+    if (!WebProcess::shared().connection()->sendSync(Messages::WebPageProxy::DidChangeAcceleratedCompositing(compositing), Messages::WebPageProxy::DidChangeAcceleratedCompositing::Reply(newDrawingAreaInfo), m_pageID))
+        return;
     
     if (newDrawingAreaInfo.type != drawingArea()->info().type) {
         m_drawingArea = 0;
@@ -286,15 +305,19 @@ void WebPage::close()
 
     m_isClosed = true;
 
-    if (WebProcess::shared().injectedBundle())
+    if (m_isVisibleToInjectedBundle && WebProcess::shared().injectedBundle())
         WebProcess::shared().injectedBundle()->willDestroyPage(this);
 
+#if ENABLE(INSPECTOR)
     m_inspector = 0;
+#endif
 
     if (m_activePopupMenu) {
         m_activePopupMenu->disconnectFromPage();
         m_activePopupMenu = 0;
     }
+
+    m_sandboxExtensionTracker.invalidate();
 
     m_mainFrame->coreFrame()->loader()->detachFromParent();
     m_page.clear();
@@ -315,13 +338,14 @@ void WebPage::sendClose()
     send(Messages::WebPageProxy::ClosePage());
 }
 
-void WebPage::loadURL(const String& url)
+void WebPage::loadURL(const String& url, const SandboxExtension::Handle& sandboxExtensionHandle)
 {
-    loadURLRequest(ResourceRequest(KURL(KURL(), url)));
+    loadURLRequest(ResourceRequest(KURL(KURL(), url)), sandboxExtensionHandle);
 }
 
-void WebPage::loadURLRequest(const ResourceRequest& request)
+void WebPage::loadURLRequest(const ResourceRequest& request, const SandboxExtension::Handle& sandboxExtensionHandle)
 {
+    m_sandboxExtensionTracker.beginLoad(m_mainFrame.get(), sandboxExtensionHandle);
     m_mainFrame->coreFrame()->loader()->load(request, false);
 }
 
@@ -389,6 +413,12 @@ void WebPage::layoutIfNeeded()
 
 void WebPage::setSize(const WebCore::IntSize& viewSize)
 {
+#if ENABLE(TILED_BACKING_STORE)
+    // If we are resizing to content ignore external attempts.
+    if (!m_resizesToContentsLayoutSize.isEmpty())
+        return;
+#endif
+
     if (m_viewSize == viewSize)
         return;
 
@@ -400,6 +430,49 @@ void WebPage::setSize(const WebCore::IntSize& viewSize)
     
     m_viewSize = viewSize;
 }
+
+#if ENABLE(TILED_BACKING_STORE)
+void WebPage::setActualVisibleContentRect(const IntRect& rect)
+{
+    Frame* frame = m_page->mainFrame();
+
+    frame->view()->setActualVisibleContentRect(rect);
+}
+
+void WebPage::setResizesToContentsUsingLayoutSize(const IntSize& targetLayoutSize)
+{
+    m_resizesToContentsLayoutSize = targetLayoutSize;
+
+    Frame* frame = m_page->mainFrame();
+    if (m_resizesToContentsLayoutSize.isEmpty()) {
+        frame->view()->setDelegatesScrolling(false);
+        frame->view()->setUseFixedLayout(false);
+        frame->view()->setPaintsEntireContents(false);
+    } else {
+        frame->view()->setDelegatesScrolling(true);
+        frame->view()->setUseFixedLayout(true);
+        frame->view()->setPaintsEntireContents(true);
+        frame->view()->setFixedLayoutSize(m_resizesToContentsLayoutSize);
+    }
+    frame->view()->forceLayout();
+}
+
+void WebPage::resizeToContentsIfNeeded()
+{
+    if (m_resizesToContentsLayoutSize.isEmpty())
+        return;
+
+    Frame* frame = m_page->mainFrame();
+
+    IntSize contentSize = frame->view()->contentsSize();
+    if (contentSize == m_viewSize)
+        return;
+
+    m_viewSize = contentSize;
+    frame->view()->resize(m_viewSize);
+    frame->view()->setNeedsLayout();
+}
+#endif
 
 void WebPage::drawRect(GraphicsContext& graphicsContext, const IntRect& rect)
 {
@@ -456,12 +529,12 @@ void WebPage::setPageAndTextZoomFactors(double pageZoomFactor, double textZoomFa
     return frame->setPageAndTextZoomFactors(static_cast<float>(pageZoomFactor), static_cast<float>(textZoomFactor));
 }
 
-void WebPage::scaleWebView(double scale)
+void WebPage::scaleWebView(double scale, const IntPoint& origin)
 {
     Frame* frame = m_mainFrame->coreFrame();
     if (!frame)
         return;
-    frame->scalePage(scale);
+    frame->scalePage(scale, origin);
 }
 
 double WebPage::viewScaleFactor() const
@@ -482,8 +555,11 @@ void WebPage::installPageOverlay(PassRefPtr<PageOverlay> pageOverlay)
     m_pageOverlay->setNeedsDisplay();
 }
 
-void WebPage::uninstallPageOverlay()
+void WebPage::uninstallPageOverlay(PageOverlay* pageOverlay)
 {
+    if (pageOverlay != m_pageOverlay)
+        return;
+
     m_pageOverlay->setPage(0);
     m_pageOverlay = nullptr;
     m_drawingArea->setNeedsDisplay(IntRect(IntPoint(0, 0), m_viewSize));
@@ -808,6 +884,8 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setFrameFlatteningEnabled(store.frameFlatteningEnabled);
     settings->setPrivateBrowsingEnabled(store.privateBrowsingEnabled);
     settings->setDeveloperExtrasEnabled(store.developerExtrasEnabled);
+    settings->setTextAreasAreResizable(store.textAreasAreResizable);
+    settings->setNeedsSiteSpecificQuirks(store.needsSiteSpecificQuirks);
     settings->setMinimumFontSize(store.minimumFontSize);
     settings->setMinimumLogicalFontSize(store.minimumLogicalFontSize);
     settings->setDefaultFontSize(store.defaultFontSize);
@@ -832,6 +910,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     platformPreferencesDidChange(store);
 }
 
+#if ENABLE(INSPECTOR)
 WebInspector* WebPage::inspector()
 {
     if (m_isClosed)
@@ -840,6 +919,7 @@ WebInspector* WebPage::inspector()
         m_inspector = adoptPtr(new WebInspector(this));
     return m_inspector.get();
 }
+#endif
 
 #if !PLATFORM(MAC)
 bool WebPage::handleEditingKeyboardEvent(KeyboardEvent* evt)
@@ -950,6 +1030,7 @@ void WebPage::didSelectItemFromActiveContextMenu(const WebContextMenuItemData& i
 }
 
 #if PLATFORM(MAC)
+
 void WebPage::addPluginView(PluginView* pluginView)
 {
     ASSERT(!m_pluginViews.contains(pluginView));
@@ -985,7 +1066,7 @@ void WebPage::setWindowFrame(const IntRect& windowFrame)
 bool WebPage::windowIsFocused() const
 {
     return m_page->focusController()->isActive();
-}   
+}
 
 #endif
 
@@ -997,11 +1078,13 @@ void WebPage::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::Messag
         return;
     }
 
+#if ENABLE(INSPECTOR)
     if (messageID.is<CoreIPC::MessageClassWebInspector>()) {
         if (WebInspector* inspector = this->inspector())
             inspector->didReceiveWebInspectorMessage(connection, messageID, arguments);
         return;
     }
+#endif
 
     didReceiveWebPageMessage(connection, messageID, arguments);
 }
@@ -1011,6 +1094,98 @@ InjectedBundleBackForwardList* WebPage::backForwardList()
     if (!m_backForwardList)
         m_backForwardList = InjectedBundleBackForwardList::create(this);
     return m_backForwardList.get();
+}
+
+#if PLATFORM(QT)
+void WebPage::findZoomableAreaForPoint(const WebCore::IntPoint& point)
+{
+    const int minimumZoomTargetWidth = 100;
+
+    Frame* mainframe = m_mainFrame->coreFrame();
+    HitTestResult result = mainframe->eventHandler()->hitTestResultAtPoint(mainframe->view()->windowToContents(point), /*allowShadowContent*/ false, /*ignoreClipping*/ true);
+
+    Node* node = result.innerNode();
+    while (node && node->getRect().width() < minimumZoomTargetWidth)
+        node = node->parentNode();
+
+    IntRect zoomableArea;
+    if (node)
+        zoomableArea = node->getRect();
+    send(Messages::WebPageProxy::DidFindZoomableArea(zoomableArea));
+}
+#endif
+
+WebPage::SandboxExtensionTracker::~SandboxExtensionTracker()
+{
+    invalidate();
+}
+
+void WebPage::SandboxExtensionTracker::invalidate()
+{
+    if (m_pendingProvisionalSandboxExtension) {
+        m_pendingProvisionalSandboxExtension->invalidate();
+        m_pendingProvisionalSandboxExtension = 0;
+    }
+
+    if (m_provisionalSandboxExtension) {
+        m_provisionalSandboxExtension->invalidate();
+        m_provisionalSandboxExtension = 0;
+    }
+
+    if (m_committedSandboxExtension) {
+        m_committedSandboxExtension->invalidate();
+        m_committedSandboxExtension = 0;
+    }
+}
+
+void WebPage::SandboxExtensionTracker::beginLoad(WebFrame* frame, const SandboxExtension::Handle& handle)
+{
+    ASSERT(frame->isMainFrame());
+
+    ASSERT(!m_pendingProvisionalSandboxExtension);
+    m_pendingProvisionalSandboxExtension = SandboxExtension::create(handle);
+}
+
+void WebPage::SandboxExtensionTracker::didStartProvisionalLoad(WebFrame* frame)
+{
+    if (!frame->isMainFrame())
+        return;
+
+    ASSERT(!m_provisionalSandboxExtension);
+
+    m_provisionalSandboxExtension = m_pendingProvisionalSandboxExtension.release();
+    if (!m_provisionalSandboxExtension)
+        return;
+
+    m_provisionalSandboxExtension->consume();
+}
+
+void WebPage::SandboxExtensionTracker::didCommitProvisionalLoad(WebFrame* frame)
+{
+    if (!frame->isMainFrame())
+        return;
+    
+    ASSERT(!m_pendingProvisionalSandboxExtension);
+
+    // The provisional load has been committed. Invalidate the currently committed sandbox
+    // extension and make the provisional sandbox extension the committed sandbox extension.
+    if (m_committedSandboxExtension)
+        m_committedSandboxExtension->invalidate();
+
+    m_committedSandboxExtension = m_provisionalSandboxExtension.release();
+}
+
+void WebPage::SandboxExtensionTracker::didFailProvisionalLoad(WebFrame* frame)
+{
+    if (!frame->isMainFrame())
+        return;
+
+    ASSERT(!m_pendingProvisionalSandboxExtension);
+    if (!m_provisionalSandboxExtension)
+        return;
+
+    m_provisionalSandboxExtension->invalidate();
+    m_provisionalSandboxExtension = 0;
 }
 
 } // namespace WebKit

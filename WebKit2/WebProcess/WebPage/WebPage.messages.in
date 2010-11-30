@@ -38,8 +38,8 @@ messages -> WebPage {
     LoadHTMLString(WTF::String htmlString, WTF::String baseURL)
     LoadAlternateHTMLString(WTF::String htmlString, WTF::String baseURL, WTF::String unreachableURL); 
     LoadPlainTextString(WTF::String string)
-    LoadURL(WTF::String url)
-    LoadURLRequest(WebCore::ResourceRequest request)
+    LoadURL(WTF::String url, WebKit::SandboxExtension::Handle sandboxExtensionHandle)
+    LoadURLRequest(WebCore::ResourceRequest request, WebKit::SandboxExtension::Handle sandboxExtensionHandle)
     Reload(bool reloadFromOrigin)
     StopLoading()
 
@@ -56,6 +56,11 @@ messages -> WebPage {
 
     SetCustomUserAgent(WTF::String customUserAgent)
 
+#if ENABLE(TILED_BACKING_STORE)
+    SetActualVisibleContentRect(WebCore::IntRect rect)
+    SetResizesToContentsUsingLayoutSize(WebCore::IntSize size)
+#endif
+
     Close()
     TryClose()
 
@@ -70,7 +75,7 @@ messages -> WebPage {
     SetPageZoomFactor(double zoomFactor)
     SetTextZoomFactor(double zoomFactor)
 
-    ScaleWebView(double scale)
+    ScaleWebView(double scale, WebCore::IntPoint origin)
 
     # Find.
     FindString(WTF::String string, uint32_t findDirection, uint32_t findOptions, unsigned maxMatchCount)
@@ -88,5 +93,9 @@ messages -> WebPage {
 #if PLATFORM(MAC)
     SetWindowIsVisible(bool windowIsVisible)
     SetWindowFrame(WebCore::IntRect windowFrame)
+#endif
+
+#if PLATFORM(QT)
+    FindZoomableAreaForPoint(WebCore::IntPoint point)
 #endif
 }

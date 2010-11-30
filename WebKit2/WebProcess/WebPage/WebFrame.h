@@ -40,6 +40,7 @@
 namespace WebCore {
     class Frame;
     class HTMLFrameOwnerElement;
+    class KURL;
 }
 
 namespace WebKit {
@@ -70,6 +71,7 @@ public:
     void didReceivePolicyDecision(uint64_t listenerID, WebCore::PolicyAction, uint64_t downloadID);
 
     void startDownload(const WebCore::ResourceRequest&);
+    void convertHandleToDownload(WebCore::ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceRequest& initialRequest, const WebCore::ResourceResponse&);
 
     String source() const;
     String contentsAsString() const;
@@ -97,6 +99,8 @@ public:
     String layerTreeAsText() const;
     
     unsigned pendingUnloadCount() const;
+    
+    bool allowsFollowingLink(const WebCore::KURL&) const;
 
     // Simple listener class used by plug-ins to know when frames finish or fail loading.
     class LoadListener {

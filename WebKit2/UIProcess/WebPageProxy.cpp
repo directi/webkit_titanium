@@ -55,6 +55,7 @@
 #include "WebProcessProxy.h"
 #include "WebURLRequest.h"
 #include <WebCore/FloatRect.h>
+#include <WebCore/MIMETypeRegistry.h>
 #include <WebCore/WindowFeatures.h>
 #include <stdio.h>
 
@@ -95,8 +96,13 @@ WebPageProxy::WebPageProxy(WebPageNamespace* pageNamespace, uint64_t pageID)
     , m_textZoomFactor(1)
     , m_pageZoomFactor(1)
     , m_viewScaleFactor(1)
+    , m_visibleToInjectedBundle(true)
     , m_isValid(true)
     , m_isClosed(false)
+    , m_inDecidePolicyForMIMEType(false)
+    , m_syncMimeTypePolicyActionIsValid(false)
+    , m_syncMimeTypePolicyAction(PolicyUse)
+    , m_syncMimeTypePolicyDownloadID(0)
     , m_pageID(pageID)
 {
 #ifndef NDEBUG
@@ -163,6 +169,11 @@ void WebPageProxy::initializeFindClient(const WKPageFindClient* client)
     m_findClient.initialize(client);
 }
 
+void WebPageProxy::initializeContextMenuClient(const WKPageContextMenuClient* client)
+{
+    m_contextMenuClient.initialize(client);
+}
+
 void WebPageProxy::relaunch()
 {
     m_isValid = true;
@@ -204,10 +215,12 @@ void WebPageProxy::close()
 
     m_customUserAgent = String();
 
+#if ENABLE(INSPECTOR)
     if (m_inspector) {
         m_inspector->invalidate();
         m_inspector = 0;
     }
+#endif
 
     m_pageTitle = String();
     m_toolTip = String();
@@ -246,12 +259,22 @@ bool WebPageProxy::tryClose()
     return false;
 }
 
+static void initializeSandboxExtensionHandle(const KURL& url, SandboxExtension::Handle& sandboxExtensionHandle)
+{
+    if (!url.isLocalFile())
+        return;
+
+    SandboxExtension::createHandle("/", SandboxExtension::ReadOnly, sandboxExtensionHandle);
+}
+
 void WebPageProxy::loadURL(const String& url)
 {
     if (!isValid())
         relaunch();
 
-    process()->send(Messages::WebPage::LoadURL(url), m_pageID);
+    SandboxExtension::Handle sandboxExtensionHandle;
+    initializeSandboxExtensionHandle(KURL(KURL(), url), sandboxExtensionHandle);
+    process()->send(Messages::WebPage::LoadURL(url, sandboxExtensionHandle), m_pageID);
 }
 
 void WebPageProxy::loadURLRequest(WebURLRequest* urlRequest)
@@ -259,7 +282,9 @@ void WebPageProxy::loadURLRequest(WebURLRequest* urlRequest)
     if (!isValid())
         relaunch();
 
-    process()->send(Messages::WebPage::LoadURLRequest(urlRequest->resourceRequest()), m_pageID);
+    SandboxExtension::Handle sandboxExtensionHandle;
+    initializeSandboxExtensionHandle(urlRequest->resourceRequest().url(), sandboxExtensionHandle);
+    process()->send(Messages::WebPage::LoadURLRequest(urlRequest->resourceRequest(), sandboxExtensionHandle), m_pageID);
 }
 
 void WebPageProxy::loadHTMLString(const String& htmlString, const String& baseURL)
@@ -347,6 +372,23 @@ void WebPageProxy::didChangeBackForwardList()
     m_loaderClient.didChangeBackForwardList(this);
 }
 
+    
+bool WebPageProxy::canShowMIMEType(const String& mimeType) const
+{
+    if (MIMETypeRegistry::isSupportedNonImageMIMEType(mimeType))
+        return true;
+
+    if (MIMETypeRegistry::isSupportedImageMIMEType(mimeType))
+        return true;
+    
+    String newMimeType = mimeType;
+    PluginInfoStore::Plugin plugin = pageNamespace()->context()->pluginInfoStore()->findPlugin(newMimeType, KURL());
+    if (!plugin.path.isNull())
+        return true;
+
+    return false;
+}
+
 void WebPageProxy::setFocused(bool isFocused)
 {
     if (!isValid())
@@ -410,6 +452,16 @@ void WebPageProxy::updateWindowFrame(const IntRect& windowFrame)
 }
 #endif
 
+#if ENABLE(TILED_BACKING_STORE)
+void WebPageProxy::setActualVisibleContentRect(const IntRect& rect)
+{
+    if (!isValid())
+        return;
+
+    process()->send(Messages::WebPage::SetActualVisibleContentRect(rect), m_pageID);
+}
+#endif
+
 void WebPageProxy::handleMouseEvent(const WebMouseEvent& event)
 {
     if (!isValid())
@@ -459,6 +511,15 @@ void WebPageProxy::receivedPolicyDecision(PolicyAction action, WebFrameProxy* fr
     if (action == PolicyDownload) {
         // Create a download proxy.
         downloadID = pageNamespace()->context()->createDownloadProxy();
+    }
+
+    // If we received a policy decision while in decidePolicyForMIMEType the decision will 
+    // be sent back to the web process by decidePolicyForMIMEType. 
+    if (m_inDecidePolicyForMIMEType) {
+        m_syncMimeTypePolicyActionIsValid = true;
+        m_syncMimeTypePolicyAction = action;
+        m_syncMimeTypePolicyDownloadID = downloadID;
+        return;
     }
 
     process()->send(Messages::WebPage::DidReceivePolicyDecision(frame->frameID(), listenerID, action, downloadID), m_pageID);
@@ -534,7 +595,7 @@ void WebPageProxy::setPageAndTextZoomFactors(double pageZoomFactor, double textZ
     process()->send(Messages::WebPage::SetPageAndTextZoomFactors(m_pageZoomFactor, m_textZoomFactor), m_pageID); 
 }
 
-void WebPageProxy::scaleWebView(double scale)
+void WebPageProxy::scaleWebView(double scale, const IntPoint& origin)
 {
     if (!isValid())
         return;
@@ -543,7 +604,7 @@ void WebPageProxy::scaleWebView(double scale)
         return;
 
     m_viewScaleFactor = scale;
-    process()->send(Messages::WebPage::ScaleWebView(scale), m_pageID);
+    process()->send(Messages::WebPage::ScaleWebView(scale, origin), m_pageID);
 }
 
 void WebPageProxy::findString(const String& string, FindDirection findDirection, FindOptions findOptions, unsigned maxMatchCount)
@@ -603,6 +664,13 @@ void WebPageProxy::preferencesDidChange()
     process()->send(Messages::WebPage::PreferencesDidChange(pageNamespace()->context()->preferences()->store()), m_pageID);
 }
 
+#if ENABLE(TILED_BACKING_STORE)
+void WebPageProxy::setResizesToContentsUsingLayoutSize(const WebCore::IntSize& targetLayoutSize)
+{
+    process()->send(Messages::WebPage::SetResizesToContentsUsingLayoutSize(targetLayoutSize), m_pageID);
+}
+#endif
+
 void WebPageProxy::getStatistics(WKContextStatistics* statistics)
 {
     statistics->numberOfWKFrames += process()->frameCountInPage(this);
@@ -615,6 +683,14 @@ void WebPageProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::M
         return;
     }
 
+#if ENABLE(INSPECTOR)
+    if (messageID.is<CoreIPC::MessageClassWebInspectorProxy>()) {
+        if (WebInspectorProxy* inspector = this->inspector())
+            inspector->didReceiveWebInspectorProxyMessage(connection, messageID, arguments);
+        return;
+    }
+#endif
+
     didReceiveWebPageProxyMessage(connection, messageID, arguments);
 }
 
@@ -624,6 +700,14 @@ void WebPageProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIP
         m_drawingArea->didReceiveSyncMessage(connection, messageID, arguments, reply);
         return;
     }
+
+#if ENABLE(INSPECTOR)
+    if (messageID.is<CoreIPC::MessageClassWebInspectorProxy>()) {
+        if (WebInspectorProxy* inspector = this->inspector())
+            inspector->didReceiveSyncWebInspectorProxyMessage(connection, messageID, arguments, reply);
+        return;
+    }
+#endif
 
     // FIXME: Do something with reply.
     didReceiveSyncWebPageProxyMessage(connection, messageID, arguments, reply);
@@ -878,12 +962,27 @@ void WebPageProxy::decidePolicyForNewWindowAction(uint64_t frameID, uint32_t opa
         listener->use();
 }
 
-void WebPageProxy::decidePolicyForMIMEType(uint64_t frameID, const String& MIMEType, const String& url, uint64_t listenerID)
+void WebPageProxy::decidePolicyForMIMEType(uint64_t frameID, const String& MIMEType, const String& url, uint64_t listenerID, bool& receivedPolicyAction, uint64_t& policyAction, uint64_t& downloadID)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
     RefPtr<WebFramePolicyListenerProxy> listener = frame->setUpPolicyListenerProxy(listenerID);
+
+    ASSERT(!m_inDecidePolicyForMIMEType);
+
+    m_inDecidePolicyForMIMEType = true;
+    m_syncMimeTypePolicyActionIsValid = false;
+
     if (!m_policyClient.decidePolicyForMIMEType(this, MIMEType, url, frame, listener.get()))
         listener->use();
+
+    m_inDecidePolicyForMIMEType = false;
+
+    // Check if we received a policy decision already. If we did, we can just pass it back.
+    if (m_syncMimeTypePolicyActionIsValid) {
+        receivedPolicyAction = true;
+        policyAction = m_syncMimeTypePolicyAction;
+        downloadID = m_syncMimeTypePolicyDownloadID;
+    }
 }
 
 // FormClient
@@ -1041,6 +1140,19 @@ void WebPageProxy::didChangeContentsSize(const WebCore::IntSize& size)
 {
     m_pageClient->didChangeContentsSize(size);
 }
+
+void WebPageProxy::didFindZoomableArea(const WebCore::IntRect& area)
+{
+    m_pageClient->didFindZoomableArea(area);
+}
+
+void WebPageProxy::findZoomableAreaForPoint(const WebCore::IntPoint& point)
+{
+    if (!isValid())
+        return;
+
+    process()->send(Messages::WebPage::FindZoomableAreaForPoint(point), m_pageID);
+}
 #endif
 
 void WebPageProxy::didDraw()
@@ -1050,6 +1162,8 @@ void WebPageProxy::didDraw()
 
 // Inspector
 
+#if ENABLE(INSPECTOR)
+
 WebInspectorProxy* WebPageProxy::inspector()
 {
     if (isClosed() || !isValid())
@@ -1058,6 +1172,8 @@ WebInspectorProxy* WebPageProxy::inspector()
         m_inspector = WebInspectorProxy::create(this);
     return m_inspector.get();
 }
+
+#endif
 
 // BackForwardList
 
@@ -1149,18 +1265,38 @@ void WebPageProxy::hidePopupMenu()
     m_activePopupMenu = 0;
 }
 
-void WebPageProxy::showContextMenu(const WebCore::IntPoint& menuLocation, const Vector<WebContextMenuItemData>& items)
+void WebPageProxy::showContextMenu(const WebCore::IntPoint& menuLocation, const Vector<WebContextMenuItemData>& proposedItems, CoreIPC::ArgumentDecoder* arguments)
 {
+    RefPtr<APIObject> userData;
+    WebContextUserMessageDecoder messageDecoder(userData, pageNamespace()->context());
+    if (!arguments->decode(messageDecoder))
+        return;
+
     if (m_activeContextMenu)
         m_activeContextMenu->hideContextMenu();
     else
         m_activeContextMenu = m_pageClient->createContextMenuProxy(this);
-      
-    m_activeContextMenu->showContextMenu(menuLocation, items);
+
+    // Give the PageContextMenuClient one last swipe at changing the menu.
+    Vector<WebContextMenuItemData> items;
+        
+    if (!m_contextMenuClient.getContextMenuFromProposedMenu(this, proposedItems, items, userData.get())) {
+        m_activeContextMenu->showContextMenu(menuLocation, proposedItems);
+        return;
+    }
+    
+    if (items.size())
+        m_activeContextMenu->showContextMenu(menuLocation, items);
 }
 
 void WebPageProxy::contextMenuItemSelected(const WebContextMenuItemData& item)
 {
+    // Application custom items don't need to round-trip through to WebCore in the WebProcess.
+    if (item.action() >= ContextMenuItemBaseApplicationTag) {
+        m_contextMenuClient.customContextMenuItemSelected(this, item);
+        return;
+    }
+    
     process()->send(Messages::WebPage::DidSelectItemFromActiveContextMenu(item), m_pageID);
 }
 
@@ -1322,10 +1458,12 @@ void WebPageProxy::processDidCrash()
 
     m_mainFrame = 0;
 
+#if ENABLE(INSPECTOR)
     if (m_inspector) {
         m_inspector->invalidate();
         m_inspector = 0;
     }
+#endif
 
     m_customUserAgent = String();
     m_pageTitle = String();
@@ -1357,6 +1495,7 @@ WebPageCreationParameters WebPageProxy::creationParameters(const IntSize& size) 
     parameters.viewSize = size;
     parameters.store = pageNamespace()->context()->preferences()->store();
     parameters.drawingAreaInfo = m_drawingArea->info();
+    parameters.visibleToInjectedBundle = m_visibleToInjectedBundle;
 
 #if PLATFORM(WIN)
     parameters.nativeWindow = m_pageClient->nativeWindow();

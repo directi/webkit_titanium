@@ -212,8 +212,16 @@ void WebFrame::startDownload(const WebCore::ResourceRequest& request)
 {
     ASSERT(m_policyDownloadID);
 
-    DownloadManager::shared().startDownload(m_policyDownloadID, request);
+    DownloadManager::shared().startDownload(m_policyDownloadID, page(), request);
 
+    m_policyDownloadID = 0;
+}
+
+void WebFrame::convertHandleToDownload(ResourceHandle* handle, const ResourceRequest& request, const ResourceRequest& initialRequest, const ResourceResponse& response)
+{
+    ASSERT(m_policyDownloadID);
+
+    DownloadManager::shared().convertHandleToDownload(m_policyDownloadID, page(), handle, request, initialRequest, response);
     m_policyDownloadID = 0;
 }
 
@@ -405,6 +413,14 @@ unsigned WebFrame::pendingUnloadCount() const
         return 0;
 
     return m_coreFrame->domWindow()->pendingUnloadEventListeners();
+}
+
+bool WebFrame::allowsFollowingLink(const WebCore::KURL& url) const
+{
+    if (!m_coreFrame)
+        return true;
+        
+    return m_coreFrame->document()->securityOrigin()->canDisplay(url);
 }
 
 JSGlobalContextRef WebFrame::jsContext()

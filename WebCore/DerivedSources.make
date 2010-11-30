@@ -73,11 +73,10 @@ DOM_CLASSES = \
     CSSUnknownRule \
     CSSValue \
     CSSValueList \
-    CSSVariablesRule \
-    CSSVariablesDeclaration \
     WebGLActiveInfo \
     ArrayBufferView \
     ArrayBuffer \
+    DataView \
     WebGLBuffer \
     Int8Array \
     WebGLContextAttributes \
@@ -270,6 +269,8 @@ DOM_CLASSES = \
     Location \
     MediaError \
     MediaList \
+    MediaQueryList \
+    MediaQueryListListener \
     MemoryInfo \
     MessageChannel \
     MessageEvent \
@@ -279,7 +280,6 @@ DOM_CLASSES = \
     MouseEvent \
     MutationEvent \
     NamedNodeMap \
-    Navigation \
     Navigator \
     Node \
     NodeFilter \
@@ -291,6 +291,8 @@ DOM_CLASSES = \
     OverflowEvent \
     PageTransitionEvent \
     Performance \
+    PerformanceNavigation \
+    PerformanceTiming \
     PopStateEvent \
     PositionError \
     ProcessingInstruction \
@@ -303,6 +305,9 @@ DOM_CLASSES = \
     SharedWorkerContext \
     ScriptProfile \
     ScriptProfileNode \
+    SpeechInputEvent \
+    SpeechInputResult \
+    SpeechInputResultList \
     SQLError \
     SQLException \
     SQLResultSet \
@@ -330,7 +335,6 @@ DOM_CLASSES = \
     SVGAnimatedLengthList \
     SVGAnimatedNumber \
     SVGAnimatedNumberList \
-    SVGAnimatedPathData \
     SVGAnimatedPreserveAspectRatio \
     SVGAnimatedRect \
     SVGAnimatedString \
@@ -470,7 +474,6 @@ DOM_CLASSES = \
     TextEvent \
     TextMetrics \
     TimeRanges \
-    Timing \
     Touch \
     TouchEvent \
     TouchList \
@@ -505,7 +508,7 @@ DOM_CLASSES = \
 
 .PHONY : all
 
-JS_DOM_HEADERS=$(filter-out JSEventListener.h JSEventTarget.h,$(DOM_CLASSES:%=JS%.h))
+JS_DOM_HEADERS=$(filter-out JSMediaQueryListListener.h JSEventListener.h JSEventTarget.h,$(DOM_CLASSES:%=JS%.h))
 
 WEB_DOM_HEADERS :=
 ifeq ($(findstring BUILDING_WX,$(FEATURE_DEFINES)), BUILDING_WX)
@@ -714,10 +717,6 @@ endif
 
 ifeq ($(findstring ENABLE_VIDEO,$(FEATURE_DEFINES)), ENABLE_VIDEO)
     HTML_FLAGS := $(HTML_FLAGS) ENABLE_VIDEO=1
-endif
-
-ifeq ($(findstring ENABLE_RUBY,$(FEATURE_DEFINES)), ENABLE_RUBY)
-    HTML_FLAGS := $(HTML_FLAGS) ENABLE_RUBY=1
 endif
 
 ifdef HTML_FLAGS

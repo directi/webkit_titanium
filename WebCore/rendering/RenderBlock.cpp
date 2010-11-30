@@ -927,11 +927,9 @@ static bool canMergeContiguousAnonymousBlocks(RenderObject* oldChild, RenderObje
     if (prev && prev->firstChild() && prev->firstChild()->isInline() && prev->firstChild()->isRunIn())
         return false;
 
-#if ENABLE(RUBY)
     if ((prev && (prev->isRubyRun() || prev->isRubyBase()))
         || (next && (next->isRubyRun() || next->isRubyBase())))
         return false;
-#endif
 
     if (!prev || !next)
         return true;
@@ -1156,7 +1154,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, int pageHeight)
             colInfo->clearForcedBreaks();
     }
 
-    LayoutStateMaintainer statePusher(view(), this, IntSize(x(), y()), hasColumns() || hasTransform() || hasReflection(), pageHeight, pageHeightChanged, colInfo);
+    LayoutStateMaintainer statePusher(view(), this, IntSize(x(), y()), hasColumns() || hasTransform() || hasReflection() || style()->isFlippedBlocksWritingMode(), pageHeight, pageHeightChanged, colInfo);
 
     // We use four values, maxTopPos, maxTopNeg, maxBottomPos, and maxBottomNeg, to track
     // our current maximal positive and negative margins.  These values are used when we
@@ -1255,6 +1253,8 @@ void RenderBlock::layoutBlock(bool relayoutChildren, int pageHeight)
 
     if (view()->layoutState()->m_pageHeight)
         setPageY(view()->layoutState()->pageY(y()));
+
+    updateLayerTransform();
 
     // Update our scroll information if we're overflow:auto/scroll/hidden now that we know if
     // we overflow or not.
@@ -1774,10 +1774,9 @@ void RenderBlock::layoutBlockChildren(bool relayoutChildren, int& maxFloatLogica
     MarginInfo marginInfo(this, beforeEdge, afterEdge);
 
     // Fieldsets need to find their legend and position it inside the border of the object.
-    // The legend then gets skipped during normal layout.
-    // FIXME: Make fieldsets work with block-flow.
-    // https://bugs.webkit.org/show_bug.cgi?id=46785
-    RenderObject* legend = layoutLegend(relayoutChildren);
+    // The legend then gets skipped during normal layout.  The same is true for ruby text.
+    // It doesn't get included in the normal layout process but is instead skipped.
+    RenderObject* childToExclude = layoutSpecialExcludedChild(relayoutChildren);
 
     int previousFloatLogicalBottom = 0;
     maxFloatLogicalBottom = 0;
@@ -1788,8 +1787,8 @@ void RenderBlock::layoutBlockChildren(bool relayoutChildren, int& maxFloatLogica
         RenderBox* child = next;
         next = child->nextSiblingBox();
 
-        if (legend == child)
-            continue; // Skip the legend, since it has already been positioned up in the fieldset's border.
+        if (childToExclude == child)
+            continue; // Skip this child, since it will be positioned by the specialized subclass (fieldsets and ruby runs).
 
         // Make sure we layout children if they need it.
         // FIXME: Technically percentage height objects only need a relayout if their percentage isn't going to be turned into
@@ -1989,7 +1988,7 @@ bool RenderBlock::layoutOnlyPositionedObjects()
     if (!posChildNeedsLayout() || normalChildNeedsLayout() || selfNeedsLayout())
         return false;
 
-    LayoutStateMaintainer statePusher(view(), this, IntSize(x(), y()), hasColumns() || hasTransform() || hasReflection());
+    LayoutStateMaintainer statePusher(view(), this, IntSize(x(), y()), hasColumns() || hasTransform() || hasReflection() || style()->isFlippedBlocksWritingMode());
 
     if (needsPositionedMovementLayout()) {
         tryLayoutDoingPositionedMovementOnly();
@@ -2001,6 +2000,8 @@ bool RenderBlock::layoutOnlyPositionedObjects()
     layoutPositionedObjects(false);
 
     statePusher.pop();
+    
+    updateLayerTransform();
 
     updateScrollInfoAfterLayout();
 
@@ -2219,7 +2220,7 @@ void RenderBlock::paintContents(PaintInfo& paintInfo, int tx, int ty)
     // Avoid painting descendants of the root element when stylesheets haven't loaded.  This eliminates FOUC.
     // It's ok not to draw, because later on, when all the stylesheets do load, updateStyleSelector on the Document
     // will do a full repaint().
-    if (document()->didLayoutWithPendingStylesheets() && !isRenderView())
+    if (document()->mayCauseFlashOfUnstyledContent() && !isRenderView())
         return;
 
     if (childrenInline())
@@ -2568,8 +2569,9 @@ void RenderBlock::paintSelection(PaintInfo& paintInfo, int tx, int ty)
             if (RenderLayer* layer = enclosingLayer()) {
                 gapRectsBounds.move(IntSize(-tx, -ty));
                 if (!hasLayer()) {
-                    FloatRect localBounds(gapRectsBounds);
-                    gapRectsBounds = localToContainerQuad(localBounds, layer->renderer()).enclosingBoundingBox();
+                    IntRect localBounds(gapRectsBounds);
+                    flipForWritingMode(localBounds);
+                    gapRectsBounds = localToContainerQuad(FloatRect(localBounds), layer->renderer()).enclosingBoundingBox();
                     gapRectsBounds.move(layer->scrolledContentOffset());
                 }
                 layer->addBlockSelectionGapsBounds(gapRectsBounds);
@@ -5231,7 +5233,7 @@ bool RenderBlock::hasLineIfEmpty() const
     if (node()->isContentEditable() && node()->rootEditableElement() == node())
         return true;
     
-    if (node()->isShadowNode() && (node()->shadowParentNode()->hasTagName(inputTag) || node()->shadowParentNode()->hasTagName(textareaTag)))
+    if (node()->isShadowNode() && (node()->shadowParentNode()->hasTagName(inputTag)))
         return true;
     
     return false;
@@ -5258,7 +5260,7 @@ int RenderBlock::lineHeight(bool firstLine, LineDirectionMode direction, LinePos
     return m_lineHeight;
 }
 
-int RenderBlock::baselinePosition(bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
+int RenderBlock::baselinePosition(FontBaseline baselineType, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
 {
     // Inline blocks are replaced elements. Otherwise, just pass off to
     // the base class.  If we're being queried as though we're the root line
@@ -5287,11 +5289,11 @@ int RenderBlock::baselinePosition(bool firstLine, LineDirectionMode direction, L
         if (baselinePos != -1 && baselinePos <= bottomOfContent)
             return direction == HorizontalLine ? marginTop() + baselinePos : marginRight() + baselinePos;
             
-        return RenderBox::baselinePosition(firstLine, direction, linePositionMode);
+        return RenderBox::baselinePosition(baselineType, firstLine, direction, linePositionMode);
     }
 
     const Font& f = style(firstLine)->font();
-    return f.ascent() + (lineHeight(firstLine, direction, linePositionMode) - f.height()) / 2;
+    return f.ascent(baselineType) + (lineHeight(firstLine, direction, linePositionMode) - f.height()) / 2;
 }
 
 int RenderBlock::firstLineBoxBaseline() const
@@ -5301,7 +5303,7 @@ int RenderBlock::firstLineBoxBaseline() const
 
     if (childrenInline()) {
         if (firstLineBox())
-            return firstLineBox()->logicalTop() + style(true)->font().ascent();
+            return firstLineBox()->logicalTop() + style(true)->font().ascent(firstRootBox()->baselineType());
         else
             return -1;
     }
@@ -5331,7 +5333,7 @@ int RenderBlock::lastLineBoxBaseline() const
             return f.ascent() + (lineHeight(true, lineDirection, PositionOfInteriorLineBoxes) - f.height()) / 2 + (lineDirection == HorizontalLine ? borderTop() + paddingTop() : borderRight() + paddingRight());
         }
         if (lastLineBox())
-            return lastLineBox()->logicalTop() + style(lastLineBox() == firstLineBox())->font().ascent();
+            return lastLineBox()->logicalTop() + style(lastLineBox() == firstLineBox())->font().ascent(lastRootBox()->baselineType());
         return -1;
     } else {
         bool haveNormalFlowChild = false;

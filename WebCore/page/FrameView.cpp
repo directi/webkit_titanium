@@ -303,7 +303,7 @@ bool FrameView::didFirstLayout() const
 void FrameView::invalidateRect(const IntRect& rect)
 {
     if (!parent()) {
-        if (hostWindow())
+        if (hostWindow() && shouldUpdate())
             hostWindow()->invalidateContentsAndWindow(rect, false /*immediate*/);
         return;
     }
@@ -349,17 +349,7 @@ void FrameView::setMarginHeight(int h)
     m_margins.setHeight(h);
 }
 
-bool FrameView::delegatesScrolling()
-{
-    ASSERT(m_frame);
-
-    if (parent())
-        return false;
-
-    return m_frame->settings() && m_frame->settings()->shouldDelegateScrolling();
-}
-
-bool FrameView::avoidScrollbarCreation()
+bool FrameView::avoidScrollbarCreation() const
 {
     ASSERT(m_frame);
 
@@ -445,7 +435,16 @@ void FrameView::adjustViewSize()
     if (!root)
         return;
 
-    setContentsSize(IntSize(root->rightLayoutOverflow(), root->bottomLayoutOverflow()));
+    int prevScrollOriginX = scrollOriginX();
+    ScrollView::setScrollOriginX(-root->leftLayoutOverflow());
+    IntSize size = IntSize(root->rightLayoutOverflow() - root->leftLayoutOverflow(), root->bottomLayoutOverflow());
+    // Take care of the case when contents remain but the RenderView's direction has changed.
+    // In which case, we need to update scroller position, for example, from leftmost to
+    // rightmost when direction changes from left-to-right to right-to-left.
+    bool directionChanged = (!prevScrollOriginX || !scrollOriginX()) && (scrollOriginX() != prevScrollOriginX);
+    if (size == contentsSize() && directionChanged)
+        ScrollView::updateScrollbars();
+    setContentsSize(size);
 }
 
 void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, ScrollbarMode& vMode)
@@ -1322,7 +1321,7 @@ void FrameView::repaintContentRectangle(const IntRect& r, bool immediate)
         return;
     }
     
-    if (!immediate && isOffscreen() && !shouldUpdateWhileOffscreen())
+    if (!shouldUpdate(immediate))
         return;
 
 #if ENABLE(TILED_BACKING_STORE)
@@ -1396,7 +1395,7 @@ void FrameView::checkStopDelayingDeferredRepaints()
 void FrameView::doDeferredRepaints()
 {
     ASSERT(!m_deferringRepaints);
-    if (isOffscreen() && !shouldUpdateWhileOffscreen()) {
+    if (!shouldUpdate()) {
         m_repaintRects.clear();
         m_repaintCount = 0;
         return;
@@ -1635,6 +1634,15 @@ void FrameView::setShouldUpdateWhileOffscreen(bool shouldUpdateWhileOffscreen)
     m_shouldUpdateWhileOffscreen = shouldUpdateWhileOffscreen;
 }
 
+bool FrameView::shouldUpdate(bool immediateRequested) const
+{
+    if (!immediateRequested && isOffscreen() && !shouldUpdateWhileOffscreen())
+        return false;
+    if (!m_frame || !m_frame->document() || m_frame->document()->mayCauseFlashOfUnstyledContent())
+        return false;
+    return true;
+}
+
 void FrameView::scheduleEvent(PassRefPtr<Event> event, PassRefPtr<Node> eventTarget)
 {
     if (!m_enqueueEvents) {
@@ -1841,6 +1849,9 @@ void FrameView::dispatchScheduledEvents()
 IntRect FrameView::windowClipRect(bool clipToContents) const
 {
     ASSERT(m_frame->view() == this);
+
+    if (paintsEntireContents())
+        return IntRect(IntPoint(0, 0), contentsSize());
 
     // Set our clip rect to be our contents.
     IntRect clipRect = contentsToWindow(visibleContentRect(!clipToContents));

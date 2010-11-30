@@ -81,6 +81,9 @@ void SVGForeignObjectElement::svgAttributeChanged(const QualifiedName& attrName)
     if (isLengthAttribute)
         updateRelativeLengthsInformation();
 
+    if (SVGTests::handleAttributeChange(this, attrName))
+        return;
+
     RenderObject* renderer = this->renderer();
     if (!renderer)
         return;
@@ -92,7 +95,6 @@ void SVGForeignObjectElement::svgAttributeChanged(const QualifiedName& attrName)
     }
 
     if (isLengthAttribute
-        || SVGTests::isKnownAttribute(attrName)
         || SVGLangSpace::isKnownAttribute(attrName)
         || SVGExternalResourcesRequired::isKnownAttribute(attrName))
         RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer);
@@ -109,6 +111,7 @@ void SVGForeignObjectElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeHeight();
         synchronizeExternalResourcesRequired();
         synchronizeHref();
+        SVGTests::synchronizeProperties(this, attrName);
         return;
     }
 
@@ -122,6 +125,8 @@ void SVGForeignObjectElement::synchronizeProperty(const QualifiedName& attrName)
         synchronizeHeight();
     else if (SVGExternalResourcesRequired::isKnownAttribute(attrName))
         synchronizeExternalResourcesRequired();
+    else if (SVGTests::isKnownAttribute(attrName))
+        SVGTests::synchronizeProperties(this, attrName);
 }
 
 RenderObject* SVGForeignObjectElement::createRenderer(RenderArena* arena, RenderStyle*)

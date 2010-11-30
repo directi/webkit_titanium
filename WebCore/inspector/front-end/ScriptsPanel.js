@@ -135,8 +135,8 @@ WebInspector.ScriptsPanel = function()
     if (Preferences.nativeInstrumentationEnabled) {
         this.sidebarPanes.domBreakpoints = WebInspector.createDOMBreakpointsSidebarPane();
         this.sidebarPanes.xhrBreakpoints = WebInspector.createXHRBreakpointsSidebarPane();
+        this.sidebarPanes.eventListenerBreakpoints = new WebInspector.EventListenerBreakpointsSidebarPane();
     }
-    this.sidebarPanes.eventListenerBreakpoints = new WebInspector.EventListenerBreakpointsSidebarPane();
 
     this.sidebarPanes.workers = new WebInspector.WorkersSidebarPane();
 
@@ -213,11 +213,9 @@ WebInspector.ScriptsPanel.prototype = {
         WebInspector.Panel.prototype.show.call(this);
         this.sidebarResizeElement.style.right = (this.sidebarElement.offsetWidth - 3) + "px";
 
-        if (this.visibleView) {
-            if (this.visibleView instanceof WebInspector.ResourceView)
-                this.visibleView.headersVisible = false;
+        if (this.visibleView)
             this.visibleView.show(this.viewsContainerElement);
-        }
+
         if (this._attachDebuggerWhenShown) {
             InspectorBackend.enableDebugger(false);
             delete this._attachDebuggerWhenShown;
@@ -385,10 +383,11 @@ WebInspector.ScriptsPanel.prototype = {
 
         this._updateDebuggerButtons();
 
+        WebInspector.currentPanel = this;
+
         this.sidebarPanes.callstack.update(callFrames, this._sourceIDMap);
         this.sidebarPanes.callstack.selectedCallFrame = callFrames[0];
 
-        WebInspector.currentPanel = this;
         window.focus();
     },
 
@@ -462,8 +461,8 @@ WebInspector.ScriptsPanel.prototype = {
             if (Preferences.nativeInstrumentationEnabled) {
                 this.sidebarPanes.domBreakpoints.reset();
                 this.sidebarPanes.xhrBreakpoints.reset();
+                this.sidebarPanes.eventListenerBreakpoints.reset();
             }
-            this.sidebarPanes.eventListenerBreakpoints.reset();
             this.sidebarPanes.workers.reset();
         }
     },
@@ -597,10 +596,9 @@ WebInspector.ScriptsPanel.prototype = {
             return;
 
         var view;
-        if (scriptOrResource instanceof WebInspector.Resource) {
+        if (scriptOrResource instanceof WebInspector.Resource)
             view = WebInspector.ResourceManager.resourceViewForResource(scriptOrResource);
-            view.headersVisible = false;
-        } else if (scriptOrResource instanceof WebInspector.Script)
+        else if (scriptOrResource instanceof WebInspector.Script)
             view = this.scriptViewForScript(scriptOrResource);
 
         if (!view)

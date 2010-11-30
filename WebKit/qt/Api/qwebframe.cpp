@@ -558,6 +558,10 @@ void QWebFrame::addToJavaScriptWindowObject(const QString &name, QObject *object
         qDebug() << "Warning: couldn't get window object";
         return;
     }
+    if (!root) {
+        qDebug() << "Warning: couldn't get root object";
+        return;
+    }
 
     JSC::ExecState* exec = window->globalExec();
 
@@ -1189,7 +1193,7 @@ void QWebFrame::setTextSizeMultiplier(qreal factor)
 */
 qreal QWebFrame::textSizeMultiplier() const
 {
-    return d->zoomTextOnly ? d->frame->textZoomFactor() : d->frame->pageZoomFactor();
+    return page()->settings()->testAttribute(QWebSettings::ZoomTextOnly) ? d->frame->textZoomFactor() : d->frame->pageZoomFactor();
 }
 
 /*!
@@ -1200,7 +1204,7 @@ qreal QWebFrame::textSizeMultiplier() const
 
 void QWebFrame::setZoomFactor(qreal factor)
 {
-    if (d->zoomTextOnly)
+    if (page()->settings()->testAttribute(QWebSettings::ZoomTextOnly))
         d->frame->setTextZoomFactor(factor);
     else
         d->frame->setPageZoomFactor(factor);
@@ -1208,7 +1212,7 @@ void QWebFrame::setZoomFactor(qreal factor)
 
 qreal QWebFrame::zoomFactor() const
 {
-    return d->zoomTextOnly ? d->frame->textZoomFactor() : d->frame->pageZoomFactor();
+    return page()->settings()->testAttribute(QWebSettings::ZoomTextOnly) ? d->frame->textZoomFactor() : d->frame->pageZoomFactor();
 }
 
 /*!

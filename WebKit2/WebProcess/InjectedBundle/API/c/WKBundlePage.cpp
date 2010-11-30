@@ -27,9 +27,13 @@
 #include "WKBundlePagePrivate.h"
 
 #include "InjectedBundleBackForwardList.h"
+#include "WebPage.h"
+#include "WebURL.h"
+#include "WebURLRequest.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
-#include "WebPage.h"
+
+#include <WebCore/KURL.h>
 
 using namespace WebKit;
 
@@ -138,7 +142,17 @@ void WKBundlePageInstallPageOverlay(WKBundlePageRef pageRef, WKBundlePageOverlay
     toImpl(pageRef)->installPageOverlay(toImpl(pageOverlayRef));
 }
 
-void WKBundlePageUninstallPageOverlay(WKBundlePageRef pageRef)
+void WKBundlePageUninstallPageOverlay(WKBundlePageRef pageRef, WKBundlePageOverlayRef pageOverlayRef)
 {
-    toImpl(pageRef)->uninstallPageOverlay();
+    toImpl(pageRef)->uninstallPageOverlay(toImpl(pageOverlayRef));
+}
+
+bool WKBundlePageHasLocalDataForURL(WKBundlePageRef pageRef, WKURLRef urlRef)
+{
+    return toImpl(pageRef)->hasLocalDataForURL(WebCore::KURL(WebCore::KURL(), toImpl(urlRef)->string()));
+}
+
+bool WKBundlePageCanHandleRequest(WKURLRequestRef requestRef)
+{
+    return WebPage::canHandleRequest(toImpl(requestRef)->resourceRequest());
 }

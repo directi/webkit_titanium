@@ -197,10 +197,8 @@
       # Bindings with custom Objective-C implementations.
       '../page/AbstractView.idl',
 
-      # FIXME: I don't know why all of these are excluded.
-      # Extra SVG bindings to exclude.
+      # These bindings are excluded, as they're only used through inheritance and don't define constants that would need a constructor.
       '../svg/ElementTimeControl.idl',
-      '../svg/SVGAnimatedPathData.idl',
       '../svg/SVGExternalResourcesRequired.idl',
       '../svg/SVGFilterPrimitiveStandardAttributes.idl',
       '../svg/SVGFitToViewBox.idl',
@@ -247,14 +245,10 @@
           '../platform/mac',
           '../platform/text/mac',
         ],
-        # enable -Wall and -Werror, just for Mac and Linux builds for now
-        # FIXME: Also enable this for Windows after verifying no warnings
+        # enable -Wall and -Werror, just for Linux builds for now
+        # FIXME: Also enable this for Linux/Windows after verifying no warnings
         'chromium_code': 1,
       }],
-# FIXME: disabled for now due to failures on different gcc versions
-#     ['OS=="linux"', {
-#        'chromium_code': 1,
-#      }],
       ['OS=="win"', {
         'webcore_include_dirs': [
           '../page/win',
@@ -499,6 +493,7 @@
             '../css/quirks.css',
             '../css/view-source.css',
             '../css/themeChromiumLinux.css',
+            '../css/themeChromiumSkia.css',
             '../css/themeWin.css',
             '../css/themeWinQuirks.css',
             '../css/svg.css',

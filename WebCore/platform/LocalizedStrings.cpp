@@ -585,7 +585,47 @@ String validationMessageValueMissingText()
     return platformStrategies()->localizationStrategy()->validationMessageValueMissingText();
 }
 
+String validationMessageValueMissingForCheckboxText()
+{
+    return platformStrategies()->localizationStrategy()->validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForFileText()
+{
+    return platformStrategies()->localizationStrategy()->validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForMultipleFileText()
+{
+    return platformStrategies()->localizationStrategy()->validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForRadioText()
+{
+    return platformStrategies()->localizationStrategy()->validationMessageValueMissingText();
+}
+
+String validationMessageValueMissingForSelectText()
+{
+    return platformStrategies()->localizationStrategy()->validationMessageValueMissingText();
+}
+
 String validationMessageTypeMismatchText()
+{
+    return platformStrategies()->localizationStrategy()->validationMessageTypeMismatchText();
+}
+
+String validationMessageTypeMismatchForEmailText()
+{
+    return platformStrategies()->localizationStrategy()->validationMessageTypeMismatchText();
+}
+
+String validationMessageTypeMismatchForMultipleEmailText()
+{
+    return platformStrategies()->localizationStrategy()->validationMessageTypeMismatchText();
+}
+
+String validationMessageTypeMismatchForURLText()
 {
     return platformStrategies()->localizationStrategy()->validationMessageTypeMismatchText();
 }
@@ -595,22 +635,22 @@ String validationMessagePatternMismatchText()
     return platformStrategies()->localizationStrategy()->validationMessagePatternMismatchText();
 }
 
-String validationMessageTooLongText()
+String validationMessageTooLongText(int, int)
 {
     return platformStrategies()->localizationStrategy()->validationMessageTooLongText();
 }
 
-String validationMessageRangeUnderflowText()
+String validationMessageRangeUnderflowText(const String&)
 {
     return platformStrategies()->localizationStrategy()->validationMessageRangeUnderflowText();
 }
 
-String validationMessageRangeOverflowText()
+String validationMessageRangeOverflowText(const String&)
 {
     return platformStrategies()->localizationStrategy()->validationMessageRangeOverflowText();
 }
 
-String validationMessageStepMismatchText()
+String validationMessageStepMismatchText(const String&, const String&)
 {
     return platformStrategies()->localizationStrategy()->validationMessageStepMismatchText();
 }

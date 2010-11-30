@@ -51,6 +51,7 @@
 #include "JSPageTransitionEvent.h"
 #include "JSPopStateEvent.h"
 #include "JSProgressEvent.h"
+#include "JSSpeechInputEvent.h"
 #include "JSTextEvent.h"
 #include "JSUIEvent.h"
 #include "JSWebKitAnimationEvent.h"
@@ -68,6 +69,7 @@
 #include "PageTransitionEvent.h"
 #include "PopStateEvent.h"
 #include "ProgressEvent.h"
+#include "SpeechInputEvent.h"
 #include "TextEvent.h"
 #include "UIEvent.h"
 #include "WebKitAnimationEvent.h"
@@ -96,6 +98,11 @@
 #include "IDBSuccessEvent.h"
 #include "JSIDBErrorEvent.h"
 #include "JSIDBSuccessEvent.h"
+#endif
+
+#if ENABLE(WEB_AUDIO)
+#include "AudioProcessingEvent.h"
+#include "JSAudioProcessingEvent.h"
 #endif
 
 using namespace JSC;
@@ -183,6 +190,14 @@ JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, Event* event)
         wrapper = CREATE_DOM_OBJECT_WRAPPER(exec, globalObject, DeviceMotionEvent, event);
     else if (event->isDeviceOrientationEvent())
         wrapper = CREATE_DOM_OBJECT_WRAPPER(exec, globalObject, DeviceOrientationEvent, event);
+#endif
+#if ENABLE(WEB_AUDIO)
+    else if (event->isAudioProcessingEvent())
+        wrapper = CREATE_DOM_OBJECT_WRAPPER(exec, globalObject, AudioProcessingEvent, event);
+#endif
+#if ENABLE(INPUT_SPEECH)
+    else if (event->isSpeechInputEvent())
+        wrapper = CREATE_DOM_OBJECT_WRAPPER(exec, globalObject, SpeechInputEvent, event);
 #endif
     else
         wrapper = CREATE_DOM_OBJECT_WRAPPER(exec, globalObject, Event, event);

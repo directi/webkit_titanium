@@ -23,6 +23,8 @@
 #include "ChunkedUpdateDrawingAreaProxy.h"
 #include "IntSize.h"
 #include "RunLoop.h"
+#include "TiledDrawingAreaProxy.h"
+#include "UpdateChunk.h"
 #include "WKAPICast.h"
 #include "WebPageNamespace.h"
 #include "qwkpage.h"
@@ -33,6 +35,7 @@
 #include <QPainter>
 #include <QScrollBar>
 #include <QStyleOptionGraphicsItem>
+#include <QUrl>
 #include <QtDebug>
 #include <WebKit2/WKRetainPtr.h>
 #include <wtf/RefPtr.h>
@@ -45,8 +48,13 @@ struct QGraphicsWKViewPrivate {
     QGraphicsWKViewPrivate(QGraphicsWKView* view);
     WKPageRef pageRef() const { return page->pageRef(); }
 
+    void onScaleChanged();
+    void commitScale();
+
     QGraphicsWKView* q;
     QWKPage* page;
+    RunLoop::Timer<QGraphicsWKViewPrivate> m_scaleCommitTimer;
+    bool m_isChangingScale;
 };
 
 QGraphicsWKView::QGraphicsWKView(WKPageNamespaceRef pageNamespaceRef, BackingStoreType backingStoreType, QGraphicsItem* parent)
@@ -56,8 +64,23 @@ QGraphicsWKView::QGraphicsWKView(WKPageNamespaceRef pageNamespaceRef, BackingSto
     setFocusPolicy(Qt::StrongFocus);
     setAcceptHoverEvents(true);
 
+    PassOwnPtr<DrawingAreaProxy> drawingAreaProxy;
+
+    switch (backingStoreType) {
+#if ENABLE(TILED_BACKING_STORE)
+    case Tiled:
+        drawingAreaProxy = TiledDrawingAreaProxy::create(this);
+        connect(this, SIGNAL(scaleChanged()), this, SLOT(onScaleChanged()));
+        break;
+#endif
+    case Simple:
+    default:
+        drawingAreaProxy = ChunkedUpdateDrawingAreaProxy::create(this);
+        break;
+    }
+
     d->page = new QWKPage(pageNamespaceRef);
-    d->page->d->init(size().toSize(), ChunkedUpdateDrawingAreaProxy::create(this));
+    d->page->d->init(size().toSize(), drawingAreaProxy);
     connect(d->page, SIGNAL(titleChanged(QString)), this, SIGNAL(titleChanged(QString)));
     connect(d->page, SIGNAL(loadStarted()), this, SIGNAL(loadStarted()));
     connect(d->page, SIGNAL(loadFinished(bool)), this, SIGNAL(loadFinished(bool)));
@@ -65,6 +88,7 @@ QGraphicsWKView::QGraphicsWKView(WKPageNamespaceRef pageNamespaceRef, BackingSto
     connect(d->page, SIGNAL(initialLayoutCompleted()), this, SIGNAL(initialLayoutCompleted()));
     connect(d->page, SIGNAL(urlChanged(const QUrl&)), this, SIGNAL(urlChanged(const QUrl&)));
     connect(d->page, SIGNAL(cursorChanged(const QCursor&)), this, SLOT(updateCursor(const QCursor&)));
+    connect(d->page, SIGNAL(focusNextPrevChild(bool)), this, SLOT(focusNextPrevChildCallback(bool)));
 }
 
 QGraphicsWKView::~QGraphicsWKView()
@@ -85,7 +109,10 @@ void QGraphicsWKView::paint(QPainter* painter, const QStyleOptionGraphicsItem* o
 
 void QGraphicsWKView::setGeometry(const QRectF& rect)
 {
+    QSizeF oldSize = geometry().size();
     QGraphicsWidget::setGeometry(rect);
+    if (geometry().size() == oldSize)
+        return;
 
     // NOTE: call geometry() as setGeometry ensures that
     // the geometry is within legal bounds (minimumSize, maximumSize)
@@ -140,6 +167,43 @@ void QGraphicsWKView::stop()
 void QGraphicsWKView::updateCursor(const QCursor& cursor)
 {
     setCursor(cursor);
+}
+
+class FriendlyWidget : public QWidget
+{
+public:
+    bool focusNextPrevChild(bool next);
+};
+
+void QGraphicsWKView::focusNextPrevChildCallback(bool next)
+{
+    if (hasFocus()) {
+        // find the view which has the focus:
+        QList<QGraphicsView*> views = scene()->views();
+        const int viewCount = views.count();
+        QGraphicsView* focusedView = 0;
+        for (int i = 0; i < viewCount; ++i) {
+            if (views[i]->hasFocus()) {
+                focusedView = views[i];
+                break;
+            }
+        }
+
+        if (focusedView) {
+            QWidget* window = focusedView->window();
+            FriendlyWidget* friendlyWindow = static_cast<FriendlyWidget*>(window);
+            friendlyWindow->focusNextPrevChild(next);
+        }
+    }
+}
+
+/*! \reimp
+*/
+bool QGraphicsWKView::focusNextPrevChild(bool next)
+{
+    QKeyEvent ev(QEvent::KeyPress, Qt::Key_Tab, Qt::KeyboardModifiers(next ? Qt::NoModifier : Qt::ShiftModifier));
+    page()->d->keyPressEvent(&ev);
+    return true;
 }
 
 /*! \reimp
@@ -241,12 +305,10 @@ void QGraphicsWKView::wheelEvent(QGraphicsSceneWheelEvent* ev)
         QGraphicsItem::wheelEvent(ev);
 }
 
-#if ENABLE(TOUCH_EVENTS)
 void QGraphicsWKView::touchEvent(QTouchEvent* ev)
 {
     page()->d->touchEvent(ev);
 }
-#endif
 
 void QGraphicsWKView::focusInEvent(QFocusEvent*)
 {
@@ -260,8 +322,21 @@ void QGraphicsWKView::focusOutEvent(QFocusEvent*)
     page()->d->page->setActive(false);
 }
 
+void QGraphicsWKView::takeSnapshot(const QSize& size, const QRect& contentsRect)
+{
+#if ENABLE(TILED_BACKING_STORE)
+    DrawingAreaProxy* drawingArea = page()->d->page->drawingArea();
+    if (drawingArea->info().type != DrawingAreaProxy::TiledDrawingAreaType)
+        return;
+    TiledDrawingAreaProxy* tiledDrawingArea = static_cast<TiledDrawingAreaProxy*>(drawingArea);
+    tiledDrawingArea->takeSnapshot(size, contentsRect);
+#endif
+}
+
 QGraphicsWKViewPrivate::QGraphicsWKViewPrivate(QGraphicsWKView* view)
     : q(view)
+    , m_scaleCommitTimer(RunLoop::current(), this, &QGraphicsWKViewPrivate::commitScale)
+    , m_isChangingScale(false)
 {
 }
 
@@ -278,6 +353,48 @@ QRectF QGraphicsWKView::visibleRect() const
     int xOffset = graphicsView->horizontalScrollBar()->value();
     int yOffset = graphicsView->verticalScrollBar()->value();
     return mapRectFromScene(QRectF(QPointF(xOffset, yOffset), graphicsView->viewport()->size()));
+}
+
+void QGraphicsWKView::prepareScaleChange()
+{
+#if ENABLE(TILED_BACKING_STORE)
+    ASSERT(!d->m_isChangingScale);
+    d->m_isChangingScale = true;
+    d->m_scaleCommitTimer.stop();
+#endif
+}
+
+void QGraphicsWKView::commitScaleChange()
+{
+#if ENABLE(TILED_BACKING_STORE)
+    ASSERT(d->m_isChangingScale);
+    d->m_isChangingScale = false;
+    d->commitScale();
+#endif
+}
+
+void QGraphicsWKViewPrivate::onScaleChanged()
+{
+#if ENABLE(TILED_BACKING_STORE)
+    if (!m_isChangingScale)
+        m_scaleCommitTimer.startOneShot(0.1);
+#endif
+}
+
+void QGraphicsWKViewPrivate::commitScale()
+{
+#if ENABLE(TILED_BACKING_STORE)
+    DrawingAreaProxy* drawingArea = page->d->page->drawingArea();
+    float newScale = q->scale();
+    if (drawingArea->info().type == DrawingAreaProxy::TiledDrawingAreaType) {
+        TiledDrawingAreaProxy* tiledDrawingArea = static_cast<TiledDrawingAreaProxy*>(drawingArea);
+        if (tiledDrawingArea->contentsScale() == newScale)
+            return;
+        tiledDrawingArea->setContentsScale(newScale);
+        // For now we block until complete.
+        tiledDrawingArea->waitUntilUpdatesComplete();
+    }
+#endif
 }
 
 #include "moc_qgraphicswkview.cpp"

@@ -59,6 +59,9 @@ static void makeCapitalized(String* string, UChar previous)
     unsigned length = string->length();
     const UChar* characters = string->characters();
 
+    if (length >= numeric_limits<unsigned>::max())
+        CRASH();
+
     StringBuffer stringWithPrevious(length + 1);
     stringWithPrevious[0] = previous == noBreakSpace ? ' ' : previous;
     for (unsigned i = 1; i < length + 1; i++) {
@@ -426,7 +429,7 @@ VisiblePosition RenderText::positionForPoint(const IntPoint& point)
         // at the y coordinate of the first line or above
         // and the x coordinate is to the left of the first text box left edge
         offset = firstTextBox()->offsetForPosition(pointLineDirection);
-        return createVisiblePosition(offset + firstTextBox()->start(), DOWNSTREAM);
+        return createVisiblePosition(offset + firstTextBox()->start(), offset > 0 ? VP_UPSTREAM_IF_POSSIBLE : DOWNSTREAM);
     }
     if (lastTextBox() && pointBlockDirection >= lastTextBox()->root()->selectionTop() && pointLineDirection >= lastTextBox()->logicalRight()) {
         // at the y coordinate of the last line or below

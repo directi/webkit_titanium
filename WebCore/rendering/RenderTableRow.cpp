@@ -115,7 +115,7 @@ void RenderTableRow::layout()
     ASSERT(needsLayout());
 
     // Table rows do not add translation.
-    LayoutStateMaintainer statePusher(view(), this, IntSize());
+    LayoutStateMaintainer statePusher(view(), this, IntSize(), style()->isFlippedBlocksWritingMode());
 
     bool paginated = view()->layoutState()->isPaginated();
                 
@@ -145,6 +145,7 @@ void RenderTableRow::layout()
     }
 
     statePusher.pop();
+    // RenderTableSection::layoutRows will set our logical height and width later, so it calls updateLayerTransform().
     setNeedsLayout(false);
 }
 

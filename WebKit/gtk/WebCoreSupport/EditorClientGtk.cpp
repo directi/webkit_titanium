@@ -38,6 +38,11 @@
 #include "Page.h"
 #include "PasteboardHelperGtk.h"
 #include "PlatformKeyboardEvent.h"
+#include "WebKitDOMBinding.h"
+#include "WebKitDOMCSSStyleDeclarationPrivate.h"
+#include "WebKitDOMHTMLElementPrivate.h"
+#include "WebKitDOMNodePrivate.h"
+#include "WebKitDOMRangePrivate.h"
 #include "WindowsKeyboardCodes.h"
 #include "webkitmarshal.h"
 #include "webkitprivate.h"
@@ -122,11 +127,23 @@ static void pasteClipboardCallback(GtkWidget* widget, EditorClient* client)
     client->addPendingEditorCommand("Paste");
 }
 
-static void toggleOverwriteCallback(GtkWidget* widget, EditorClient* client)
+static void toggleOverwriteCallback(GtkWidget* widget, EditorClient*)
 {
     // We don't support toggling the overwrite mode, but the default callback expects
     // the GtkTextView to have a layout, so we handle this signal just to stop it.
     g_signal_stop_emission_by_name(widget, "toggle-overwrite");
+}
+
+// GTK+ will still send these signals to the web view. So we can safely stop signal
+// emission without breaking accessibility.
+static void popupMenuCallback(GtkWidget* widget, EditorClient*)
+{
+    g_signal_stop_emission_by_name(widget, "popup-menu");
+}
+
+static void showHelpCallback(GtkWidget* widget, EditorClient*)
+{
+    g_signal_stop_emission_by_name(widget, "show-help");
 }
 
 static const char* const gtkDeleteCommands[][2] = {
@@ -213,6 +230,13 @@ static void moveCursorCallback(GtkWidget* widget, GtkMovementStep step, gint cou
     if (!rawCommand)
         return;
 
+    if (isSpatialNavigationEnabled(core(client->webView())->focusController()->focusedOrMainFrame()) && step == 1) {
+        if (direction == 1)
+            rawCommand = "MoveRight";
+        else if (!direction)
+            rawCommand = "MoveLeft";
+    }
+
     for (int i = 0; i < abs(count); i++)
         client->addPendingEditorCommand(rawCommand);
 }
@@ -248,15 +272,20 @@ void EditorClient::setInputMethodState(bool active)
 #endif
 }
 
-bool EditorClient::shouldDeleteRange(Range*)
+bool EditorClient::shouldDeleteRange(Range* range)
 {
-    notImplemented();
-    return true;
+    gboolean accept = TRUE;
+    PlatformRefPtr<WebKitDOMRange> kitRange(adoptPlatformRef(kit(range)));
+    g_signal_emit_by_name(m_webView, "should-delete-range", kitRange.get(), &accept);
+    return accept;
 }
 
-bool EditorClient::shouldShowDeleteInterface(HTMLElement*)
+bool EditorClient::shouldShowDeleteInterface(HTMLElement* element)
 {
-    return false;
+    gboolean accept = TRUE;
+    PlatformRefPtr<WebKitDOMHTMLElement> kitElement(adoptPlatformRef(kit(element)));
+    g_signal_emit_by_name(m_webView, "should-show-delete-interface-for-element", kitElement.get(), &accept);
+    return accept;
 }
 
 bool EditorClient::isContinuousSpellCheckingEnabled()
@@ -281,38 +310,77 @@ int EditorClient::spellCheckerDocumentTag()
     return 0;
 }
 
-bool EditorClient::shouldBeginEditing(WebCore::Range*)
+bool EditorClient::shouldBeginEditing(WebCore::Range* range)
 {
     clearPendingComposition();
 
-    notImplemented();
-    return true;
+    gboolean accept = TRUE;
+    PlatformRefPtr<WebKitDOMRange> kitRange(adoptPlatformRef(kit(range)));
+    g_signal_emit_by_name(m_webView, "should-begin-editing", kitRange.get(), &accept);
+    return accept;
 }
 
-bool EditorClient::shouldEndEditing(WebCore::Range*)
+bool EditorClient::shouldEndEditing(WebCore::Range* range)
 {
     clearPendingComposition();
 
-    notImplemented();
-    return true;
+    gboolean accept = TRUE;
+    PlatformRefPtr<WebKitDOMRange> kitRange(adoptPlatformRef(kit(range)));
+    g_signal_emit_by_name(m_webView, "should-end-editing", kitRange.get(), &accept);
+    return accept;
 }
 
-bool EditorClient::shouldInsertText(const String&, Range*, EditorInsertAction)
+static WebKitInsertAction kit(EditorInsertAction action)
 {
-    notImplemented();
-    return true;
+    switch (action) {
+    case EditorInsertActionTyped:
+        return WEBKIT_INSERT_ACTION_TYPED;
+    case EditorInsertActionPasted:
+        return WEBKIT_INSERT_ACTION_PASTED;
+    case EditorInsertActionDropped:
+        return WEBKIT_INSERT_ACTION_DROPPED;
+    }
+    ASSERT_NOT_REACHED();
+    return WEBKIT_INSERT_ACTION_TYPED;
 }
 
-bool EditorClient::shouldChangeSelectedRange(Range*, Range*, EAffinity, bool)
+bool EditorClient::shouldInsertText(const String& string, Range* range, EditorInsertAction action)
 {
-    notImplemented();
-    return true;
+    gboolean accept = TRUE;
+    PlatformRefPtr<WebKitDOMRange> kitRange(adoptPlatformRef(kit(range)));
+    g_signal_emit_by_name(m_webView, "should-insert-text", string.utf8().data(), kitRange.get(), kit(action), &accept);
+    return accept;
 }
 
-bool EditorClient::shouldApplyStyle(WebCore::CSSStyleDeclaration*, WebCore::Range*)
+static WebKitSelectionAffinity kit(EAffinity affinity)
 {
-    notImplemented();
-    return true;
+    switch (affinity) {
+    case UPSTREAM:
+        return WEBKIT_SELECTION_AFFINITY_UPSTREAM;
+    case DOWNSTREAM:
+        return WEBKIT_SELECTION_AFFINITY_DOWNSTREAM;
+    }
+    ASSERT_NOT_REACHED();
+    return WEBKIT_SELECTION_AFFINITY_UPSTREAM;
+}
+
+bool EditorClient::shouldChangeSelectedRange(Range* fromRange, Range* toRange, EAffinity affinity, bool stillSelecting)
+{
+    gboolean accept = TRUE;
+    PlatformRefPtr<WebKitDOMRange> kitFromRange(fromRange ? adoptPlatformRef(kit(fromRange)) : 0);
+    PlatformRefPtr<WebKitDOMRange> kitToRange(toRange ? adoptPlatformRef(kit(toRange)) : 0);
+    g_signal_emit_by_name(m_webView, "should-change-selected-range", kitFromRange.get(), kitToRange.get(),
+                          kit(affinity), stillSelecting, &accept);
+    return accept;
+}
+
+bool EditorClient::shouldApplyStyle(WebCore::CSSStyleDeclaration* declaration, WebCore::Range* range)
+{
+    gboolean accept = TRUE;
+    PlatformRefPtr<WebKitDOMCSSStyleDeclaration> kitDeclaration(kit(declaration));
+    PlatformRefPtr<WebKitDOMRange> kitRange(adoptPlatformRef(kit(range)));
+    g_signal_emit_by_name(m_webView, "should-apply-style", kitDeclaration.get(), kitRange.get(), &accept);
+    return accept;
 }
 
 bool EditorClient::shouldMoveRangeAfterDelete(WebCore::Range*, WebCore::Range*)
@@ -323,12 +391,12 @@ bool EditorClient::shouldMoveRangeAfterDelete(WebCore::Range*, WebCore::Range*)
 
 void EditorClient::didBeginEditing()
 {
-    notImplemented();
+    g_signal_emit_by_name(m_webView, "editing-began");
 }
 
 void EditorClient::respondToChangedContents()
 {
-    notImplemented();
+    g_signal_emit_by_name(m_webView, "user-changed-contents");
 }
 
 static WebKitWebView* viewSettingClipboard = 0;
@@ -375,6 +443,8 @@ static void setSelectionPrimaryClipboardIfNeeded(WebKitWebView* webView)
 
 void EditorClient::respondToChangedSelection()
 {
+    g_signal_emit_by_name(m_webView, "selection-changed");
+
     WebKitWebViewPrivate* priv = m_webView->priv;
     WebCore::Page* corePage = core(m_webView);
     Frame* targetFrame = corePage->focusController()->focusedOrMainFrame();
@@ -403,7 +473,7 @@ void EditorClient::respondToChangedSelection()
 
 void EditorClient::didEndEditing()
 {
-    notImplemented();
+    g_signal_emit_by_name(m_webView, "editing-ended");
 }
 
 void EditorClient::didWriteSelectionToPasteboard()
@@ -475,10 +545,13 @@ void EditorClient::redo()
     }
 }
 
-bool EditorClient::shouldInsertNode(Node*, Range*, EditorInsertAction)
+bool EditorClient::shouldInsertNode(Node* node, Range* range, EditorInsertAction action)
 {
-    notImplemented();
-    return true;
+    gboolean accept = TRUE;
+    PlatformRefPtr<WebKitDOMRange> kitRange(adoptPlatformRef(kit(range)));
+    PlatformRefPtr<WebKitDOMNode> kitNode(adoptPlatformRef(kit(node)));
+    g_signal_emit_by_name(m_webView, "should-insert-node", kitNode.get(), kitRange.get(), kit(action), &accept);
+    return accept;
 }
 
 void EditorClient::pageDestroyed()
@@ -782,6 +855,8 @@ EditorClient::EditorClient(WebKitWebView* webView)
     g_signal_connect(m_nativeWidget.get(), "move-cursor", G_CALLBACK(moveCursorCallback), this);
     g_signal_connect(m_nativeWidget.get(), "delete-from-cursor", G_CALLBACK(deleteFromCursorCallback), this);
     g_signal_connect(m_nativeWidget.get(), "toggle-overwrite", G_CALLBACK(toggleOverwriteCallback), this);
+    g_signal_connect(m_nativeWidget.get(), "popup-menu", G_CALLBACK(popupMenuCallback), this);
+    g_signal_connect(m_nativeWidget.get(), "show-help", G_CALLBACK(showHelpCallback), this);
 }
 
 EditorClient::~EditorClient()

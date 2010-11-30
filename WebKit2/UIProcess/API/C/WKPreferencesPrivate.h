@@ -37,7 +37,7 @@ enum WKFontSmoothingLevel {
     kWKFontSmoothingLevelLight = 1,
     kWKFontSmoothingLevelMedium = 2,
     kWKFontSmoothingLevelStrong = 3,
-#if PLATFORM(WIN)
+#if defined(WIN32) || defined(_WIN32)
     kWKFontSmoothingLevelWindows = 4,
 #endif
 };
@@ -58,6 +58,10 @@ WK_EXPORT bool WKPreferencesGetCompositingBordersVisible(WKPreferencesRef);
 // Defaults to false.
 WK_EXPORT void WKPreferencesSetCompositingRepaintCountersVisible(WKPreferencesRef, bool);
 WK_EXPORT bool WKPreferencesGetCompositingRepaintCountersVisible(WKPreferencesRef);
+
+// Defaults to false.
+WK_EXPORT void WKPreferencesSetNeedsSiteSpecificQuirks(WKPreferencesRef, bool);
+WK_EXPORT bool WKPreferencesGetNeedsSiteSpecificQuirks(WKPreferencesRef);
 
 #ifdef __cplusplus
 }

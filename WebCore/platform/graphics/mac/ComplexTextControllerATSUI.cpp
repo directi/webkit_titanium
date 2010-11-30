@@ -30,9 +30,9 @@
 #include "ShapeArabic.h"
 
 #ifdef __LP64__
+// ATSUTextInserted() is SPI in 64-bit.
 extern "C" {
 OSStatus ATSUTextInserted(ATSUTextLayout iTextLayout,  UniCharArrayOffset iInsertionLocation, UniCharCount iInsertionLength);
-OSStatus ATSUTextDeleted(ATSUTextLayout iTextLayout,  UniCharArrayOffset iInsertionLocation, UniCharCount iInsertionLength);
 }
 #endif
 
@@ -188,32 +188,6 @@ ComplexTextController::ComplexTextRun::ComplexTextRun(ATSUTextLayout atsuTextLay
         ATSUTextMoved(atsuTextLayout, substituteCharacters.data());
     }
 
-    // Remove the leading character if it is one of explicit Unicode bidi control characters.
-    // Explicit Unicode bidi control character, if present, is always the leading
-    // character in a run. And it could be the leading character in a LTR run.
-    // For example, "a&#x202b;x!&#202c;y", the last run "&#x202c;y" is a LTR run
-    // and begins with an explicit Unicode bidi control character.
-    if (stringLength > 0) {
-        UChar leadingCharacter;
-        if (substituteCharacters.isEmpty())
-            leadingCharacter = characters[0];
-        else
-            leadingCharacter = substituteCharacters[0];
-        if (leadingCharacter == leftToRightEmbed
-            || leadingCharacter == leftToRightOverride 
-            || leadingCharacter == rightToLeftEmbed
-            || leadingCharacter == rightToLeftOverride
-            || leadingCharacter == popDirectionalFormatting)
-            if (substituteCharacters.isEmpty()) {
-                substituteCharacters.grow(stringLength - 1);
-                memcpy(substituteCharacters.data(), characters + 1, (stringLength - 1) * sizeof(UChar));
-                ATSUTextMoved(atsuTextLayout, substituteCharacters.data());
-            } else {
-                substituteCharacters.remove(0);
-                ATSUTextDeleted(atsuTextLayout, 0, 1);
-            }
-    }
-
     if (directionalOverride) {
         UChar override = ltr ? leftToRightOverride : rightToLeftOverride;
         if (substituteCharacters.isEmpty()) {
@@ -240,7 +214,7 @@ ComplexTextController::ComplexTextRun::ComplexTextRun(ATSUTextLayout atsuTextLay
     status = ATSUSetLayoutControls(atsuTextLayout, 3, tags, sizes, values);
 
     ItemCount boundsCount;
-    status = ATSUGetGlyphBounds(atsuTextLayout, 0, 0, 0, kATSUToTextEnd, kATSUseFractionalOrigins, 0, 0, &boundsCount);
+    status = ATSUGetGlyphBounds(atsuTextLayout, 0, 0, 0, m_stringLength, kATSUseFractionalOrigins, 0, 0, &boundsCount);
 
     status = ATSUDisposeTextLayout(atsuTextLayout);
 }
@@ -288,7 +262,7 @@ static void disableLigatures(const SimpleFontData* fontData, ATSUStyle atsuStyle
     // Don't be too aggressive: if the font doesn't contain 'a', then assume that any ligatures it contains are
     // in characters that always go through ATSUI, and therefore allow them. Geeza Pro is an example.
     // See bugzilla 5166.
-    if ((typesettingFeatures & Ligatures) || fontData->platformData().allowsLigatures())
+    if ((typesettingFeatures & Ligatures) || (fontData->orientation() == Horizontal && fontData->platformData().allowsLigatures()))
         return;
 
     ATSUFontFeatureType featureTypes[] = { kLigaturesType };
@@ -306,7 +280,7 @@ static ATSUStyle initializeATSUStyle(const SimpleFontData* fontData, Typesetting
     if (!addResult.second)
         return atsuStyle;
 
-    ATSUFontID fontID = fontData->platformData().m_atsuFontID;
+    ATSUFontID fontID = fontData->platformData().ctFont() ? CTFontGetPlatformFont(fontData->platformData().ctFont(), 0) : 0;
     if (!fontID) {
         LOG_ERROR("unable to get ATSUFontID for %p", fontData->platformData().font());
         fontData->m_ATSUStyleMap.remove(addResult.first);

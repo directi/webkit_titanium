@@ -92,7 +92,7 @@ void SVGFEConvolveMatrixElement::parseMappedAttribute(Attribute* attr)
         SVGNumberList newList;
         newList.parse(value);
         detachAnimatedKernelMatrixListWrappers(newList.size());
-        kernelMatrixBaseValue() = newList;
+        setKernelMatrixBaseValue(newList);
     } else if (attr->name() == SVGNames::divisorAttr)
         setDivisorBaseValue(value.toFloat());
     else if (attr->name() == SVGNames::biasAttr)
@@ -147,7 +147,7 @@ void SVGFEConvolveMatrixElement::svgAttributeChanged(const QualifiedName& attrNa
         invalidate();
 }
 
-PassRefPtr<FilterEffect> SVGFEConvolveMatrixElement::build(SVGFilterBuilder* filterBuilder)
+PassRefPtr<FilterEffect> SVGFEConvolveMatrixElement::build(SVGFilterBuilder* filterBuilder, Filter* filter)
 {
     FilterEffect* input1 = filterBuilder->getEffectById(in1());
 
@@ -189,7 +189,7 @@ PassRefPtr<FilterEffect> SVGFEConvolveMatrixElement::build(SVGFilterBuilder* fil
             divisorValue = 1;
     }
 
-    RefPtr<FilterEffect> effect = FEConvolveMatrix::create(
+    RefPtr<FilterEffect> effect = FEConvolveMatrix::create(filter,
                     IntSize(orderXValue, orderYValue), divisorValue,
                     bias(), IntPoint(targetXValue, targetYValue), static_cast<EdgeModeType>(edgeMode()),
                     FloatPoint(kernelUnitLengthX(), kernelUnitLengthX()), preserveAlpha(), kernelMatrix);

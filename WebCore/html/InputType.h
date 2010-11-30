@@ -38,8 +38,11 @@
 namespace WebCore {
 
 class DateComponents;
+class Event;
 class FormDataList;
 class HTMLInputElement;
+class KeyboardEvent;
+class MouseEvent;
 class RenderArena;
 class RenderObject;
 class RenderStyle;
@@ -57,6 +60,7 @@ public:
 
     virtual bool isTextField() const;
     virtual bool isTextType() const;
+    virtual bool isRangeControl() const;
     virtual const AtomicString& formControlType() const = 0;
 
     // Form value functions
@@ -86,6 +90,7 @@ public:
     virtual bool patternMismatch(const String&) const;
     virtual bool rangeUnderflow(const String&) const;
     virtual bool rangeOverflow(const String&) const;
+    virtual double defaultValueForStepUp() const;
     virtual double minimum() const;
     virtual double maximum() const;
     virtual bool stepMismatch(const String&, double) const;
@@ -96,6 +101,17 @@ public:
     virtual bool parsedStepValueShouldBeInteger() const;
     virtual bool scaledStepValeuShouldBeInteger() const;
     virtual double acceptableError(double) const;
+    virtual String typeMismatchText() const;
+    virtual String valueMissingText() const;
+
+    // Event handlers
+    // If the return value is true, do no further default event handling in the
+    // default event handler. If an event handler calls Event::setDefaultHandled(),
+    // its return value must be true.
+
+    virtual bool handleClickEvent(MouseEvent*);
+    virtual bool handleDOMActivateEvent(Event*);
+    virtual bool handleKeydownEvent(KeyboardEvent*);
 
     // Miscellaneous functions
 

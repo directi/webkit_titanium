@@ -47,12 +47,11 @@ protected:
 
 private:
     virtual bool isMouseFocusable() const { return false; } 
-    virtual bool isShadowNode() const { return m_shadowParent; }
-    virtual ContainerNode* shadowParentNode() { return m_shadowParent; }
-    virtual bool isSpellCheckingEnabled() const;
+    virtual bool isShadowNode() const { return m_shadowParent.get(); }
+    virtual ContainerNode* shadowParentNode() { return m_shadowParent.get(); }
     void setShadowParentNode(HTMLElement* shadowParent) { m_shadowParent = shadowParent; }
 
-    HTMLElement* m_shadowParent;
+    RefPtr<HTMLElement> m_shadowParent;
 };
 
 class TextControlInnerTextElement : public TextControlInnerElement {

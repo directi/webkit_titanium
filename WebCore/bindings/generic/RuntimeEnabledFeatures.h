@@ -102,6 +102,7 @@ public:
     static bool int32ArrayEnabled() { return isWebGLEnabled; }
     static bool uint32ArrayEnabled() { return isWebGLEnabled; }
     static bool float32ArrayEnabled() { return isWebGLEnabled; }
+    static bool dataViewEnabled() { return isWebGLEnabled; }
     static bool webGLRenderingContextEnabled() { return isWebGLEnabled; }
     static bool webGLArrayBufferEnabled() { return isWebGLEnabled; }
     static bool webGLByteArrayEnabled() { return isWebGLEnabled; }
@@ -124,6 +125,8 @@ public:
     static bool ontouchmoveEnabled() { return isTouchEnabled; }
     static bool ontouchendEnabled() { return isTouchEnabled; }
     static bool ontouchcancelEnabled() { return isTouchEnabled; }
+    static bool createTouchEnabled() { return isTouchEnabled; }
+    static bool createTouchListEnabled() { return isTouchEnabled; }
 #endif
 
     static void setDeviceMotionEnabled(bool isEnabled) { isDeviceMotionEnabled = isEnabled; }

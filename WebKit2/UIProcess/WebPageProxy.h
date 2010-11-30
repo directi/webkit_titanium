@@ -32,6 +32,7 @@
 #include "GenericCallback.h"
 #include "SharedMemory.h"
 #include "WKBase.h"
+#include "WebPageContextMenuClient.h"
 #include "WebContextMenuItemData.h"
 #include "WebEvent.h"
 #include "WebFindClient.h"
@@ -114,16 +115,22 @@ public:
     DrawingAreaProxy* drawingArea() { return m_drawingArea.get(); }
     void setDrawingArea(PassOwnPtr<DrawingAreaProxy>);
 
+    bool visibleToInjectedBundle() const { return m_visibleToInjectedBundle; }
+    void setVisibleToInjectedBundle(bool visible) { m_visibleToInjectedBundle = visible; }
+
     WebBackForwardList* backForwardList() { return m_backForwardList.get(); }
 
+#if ENABLE(INSPECTOR)
     WebInspectorProxy* inspector();
+#endif
 
     void setPageClient(PageClient*);
+    void initializeContextMenuClient(const WKPageContextMenuClient*);
+    void initializeFindClient(const WKPageFindClient*);
+    void initializeFormClient(const WKPageFormClient*);
     void initializeLoaderClient(const WKPageLoaderClient*);
     void initializePolicyClient(const WKPagePolicyClient*);
-    void initializeFormClient(const WKPageFormClient*);
     void initializeUIClient(const WKPageUIClient*);
-    void initializeFindClient(const WKPageFindClient*);
     void relaunch();
 
     void initializeWebPage(const WebCore::IntSize&);
@@ -150,6 +157,8 @@ public:
     void goToBackForwardItem(WebBackForwardListItem*);
     void didChangeBackForwardList();
 
+    bool canShowMIMEType(const String& mimeType) const;
+
     void setFocused(bool isFocused);
     void setActive(bool active);
     void setIsInWindow(bool isInWindow);
@@ -162,6 +171,10 @@ public:
 #if PLATFORM(MAC)
     void updateWindowIsVisible(bool windowIsVisible);
     void updateWindowFrame(const WebCore::IntRect&);
+#endif
+
+#if ENABLE(TILED_BACKING_STORE)
+    void setActualVisibleContentRect(const WebCore::IntRect& rect);
 #endif
 
     void handleMouseEvent(const WebMouseEvent&);
@@ -191,7 +204,7 @@ public:
     void setPageZoomFactor(double);
     void setPageAndTextZoomFactors(double pageZoomFactor, double textZoomFactor);
 
-    void scaleWebView(double scale);
+    void scaleWebView(double scale, const WebCore::IntPoint& origin);
     double viewScaleFactor() const { return m_viewScaleFactor; }
 
     // Find.
@@ -238,7 +251,17 @@ public:
 
     void getStatistics(WKContextStatistics*);
 
+#if ENABLE(TILED_BACKING_STORE)
+    void setResizesToContentsUsingLayoutSize(const WebCore::IntSize&);
+#endif
+
     void contextMenuItemSelected(const WebContextMenuItemData&);
+
+    WebPageCreationParameters creationParameters(const WebCore::IntSize&) const;
+
+#if PLATFORM(QT)
+    void findZoomableAreaForPoint(const WebCore::IntPoint&);
+#endif
 
 private:
     WebPageProxy(WebPageNamespace*, uint64_t pageID);
@@ -272,7 +295,7 @@ private:
     
     void decidePolicyForNavigationAction(uint64_t frameID, uint32_t navigationType, uint32_t modifiers, int32_t mouseButton, const String& url, uint64_t listenerID);
     void decidePolicyForNewWindowAction(uint64_t frameID, uint32_t navigationType, uint32_t modifiers, int32_t mouseButton, const String& url, uint64_t listenerID);
-    void decidePolicyForMIMEType(uint64_t frameID, const String& MIMEType, const String& url, uint64_t listenerID);
+    void decidePolicyForMIMEType(uint64_t frameID, const String& MIMEType, const String& url, uint64_t listenerID, bool& receivedPolicyAction, uint64_t& policyAction, uint64_t& downloadID);
 
     void willSubmitForm(uint64_t frameID, uint64_t sourceFrameID, const StringPairVector& textFieldValues, uint64_t listenerID, CoreIPC::ArgumentDecoder*);
 
@@ -304,6 +327,7 @@ private:
 #endif
 #if PLATFORM(QT)
     void didChangeContentsSize(const WebCore::IntSize&);
+    void didFindZoomableArea(const WebCore::IntRect&);
 #endif
 
     // Back/Forward list management
@@ -334,13 +358,13 @@ private:
     void hidePopupMenu();
 
     // Context Menu.
-    void showContextMenu(const WebCore::IntPoint&, const Vector<WebContextMenuItemData>& items);
+    void showContextMenu(const WebCore::IntPoint&, const Vector<WebContextMenuItemData>&, CoreIPC::ArgumentDecoder*);
 
     void takeFocus(bool direction);
     void setToolTip(const String&);
     void setCursor(const WebCore::Cursor&);
     void didValidateMenuItem(const String& commandName, bool isEnabled, int32_t state);
-    
+
     void didReceiveEvent(uint32_t opaqueType, bool handled);
 
     void didGetContentsAsString(const String&, uint64_t);
@@ -350,11 +374,9 @@ private:
 
     void focusedFrameChanged(uint64_t frameID);
 
-    WebPageCreationParameters creationParameters(const WebCore::IntSize&) const;
-
 #if USE(ACCELERATED_COMPOSITING)
     void didChangeAcceleratedCompositing(bool compositing, DrawingAreaBase::DrawingAreaInfo&);
-#endif    
+#endif
 
     PageClient* m_pageClient;
     WebLoaderClient m_loaderClient;
@@ -362,6 +384,7 @@ private:
     WebFormClient m_formClient;
     WebUIClient m_uiClient;
     WebFindClient m_findClient;
+    WebPageContextMenuClient m_contextMenuClient;
 
     OwnPtr<DrawingAreaProxy> m_drawingArea;
     RefPtr<WebPageNamespace> m_pageNamespace;
@@ -371,7 +394,9 @@ private:
 
     String m_customUserAgent;
 
+#if ENABLE(INSPECTOR)
     RefPtr<WebInspectorProxy> m_inspector;
+#endif
 
     HashMap<uint64_t, RefPtr<ContentsAsStringCallback> > m_contentsAsStringCallbacks;
     HashMap<uint64_t, RefPtr<FrameSourceCallback> > m_frameSourceCallbacks;
@@ -400,12 +425,19 @@ private:
     double m_textZoomFactor;
     double m_pageZoomFactor;
     double m_viewScaleFactor;
-    
+
+    bool m_visibleToInjectedBundle;
+
     // If the process backing the web page is alive and kicking.
     bool m_isValid;
 
     // Whether WebPageProxy::close() has been called on this page.
     bool m_isClosed;
+
+    bool m_inDecidePolicyForMIMEType;
+    bool m_syncMimeTypePolicyActionIsValid;
+    WebCore::PolicyAction m_syncMimeTypePolicyAction;
+    uint64_t m_syncMimeTypePolicyDownloadID;
 
     uint64_t m_pageID;
 

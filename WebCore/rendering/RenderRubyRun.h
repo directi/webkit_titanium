@@ -31,8 +31,6 @@
 #ifndef RenderRubyRun_h
 #define RenderRubyRun_h
 
-#if ENABLE(RUBY)
-
 #include "RenderBlock.h"
 
 namespace WebCore {
@@ -57,6 +55,9 @@ public:
     RenderRubyBase* rubyBase() const;
     RenderRubyBase* rubyBaseSafe(); // creates the base if it doesn't already exist
 
+    virtual RenderObject* layoutSpecialExcludedChild(bool relayoutChildren);
+    virtual void layout();
+
     virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0);
     virtual void removeChild(RenderObject* child);
@@ -79,7 +80,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif
 
 #endif // RenderRubyRun_h
