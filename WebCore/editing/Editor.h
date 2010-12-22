@@ -55,6 +55,7 @@ class HitTestResult;
 class KillRing;
 class Pasteboard;
 class SimpleFontData;
+class SpellChecker;
 class Text;
 class TextEvent;
 
@@ -300,6 +301,7 @@ public:
     VisibleSelection selectionForCommand(Event*);
 
     KillRing* killRing() const { return m_killRing.get(); }
+    SpellChecker* spellChecker() const { return m_spellChecker.get(); }
 
     EditingBehavior behavior() const;
 
@@ -313,7 +315,8 @@ public:
 
     void handleCancelOperation();
     void startCorrectionPanelTimer(CorrectionPanelInfo::PanelType);
-    void handleRejectedCorrection();
+    // If user confirmed a correction in the correction panel, correction has non-zero length, otherwise it means that user has dismissed the panel.
+    void handleCorrectionPanelResult(const String& correction);
     bool isShowingCorrectionPanel();
 
     void pasteAsFragment(PassRefPtr<DocumentFragment>, bool smartReplace, bool matchStyle);
@@ -347,6 +350,7 @@ public:
     RenderStyle* styleForSelectionStart(Node*& nodeToRemove) const;
 
     unsigned countMatchesForText(const String&, FindOptions, unsigned limit, bool markMatches);
+    unsigned countMatchesForText(const String&, Range*, FindOptions, unsigned limit, bool markMatches);
     bool markedTextMatchesAreHighlighted() const;
     void setMarkedTextMatchesAreHighlighted(bool);
 
@@ -362,6 +366,8 @@ public:
 #if PLATFORM(MAC)
     NSDictionary* fontAttributesForSelectionStart() const;
     NSWritingDirection baseWritingDirectionForSelectionStart() const;
+    bool canCopyExcludingStandaloneImages();
+    void takeFindStringFromSelection();
 #endif
 
     bool selectionStartHasSpellingMarkerFor(int from, int length) const;
@@ -381,7 +387,9 @@ private:
     bool m_shouldStyleWithCSS;
     OwnPtr<KillRing> m_killRing;
     CorrectionPanelInfo m_correctionPanelInfo;
+    OwnPtr<SpellChecker> m_spellChecker;
     Timer<Editor> m_correctionPanelTimer;
+    bool m_correctionPanelIsDismissedByEditor;
     VisibleSelection m_mark;
     bool m_areMarkedTextMatchesHighlighted;
 
@@ -408,8 +416,8 @@ private:
     void correctionPanelTimerFired(Timer<Editor>*);
     Node* findEventTargetFromSelection() const;
     void stopCorrectionPanelTimer();
-    void dismissCorrectionPanel(CorrectionWasRejectedOrNot);
-    void applyCorrectionPanelInfo(bool addCorrectionIndicatorMarker);
+    void dismissCorrectionPanel(ReasonForDismissingCorrectionPanel);
+    void applyCorrectionPanelInfo(const Vector<DocumentMarker::MarkerType>& markerTypesToAdd);
 };
 
 inline void Editor::setStartNewKillRingSequence(bool flag)

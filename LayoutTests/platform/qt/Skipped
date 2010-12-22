@@ -75,15 +75,6 @@ svg/webarchive
 # This test is for clients that choose to make the missing plugin indicator a button
 plugins/clicking-missing-plugin-fires-delegate.html
 
-# =========================================================================== #
-#       Feature not supported... yet
-# =========================================================================== #
-
-# This port doesn't support DeviceMotion or DeviceOrientation.
-fast/dom/DeviceMotion
-fast/dom/DeviceOrientation
-fast/dom/Window/window-properties-device-orientation.html
-
 # IndexedDB is not yet enabled.
 storage/indexeddb
 
@@ -661,6 +652,9 @@ media/media-can-play-mpeg4-video.html
 # https://bugs.webkit.org/show_bug.cgi?id=48617
 media/video-seek-by-small-increment.html
 
+# requires video.buffered to be able to return multiple timeranges
+http/tests/media/video-buffered.html
+
 # ============================================================================= #
 # Crashing tests due to re-enabled Phonon support in Buildbot's Qt              #
 # Skip these until a proper solution for the Phonon related crashes found.      #
@@ -686,7 +680,7 @@ java
 fast/dom/Window/timer-resume-on-navigation-back.html
 loader/go-back-to-different-window-size.html
 
-# Missing layoutTestController.findString()
+# Missing layoutTestController.findString() http://webkit.org/b/50236
 editing/text-iterator/findString.html
 
 # Missing layoutTestController.overridePreference()
@@ -702,6 +696,12 @@ http/tests/xmlhttprequest/access-control-basic-allow-preflight-cache-timeout.htm
 # Missing layoutTestController.setUseDashboardCompatibilityMode()
 http/tests/xmlhttprequest/default-content-type-dashboard.html
 http/tests/xmlhttprequest/svg-created-by-xhr-disallowed-in-dashboard.html
+
+# Missing layoutTestController.testRepaint()
+fast/repaint/table-writing-modes-h.html
+fast/repaint/table-writing-modes-v.html
+fast/repaint/text-emphasis-h.html
+fast/repaint/text-emphasis-v.html
 
 # timeout
 http/tests/misc/redirect-to-external-url.html
@@ -723,6 +723,9 @@ http/tests/plugins/third-party-cookie-accept-policy.html
 
 # Missing layoutTestController.dumpWillCacheResponse
 http/tests/misc/willCacheResponse-delegate-callback.html
+
+# Missing layoutTestController.setHandlesAuthenticationChallenges()
+http/tests/misc/authentication-sent-to-redirect.html
 
 # ------- missing eventSender.beginDragWithFiles
 editing/pasteboard/dataTransfer-setData-getData.html
@@ -1501,11 +1504,6 @@ animations/animation-drt-api.html
 animations/animation-drt-api-multiple-keyframes.html
 
 # ============================================================================= #
-# failing application cache quota tests
-# ============================================================================= #
-http/tests/appcache/origin-quota.html
-
-# ============================================================================= #
 # Failing CSS Tests
 # ============================================================================= #
 css1/classification/white_space.html
@@ -1959,7 +1957,6 @@ editing/selection/selection-background.html
 editing/selection/triple-click-in-pre.html
 editing/selection/word-granularity.html
 editing/selection/4975120.html
-editing/selection/5109817.html
 editing/selection/5354455-1.html
 editing/selection/5354455-2.html
 editing/selection/caret-and-focus-ring.html
@@ -2097,6 +2094,9 @@ editing/spelling/spelling-backspace-between-lines.html
 
 editing/spelling/spelling-attribute-change.html
 editing/spelling/spelling-attribute-at-child.html
+
+# EditorClient::requestCheckingOfString() is not implemented
+editing/spelling/spellcheck-paste.html
 
 # ============================================================================= #
 # failing editing/style tests
@@ -2411,8 +2411,6 @@ fast/frames/onlyCommentInIFrame.html
 fast/invalid/junk-data.xml
 fast/loader/text-document-wrapping.html
 fast/overflow/005.html
-fast/regex/test1.html
-fast/regex/test4.html
 fast/repaint/inline-outline-repaint.html
 fast/text/find-case-folding.html
 fast/text/large-text-composed-char.html
@@ -3055,6 +3053,7 @@ fast/dom/row-inner-text.html
 fast/dom/setPrimitiveValue.html
 fast/dom/stripNullFromTextNodes.html
 fast/dom/wrapper-classes.html
+fast/dom/Window/window-properties-device-orientation.html
 fast/dynamic/002.html
 fast/dynamic/004.html
 fast/dynamic/006.html
@@ -3491,15 +3490,12 @@ fast/overflow/table-overflow-float.html
 fast/parser/001.html
 fast/parser/bad-xml-slash.html
 fast/parser/broken-comments-vs-parsing-mode.html
-fast/parser/comment-in-style.html
 fast/parser/comments.html
 fast/parser/document-write-option.html
 fast/parser/entity-comment-in-style.html
 fast/parser/fonts.html
 fast/parser/nofoo-tags-inside-paragraph.html
 fast/parser/open-comment-in-style.html
-fast/parser/parseCommentsInTitles.html
-fast/parser/remove-block-in-residual-style.html
 fast/parser/style-script-head-test.html
 fast/parser/tabs-in-scripts.html
 fast/parser/title-error-test.html
@@ -3965,8 +3961,6 @@ fast/tokenizer/002.html
 fast/tokenizer/003.html
 fast/tokenizer/external-script-document-write.html
 fast/tokenizer/external-script-document-write_2.html
-fast/tokenizer/missing-title-end-tag-1.html
-fast/tokenizer/missing-title-end-tag-2.html
 fast/tokenizer/script_extra_close.html
 fast/transforms/diamond.html
 fast/transforms/identity-matrix.html
@@ -5152,7 +5146,9 @@ media/video-delay-load-event.html
 fast/dom/Geolocation/callback-to-remote-context2.html
 
 # Link prefetch is disabled by default
+fast/dom/HTMLLinkElement/link-and-subresource-test.html
 fast/dom/HTMLLinkElement/prefetch.html
+fast/dom/HTMLLinkElement/prefetch-onload.html
 http/tests/misc/prefetch-purpose.html
 
 # [Qt] Regression(r61749): inspector/debugger-pause-on-debugger-statement.html fails
@@ -5203,17 +5199,10 @@ fast/forms/input-file-directory-upload.html
 # Need setPrinting. See https://bugs.webkit.org/show_bug.cgi?id=20011
 printing/setPrinting.html
 
-# Web Timing is not enabled.
-# https://bugs.webkit.org/show_bug.cgi?id=42433
-fast/dom/Window/window-properties-performance.html
-fast/dom/navigation-type-back-forward.html
-fast/dom/navigation-type-navigate.html
-fast/dom/navigation-type-reload.html
+# Web Timing related bugs
+# https://bugs.webkit.org/show_bug.cgi?id=51245
 fast/dom/webtiming.html
-fast/dom/webtiming-document-open.html
-fast/dom/webtiming-navigate-within-document.html
-http/tests/misc/webtiming-one-redirect.php
-http/tests/misc/webtiming-two-redirects.php
+http/tests/misc/webtiming-ssl.php
 
 # Advanced credential handling
 http/tests/security/401-logout/401-logout.php
@@ -5351,10 +5340,6 @@ editing/pasteboard/paste-4039777-fix.html
 # https://bugs.webkit.org/show_bug.cgi?id=49749
 plugins/refcount-leaks.html
 
-# [Qt] Zero-sized font does not yet work
-# https://bugs.webkit.org/show_bug.cgi?id=49759
-fast/text/font-size-zero.html
-
 # [Qt] REGRESSION (r72351): fast/profiler/throw-exception-from-eval.html fails
 # https://bugs.webkit.org/show_bug.cgi?id=49801
 fast/profiler/throw-exception-from-eval.html
@@ -5373,3 +5358,16 @@ plugins/keyboard-events.html
 # https://bugs.webkit.org/show_bug.cgi?id=50204
 editing/selection/click-left-of-rtl-wrapping-text.html
 editing/selection/modify-up-on-rtl-wrapping-text.html
+
+# [Qt] fast/loader/user-stylesheet-fast-path.html fails
+# https://bugs.webkit.org/show_bug.cgi?id=50911
+fast/loader/user-stylesheet-fast-path.html
+
+# For https://bugs.webkit.org/show_bug.cgi?id=50758
+# These require DRT setSerializeHTTPLoads implementation to be reliable.
+http/tests/local/link-stylesheet-load-order.html
+http/tests/local/link-stylesheet-load-order-preload.html
+
+# [Qt] fast/text/emphasis-overlap.html fails
+# https://bugs.webkit.org/show_bug.cgi?id=51324
+fast/text/emphasis-overlap.html

@@ -76,6 +76,23 @@ void PluginProcess::removeWebProcessConnection(WebProcessConnection* webProcessC
     }
 }
 
+NetscapePluginModule* PluginProcess::netscapePluginModule()
+{
+    if (!m_pluginModule) {
+        ASSERT(!m_pluginPath.isNull());
+        m_pluginModule = NetscapePluginModule::getOrCreate(m_pluginPath);
+
+#if PLATFORM(MAC)
+        if (m_pluginModule) {
+            if (m_pluginModule->pluginQuirks().contains(PluginQuirks::PrognameShouldBeWebKitPluginHost))
+                setprogname("WebKitPluginHost");
+        }
+#endif
+    }
+
+    return m_pluginModule.get();
+}
+
 void PluginProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
 {
     didReceivePluginProcessMessage(connection, messageID, arguments);
@@ -96,7 +113,7 @@ void PluginProcess::initialize(const PluginProcessCreationParameters& parameters
 {
     ASSERT(!m_pluginModule);
 
-    m_pluginModule = NetscapePluginModule::getOrCreate(parameters.pluginPath);
+    m_pluginPath = parameters.pluginPath;
 
 #if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
     m_compositingRenderServerPort = parameters.acceleratedCompositingPort.port();

@@ -25,32 +25,24 @@
 
 #include "WebCoreArgumentCoders.h"
 
+#include "ArgumentCodersCF.h"
+#include "WebKitSystemInterface.h"
+
 namespace CoreIPC {
-
-static void encodeWithNSKeyedArchiver(ArgumentEncoder* encoder, id rootObject)
-{
-    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:rootObject];
-    encoder->encodeBytes(static_cast<const uint8_t*>([data bytes]), [data length]);
-}
-
-static id decodeWithNSKeyedArchiver(ArgumentDecoder* decoder)
-{
-    Vector<uint8_t> bytes;
-    if (!decoder->decodeBytes(bytes))
-        return nil;
-
-    RetainPtr<NSData> nsData(AdoptNS, [[NSData alloc] initWithBytesNoCopy:bytes.data() length:bytes.size() freeWhenDone:NO]);
-    return [NSKeyedUnarchiver unarchiveObjectWithData:nsData.get()];
-}
 
 void encodeResourceRequest(ArgumentEncoder* encoder, const WebCore::ResourceRequest& resourceRequest)
 {
-    encodeWithNSKeyedArchiver(encoder, resourceRequest.nsURLRequest());
+    RetainPtr<CFDictionaryRef> dictionary(AdoptCF, WKNSURLRequestCreateSerializableRepresentation(resourceRequest.nsURLRequest(), CoreIPC::tokenNullTypeRef()));
+    encode(encoder, dictionary.get());
 }
 
 bool decodeResourceRequest(ArgumentDecoder* decoder, WebCore::ResourceRequest& resourceRequest)
 {
-    NSURLRequest *nsURLRequest = decodeWithNSKeyedArchiver(decoder);
+    RetainPtr<CFDictionaryRef> dictionary;
+    if (!decode(decoder, dictionary))
+        return false;
+
+    NSURLRequest *nsURLRequest = WKNSURLRequestFromSerializableRepresentation(dictionary.get(), CoreIPC::tokenNullTypeRef());
     if (!nsURLRequest)
         return false;
 
@@ -60,12 +52,31 @@ bool decodeResourceRequest(ArgumentDecoder* decoder, WebCore::ResourceRequest& r
 
 void encodeResourceResponse(ArgumentEncoder* encoder, const WebCore::ResourceResponse& resourceResponse)
 {
-    encodeWithNSKeyedArchiver(encoder, resourceResponse.nsURLResponse());
+    bool responseIsPresent = resourceResponse.nsURLResponse();
+    encoder->encode(responseIsPresent);
+
+    if (!responseIsPresent)
+        return;
+
+    RetainPtr<CFDictionaryRef> dictionary(AdoptCF, WKNSURLResponseCreateSerializableRepresentation(resourceResponse.nsURLResponse(), CoreIPC::tokenNullTypeRef()));
+    encode(encoder, dictionary.get());
 }
 
 bool decodeResourceResponse(ArgumentDecoder* decoder, WebCore::ResourceResponse& resourceResponse)
 {
-    NSURLResponse *nsURLResponse = decodeWithNSKeyedArchiver(decoder);
+    bool responseIsPresent;
+    decoder->decode(responseIsPresent);
+
+    if (!responseIsPresent) {
+        resourceResponse = WebCore::ResourceResponse();
+        return true;
+    }
+
+    RetainPtr<CFDictionaryRef> dictionary;
+    if (!decode(decoder, dictionary))
+        return false;
+
+    NSURLResponse* nsURLResponse = WKNSURLResponseFromSerializableRepresentation(dictionary.get(), CoreIPC::tokenNullTypeRef());
     if (!nsURLResponse)
         return false;
 

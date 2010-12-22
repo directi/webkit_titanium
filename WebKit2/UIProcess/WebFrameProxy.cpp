@@ -26,10 +26,12 @@
 #include "WebFrameProxy.h"
 
 #include "WebCertificateInfo.h"
+#include "WebContext.h"
 #include "WebFormSubmissionListenerProxy.h"
 #include "WebFramePolicyListenerProxy.h"
 #include "WebPageProxy.h"
 #include <WebCore/DOMImplementation.h>
+#include <WebCore/Image.h>
 #include <wtf/text/WTFString.h>
 
 using namespace WebCore;
@@ -42,10 +44,12 @@ WebFrameProxy::WebFrameProxy(WebPageProxy* page, uint64_t frameID)
     , m_isFrameSet(false)
     , m_frameID(frameID)
 {
+    WebContext::statistics().wkFrameCount++;
 }
 
 WebFrameProxy::~WebFrameProxy()
 {
+    WebContext::statistics().wkFrameCount--;
 }
 
 void WebFrameProxy::disconnect()
@@ -72,51 +76,97 @@ void WebFrameProxy::setCertificateInfo(PassRefPtr<WebCertificateInfo> certificat
 
 bool WebFrameProxy::canProvideSource() const
 {
-    // FIXME: This check should be moved to somewhere in WebCore. 
-    if (m_MIMEType == "text/html" || m_MIMEType == "image/svg+xml" || DOMImplementation::isXMLMIMEType(m_MIMEType))
+    return isDisplayingMarkupDocument();
+}
+
+bool WebFrameProxy::canShowMIMEType(const String& mimeType) const
+{
+    if (!m_page)
+        return false;
+
+    if (m_page->canShowMIMEType(mimeType))
         return true;
+
+#if PLATFORM(MAC)
+    // On Mac, we can show PDFs in the main frame.
+    if (isMainFrame() && !mimeType.isEmpty())
+        return WebContext::pdfAndPostScriptMIMETypes().contains(mimeType);
+#endif
+
     return false;
+}
+
+bool WebFrameProxy::isDisplayingStandaloneImageDocument() const
+{
+    return Image::supportsType(m_MIMEType);
+}
+
+bool WebFrameProxy::isDisplayingMarkupDocument() const
+{
+    // FIXME: This check should be moved to somewhere in WebCore. 
+    return m_MIMEType == "text/html" || m_MIMEType == "image/svg+xml" || DOMImplementation::isXMLMIMEType(m_MIMEType);
 }
 
 void WebFrameProxy::didStartProvisionalLoad(const String& url)
 {
-    // FIXME: Add assertions.
+    ASSERT(!url.isEmpty());
+    ASSERT(m_loadState == LoadStateFinished);
+    ASSERT(m_provisionalURL.isEmpty());
     m_loadState = LoadStateProvisional;
     m_provisionalURL = url;
 }
 
 void WebFrameProxy::didReceiveServerRedirectForProvisionalLoad(const String& url)
 {
+    ASSERT(!url.isEmpty());
+    ASSERT(m_loadState == LoadStateProvisional);
+    ASSERT(!m_provisionalURL.isEmpty());
     m_provisionalURL = url;
 }
 
 void WebFrameProxy::didFailProvisionalLoad()
 {
+    ASSERT(m_loadState == LoadStateProvisional);
+    ASSERT(!m_provisionalURL.isEmpty());
     m_loadState = LoadStateFinished;
     m_provisionalURL = String();
 }
 
 void WebFrameProxy::didCommitLoad()
 {
-    // FIXME: Add assertions.
+    ASSERT(m_loadState == LoadStateProvisional);
+    ASSERT(!m_provisionalURL.isEmpty());
     m_loadState = LoadStateCommitted;
     m_url = m_provisionalURL;
     m_provisionalURL = String();
+    m_title = String();
 }
 
 void WebFrameProxy::didFinishLoad()
 {
-    // FIXME: Add assertions
+    ASSERT(m_loadState == LoadStateCommitted);
+    ASSERT(m_provisionalURL.isEmpty());
+    ASSERT(!m_url.isEmpty());
     m_loadState = LoadStateFinished;
 }
 
 void WebFrameProxy::didFailLoad()
 {
+    ASSERT(m_loadState == LoadStateCommitted);
+    ASSERT(m_provisionalURL.isEmpty());
+    ASSERT(!m_url.isEmpty());
     m_loadState = LoadStateFinished;
+    m_title = String();
 }
 
-void WebFrameProxy::didReceiveTitle(const String&)
+void WebFrameProxy::didSameDocumentNavigation(const String& url)
 {
+    m_url = url;
+}
+
+void WebFrameProxy::didChangeTitle(const String& title)
+{
+    m_title = title;
 }
 
 void WebFrameProxy::receivedPolicyDecision(WebCore::PolicyAction action, uint64_t listenerID)

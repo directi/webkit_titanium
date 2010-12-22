@@ -25,6 +25,7 @@
 
 #include "TiledDrawingAreaProxy.h"
 
+#if ENABLE(TILED_BACKING_STORE)
 #include "DrawingAreaMessageKinds.h"
 #include "DrawingAreaProxyMessageKinds.h"
 #include "MessageID.h"
@@ -40,13 +41,13 @@ namespace WebKit {
 static const int defaultTileWidth = 1024;
 static const int defaultTileHeight = 1024;
 
-PassOwnPtr<TiledDrawingAreaProxy> TiledDrawingAreaProxy::create(PlatformWebView* webView)
+PassOwnPtr<TiledDrawingAreaProxy> TiledDrawingAreaProxy::create(PlatformWebView* webView, WebPageProxy* webPageProxy)
 {
-    return adoptPtr(new TiledDrawingAreaProxy(webView));
+    return adoptPtr(new TiledDrawingAreaProxy(webView, webPageProxy));
 }
 
-TiledDrawingAreaProxy::TiledDrawingAreaProxy(PlatformWebView* webView)
-    : DrawingAreaProxy(TiledDrawingAreaType)
+TiledDrawingAreaProxy::TiledDrawingAreaProxy(PlatformWebView* webView, WebPageProxy* webPageProxy)
+    : DrawingAreaProxy(DrawingAreaInfo::Tiled, webPageProxy)
     , m_isWaitingForDidSetFrameNotification(false)
     , m_isVisible(true)
     , m_webView(webView)
@@ -64,24 +65,24 @@ TiledDrawingAreaProxy::~TiledDrawingAreaProxy()
 {
 }
 
-void TiledDrawingAreaProxy::setSize(const IntSize& viewSize)
+void TiledDrawingAreaProxy::sizeDidChange()
 {
     WebPageProxy* page = this->page();
     if (!page || !page->isValid())
         return;
 
-    if (viewSize.isEmpty())
+    if (m_size.isEmpty())
         return;
 
-    m_viewSize = viewSize;
-    m_lastSetViewSize = viewSize;
+    m_viewSize = m_size;
+    m_lastSetViewSize = m_size;
 
     if (m_isWaitingForDidSetFrameNotification)
         return;
     m_isWaitingForDidSetFrameNotification = true;
 
     page->process()->responsivenessTimer()->start();
-    page->process()->send(DrawingAreaMessage::SetSize, page->pageID(), CoreIPC::In(viewSize));
+    page->process()->send(DrawingAreaMessage::SetSize, page->pageID(), CoreIPC::In(m_size));
 }
 
 void TiledDrawingAreaProxy::setPageIsVisible(bool isVisible)
@@ -345,13 +346,6 @@ void TiledDrawingAreaProxy::paint(const IntRect& rect, PlatformDrawingContext co
             RefPtr<TiledDrawingAreaTile> currentTile = tileAt(currentCoordinate);
             if (currentTile && currentTile->isReadyToPaint())
                 currentTile->paint(&gc, dirtyRect);
-            else {
-                IntRect tileRect = tileRectForCoordinate(currentCoordinate);
-                IntRect target = intersection(tileRect, dirtyRect);
-                if (target.isEmpty())
-                    continue;
-                TiledDrawingAreaTile::paintCheckerPattern(&gc, FloatRect(target));
-            }
         }
     }
     gc.restore();
@@ -625,3 +619,4 @@ bool TiledDrawingAreaProxy::hasPendingUpdates() const
 
 } // namespace WebKit
 
+#endif

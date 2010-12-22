@@ -35,6 +35,7 @@
 #include "AXObjectCache.h"
 #include "BackForwardListImpl.h"
 #include "Chrome.h"
+#include "ChromiumBridge.h"
 #include "ColorSpace.h"
 #include "CompositionUnderlineVectorBuilder.h"
 #include "ContextMenu.h"
@@ -58,6 +59,7 @@
 #include "FrameLoader.h"
 #include "FrameTree.h"
 #include "FrameView.h"
+#include "GeolocationClientProxy.h"
 #include "GraphicsContext.h"
 #include "GraphicsContext3D.h"
 #include "GraphicsContext3DInternal.h"
@@ -309,6 +311,9 @@ WebViewImpl::WebViewImpl(WebViewClient* client, WebDevToolsAgentClient* devTools
     , m_speechInputClient(SpeechInputClientImpl::create(client))
 #endif
     , m_deviceOrientationClientProxy(new DeviceOrientationClientProxy(client ? client->deviceOrientationClient() : 0))
+#if ENABLE(CLIENT_BASED_GEOLOCATION)
+    , m_geolocationClientProxy(new GeolocationClientProxy(client ? client->geolocationClient() : 0))
+#endif
 {
     // WebKit/win/WebView.cpp does the same thing, except they call the
     // KJS specific wrapper around this method. We need to have threading
@@ -332,8 +337,15 @@ WebViewImpl::WebViewImpl(WebViewClient* client, WebDevToolsAgentClient* devTools
     pageClients.speechInputClient = m_speechInputClient.get();
 #endif
     pageClients.deviceOrientationClient = m_deviceOrientationClientProxy.get();
+#if ENABLE(CLIENT_BASED_GEOLOCATION)
+    pageClients.geolocationClient = m_geolocationClientProxy.get();
+#endif
 
     m_page.set(new Page(pageClients));
+
+#if ENABLE(CLIENT_BASED_GEOLOCATION)
+    m_geolocationClientProxy->setController(m_page->geolocationController());
+#endif
 
     static_cast<BackForwardListImpl*>(m_page->backForwardList())->setClient(&m_backForwardListClientImpl);
     m_page->setGroupName(pageGroupName);
@@ -1909,17 +1921,6 @@ void WebViewImpl::applyAutoFillSuggestions(
     const WebNode& node,
     const WebVector<WebString>& names,
     const WebVector<WebString>& labels,
-    const WebVector<int>& uniqueIDs,
-    int separatorIndex)
-{
-    WebVector<WebString> icons(names.size());
-    applyAutoFillSuggestions(node, names, labels, icons, uniqueIDs, separatorIndex);
-}
-
-void WebViewImpl::applyAutoFillSuggestions(
-    const WebNode& node,
-    const WebVector<WebString>& names,
-    const WebVector<WebString>& labels,
     const WebVector<WebString>& icons,
     const WebVector<int>& uniqueIDs,
     int separatorIndex)
@@ -1965,30 +1966,6 @@ void WebViewImpl::applyAutoFillSuggestions(
         m_autoFillPopup->show(focusedNode->getRect(), focusedNode->ownerDocument()->view(), 0);
         m_autoFillPopupShowing = true;
     }
-
-    // DEPRECATED: This special mode will go away once AutoFill and Autocomplete
-    // merge is complete.
-    if (m_autoFillPopupClient)
-        m_autoFillPopupClient->setAutocompleteMode(false);
-}
-
-// DEPRECATED: replacing with applyAutoFillSuggestions.
-void WebViewImpl::applyAutocompleteSuggestions(
-    const WebNode& node,
-    const WebVector<WebString>& suggestions,
-    int defaultSuggestionIndex)
-{
-    WebVector<WebString> names(suggestions.size());
-    WebVector<WebString> labels(suggestions.size());
-    WebVector<WebString> icons(suggestions.size());
-    WebVector<int> uniqueIDs(suggestions.size());
-
-    for (size_t i = 0; i < suggestions.size(); ++i)
-        names[i] = suggestions[i];
-
-    applyAutoFillSuggestions(node, names, labels, icons, uniqueIDs, -1);
-    if (m_autoFillPopupClient)
-        m_autoFillPopupClient->setAutocompleteMode(true);
 }
 
 void WebViewImpl::hidePopups()
@@ -2272,17 +2249,15 @@ bool WebViewImpl::allowsAcceleratedCompositing()
 
 void WebViewImpl::setRootGraphicsLayer(WebCore::PlatformLayer* layer)
 {
-    bool wasActive = m_isAcceleratedCompositingActive;
     setIsAcceleratedCompositingActive(layer ? true : false);
     if (m_layerRenderer)
         m_layerRenderer->setRootLayer(layer);
-    if (wasActive != m_isAcceleratedCompositingActive) {
-        IntRect damagedRect(0, 0, m_size.width, m_size.height);
-        if (m_isAcceleratedCompositingActive)
-            invalidateRootLayerRect(damagedRect);
-        else
-            m_client->didInvalidateRect(damagedRect);
-    }
+
+    IntRect damagedRect(0, 0, m_size.width, m_size.height);
+    if (m_isAcceleratedCompositingActive)
+        invalidateRootLayerRect(damagedRect);
+    else
+        m_client->didInvalidateRect(damagedRect);
 }
 
 void WebViewImpl::setRootLayerNeedsDisplay()
@@ -2376,12 +2351,15 @@ void WebViewImpl::invalidateRootLayerRect(const IntRect& rect)
 
 void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
 {
+    ChromiumBridge::histogramEnumeration("GPU.setIsAcceleratedCompositingActive", active * 2 + m_isAcceleratedCompositingActive, 4);
+
     if (m_isAcceleratedCompositingActive == active)
         return;
 
     if (!active) {
         m_isAcceleratedCompositingActive = false;
-        m_layerRenderer->finish(); // finish all GL rendering before we hide the window?
+        if (m_layerRenderer)
+            m_layerRenderer->finish(); // finish all GL rendering before we hide the window?
         m_client->didActivateAcceleratedCompositing(false);
         return;
     }
@@ -2518,7 +2496,6 @@ void WebViewImpl::reallocateRenderer()
     m_layerRenderer = layerRenderer;
 
     // Enable or disable accelerated compositing and request a refresh.
-    m_isAcceleratedCompositingActive = false;
     setRootGraphicsLayer(m_layerRenderer ? m_layerRenderer->rootLayer() : 0);
 }
 #endif

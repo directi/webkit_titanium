@@ -25,9 +25,11 @@
 
 #include "WebProcess.h"
 
-#include <WebCore/MemoryCache.h>
+#include "WebProcessCreationParameters.h"
 #include <WebCore/FileSystem.h>
+#include <WebCore/MemoryCache.h>
 #include <WebCore/PageCache.h>
+#include <WebCore/Settings.h>
 #include <wtf/text/WTFString.h>
 
 #if USE(CFNETWORK)
@@ -99,6 +101,22 @@ void WebProcess::platformClearResourceCaches()
 {
 #if USE(CFNETWORK)
     CFURLCacheRemoveAllCachedResponses(RetainPtr<CFURLCacheRef>(AdoptCF, CFURLCacheCopySharedURLCache()).get());
+#endif
+}
+
+void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters& parameters, CoreIPC::ArgumentDecoder*)
+{
+    setShouldPaintNativeControls(parameters.shouldPaintNativeControls);
+}
+
+void WebProcess::platformShutdown()
+{
+}
+
+void WebProcess::setShouldPaintNativeControls(bool shouldPaintNativeControls)
+{
+#if USE(SAFARI_THEME)
+    Settings::setShouldPaintNativeControls(shouldPaintNativeControls);
 #endif
 }
 

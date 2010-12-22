@@ -59,8 +59,10 @@
 #include "EventHandler.h"
 #include "EventListener.h"
 #include "EventNames.h"
+#include "EventQueue.h"
 #include "ExceptionCode.h"
 #include "FocusController.h"
+#include "FormAssociatedElement.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
@@ -402,7 +404,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML, con
     , m_normalWorldWrapperCache(0)
 #endif
     , m_usingGeolocation(false)
-    , m_pendingEventTimer(this, &Document::pendingEventTimerFired)
+    , m_eventQueue(adoptPtr(new EventQueue))
 #if ENABLE(WML)
     , m_containsWMLContent(false)
 #endif
@@ -1853,8 +1855,11 @@ void Document::clearAXObjectCache()
 {
     // clear cache in top document
     if (m_axObjectCache) {
-        delete m_axObjectCache;
+        // Clear the cache member variable before calling delete because attempts
+        // are made to access it during destruction.
+        AXObjectCache* axObjectCache = m_axObjectCache;
         m_axObjectCache = 0;
+        delete axObjectCache;
         return;
     }
     
@@ -2611,7 +2616,7 @@ void Document::processHttpEquiv(const String& equiv, const String& content)
             FrameLoader* frameLoader = frame->loader();
             if (frameLoader->shouldInterruptLoadForXFrameOptions(content, url())) {
                 frameLoader->stopAllLoaders();
-                frame->navigationScheduler()->scheduleLocationChange(blankURL(), String());
+                frame->navigationScheduler()->scheduleLocationChange(securityOrigin(), blankURL(), String());
 
                 DEFINE_STATIC_LOCAL(String, consoleMessage, ("Refused to display document because display forbidden by X-Frame-Options.\n"));
                 frame->domWindow()->console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, consoleMessage, 1, String());
@@ -3299,6 +3304,18 @@ void Document::detachNodeIterator(NodeIterator* ni)
     m_nodeIterators.remove(ni);
 }
 
+void Document::moveNodeIteratorsToNewDocument(Node* node, Document* newDocument)
+{
+    HashSet<NodeIterator*> nodeIteratorsList = m_nodeIterators;
+    HashSet<NodeIterator*>::const_iterator nodeIteratorsEnd = nodeIteratorsList.end();
+    for (HashSet<NodeIterator*>::const_iterator it = nodeIteratorsList.begin(); it != nodeIteratorsEnd; ++it) {
+        if ((*it)->root() == node) {
+            detachNodeIterator(*it);
+            newDocument->attachNodeIterator(*it);
+        }
+    }
+}
+
 void Document::nodeChildrenChanged(ContainerNode* container)
 {
     if (!disableRangeMutation(page())) {
@@ -3457,23 +3474,10 @@ void Document::dispatchWindowLoadEvent()
     domWindow->dispatchLoadEvent();
 }
 
-void Document::enqueueEvent(PassRefPtr<Event> event)
+void Document::enqueueWindowEvent(PassRefPtr<Event> event)
 {
-    m_pendingEventQueue.append(event);
-    if (!m_pendingEventTimer.isActive())
-        m_pendingEventTimer.startOneShot(0);
-}
-
-void Document::pendingEventTimerFired(Timer<Document>*)
-{
-    ASSERT(!m_pendingEventTimer.isActive());
-    Vector<RefPtr<Event> > eventQueue;
-    eventQueue.swap(m_pendingEventQueue);
-
-    typedef Vector<RefPtr<Event> >::const_iterator Iterator;
-    Iterator end = eventQueue.end();
-    for (Iterator it = eventQueue.begin(); it != end; ++it)
-        dispatchWindowEvent(*it);
+    event->setTarget(domWindow());
+    m_eventQueue->enqueueEvent(event);
 }
 
 PassRefPtr<Event> Document::createEvent(const String& eventType, ExceptionCode& ec)
@@ -4204,11 +4208,11 @@ void Document::finishedParsing()
     ASSERT(!scriptableDocumentParser() || !m_parser->isParsing());
     ASSERT(!scriptableDocumentParser() || m_readyState != Loading);
     setParsing(false);
-    if (!m_documentTiming.domContentLoadedStart)
-        m_documentTiming.domContentLoadedStart = currentTime();
+    if (!m_documentTiming.domContentLoadedEventStart)
+        m_documentTiming.domContentLoadedEventStart = currentTime();
     dispatchEvent(Event::create(eventNames().DOMContentLoadedEvent, true, false));
-    if (!m_documentTiming.domContentLoadedEnd)
-        m_documentTiming.domContentLoadedEnd = currentTime();
+    if (!m_documentTiming.domContentLoadedEventEnd)
+        m_documentTiming.domContentLoadedEventEnd = currentTime();
 
     if (Frame* f = frame()) {
         // FrameLoader::finishedParsing() might end up calling Document::implicitClose() if all
@@ -4385,23 +4389,23 @@ void Document::setIconURL(const String& iconURL, const String& type)
         f->loader()->setIconURL(m_iconURL);
 }
 
-void Document::registerFormElementWithFormAttribute(Element* control)
+void Document::registerFormElementWithFormAttribute(FormAssociatedElement* element)
 {
-    ASSERT(control->fastHasAttribute(formAttr));
-    m_formElementsWithFormAttribute.add(control);
+    ASSERT(toHTMLElement(element)->fastHasAttribute(formAttr));
+    m_formElementsWithFormAttribute.add(element);
 }
 
-void Document::unregisterFormElementWithFormAttribute(Element* control)
+void Document::unregisterFormElementWithFormAttribute(FormAssociatedElement* element)
 {
-    m_formElementsWithFormAttribute.remove(control);
+    m_formElementsWithFormAttribute.remove(element);
 }
 
 void Document::resetFormElementsOwner(HTMLFormElement* form)
 {
-    typedef FormElementListHashSet::iterator Iterator;
+    typedef FormAssociatedElementListHashSet::iterator Iterator;
     Iterator end = m_formElementsWithFormAttribute.end();
     for (Iterator it = m_formElementsWithFormAttribute.begin(); it != end; ++it)
-        static_cast<HTMLFormControlElement*>(*it)->resetFormOwner(form);
+        (*it)->resetFormOwner(form);
 }
 
 void Document::setUseSecureKeyboardEntryWhenActive(bool usesSecureKeyboard)
@@ -4492,11 +4496,11 @@ void Document::setSecurityOrigin(SecurityOrigin* securityOrigin)
 
 #if ENABLE(DATABASE)
 
-bool Document::isDatabaseReadOnly() const
+bool Document::allowDatabaseAccess() const
 {
     if (!page() || page()->settings()->privateBrowsingEnabled())
-        return true;
-    return false;
+        return false;
+    return true;
 }
 
 void Document::databaseExceededQuota(const String& name)
@@ -4735,7 +4739,7 @@ void Document::enqueuePageshowEvent(PageshowEventPersistence persisted)
 
 void Document::enqueueHashchangeEvent(const String& oldURL, const String& newURL)
 {
-    enqueueEvent(HashChangeEvent::create(oldURL, newURL));
+    enqueueWindowEvent(HashChangeEvent::create(oldURL, newURL));
 }
 
 void Document::enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject)

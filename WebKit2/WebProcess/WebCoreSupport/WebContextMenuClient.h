@@ -42,7 +42,11 @@ public:
 private:
     virtual void contextMenuDestroyed();
     
+#if USE(CROSS_PLATFORM_CONTEXT_MENUS)
+    virtual PassOwnPtr<WebCore::ContextMenu> customizeMenu(PassOwnPtr<WebCore::ContextMenu>);
+#else
     virtual WebCore::PlatformMenuDescription getCustomMenuFromDefaultItems(WebCore::ContextMenu*);
+#endif
     virtual void contextMenuItemSelected(WebCore::ContextMenuItem*, const WebCore::ContextMenu*);
     
     virtual void downloadURL(const WebCore::KURL& url);

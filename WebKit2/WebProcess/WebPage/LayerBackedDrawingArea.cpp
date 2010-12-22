@@ -39,14 +39,16 @@ using namespace WebCore;
 
 namespace WebKit {
 
-LayerBackedDrawingArea::LayerBackedDrawingArea(DrawingAreaID identifier, WebPage* webPage)
-    : DrawingArea(LayerBackedDrawingAreaType, identifier, webPage)
+LayerBackedDrawingArea::LayerBackedDrawingArea(DrawingAreaInfo::Identifier identifier, WebPage* webPage)
+    : DrawingArea(DrawingAreaInfo::LayerBacked, identifier, webPage)
     , m_syncTimer(WebProcess::shared().runLoop(), this, &LayerBackedDrawingArea::syncCompositingLayers)
     , m_attached(false)
     , m_shouldPaint(true)
 {
     m_backingLayer = GraphicsLayer::create(this);
     m_backingLayer->setDrawsContent(true);
+    m_backingLayer->setContentsOpaque(webPage->drawsBackground() && !webPage->drawsTransparentBackground());
+
 #ifndef NDEBUG
     m_backingLayer->setName("DrawingArea backing layer");
 #endif
@@ -88,8 +90,19 @@ void LayerBackedDrawingArea::setNeedsDisplay(const IntRect& rect)
 
 void LayerBackedDrawingArea::display()
 {
+    // Laying out the page can cause the drawing area to change so we keep an extra reference.
+    RefPtr<LayerBackedDrawingArea> protect(this);
+
     // Layout if necessary.
     m_webPage->layoutIfNeeded();
+
+    if (m_webPage->drawingArea() != this)
+        return;
+}
+
+void LayerBackedDrawingArea::pageBackgroundTransparencyChanged()
+{
+    m_backingLayer->setContentsOpaque(m_webPage->drawsBackground() && !m_webPage->drawsTransparentBackground());
 }
 
 void LayerBackedDrawingArea::scheduleDisplay()
@@ -110,12 +123,10 @@ void LayerBackedDrawingArea::setSize(const IntSize& viewSize)
     m_webPage->setSize(viewSize);
     m_webPage->layoutIfNeeded();
 
-    if (m_webPage->drawingArea() != this) {
-        // The drawing area changed, return early.
+    if (m_webPage->drawingArea() != this)
         return;
-    }
     
-    WebProcess::shared().connection()->send(DrawingAreaProxyMessage::DidSetSize, m_webPage->pageID(), CoreIPC::In());
+    WebProcess::shared().connection()->send(DrawingAreaProxyMessage::DidSetSize, m_webPage->pageID(), CoreIPC::In(viewSize));
 }
 
 void LayerBackedDrawingArea::suspendPainting()
@@ -143,12 +154,12 @@ void LayerBackedDrawingArea::didUpdate()
 
 void LayerBackedDrawingArea::didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
 {
-    DrawingAreaID targetDrawingAreaID;
-    if (!arguments->decode(CoreIPC::Out(targetDrawingAreaID)))
+    DrawingAreaInfo::Identifier targetIdentifier;
+    if (!arguments->decode(CoreIPC::Out(targetIdentifier)))
         return;
 
     // We can switch drawing areas on the fly, so if this message was targetted at an obsolete drawing area, ignore it.
-    if (targetDrawingAreaID != info().id)
+    if (targetIdentifier != info().identifier)
         return;
 
     switch (messageID.get<DrawingAreaMessage::Kind>()) {

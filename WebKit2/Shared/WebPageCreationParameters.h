@@ -26,9 +26,11 @@
 #ifndef WebPageCreationParameters_h
 #define WebPageCreationParameters_h
 
-#include "DrawingAreaBase.h"
+#include "DrawingAreaInfo.h"
+#include "WebPageGroupData.h"
 #include "WebPreferencesStore.h"
 #include <WebCore/IntSize.h>
+#include <wtf/text/WTFString.h>
 
 namespace CoreIPC {
     class ArgumentDecoder;
@@ -43,8 +45,14 @@ struct WebPageCreationParameters {
 
     WebCore::IntSize viewSize;
     WebPreferencesStore store;
-    DrawingAreaBase::DrawingAreaInfo drawingAreaInfo;
-    bool visibleToInjectedBundle;
+    DrawingAreaInfo drawingAreaInfo;
+    WebPageGroupData pageGroupData;
+
+    bool drawsBackground;
+    bool drawsTransparentBackground;
+
+    String userAgent;
+
 #if PLATFORM(WIN)
     HWND nativeWindow;
 #endif

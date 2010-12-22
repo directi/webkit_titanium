@@ -25,10 +25,13 @@
 
 #include "DrawingAreaProxy.h"
 
+using namespace WebCore;
+
 namespace WebKit {
 
-DrawingAreaProxy::DrawingAreaProxy(Type type)
-    : DrawingAreaBase(type, nextDrawingAreaID())
+DrawingAreaProxy::DrawingAreaProxy(DrawingAreaInfo::Type type, WebPageProxy* webPageProxy)
+    : m_info(type, nextIdentifier())
+    , m_webPageProxy(webPageProxy)
 {
 }
 
@@ -36,10 +39,19 @@ DrawingAreaProxy::~DrawingAreaProxy()
 {
 }
 
-DrawingAreaProxy::DrawingAreaID DrawingAreaProxy::nextDrawingAreaID()
+DrawingAreaInfo::Identifier DrawingAreaProxy::nextIdentifier()
 {
-    static DrawingAreaID nextID = 1;
+    static DrawingAreaInfo::Identifier nextID = 1;
     return ++nextID;
+}
+
+void DrawingAreaProxy::setSize(const IntSize& size)
+{ 
+    if (m_size == size)
+        return;
+
+    m_size = size;
+    sizeDidChange();
 }
 
 } // namespace WebKit

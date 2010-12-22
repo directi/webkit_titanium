@@ -77,6 +77,11 @@ void WKBundlePageSetUIClient(WKBundlePageRef pageRef, WKBundlePageUIClient* wkCl
     toImpl(pageRef)->initializeInjectedBundleUIClient(wkClient);
 }
 
+WKBundlePageGroupRef WKBundlePageGetPageGroup(WKBundlePageRef pageRef)
+{
+    return toAPI(toImpl(pageRef)->pageGroup());
+}
+
 WKBundleFrameRef WKBundlePageGetMainFrame(WKBundlePageRef pageRef)
 {
     return toAPI(toImpl(pageRef)->mainFrame());
@@ -155,4 +160,9 @@ bool WKBundlePageHasLocalDataForURL(WKBundlePageRef pageRef, WKURLRef urlRef)
 bool WKBundlePageCanHandleRequest(WKURLRequestRef requestRef)
 {
     return WebPage::canHandleRequest(toImpl(requestRef)->resourceRequest());
+}
+
+bool WKBundlePageFindString(WKBundlePageRef pageRef, WKStringRef target, WKFindOptions findOptions)
+{
+    return toImpl(pageRef)->findStringFromInjectedBundle(toImpl(target)->string(), toFindOptions(findOptions));
 }

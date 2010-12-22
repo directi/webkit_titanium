@@ -38,13 +38,13 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PassOwnPtr<LayerBackedDrawingAreaProxy> LayerBackedDrawingAreaProxy::create(PlatformWebView* webView)
+PassOwnPtr<LayerBackedDrawingAreaProxy> LayerBackedDrawingAreaProxy::create(PlatformWebView* webView, WebPageProxy* webPageProxy)
 {
-    return adoptPtr(new LayerBackedDrawingAreaProxy(webView));
+    return adoptPtr(new LayerBackedDrawingAreaProxy(webView, webPageProxy));
 }
 
-LayerBackedDrawingAreaProxy::LayerBackedDrawingAreaProxy(PlatformWebView* webView)
-    : DrawingAreaProxy(LayerBackedDrawingAreaType)
+LayerBackedDrawingAreaProxy::LayerBackedDrawingAreaProxy(PlatformWebView* webView, WebPageProxy* webPageProxy)
+    : DrawingAreaProxy(DrawingAreaInfo::LayerBacked, webPageProxy)
     , m_isWaitingForDidSetFrameNotification(false)
     , m_isVisible(true)
     , m_webView(webView)
@@ -61,27 +61,26 @@ void LayerBackedDrawingAreaProxy::paint(const IntRect& rect, PlatformDrawingCont
 }
 #endif
 
-void LayerBackedDrawingAreaProxy::setSize(const IntSize& viewSize)
+void LayerBackedDrawingAreaProxy::sizeDidChange()
 {
-    DrawingAreaProxy::setSize(viewSize);
-
     WebPageProxy* page = this->page();
     if (!page->isValid())
         return;
 
-    if (viewSize.isEmpty())
+    if (m_size.isEmpty())
         return;
 
-    m_lastSetViewSize = viewSize;
+    m_lastSetViewSize = m_size;
 
     platformSetSize();
 
     if (m_isWaitingForDidSetFrameNotification)
         return;
+
     m_isWaitingForDidSetFrameNotification = true;
 
     page->process()->responsivenessTimer()->start();
-    page->process()->send(DrawingAreaMessage::SetSize, page->pageID(), CoreIPC::In(info().id, viewSize));
+    page->process()->send(DrawingAreaMessage::SetSize, page->pageID(), CoreIPC::In(info().identifier, m_size));
 }
 
 #if !PLATFORM(MAC) && !PLATFORM(WIN)
@@ -103,19 +102,22 @@ void LayerBackedDrawingAreaProxy::setPageIsVisible(bool isVisible)
 
     if (!m_isVisible) {
         // Tell the web process that it doesn't need to paint anything for now.
-        page->process()->send(DrawingAreaMessage::SuspendPainting, page->pageID(), CoreIPC::In(info().id));
+        page->process()->send(DrawingAreaMessage::SuspendPainting, page->pageID(), CoreIPC::In(info().identifier));
         return;
     }
     
     // The page is now visible.
-    page->process()->send(DrawingAreaMessage::ResumePainting, page->pageID(), CoreIPC::In(info().id));
+    page->process()->send(DrawingAreaMessage::ResumePainting, page->pageID(), CoreIPC::In(info().identifier));
     
     // FIXME: We should request a full repaint here if needed.
 }
     
-void LayerBackedDrawingAreaProxy::didSetSize()
+void LayerBackedDrawingAreaProxy::didSetSize(const IntSize& size)
 {
     m_isWaitingForDidSetFrameNotification = false;
+
+    if (size != m_lastSetViewSize)
+        setSize(m_lastSetViewSize);
 
     WebPageProxy* page = this->page();
     page->process()->responsivenessTimer()->stop();
@@ -124,7 +126,7 @@ void LayerBackedDrawingAreaProxy::didSetSize()
 void LayerBackedDrawingAreaProxy::update()
 {
     WebPageProxy* page = this->page();
-    page->process()->send(DrawingAreaMessage::DidUpdate, page->pageID(), CoreIPC::In(info().id));
+    page->process()->send(DrawingAreaMessage::DidUpdate, page->pageID(), CoreIPC::In(info().identifier));
 }
 
 void LayerBackedDrawingAreaProxy::didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
@@ -135,7 +137,10 @@ void LayerBackedDrawingAreaProxy::didReceiveMessage(CoreIPC::Connection*, CoreIP
             break;
         }
         case DrawingAreaProxyMessage::DidSetSize: {
-            didSetSize();
+            IntSize size;
+            if (!arguments->decode(CoreIPC::Out(size)))
+                return;
+            didSetSize(size);
             break;
         }
         default:

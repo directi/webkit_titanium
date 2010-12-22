@@ -27,6 +27,7 @@
 #define WebLoaderClient_h
 
 #include "APIClient.h"
+#include "SameDocumentNavigationType.h"
 #include "WKPage.h"
 #include <wtf/Forward.h>
 
@@ -37,8 +38,11 @@ class ResourceError;
 namespace WebKit {
 
 class APIObject;
-class WebPageProxy;
+class AuthenticationChallengeProxy;
+class AuthenticationDecisionListener;
 class WebFrameProxy;
+class WebPageProxy;
+class WebProtectionSpace;
 
 class WebLoaderClient : public APIClient<WKPageLoaderClient> {
 public:
@@ -49,12 +53,16 @@ public:
     void didFinishDocumentLoadForFrame(WebPageProxy*, WebFrameProxy*, APIObject*);
     void didFinishLoadForFrame(WebPageProxy*, WebFrameProxy*, APIObject*);
     void didFailLoadWithErrorForFrame(WebPageProxy*, WebFrameProxy*, const WebCore::ResourceError&, APIObject*);
+    void didSameDocumentNavigationForFrame(WebPageProxy*, WebFrameProxy*, SameDocumentNavigationType, APIObject*);
     void didReceiveTitleForFrame(WebPageProxy*, const String&, WebFrameProxy*, APIObject*);
     void didFirstLayoutForFrame(WebPageProxy*, WebFrameProxy*, APIObject*);
     void didFirstVisuallyNonEmptyLayoutForFrame(WebPageProxy*, WebFrameProxy*, APIObject*);
     void didRemoveFrameFromHierarchy(WebPageProxy*, WebFrameProxy*, APIObject*);
     void didDisplayInsecureContentForFrame(WebPageProxy*, WebFrameProxy*, APIObject*);
     void didRunInsecureContentForFrame(WebPageProxy*, WebFrameProxy*, APIObject*);
+    
+    bool canAuthenticateAgainstProtectionSpaceInFrame(WebPageProxy*, WebFrameProxy*, WebProtectionSpace*);
+    void didReceiveAuthenticationChallengeInFrame(WebPageProxy*, WebFrameProxy*, AuthenticationChallengeProxy*);
 
     void didStartProgress(WebPageProxy*);
     void didChangeProgress(WebPageProxy*);

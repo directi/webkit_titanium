@@ -61,7 +61,6 @@ editing/style/style-boundary-005.html
 
 # WebKitTestRunner needs an implementation of eventSender
 # <https://bugs.webkit.org/show_bug.cgi?id=42194>
-editing/inserting/insert-paste-bidi-control.html
 compositing/iframes/layout-on-compositing-change.html
 editing/deleting/5390681-2.html
 editing/deleting/5729680.html
@@ -75,6 +74,7 @@ editing/execCommand/findString-2.html
 editing/input/option-page-up-down.html
 editing/input/page-up-down-scrolls.html
 editing/input/scroll-viewport-page-up-down.html
+editing/inserting/insert-paste-bidi-control.html
 editing/inserting/return-key-in-hidden-field.html
 editing/inserting/typing-tab-designmode-forms.html
 editing/inserting/typing-tab-designmode.html
@@ -117,13 +117,20 @@ editing/selection/anchor-focus1.html
 editing/selection/anchor-focus2.html
 editing/selection/anchor-focus3.html
 editing/selection/button-right-click.html
+editing/selection/caret-ltr-2-left.html
+editing/selection/caret-ltr-2.html
+editing/selection/caret-ltr-right.html
+editing/selection/caret-ltr.html
+editing/selection/caret-rtl-2-left.html
 editing/selection/caret-rtl-2.html
+editing/selection/caret-rtl-right.html
 editing/selection/caret-rtl.html
 editing/selection/click-after-nested-block.html
 editing/selection/click-before-and-after-table.html
 editing/selection/click-in-focusable-link-should-not-clear-selection.html
 editing/selection/click-in-margins-inside-editable-div.html
 editing/selection/click-in-padding-with-multiple-line-boxes.html
+editing/selection/click-left-of-rtl-wrapping-text.html
 editing/selection/click-outside-editable-div.html
 editing/selection/click-start-of-line.html
 editing/selection/contains-boundaries.html
@@ -166,6 +173,7 @@ editing/selection/triple-click-in-pre.html
 editing/selection/user-drag-element-and-user-select-none.html
 editing/selection/word-granularity.html
 editing/spelling/context-menu-suggestions.html
+editing/spelling/spellcheck-paste.html
 editing/undo/undo-deleteWord.html
 editing/undo/undo-smart-delete-reversed-selection.html
 editing/undo/undo-smart-delete-word.html
@@ -195,10 +203,12 @@ fast/css/resize-single-axis.html
 fast/css/universal-hover-quirk.html
 fast/css/user-drag-none.html
 fast/dom/Document/CaretRangeFromPoint/caretRangeFromPoint-in-zoom-and-scroll.html
+fast/dom/horizontal-scrollbar-in-rtl.html
 fast/dom/HTMLSelectElement/click-size-zero-no-crash.html
 fast/dom/HTMLTableColElement/resize-table-using-col-width.html
 fast/dom/Node/mutation-blur.html
 fast/dom/replaced-image-map.html
+fast/dom/vertical-scrollbar-in-rtl.html
 fast/dom/Window/window-postmessage-clone-frames.html
 fast/dom/Window/window-postmessage-clone.html
 fast/dom/Window/window-xy-properties.html
@@ -218,6 +228,8 @@ fast/events/autoscroll-with-non-scrollable-parent.html
 fast/events/autoscroll.html
 fast/events/bogus-dropEffect-effectAllowed.html
 fast/events/capture-on-target.html
+fast/events/check-defocus-event-order-when-triggered-by-mouse-click.html
+fast/events/check-defocus-event-order-when-triggered-by-tab.html
 fast/events/click-count.html
 fast/events/click-focus-anchor.html
 fast/events/click-focus-control.html
@@ -316,6 +328,8 @@ fast/events/tab-imagemap.html
 fast/events/tab-is-focusable-assert.html
 fast/events/tabindex-focus-chain.html
 fast/events/updateLayoutForHitTest.html
+fast/events/wheelevent-in-horizontal-scrollbar-in-rtl.html
+fast/events/wheelevent-in-vertical-scrollbar-in-rtl.html
 fast/events/window-events-bubble.html
 fast/events/window-events-bubble2.html
 fast/events/window-events-capture.html
@@ -325,6 +339,7 @@ fast/forms/25153.html
 fast/forms/access-key.html
 fast/forms/button-enter-click.html
 fast/forms/button-spacebar-click.html
+fast/forms/disabled-search-input.html
 fast/forms/display-none-in-onchange-keyboard.html
 fast/forms/drag-into-textarea.html
 fast/forms/drag-out-of-textarea.html
@@ -389,6 +404,7 @@ fast/forms/select-cache-desynchronization.html
 fast/forms/select-double-onchange.html
 fast/forms/select-empty-list.html
 fast/forms/select-listbox-focus-displaynone.html
+fast/forms/select-option-accesskey-crash.html
 fast/forms/select-popup-pagekeys.html
 fast/forms/select-script-onchange.html
 fast/forms/select-type-ahead-list-box-no-selection.html
@@ -397,6 +413,7 @@ fast/forms/slider-delete-while-dragging-thumb.html
 fast/forms/slider-mouse-events.html
 fast/forms/slider-onchange-event.html
 fast/forms/tabbing-input-iframe.html
+fast/forms/text-input-event.html
 fast/forms/textarea-arrow-navigation.html
 fast/forms/textarea-input-event.html
 fast/forms/textarea-live-pseudo-selectors.html
@@ -460,8 +477,8 @@ http/tests/local/blob/send-data-blob.html
 http/tests/local/blob/send-hybrid-blob.html
 http/tests/local/blob/send-sliced-data-blob.html
 http/tests/local/drag-over-remote-content.html
-http/tests/local/formdata
 http/tests/local/fileapi
+http/tests/local/formdata
 http/tests/misc/bubble-drag-events.html
 http/tests/misc/drag-over-iframe-invalid-source-crash.html
 http/tests/misc/isindex-with-no-form.html
@@ -476,6 +493,7 @@ http/tests/navigation/redirect-preserves-referrer.html
 http/tests/security/clipboard/clipboard-file-access.html
 http/tests/security/dataTransfer-set-data-file-url.html
 http/tests/security/drag-drop-different-origin.html
+http/tests/security/drag-drop-same-unique-origin.html
 http/tests/security/drag-over-remote-content-iframe.html
 http/tests/security/listener/xss-window-onclick-addEventListener.html
 http/tests/security/listener/xss-window-onclick-shortcut.html
@@ -494,6 +512,7 @@ platform/mac/editing/spelling/autocorrection-removing-underline-after-paste.html
 platform/mac/editing/spelling/autocorrection-removing-underline.html
 platform/mac/editing/spelling/autocorrection-simple.html
 platform/mac/editing/spelling/click-autocorrected-word.html
+platform/mac/editing/spelling/delete-autocorrected-word-1.html
 platform/mac/editing/spelling/delete-into-autocorrected-word.html
 platform/mac/editing/spelling/delete-into-misspelled-word.html
 platform/mac/editing/spelling/editing-multiple-words-with-markers.html
@@ -1001,6 +1020,7 @@ fast/canvas/webgl/index-validation-crash-with-buffer-sub-data.html
 fast/canvas/webgl/index-validation-verifies-too-many-indices.html
 fast/canvas/webgl/index-validation-with-resized-buffer.html
 fast/canvas/webgl/index-validation.html
+fast/canvas/webgl/instanceof-test.html
 fast/canvas/webgl/invalid-passed-params.html
 fast/canvas/webgl/invalid-UTF-16.html
 fast/canvas/webgl/is-object.html
@@ -1010,6 +1030,7 @@ fast/canvas/webgl/object-deletion-behaviour.html
 fast/canvas/webgl/point-size.html
 fast/canvas/webgl/program-test.html
 fast/canvas/webgl/read-pixels-pack-alignment.html
+fast/canvas/webgl/read-pixels-test.html
 fast/canvas/webgl/renderbuffer-initialization.html
 fast/canvas/webgl/tex-image-and-sub-image-2d-with-array-buffer-view.html
 fast/canvas/webgl/tex-image-and-sub-image-2d-with-image-data.html
@@ -1696,9 +1717,9 @@ plugins/netscape-plugin-setwindow-size-2.html
 # WebKitTestRunner needs layoutTestController.setEditingBehavior
 # <https://bugs.webkit.org/show_bug.cgi?id=42689>
 editing/selection/5195166-1.html
+editing/selection/context-menu-text-selection.html
 editing/execCommand/query-command-state.html
 editing/execCommand/query-text-alignment.html
-
 
 # WebKitTestRunner needs layoutTestController.setWillSendRequestReturnsNull
 # <https://bugs.webkit.org/show_bug.cgi?id=42690>
@@ -1877,10 +1898,11 @@ fast/events/popup-allowed-from-gesture-initiated-form-submit.html
 fast/events/popup-blocked-from-fake-button-click.html
 fast/events/popup-blocked-from-fake-focus.html
 fast/events/popup-blocked-from-fake-user-gesture.html
-fast/events/popup-blocked-to-post-blank.html
-fast/events/popup-blocked-from-iframe-script.html
 fast/events/popup-blocked-from-history-reload.html
+fast/events/popup-blocked-from-iframe-script.html
+fast/events/popup-blocked-from-untrusted-mouse-click.html
 fast/events/popup-blocked-from-window-open.html
+fast/events/popup-blocked-to-post-blank.html
 
 # WebKitTestRunner needs layoutTestController.addDisallowedURL
 plugins/get-url-that-the-resource-load-delegate-will-disallow.html
@@ -1909,6 +1931,10 @@ fast/spatial-navigation
 
 # WebKitTestRunner needs layoutTestController.pageSizeAndMarginsInPixels
 printing/page-format-data-display-none.html
+
+# WebKitTestRunner needs layoutTestController.dumpUserGestureInFrameLoadCallbacks
+fast/frames/location-redirect-user-gesture.html
+fast/frames/meta-refresh-user-gesture.html
 
 # WebKit2 needs support for moving/resizing and querying the location/size the window
 fast/dom/Window/window-resize-and-move-arguments.html
@@ -2124,6 +2150,7 @@ fast/replaced/applet-rendering-java-disabled.html
 
 # Unexplained failures
 canvas/philip/tests/2d.text.draw.fontface.notinpage.html
+fast/block/basic/truncation-rtl.html
 fast/dom/beforeload/remove-frame-in-beforeload-listener.html
 fast/dom/css-cached-import-rule.html
 fast/dom/Document/open-with-pending-load.html
@@ -2132,6 +2159,8 @@ fast/dom/StyleSheet/detached-style-pi-2.xhtml
 fast/dom/StyleSheet/detached-style-pi.xhtml
 fast/dom/StyleSheet/detached-style.html
 fast/dom/Window/window-appendages-cleared.html
+fast/dom/horizontal-scrollbar-when-dir-change.html
+fast/dom/tab-in-right-alignment.html
 fast/dynamic/anchor-lock.html
 fast/events/simulated-key-state.html
 fast/forms/input-image-submit.html
@@ -2159,8 +2188,6 @@ fast/loader/submit-form-while-parsing-2.html
 fast/overflow/overflow_hidden.html
 fast/overflow/scroll-vertical-not-horizontal.html
 fast/parser/document-close-iframe-load.html
-fast/regex/test1.html
-fast/regex/test4.html
 fast/table/giantCellspacing.html
 fast/workers/storage/change-version-handle-reuse-sync.html
 fast/workers/storage/executesql-accepts-only-one-statement-sync.html
@@ -2185,6 +2212,7 @@ http/tests/media/video-load-twice.html
 http/tests/misc/location-replace-crossdomain.html
 http/tests/misc/object-image-error-with-onload.html
 http/tests/misc/slow-loading-mask.html
+http/tests/misc/unloadable-script.html
 http/tests/multipart/multipart-wait-before-boundary.html
 http/tests/navigation/back-send-referrer.html
 http/tests/navigation/fallback-anchor-reload.html
@@ -2246,10 +2274,11 @@ platform/mac/fast/AppleScript/array.html
 platform/mac/fast/AppleScript/date.html
 
 # WebKitTestRunner doesn't have objCController
-platform/mac/fast/objc/dom-html-select-activate.html
 platform/mac/fast/dom/objc-wrapper-identity.html
 platform/mac/fast/dom/wrapper-classes-objc.html
 platform/mac/fast/dom/wrapper-round-tripping.html
+platform/mac/fast/objc/dom-html-select-activate.html
+platform/mac/fast/objc/dom-html-select-live-pseudo-selectors.html
 platform/mac/fast/objc/longlongTest.html
 platform/mac/fast/objc/webScriptObject-hasWebScriptKey.html
 platform/mac/plugins/bindings-array-apply-crash.html
@@ -2274,3 +2303,11 @@ platform/mac/fast/events/objc-keyboard-event-creation.html
 # WebKit2 does not (should not?) support setting WebKitUsePreHTML5ParserQuirks
 # in its WebPreferences implementation.
 fast/parser/pre-html5-parser-quirks.html
+
+# requires video.buffered to be able to return multiple timeranges
+http/tests/media/video-buffered.html
+
+# For https://bugs.webkit.org/show_bug.cgi?id=50758
+# These require DRT setSerializeHTTPLoads implementation for WebKit2 to be reliable.
+http/tests/local/link-stylesheet-load-order.html
+http/tests/local/link-stylesheet-load-order-preload.html

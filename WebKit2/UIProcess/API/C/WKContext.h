@@ -103,9 +103,6 @@ WK_EXPORT WKContextRef WKContextCreate();
 WK_EXPORT WKContextRef WKContextCreateWithInjectedBundlePath(WKStringRef path);
 WK_EXPORT WKContextRef WKContextGetSharedProcessContext();
 
-WK_EXPORT void WKContextSetPreferences(WKContextRef context, WKPreferencesRef preferences);
-WK_EXPORT WKPreferencesRef WKContextGetPreferences(WKContextRef context);
-
 WK_EXPORT void WKContextSetInjectedBundleClient(WKContextRef context, const WKContextInjectedBundleClient* client);
 WK_EXPORT void WKContextSetHistoryClient(WKContextRef context, const WKContextHistoryClient* client);
 WK_EXPORT void WKContextSetDownloadClient(WKContextRef context, const WKContextDownloadClient* client);
@@ -120,6 +117,8 @@ WK_EXPORT WKCacheModel WKContextGetCacheModel(WKContextRef context);
 
 WK_EXPORT void WKContextClearResourceCaches(WKContextRef context);
 WK_EXPORT void WKContextClearApplicationCache(WKContextRef context);
+
+WK_EXPORT WKDatabaseManagerRef WKContextGetDatabaseManager(WKContextRef context);
 
 #ifdef __cplusplus
 }

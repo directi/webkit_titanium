@@ -25,7 +25,7 @@
 
 #include "WebPageCreationParameters.h"
 
-#include "ArgumentEncoder.h"
+#include "WebCoreArgumentCoders.h"
 
 namespace WebKit {
 
@@ -34,7 +34,10 @@ void WebPageCreationParameters::encode(CoreIPC::ArgumentEncoder* encoder) const
     encoder->encode(viewSize);
     encoder->encode(store);
     encoder->encode(drawingAreaInfo);
-    encoder->encode(visibleToInjectedBundle);
+    encoder->encode(pageGroupData);
+    encoder->encode(drawsBackground);
+    encoder->encode(drawsTransparentBackground);
+    encoder->encode(userAgent);
 
 #if PLATFORM(WIN)
     encoder->encode(reinterpret_cast<uint64_t>(nativeWindow));
@@ -49,7 +52,13 @@ bool WebPageCreationParameters::decode(CoreIPC::ArgumentDecoder* decoder, WebPag
         return false;
     if (!decoder->decode(parameters.drawingAreaInfo))
         return false;
-    if (!decoder->decode(parameters.visibleToInjectedBundle))
+    if (!decoder->decode(parameters.pageGroupData))
+        return false;
+    if (!decoder->decode(parameters.drawsBackground))
+        return false;
+    if (!decoder->decode(parameters.drawsTransparentBackground))
+        return false;
+    if (!decoder->decode(parameters.userAgent))
         return false;
 
 #if PLATFORM(WIN)

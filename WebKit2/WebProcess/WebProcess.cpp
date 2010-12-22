@@ -25,6 +25,7 @@
 
 #include "WebProcess.h"
 
+#include "AuthenticationManager.h"
 #include "DownloadManager.h"
 #include "InjectedBundle.h"
 #include "InjectedBundleMessageKinds.h"
@@ -32,6 +33,7 @@
 #include "RunLoop.h"
 #include "WebContextMessages.h"
 #include "WebCoreArgumentCoders.h"
+#include "WebDatabaseManager.h"
 #include "WebFrame.h"
 #include "WebPage.h"
 #include "WebPageCreationParameters.h"
@@ -42,6 +44,7 @@
 #include "WebProcessProxyMessages.h"
 #include <WebCore/ApplicationCacheStorage.h>
 #include <WebCore/CrossOriginPreflightResultCache.h>
+#include <WebCore/Font.h>
 #include <WebCore/Language.h>
 #include <WebCore/Page.h>
 #include <WebCore/PageGroup.h>
@@ -99,11 +102,19 @@ WebProcess::WebProcess()
 #if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
     , m_compositingRenderServerPort(MACH_PORT_NULL)
 #endif
+#if PLATFORM(QT)
+    , m_networkAccessManager(0)
+#endif
 {
 #if USE(PLATFORM_STRATEGIES)
     // Initialize our platform strategies.
     WebPlatformStrategies::initialize();
 #endif // USE(PLATFORM_STRATEGIES)
+
+#if ENABLE(DATABASE)
+    // Make sure the WebDatabaseManager is initialized so that the Database directory is set.
+    WebDatabaseManager::shared();
+#endif
 }
 
 void WebProcess::initialize(CoreIPC::Connection::Identifier serverIdentifier, RunLoop* runLoop)
@@ -122,6 +133,8 @@ void WebProcess::initializeWebProcess(const WebProcessCreationParameters& parame
 {
     ASSERT(m_pageMap.isEmpty());
 
+    platformInitializeWebProcess(parameters, arguments);
+
     RefPtr<APIObject> injectedBundleInitializationUserData;
     InjectedBundleUserMessageDecoder messageDecoder(injectedBundleInitializationUserData);
     if (!arguments->decode(messageDecoder))
@@ -137,8 +150,10 @@ void WebProcess::initializeWebProcess(const WebProcessCreationParameters& parame
         }
     }
 
+#if ENABLE(OFFLINE_WEB_APPLICATIONS)
     if (!parameters.applicationCacheDirectory.isEmpty())
         cacheStorage().setCacheDirectory(parameters.applicationCacheDirectory);
+#endif
 
     setShouldTrackVisitedLinks(parameters.shouldTrackVisitedLinks);
     setCacheModel(static_cast<uint32_t>(parameters.cacheModel));
@@ -155,12 +170,16 @@ void WebProcess::initializeWebProcess(const WebProcessCreationParameters& parame
     for (size_t i = 0; i < parameters.urlSchemesForWhichDomainRelaxationIsForbidden.size(); ++i)
         setDomainRelaxationForbiddenForURLScheme(parameters.urlSchemesForWhichDomainRelaxationIsForbidden[i]);
 
-#if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
-    m_compositingRenderServerPort = parameters.acceleratedCompositingPort.port();
-#endif
-#if PLATFORM(WIN)
-    setShouldPaintNativeControls(parameters.shouldPaintNativeControls);
-#endif
+    for (size_t i = 0; i < parameters.mimeTypesWithCustomRepresentation.size(); ++i)
+        m_mimeTypesWithCustomRepresentations.add(parameters.mimeTypesWithCustomRepresentation[i]);
+
+    if (parameters.clearResourceCaches)
+        clearResourceCaches();
+    if (parameters.clearApplicationCache)
+        clearApplicationCache();
+
+    if (parameters.shouldAlwaysUseComplexTextCodePath)
+        setAlwaysUsesComplexTextCodePath(true);
 }
 
 void WebProcess::setShouldTrackVisitedLinks(bool shouldTrackVisitedLinks)
@@ -181,6 +200,11 @@ void WebProcess::registerURLSchemeAsSecure(const String& urlScheme) const
 void WebProcess::setDomainRelaxationForbiddenForURLScheme(const String& urlScheme) const
 {
     SecurityOrigin::setDomainRelaxationForbiddenForURLScheme(true, urlScheme);
+}
+
+void WebProcess::setAlwaysUsesComplexTextCodePath(bool alwaysUseComplexText)
+{
+    Font::setCodePath(alwaysUseComplexText ? Font::Complex : Font::Auto);
 }
 
 void WebProcess::languageChanged(const String& language) const
@@ -380,15 +404,6 @@ void WebProcess::calculateCacheSizes(CacheModel cacheModel, uint64_t memorySize,
     };
 }
 
-#if PLATFORM(WIN)
-void WebProcess::setShouldPaintNativeControls(bool shouldPaintNativeControls)
-{
-#if USE(SAFARI_THEME)
-    Settings::setShouldPaintNativeControls(shouldPaintNativeControls);
-#endif
-}
-#endif
-
 WebPage* WebProcess::webPage(uint64_t pageID) const
 {
     return m_pageMap.get(pageID).get();
@@ -446,13 +461,39 @@ void WebProcess::shutdownIfPossible()
     m_connection->invalidate();
     m_connection = nullptr;
 
+    platformShutdown();
+
     m_runLoop->stop();
+}
+
+CoreIPC::SyncReplyMode WebProcess::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, CoreIPC::ArgumentEncoder* reply)
+{   
+    uint64_t pageID = arguments->destinationID();
+    if (!pageID)
+        return CoreIPC::AutomaticReply;
+    
+    WebPage* page = webPage(pageID);
+    if (!page)
+        return CoreIPC::AutomaticReply;
+    
+    page->didReceiveSyncMessage(connection, messageID, arguments, reply);
+    return CoreIPC::AutomaticReply;
 }
 
 void WebProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
 {
     if (messageID.is<CoreIPC::MessageClassWebProcess>()) {
         didReceiveWebProcessMessage(connection, messageID, arguments);
+        return;
+    }
+
+    if (messageID.is<CoreIPC::MessageClassAuthenticationManager>()) {
+        AuthenticationManager::shared().didReceiveMessage(connection, messageID, arguments);
+        return;
+    }
+
+    if (messageID.is<CoreIPC::MessageClassWebDatabaseManager>()) {
+        WebDatabaseManager::shared().didReceiveMessage(connection, messageID, arguments);
         return;
     }
 
@@ -524,6 +565,22 @@ void WebProcess::removeWebFrame(uint64_t frameID)
         return;
 
     m_connection->send(Messages::WebProcessProxy::DidDestroyFrame(frameID), 0);
+}
+
+WebPageGroupProxy* WebProcess::webPageGroup(uint64_t pageGroupID)
+{
+    return m_pageGroupMap.get(pageGroupID).get();
+}
+
+WebPageGroupProxy* WebProcess::webPageGroup(const WebPageGroupData& pageGroupData)
+{
+    std::pair<HashMap<uint64_t, RefPtr<WebPageGroupProxy> >::iterator, bool> result = m_pageGroupMap.add(pageGroupData.pageGroupID, 0);
+    if (result.second) {
+        ASSERT(!result.first->second);
+        result.first->second = WebPageGroupProxy::create(pageGroupData);
+    }
+
+    return result.first->second.get();
 }
 
 void WebProcess::clearResourceCaches()

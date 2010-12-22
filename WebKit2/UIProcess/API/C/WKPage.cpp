@@ -42,9 +42,14 @@ WKTypeID WKPageGetTypeID()
     return toAPI(WebPageProxy::APIType);
 }
 
-WKPageNamespaceRef WKPageGetPageNamespace(WKPageRef pageRef)
+WKContextRef WKPageGetContext(WKPageRef pageRef)
 {
-    return toAPI(toImpl(pageRef)->pageNamespace());
+    return toAPI(toImpl(pageRef)->context());
+}
+
+WKPageGroupRef WKPageGetPageGroup(WKPageRef pageRef)
+{
+    return toAPI(toImpl(pageRef)->pageGroup());
 }
 
 void WKPageLoadURL(WKPageRef pageRef, WKURLRef URLRef)
@@ -132,11 +137,6 @@ WKBackForwardListRef WKPageGetBackForwardList(WKPageRef pageRef)
     return toAPI(toImpl(pageRef)->backForwardList());
 }
 
-bool WKPageCanShowMIMEType(WKPageRef pageRef, WKStringRef mimeTypeRef)
-{
-    return toImpl(pageRef)->canShowMIMEType(toWTFString(mimeTypeRef));
-}
-
 WKStringRef WKPageCopyTitle(WKPageRef pageRef)
 {
     return toCopiedAPI(toImpl(pageRef)->pageTitle());
@@ -164,6 +164,21 @@ double WKPageGetEstimatedProgress(WKPageRef pageRef)
     return toImpl(pageRef)->estimatedProgress();
 }
 
+WKStringRef WKPageCopyUserAgent(WKPageRef pageRef)
+{
+    return toCopiedAPI(toImpl(pageRef)->userAgent());
+}
+
+WKStringRef WKPageCopyApplicationNameForUserAgent(WKPageRef pageRef)
+{
+    return toCopiedAPI(toImpl(pageRef)->applicationNameForUserAgent());
+}
+
+void WKPageSetApplicationNameForUserAgent(WKPageRef pageRef, WKStringRef applicationNameRef)
+{
+    toImpl(pageRef)->setApplicationNameForUserAgent(toWTFString(applicationNameRef));
+}
+
 WKStringRef WKPageCopyCustomUserAgent(WKPageRef pageRef)
 {
     return toCopiedAPI(toImpl(pageRef)->customUserAgent());
@@ -171,7 +186,22 @@ WKStringRef WKPageCopyCustomUserAgent(WKPageRef pageRef)
 
 void WKPageSetCustomUserAgent(WKPageRef pageRef, WKStringRef userAgentRef)
 {
-    toImpl(pageRef)->setCustomUserAgent(toImpl(userAgentRef)->string());
+    toImpl(pageRef)->setCustomUserAgent(toWTFString(userAgentRef));
+}
+
+bool WKPageSupportsTextEncoding(WKPageRef pageRef)
+{
+    return toImpl(pageRef)->supportsTextEncoding();
+}
+
+WKStringRef WKPageCopyCustomTextEncodingName(WKPageRef pageRef)
+{
+    return toCopiedAPI(toImpl(pageRef)->customTextEncodingName());
+}
+
+void WKPageSetCustomTextEncodingName(WKPageRef pageRef, WKStringRef encodingNameRef)
+{
+    toImpl(pageRef)->setCustomTextEncodingName(toWTFString(encodingNameRef));
 }
 
 void WKPageTerminate(WKPageRef pageRef)
@@ -278,6 +308,13 @@ void WKPageSetPagePolicyClient(WKPageRef pageRef, const WKPagePolicyClient* wkCl
     if (wkClient && wkClient->version)
         return;
     toImpl(pageRef)->initializePolicyClient(wkClient);
+}
+
+void WKPageSetPageResourceLoadClient(WKPageRef pageRef, const WKPageResourceLoadClient* wkClient)
+{
+    if (wkClient && wkClient->version)
+        return;
+    toImpl(pageRef)->initializeResourceLoadClient(wkClient);
 }
 
 void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClient* wkClient)

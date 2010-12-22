@@ -94,6 +94,7 @@ RenderLayerCompositor::RenderLayerCompositor(RenderView* renderView)
     , m_rootPlatformLayer(0)
     , m_updateCompositingLayersTimer(this, &RenderLayerCompositor::updateCompositingLayersTimerFired)
     , m_hasAcceleratedCompositing(true)
+    , m_compositingTriggers(static_cast<ChromeClient::CompositingTriggerFlags>(ChromeClient::AllTriggers))
     , m_showDebugBorders(false)
     , m_showRepaintCounter(false)
     , m_compositingConsultsOverlap(true)
@@ -130,7 +131,7 @@ void RenderLayerCompositor::cacheAcceleratedCompositingFlags()
     bool hasAcceleratedCompositing = false;
     bool showDebugBorders = false;
     bool showRepaintCounter = false;
-    
+
     if (Settings* settings = m_renderView->document()->settings()) {
         hasAcceleratedCompositing = settings->acceleratedCompositingEnabled();
         showDebugBorders = settings->showDebugBorders();
@@ -142,16 +143,24 @@ void RenderLayerCompositor::cacheAcceleratedCompositingFlags()
     if (hasAcceleratedCompositing) {
         Frame* frame = m_renderView->frameView()->frame();
         Page* page = frame ? frame->page() : 0;
-        if (page)
-            hasAcceleratedCompositing = page->chrome()->client()->allowsAcceleratedCompositing();
+        if (page) {
+            ChromeClient* chromeClient = page->chrome()->client();
+            m_compositingTriggers = chromeClient->allowedCompositingTriggers();
+            hasAcceleratedCompositing = m_compositingTriggers;
+        }
     }
 
     if (hasAcceleratedCompositing != m_hasAcceleratedCompositing || showDebugBorders != m_showDebugBorders || showRepaintCounter != m_showRepaintCounter)
         setCompositingLayersNeedRebuild();
-        
+
     m_hasAcceleratedCompositing = hasAcceleratedCompositing;
     m_showDebugBorders = showDebugBorders;
     m_showRepaintCounter = showRepaintCounter;
+}
+
+bool RenderLayerCompositor::canRender3DTransforms() const
+{
+    return hasAcceleratedCompositing() && (m_compositingTriggers & ChromeClient::ThreeDTransformTrigger);
 }
 
 void RenderLayerCompositor::setCompositingLayersNeedRebuild(bool needRebuild)
@@ -288,6 +297,14 @@ bool RenderLayerCompositor::updateBacking(RenderLayer* layer, CompositingChangeR
                 repaintOnCompositingChange(layer);
 
             layer->ensureBacking();
+
+#if PLATFORM(MAC) && PLATFORM(CA)
+            if (layer->renderer()->isCanvas()) {
+                HTMLCanvasElement* canvas = static_cast<HTMLCanvasElement*>(layer->renderer()->node());
+                if (canvas->renderingContext() && canvas->renderingContext()->isAccelerated())
+                    layer->backing()->graphicsLayer()->setAcceleratesDrawing(true);
+            }
+#endif
             layerChanged = true;
         }
     } else {
@@ -1040,18 +1057,19 @@ void RenderLayerCompositor::willMoveOffscreen()
 
 void RenderLayerCompositor::updateRootLayerPosition()
 {
-    // Eventually we will need to account for scrolling here.
-    // https://bugs.webkit.org/show_bug.cgi?id=38518
-    if (m_rootPlatformLayer)
-        m_rootPlatformLayer->setSize(FloatSize(m_renderView->rightLayoutOverflow(), m_renderView->bottomLayoutOverflow()));
+    if (m_rootPlatformLayer) {
+        m_rootPlatformLayer->setSize(FloatSize(m_renderView->docWidth(), m_renderView->docHeight()));
+        m_rootPlatformLayer->setPosition(FloatPoint(m_renderView->docLeft(), m_renderView->docTop()));
+    }
 }
 
-void RenderLayerCompositor::didStartAcceleratedAnimation()
+void RenderLayerCompositor::didStartAcceleratedAnimation(CSSPropertyID property)
 {
     // If an accelerated animation or transition runs, we have to turn off overlap checking because
     // we don't do layout for every frame, but we have to ensure that the layering is
     // correct between the animating object and other objects on the page.
-    setCompositingConsultsOverlap(false);
+    if (property == CSSPropertyWebkitTransform)
+        setCompositingConsultsOverlap(false);
 }
 
 bool RenderLayerCompositor::has3DContent() const
@@ -1127,7 +1145,7 @@ bool RenderLayerCompositor::requiresCompositingLayer(const RenderLayer* layer) c
              || requiresCompositingForCanvas(renderer)
              || requiresCompositingForPlugin(renderer)
              || requiresCompositingForIFrame(renderer)
-             || renderer->style()->backfaceVisibility() == BackfaceVisibilityHidden
+             || (canRender3DTransforms() && renderer->style()->backfaceVisibility() == BackfaceVisibilityHidden)
              || clipsCompositingDescendants(layer)
              || requiresCompositingForAnimation(renderer);
 }
@@ -1183,6 +1201,9 @@ bool RenderLayerCompositor::clipsCompositingDescendants(const RenderLayer* layer
 
 bool RenderLayerCompositor::requiresCompositingForTransform(RenderObject* renderer) const
 {
+    if (!(m_compositingTriggers & ChromeClient::ThreeDTransformTrigger))
+        return false;
+
     RenderStyle* style = renderer->style();
     // Note that we ask the renderer if it has a transform, because the style may have transforms,
     // but the renderer may be an inline that doesn't suppport them.
@@ -1191,6 +1212,8 @@ bool RenderLayerCompositor::requiresCompositingForTransform(RenderObject* render
 
 bool RenderLayerCompositor::requiresCompositingForVideo(RenderObject* renderer) const
 {
+    if (!(m_compositingTriggers & ChromeClient::VideoTrigger))
+        return false;
 #if ENABLE(VIDEO)
     if (renderer->isVideo()) {
         RenderVideo* video = toRenderVideo(renderer);
@@ -1217,6 +1240,9 @@ bool RenderLayerCompositor::requiresCompositingForVideo(RenderObject* renderer) 
 
 bool RenderLayerCompositor::requiresCompositingForCanvas(RenderObject* renderer) const
 {
+    if (!(m_compositingTriggers & ChromeClient::CanvasTrigger))
+        return false;
+
     if (renderer->isCanvas()) {
         HTMLCanvasElement* canvas = static_cast<HTMLCanvasElement*>(renderer->node());
         return canvas->renderingContext() && canvas->renderingContext()->isAccelerated();
@@ -1226,6 +1252,9 @@ bool RenderLayerCompositor::requiresCompositingForCanvas(RenderObject* renderer)
 
 bool RenderLayerCompositor::requiresCompositingForPlugin(RenderObject* renderer) const
 {
+    if (!(m_compositingTriggers & ChromeClient::PluginTrigger))
+        return false;
+
     bool composite = (renderer->isEmbeddedObject() && toRenderEmbeddedObject(renderer)->allowsAcceleratedCompositing())
                   || (renderer->isApplet() && toRenderApplet(renderer)->allowsAcceleratedCompositing());
     if (!composite)
@@ -1270,6 +1299,9 @@ bool RenderLayerCompositor::requiresCompositingForIFrame(RenderObject* renderer)
 
 bool RenderLayerCompositor::requiresCompositingForAnimation(RenderObject* renderer) const
 {
+    if (!(m_compositingTriggers & ChromeClient::AnimationTrigger))
+        return false;
+
     if (AnimationController* animController = renderer->animation()) {
         return (animController->isRunningAnimationOnRenderer(renderer, CSSPropertyOpacity) && inCompositingMode())
             || animController->isRunningAnimationOnRenderer(renderer, CSSPropertyWebkitTransform);

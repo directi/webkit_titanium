@@ -41,16 +41,6 @@ SBOX_CHECK = $$(_SBOX_DIR)
     PYTHON = python
 }
 
-
-DIRS = \
-    $$OUTPUT_DIR/WebKitTools/MiniBrowser/qt
-
-for(DIR, DIRS) {
-    !exists($$DIR): system($$QMAKE_MKDIR $$DIR)
-}
-
-QMAKE_EXTRA_TARGETS += createdirs
-
 SRC_ROOT_DIR = $$replace(PWD, /WebKit2, /)
 
 defineTest(addExtraCompiler) {
@@ -85,7 +75,9 @@ defineReplace(message_receiver_generator_output) {
 
 VPATH = \
     PluginProcess \
+    WebProcess/Authentication \
     WebProcess/Plugins \
+    WebProcess/WebCoreSupport \
     WebProcess/WebPage \
     WebProcess \
     UIProcess \
@@ -93,12 +85,15 @@ VPATH = \
     UIProcess/Plugins
 
 MESSAGE_RECEIVERS = \
+    AuthenticationManager.messages.in \
     DownloadProxy.messages.in \
     PluginControllerProxy.messages.in \
     PluginProcess.messages.in \
     PluginProcessProxy.messages.in \
     PluginProxy.messages.in \
     WebContext.messages.in \
+    WebDatabaseManager.messages.in \
+    WebDatabaseManagerProxy.messages.in \
     WebInspectorProxy.messages.in \
     WebPage/WebInspector.messages.in \
     WebPage/WebPage.messages.in \
@@ -113,20 +108,6 @@ SCRIPTS = \
     $$PWD/Scripts/webkit2/__init__.py \
     $$PWD/Scripts/webkit2/messages.py
 
-ualist_copier.commands = $(COPY_FILE) $${SRC_ROOT_DIR}/WebKitTools/QtTestBrowser/useragentlist.txt $$OUTPUT_DIR/WebKitTools/MiniBrowser/qt/useragentlist.txt
-ualist_copier.depends = $${SRC_ROOT_DIR}/WebKitTools/QtTestBrowser/useragentlist.txt
-ualist_copier.input = $${SRC_ROOT_DIR}/WebKitTools/QtTestBrowser/useragentlist.txt
-ualist_copier.output = $$OUTPUT_DIR/WebKitTools/MiniBrowser/qt/useragentlist.txt
-generated_files.depends += ualist_copier
-QMAKE_EXTRA_TARGETS += ualist_copier
-
-qrc_copier.commands = $(COPY_FILE) $${SRC_ROOT_DIR}/WebKitTools/MiniBrowser/MiniBrowser.qrc $$OUTPUT_DIR/WebKitTools/MiniBrowser/qt/MiniBrowser.qrc
-qrc_copier.depends = ualist_copier $${SRC_ROOT_DIR}/WebKitTools/MiniBrowser/MiniBrowser.qrc
-qrc_copier.input = $${SRC_ROOT_DIR}/WebKitTools/MiniBrowser/MiniBrowser.qrc
-qrc_copier.output = $$OUTPUT_DIR/WebKitTools/MiniBrowser/qt/MiniBrowser.qrc
-generated_files.depends += qrc_copier
-QMAKE_EXTRA_TARGETS += qrc_copier
-
 message_header_generator.commands = $${PYTHON} $${SRC_ROOT_DIR}WebKit2/Scripts/generate-messages-header.py ${QMAKE_FILE_IN} > ${QMAKE_FILE_OUT}
 message_header_generator.input = MESSAGE_RECEIVERS
 message_header_generator.depends = $$SCRIPTS
@@ -139,8 +120,8 @@ message_receiver_generator.depends = $$SCRIPTS
 message_receiver_generator.output_function = message_receiver_generator_output
 addExtraCompiler(message_receiver_generator)
 
-fwheader_generator.commands = perl $${SRC_ROOT_DIR}/WebKitTools/Scripts/generate-forwarding-headers.pl $${SRC_ROOT_DIR}/WebKit2 $${OUTPUT_DIR}/include qt
-fwheader_generator.depends  = $${SRC_ROOT_DIR}/WebKitTools/Scripts/generate-forwarding-headers.pl
+fwheader_generator.commands = perl $${SRC_ROOT_DIR}/WebKit2/Scripts/generate-forwarding-headers.pl $${SRC_ROOT_DIR}/WebKit2 ../include qt
+fwheader_generator.depends  = $${SRC_ROOT_DIR}/WebKit2/Scripts/generate-forwarding-headers.pl
 generated_files.depends     += fwheader_generator
 QMAKE_EXTRA_TARGETS         += fwheader_generator
 

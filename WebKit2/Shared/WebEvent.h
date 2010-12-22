@@ -79,6 +79,8 @@ public:
     bool altKey() const { return m_modifiers & AltKey; }
     bool metaKey() const { return m_modifiers & MetaKey; }
 
+    Modifiers modifiers() const { return static_cast<Modifiers>(m_modifiers); }
+
     double timestamp() const { return m_timestamp; }
 
 protected:
@@ -168,13 +170,14 @@ class WebKeyboardEvent : public WebEvent {
 public:
     WebKeyboardEvent() { }
 
-    WebKeyboardEvent(Type, const String& text, const String& unmodifiedText, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, bool isAutoRepeat, bool isKeypad, bool isSystemKey, Modifiers, double timestamp);
+    WebKeyboardEvent(Type, const String& text, const String& unmodifiedText, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, int macCharCode, bool isAutoRepeat, bool isKeypad, bool isSystemKey, Modifiers, double timestamp);
 
     const String& text() const { return m_text; }
     const String& unmodifiedText() const { return m_unmodifiedText; }
     const String& keyIdentifier() const { return m_keyIdentifier; }
     int32_t windowsVirtualKeyCode() const { return m_windowsVirtualKeyCode; }
     int32_t nativeVirtualKeyCode() const { return m_nativeVirtualKeyCode; }
+    int32_t macCharCode() const { return m_macCharCode; }
     bool isAutoRepeat() const { return m_isAutoRepeat; }
     bool isKeypad() const { return m_isKeypad; }
     bool isSystemKey() const { return m_isSystemKey; }
@@ -190,6 +193,7 @@ private:
     String m_keyIdentifier;
     int32_t m_windowsVirtualKeyCode;
     int32_t m_nativeVirtualKeyCode;
+    int32_t m_macCharCode;
     bool m_isAutoRepeat;
     bool m_isKeypad;
     bool m_isSystemKey;

@@ -132,6 +132,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	dom/EventContext.cpp \
 	dom/EventNames.cpp \
 	dom/EventTarget.cpp \
+	dom/EventQueue.cpp \
 	dom/ExceptionBase.cpp \
 	dom/ExceptionCode.cpp \
 	dom/InputElement.cpp \
@@ -165,6 +166,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	dom/QualifiedName.cpp \
 	dom/Range.cpp \
 	dom/RegisteredEventListener.cpp \
+	dom/ScopedEventQueue.cpp \
 	dom/ScriptableDocumentParser.cpp \
 	dom/ScriptElement.cpp \
 	dom/ScriptExecutionContext.cpp \
@@ -277,6 +279,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	html/DateTimeLocalInputType.cpp \
 	html/EmailInputType.cpp \
 	html/FileInputType.cpp \
+	html/FormAssociatedElement.cpp \
 	html/FormDataList.cpp \
 	html/HTMLAllCollection.cpp \
 	html/HTMLCollection.cpp \
@@ -332,6 +335,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	html/parser/HTMLElementStack.cpp \
 	html/parser/HTMLEntityParser.cpp \
 	html/parser/HTMLFormattingElementList.cpp \
+	html/parser/HTMLMetaCharsetParser.cpp \
 	html/parser/HTMLParserIdioms.cpp \
 	html/parser/HTMLParserScheduler.cpp \
 	html/parser/HTMLPreloadScanner.cpp \
@@ -341,6 +345,8 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	html/parser/HTMLViewSourceParser.cpp \
 	html/parser/TextDocumentParser.cpp \
 	html/parser/TextViewSourceParser.cpp \
+	\
+	html/shadow/SliderThumbElement.cpp \
 	\
 	loader/cache/CachedCSSStyleSheet.cpp \
 	loader/cache/CachedFont.cpp \
@@ -352,6 +358,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	loader/CrossOriginAccessControl.cpp \
 	loader/CrossOriginPreflightResultCache.cpp \
 	loader/cache/CachedResourceLoader.cpp \
+	loader/cache/CachedResourceRequest.cpp \
 	loader/DocumentLoader.cpp \
 	loader/DocumentThreadableLoader.cpp \
 	loader/DocumentWriter.cpp \
@@ -370,7 +377,6 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	loader/PolicyChecker.cpp \
 	loader/ProgressTracker.cpp \
 	loader/NavigationScheduler.cpp \
-	loader/Request.cpp \
 	loader/ResourceLoadNotifier.cpp \
 	loader/ResourceLoader.cpp \
 	loader/SubframeLoader.cpp \
@@ -393,8 +399,6 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	loader/icon/IconLoader.cpp \
 	loader/icon/IconRecord.cpp \
 	loader/icon/PageURLRecord.cpp \
-	\
-	loader/loader.cpp \
 	\
 	page/BarInfo.cpp \
 	page/Chrome.cpp \
@@ -449,7 +453,6 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	\
 	platform/Arena.cpp \
 	platform/ContentType.cpp \
-	platform/ContextMenu.cpp \
 	platform/CrossThreadCopier.cpp \
 	platform/DeprecatedPtrListImpl.cpp \
 	platform/DragData.cpp \

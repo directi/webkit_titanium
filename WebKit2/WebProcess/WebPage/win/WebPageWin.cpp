@@ -31,6 +31,7 @@
 #include <WebCore/FocusController.h>
 #include <WebCore/FontRenderingMode.h>
 #include <WebCore/Frame.h>
+#include <WebCore/FrameView.h>
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/Page.h>
 #include <WebCore/PlatformKeyboardEvent.h>
@@ -39,6 +40,12 @@
 #include <WebKitSystemInterface/WebKitSystemInterface.h>
 #endif
 #include <WinUser.h>
+
+#if USE(CFNETWORK)
+#include <CFNetwork/CFURLCachePriv.h>
+#include <CFNetwork/CFURLProtocolPriv.h>
+#include <CFNetwork/CFURLRequestPriv.h>
+#endif
 
 using namespace WebCore;
 
@@ -51,14 +58,16 @@ void WebPage::platformInitialize()
 
 void WebPage::platformPreferencesDidChange(const WebPreferencesStore& store)
 {
+    FontSmoothingLevel fontSmoothingLevel = static_cast<FontSmoothingLevel>(store.getUInt32ValueForKey(WebPreferencesKey::fontSmoothingLevelKey()));
+
 #if PLATFORM(CG)
-    FontSmoothingLevel adjustedLevel = static_cast<FontSmoothingLevel>(store.fontSmoothingLevel);
+    FontSmoothingLevel adjustedLevel = fontSmoothingLevel;
     if (adjustedLevel == FontSmoothingLevelWindows)
         adjustedLevel = FontSmoothingLevelMedium;
     wkSetFontSmoothingLevel(adjustedLevel);
 #endif
 
-    m_page->settings()->setFontRenderingMode(store.fontSmoothingLevel == FontSmoothingLevelWindows ? AlternateRenderingMode : NormalRenderingMode);
+    m_page->settings()->setFontRenderingMode(fontSmoothingLevel == FontSmoothingLevelWindows ? AlternateRenderingMode : NormalRenderingMode);
 }
 
 static const unsigned CtrlKey = 1 << 0;
@@ -186,6 +195,11 @@ static inline void scroll(Page* page, ScrollDirection direction, ScrollGranulari
     page->focusController()->focusedOrMainFrame()->eventHandler()->scrollRecursively(direction, granularity);
 }
 
+static inline void logicalScroll(Page* page, ScrollLogicalDirection direction, ScrollGranularity granularity)
+{
+    page->focusController()->focusedOrMainFrame()->eventHandler()->logicalScrollRecursively(direction, granularity);
+}
+
 bool WebPage::performDefaultBehaviorForKeyEvent(const WebKeyboardEvent& keyboardEvent)
 {
     if (keyboardEvent.type() != WebEvent::KeyDown && keyboardEvent.type() != WebEvent::RawKeyDown)
@@ -211,16 +225,16 @@ bool WebPage::performDefaultBehaviorForKeyEvent(const WebKeyboardEvent& keyboard
         scroll(m_page.get(), ScrollDown, ScrollByLine);
         break;
     case VK_HOME:
-        scroll(m_page.get(), ScrollUp, ScrollByDocument);
+        logicalScroll(m_page.get(), ScrollBlockDirectionBackward, ScrollByDocument);
         break;
     case VK_END:
-        scroll(m_page.get(), ScrollDown, ScrollByDocument);
+        logicalScroll(m_page.get(), ScrollBlockDirectionForward, ScrollByDocument);
         break;
     case VK_PRIOR:
-        scroll(m_page.get(), ScrollUp, ScrollByPage);
+        logicalScroll(m_page.get(), ScrollBlockDirectionBackward, ScrollByPage);
         break;
     case VK_NEXT:
-        scroll(m_page.get(), ScrollDown, ScrollByPage);
+        logicalScroll(m_page.get(), ScrollBlockDirectionForward, ScrollByPage);
         break;
     default:
         return false;
@@ -229,16 +243,68 @@ bool WebPage::performDefaultBehaviorForKeyEvent(const WebKeyboardEvent& keyboard
     return true;
 }
 
-bool WebPage::hasLocalDataForURL(const WebCore::KURL&)
+bool WebPage::platformHasLocalDataForURL(const WebCore::KURL& url)
 {
-    // FIXME <rdar://problem/8608754>: Implement
+#if USE(CFNETWORK)
+    RetainPtr<CFURLRef> cfURL(AdoptCF, url.createCFURL());
+    RetainPtr<CFMutableURLRequestRef> request(AdoptCF, CFURLRequestCreateMutable(0, cfURL.get(), kCFURLRequestCachePolicyReloadIgnoringCache, 60, 0));
+    
+    RetainPtr<CFStringRef> userAgent(AdoptCF, userAgent().createCFString());
+    CFURLRequestSetHTTPHeaderFieldValue(request.get(), CFSTR("User-Agent"), userAgent.get());
+
+    RetainPtr<CFURLCacheRef> cache(AdoptCF, CFURLCacheCopySharedURLCache());
+
+    RetainPtr<CFCachedURLResponseRef> response(AdoptCF, CFURLCacheCopyResponseForRequest(cache.get(), request.get()));    
+    return response;
+#else
     return false;
+#endif
 }
 
-bool WebPage::canHandleRequest(const WebCore::ResourceRequest&)
+bool WebPage::canHandleRequest(const WebCore::ResourceRequest& request)
 {
-    // FIXME <rdar://problem/8608754>: Implement
+#if USE(CFNETWORK)
+     // FIXME: Are there other requests we need to be able to handle? WebKit1's WebView.cpp has a FIXME here as well.
+    return CFURLProtocolCanHandleRequest(request.cfURLRequest());
+#else
     return true;
+#endif
+}
+
+void WebPage::confirmComposition(const String& compositionString)
+{
+    Frame* frame = m_page->focusController()->focusedOrMainFrame();
+    if (!frame || !frame->editor()->canEdit())
+        return;
+    frame->editor()->confirmComposition(compositionString);
+}
+
+void WebPage::setComposition(const String& compositionString, const Vector<WebCore::CompositionUnderline>& underlines, uint64_t cursorPosition)
+{
+    Frame* frame = m_page->focusController()->focusedOrMainFrame();
+    if (!frame || !frame->editor()->canEdit())
+        return;
+    frame->editor()->setComposition(compositionString, underlines, cursorPosition, 0);
+}
+
+void WebPage::firstRectForCharacterInSelectedRange(const uint64_t characterPosition, WebCore::IntRect& resultRect)
+{
+    Frame* frame = m_page->focusController()->focusedOrMainFrame();
+    IntRect rect;
+    if (RefPtr<Range> range = frame->editor()->hasComposition() ? frame->editor()->compositionRange() : frame->selection()->selection().toNormalizedRange()) {
+        ExceptionCode ec = 0;
+        RefPtr<Range> tempRange = range->cloneRange(ec);
+        tempRange->setStart(tempRange->startContainer(ec), tempRange->startOffset(ec) + characterPosition, ec);
+        rect = frame->editor()->firstRectForRange(tempRange.get());
+    }
+    resultRect = frame->view()->contentsToWindow(rect);
+}
+
+void WebPage::getSelectedText(String& text)
+{
+    Frame* frame = m_page->focusController()->focusedOrMainFrame();
+    RefPtr<Range> selectedRange = frame->selection()->toNormalizedRange();
+    text = selectedRange->text();
 }
 
 } // namespace WebKit

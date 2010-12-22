@@ -31,12 +31,18 @@
 #include "DrawingArea.h"
 #include "SharedMemory.h"
 #include "VisitedLinkTable.h"
+#include "WebPageGroupProxy.h"
 #include <WebCore/LinkHash.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
+#include <wtf/HashSet.h>
 
 #if PLATFORM(MAC)
 #include "MachPort.h"
+#endif
+
+#if PLATFORM(QT)
+class QNetworkAccessManager;
 #endif
 
 namespace WebCore {
@@ -50,6 +56,7 @@ class InjectedBundle;
 class WebFrame;
 class WebPage;
 struct WebPageCreationParameters;
+struct WebPageGroupData;
 struct WebPreferencesStore;
 struct WebProcessCreationParameters;
 
@@ -81,19 +88,30 @@ public:
     void addWebFrame(uint64_t, WebFrame*);
     void removeWebFrame(uint64_t);
 
+    WebPageGroupProxy* webPageGroup(uint64_t pageGroupID);
+    WebPageGroupProxy* webPageGroup(const WebPageGroupData&);
     static WebCore::PageGroup* sharedPageGroup();
+
+#if PLATFORM(QT)
+    QNetworkAccessManager* networkAccessManager() { return m_networkAccessManager; }
+#endif
 
     // Will shut down the web process if there are no live pages or downloads.
     void shutdownIfPossible();
+
+    bool shouldUseCustomRepresentationForMIMEType(const String& mimeType) const { return m_mimeTypesWithCustomRepresentations.contains(mimeType); }
 
 private:
     WebProcess();
 
     void initializeWebProcess(const WebProcessCreationParameters&, CoreIPC::ArgumentDecoder*);
+    void platformInitializeWebProcess(const WebProcessCreationParameters&, CoreIPC::ArgumentDecoder*);
+    void platformShutdown();
     void setShouldTrackVisitedLinks(bool);
     void registerURLSchemeAsEmptyDocument(const String&);
     void registerURLSchemeAsSecure(const String&) const;
     void setDomainRelaxationForbiddenForURLScheme(const String&) const;
+    void setAlwaysUsesComplexTextCodePath(bool);
     void languageChanged(const String&) const;
 #if PLATFORM(WIN)
     void setShouldPaintNativeControls(bool);
@@ -116,6 +134,7 @@ private:
 
     // CoreIPC::Connection::Client
     void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    CoreIPC::SyncReplyMode didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
     void didClose(CoreIPC::Connection*);
     void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID);
 
@@ -124,6 +143,7 @@ private:
     
     RefPtr<CoreIPC::Connection> m_connection;
     HashMap<uint64_t, RefPtr<WebPage> > m_pageMap;
+    HashMap<uint64_t, RefPtr<WebPageGroupProxy> > m_pageGroupMap;
     RefPtr<InjectedBundle> m_injectedBundle;
 
     bool m_inDidClose;
@@ -140,7 +160,13 @@ private:
     mach_port_t m_compositingRenderServerPort;
 #endif
 
+#if PLATFORM(QT)
+    QNetworkAccessManager* m_networkAccessManager;
+#endif
+
     HashMap<uint64_t, WebFrame*> m_frameMap;
+
+    HashSet<String, CaseFoldingHash> m_mimeTypesWithCustomRepresentations;
 };
 
 } // namespace WebKit

@@ -21,6 +21,7 @@
 #define WKView_h
 
 #include <WebKit2/qgraphicswkview.h>
+#include <WebKit2/qwkcontext.h>
 #include <WebKit2/qwkpage.h>
 #include <WebKit2/qwkpreferences.h>
 

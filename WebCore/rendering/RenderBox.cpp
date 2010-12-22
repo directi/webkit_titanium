@@ -306,23 +306,24 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
     // Set the text color if we're the body.
     if (isBodyRenderer)
         document()->setTextColor(style()->visitedDependentColor(CSSPropertyColor));
-    
-    if ((isRootRenderer || isBodyRenderer) && (!oldStyle || oldStyle->writingMode() != style()->writingMode() || oldStyle->direction() != style()->direction())) {
+
+    if (isRootRenderer || isBodyRenderer) {
         // Propagate the new writing mode and direction up to the RenderView.
         RenderView* viewRenderer = view();
         RenderStyle* viewStyle = viewRenderer->style();
-        if (isRootRenderer || !document()->directionSetOnDocumentElement()) {
+        if (viewStyle->direction() != style()->direction() && (isRootRenderer || !document()->directionSetOnDocumentElement())) {
             viewStyle->setDirection(style()->direction());
             if (isBodyRenderer)
                 document()->documentElement()->renderer()->style()->setDirection(style()->direction());
+            setNeedsLayoutAndPrefWidthsRecalc();
         }
-        
-        if (isRootRenderer || !document()->writingModeSetOnDocumentElement()) {
+
+        if (viewStyle->writingMode() != style()->writingMode() && (isRootRenderer || !document()->writingModeSetOnDocumentElement())) {
             viewStyle->setWritingMode(style()->writingMode());
             if (isBodyRenderer)
                 document()->documentElement()->renderer()->style()->setWritingMode(style()->writingMode());
+            setNeedsLayoutAndPrefWidthsRecalc();
         }
-        setNeedsLayoutAndPrefWidthsRecalc();
     }
 }
 
@@ -405,9 +406,10 @@ int RenderBox::scrollWidth() const
     if (hasOverflowClip())
         return layer()->scrollWidth();
     // For objects with visible overflow, this matches IE.
+    // FIXME: Need to work right with writing modes.
     if (style()->isLeftToRightDirection())
-        return max(clientWidth(), rightmostPosition(true, false) - borderLeft());
-    return clientWidth() - min(0, leftmostPosition(true, false) - borderLeft());
+        return max(clientWidth(), rightLayoutOverflow() - borderLeft());
+    return clientWidth() - min(0, leftLayoutOverflow() - borderLeft());
 }
 
 int RenderBox::scrollHeight() const
@@ -415,7 +417,8 @@ int RenderBox::scrollHeight() const
     if (hasOverflowClip())
         return layer()->scrollHeight();
     // For objects with visible overflow, this matches IE.
-    return max(clientHeight(), lowestPosition(true, false) - borderTop());
+    // FIXME: Need to work right with writing modes.
+    return max(clientHeight(), bottomLayoutOverflow() - borderTop());
 }
 
 int RenderBox::scrollLeft() const
@@ -448,22 +451,6 @@ void RenderBox::absoluteRects(Vector<IntRect>& rects, int tx, int ty)
 void RenderBox::absoluteQuads(Vector<FloatQuad>& quads)
 {
     quads.append(localToAbsoluteQuad(FloatRect(0, 0, width(), height())));
-}
-
-IntRect RenderBox::applyLayerTransformToRect(const IntRect& rect) const
-{
-    if (hasLayer() && layer()->hasTransform()) {
-        TransformationMatrix transform;
-        transform.translate(rect.x(), rect.y());
-        transform.multLeft(layer()->currentTransform());
-        return transform.mapRect(IntRect(0, 0, rect.width(), rect.height()));
-    }
-    return rect;
-}
-
-IntRect RenderBox::transformedFrameRect() const
-{
-    return applyLayerTransformToRect(frameRect());
 }
 
 void RenderBox::updateLayerTransform()
@@ -595,6 +582,36 @@ bool RenderBox::scroll(ScrollDirection direction, ScrollGranularity granularity,
     RenderBlock* b = containingBlock();
     if (b && !b->isRenderView())
         return b->scroll(direction, granularity, multiplier, stopNode);
+    return false;
+}
+
+bool RenderBox::logicalScroll(ScrollLogicalDirection direction, ScrollGranularity granularity, float multiplier, Node** stopNode)
+{
+    bool scrolled = false;
+    
+    RenderLayer* l = layer();
+    if (l) {
+#if PLATFORM(MAC)
+        // On Mac only we reset the inline direction position when doing a document scroll (e.g., hitting Home/End).
+        if (granularity == ScrollByDocument)
+            scrolled = l->scroll(logicalToPhysical(ScrollInlineDirectionBackward, style()->isHorizontalWritingMode(), style()->isFlippedBlocksWritingMode()), ScrollByDocument, multiplier);
+#endif
+        if (l->scroll(logicalToPhysical(direction, style()->isHorizontalWritingMode(), style()->isFlippedBlocksWritingMode()), granularity, multiplier))
+            scrolled = true;
+        
+        if (scrolled) {
+            if (stopNode)
+                *stopNode = node();
+            return true;
+        }
+    }
+
+    if (stopNode && *stopNode && *stopNode == node())
+        return true;
+
+    RenderBlock* b = containingBlock();
+    if (b && !b->isRenderView())
+        return b->logicalScroll(direction, granularity, multiplier, stopNode);
     return false;
 }
 
@@ -756,31 +773,12 @@ void RenderBox::paintRootBoxDecorations(PaintInfo& paintInfo, int tx, int ty)
         }
     }
 
-    int w = width();
-    int h = height();
-
-    int rw;
-    int rh;
-    if (view()->frameView()) {
-        rw = view()->frameView()->contentsWidth();
-        rh = view()->frameView()->contentsHeight();
-    } else {
-        rw = view()->width();
-        rh = view()->height();
-    }
-
-    // CSS2 14.2:
-    // The background of the box generated by the root element covers the entire canvas including
-    // its margins.
-    int bx = tx - marginLeft() + view()->leftLayoutOverflow();
-    int by = ty - marginTop();
-    int bw = max(w + marginLeft() + marginRight() + borderLeft() + borderRight(), rw);
-    int bh = max(h + marginTop() + marginBottom() + borderTop() + borderBottom(), rh);
-
-    paintFillLayers(paintInfo, bgColor, bgLayer, bx, by, bw, bh, CompositeSourceOver, bodyObject);
+    // The background of the box generated by the root element covers the entire canvas, so just use
+    // the RenderView's docTop/Left/Width/Height accessors.
+    paintFillLayers(paintInfo, bgColor, bgLayer, view()->docLeft(), view()->docTop(), view()->docWidth(), view()->docHeight(), CompositeSourceOver, bodyObject);
 
     if (style()->hasBorder() && style()->display() != INLINE)
-        paintBorder(paintInfo.context, tx, ty, w, h, style());
+        paintBorder(paintInfo.context, tx, ty, width(), height(), style());
 }
 
 void RenderBox::paintBoxDecorations(PaintInfo& paintInfo, int tx, int ty)
@@ -939,6 +937,18 @@ void RenderBox::paintFillLayer(const PaintInfo& paintInfo, const Color& c, const
     paintFillLayerExtended(paintInfo, c, fillLayer, tx, ty, width, height, 0, op, backgroundObject);
 }
 
+#if USE(ACCELERATED_COMPOSITING)
+static bool layersUseImage(WrappedImagePtr image, const FillLayer* layers)
+{
+    for (const FillLayer* curLayer = layers; curLayer; curLayer = curLayer->next()) {
+        if (curLayer->image() && image == curLayer->image()->data())
+            return true;
+    }
+
+    return false;
+}
+#endif
+
 void RenderBox::imageChanged(WrappedImagePtr image, const IntRect*)
 {
     if (!parent())
@@ -953,6 +963,12 @@ void RenderBox::imageChanged(WrappedImagePtr image, const IntRect*)
     bool didFullRepaint = repaintLayerRectsForImage(image, style()->backgroundLayers(), true);
     if (!didFullRepaint)
         repaintLayerRectsForImage(image, style()->maskLayers(), false);
+
+
+#if USE(ACCELERATED_COMPOSITING)
+    if (hasLayer() && layer()->hasCompositedMask() && layersUseImage(image, style()->maskLayers()))
+        layer()->contentChanged(RenderLayer::MaskImageChanged);
+#endif
 }
 
 bool RenderBox::repaintLayerRectsForImage(WrappedImagePtr image, const FillLayer* layers, bool drawingBackground)
@@ -1315,7 +1331,7 @@ IntRect RenderBox::clippedOverflowRectForRepaint(RenderBoxModelObject* repaintCo
     if (style()->visibility() != VISIBLE && !enclosingLayer()->hasVisibleContent())
         return IntRect();
 
-    IntRect r = visibleOverflowRect();
+    IntRect r = visualOverflowRect();
 
     RenderView* v = view();
     if (v) {
@@ -1754,7 +1770,7 @@ void RenderBox::computeLogicalHeight()
         int margins = collapsedMarginBefore() + collapsedMarginAfter();
         int visHeight;
         if (document()->printing())
-            visHeight = static_cast<int>(view()->pageHeight());
+            visHeight = static_cast<int>(view()->pageLogicalHeight());
         else  {
             if (style()->isHorizontalWritingMode())
                 visHeight = view()->viewHeight();
@@ -2128,20 +2144,19 @@ void RenderBox::computePositionedLogicalWidth()
         if (containerDirection == LTR) {
             // 'staticX' should already have been set through layout of the parent.
             int staticPosition = layer()->staticX() - containerBlock->borderLeft();
-            for (RenderObject* po = parent(); po && po != containerBlock; po = po->parent()) {
-                if (po->isBox())
-                    staticPosition += toRenderBox(po)->x();
+            for (RenderObject* curr = parent(); curr && curr != containerBlock; curr = curr->parent()) {
+                if (curr->isBox())
+                    staticPosition += toRenderBox(curr)->x();
             }
             left.setValue(Fixed, staticPosition);
         } else {
-            RenderObject* po = parent();
+            RenderBox* enclosingBox = parent()->enclosingBox();
             // 'staticX' should already have been set through layout of the parent.
             int staticPosition = layer()->staticX() + containerWidth + containerBlock->borderRight();
-            if (po->isBox())
-                staticPosition -= toRenderBox(po)->width();
-            for (; po && po != containerBlock; po = po->parent()) {
-                if (po->isBox())
-                    staticPosition -= toRenderBox(po)->x();
+            staticPosition -= enclosingBox->width();
+            for (RenderObject* curr = enclosingBox; curr && curr != containerBlock; curr = curr->parent()) {
+                if (curr->isBox())
+                    staticPosition -= toRenderBox(curr)->x();
             }
             right.setValue(Fixed, staticPosition);
         }
@@ -2961,50 +2976,6 @@ IntRect RenderBox::localCaretRect(InlineBox* box, int caretOffset, int* extraWid
     return rect;
 }
 
-int RenderBox::topmostPosition(bool /*includeOverflowInterior*/, bool includeSelf, ApplyTransform applyTransform) const
-{
-    IntRect transformedRect = applyTransform == IncludeTransform && includeSelf ? transformedFrameRect() : frameRect();
-    if (!includeSelf || !transformedRect.width())
-        return 0;
-    int top = 0;
-    if (isRelPositioned())
-        top += relativePositionOffsetY();
-    return top;
-}
-
-int RenderBox::lowestPosition(bool /*includeOverflowInterior*/, bool includeSelf, ApplyTransform applyTransform) const
-{
-    IntRect transformedRect = applyTransform == IncludeTransform && includeSelf ? transformedFrameRect() : frameRect();
-    if (!includeSelf || !transformedRect.width())
-        return 0;
-    int bottom = transformedRect.height();
-    if (isRelPositioned())
-        bottom += relativePositionOffsetY();
-    return bottom;
-}
-
-int RenderBox::rightmostPosition(bool /*includeOverflowInterior*/, bool includeSelf, ApplyTransform applyTransform) const
-{
-    IntRect transformedRect = applyTransform == IncludeTransform && includeSelf ? transformedFrameRect() : frameRect();
-    if (!includeSelf || !transformedRect.height())
-        return 0;
-    int right = transformedRect.width();
-    if (isRelPositioned())
-        right += relativePositionOffsetX();
-    return right;
-}
-
-int RenderBox::leftmostPosition(bool /*includeOverflowInterior*/, bool includeSelf, ApplyTransform applyTransform) const
-{
-    IntRect transformedRect = applyTransform == IncludeTransform && includeSelf ? transformedFrameRect() : frameRect();
-    if (!includeSelf || !transformedRect.height())
-        return transformedRect.width();
-    int left = 0;
-    if (isRelPositioned())
-        left += relativePositionOffsetX();
-    return left;
-}
-
 VisiblePosition RenderBox::positionForPoint(const IntPoint& point)
 {
     // no children...return this render object's element, if there is one, and offset 0
@@ -3129,47 +3100,67 @@ void RenderBox::addShadowOverflow()
 
 void RenderBox::addOverflowFromChild(RenderBox* child, const IntSize& delta)
 {
-    // Update our overflow in case the child spills out the block, but only if we were going to paint
-    // the child block ourselves.
-    if (child->hasSelfPaintingLayer())
-        return;
-
     // Only propagate layout overflow from the child if the child isn't clipping its overflow.  If it is, then
-    // its overflow is internal to it, and we don't care about it.
-    IntRect childLayoutOverflowRect = child->hasOverflowClip() ? child->borderBoxRect() : child->layoutOverflowRect();
+    // its overflow is internal to it, and we don't care about it.  layoutOverflowRectForPropagation takes care of this
+    // and just propagates the border box rect instead.
+    IntRect childLayoutOverflowRect = child->layoutOverflowRectForPropagation(style());
     childLayoutOverflowRect.move(delta);
     addLayoutOverflow(childLayoutOverflowRect);
             
     // Add in visual overflow from the child.  Even if the child clips its overflow, it may still
     // have visual overflow of its own set from box shadows or reflections.  It is unnecessary to propagate this
     // overflow if we are clipping our own overflow.
-    if (hasOverflowClip())
+    if (child->hasSelfPaintingLayer() || hasOverflowClip())
         return;
-    IntRect childVisualOverflowRect = child->visualOverflowRect();
+    IntRect childVisualOverflowRect = child->visualOverflowRectForPropagation(style());
     childVisualOverflowRect.move(delta);
     addVisualOverflow(childVisualOverflowRect);
 }
 
 void RenderBox::addLayoutOverflow(const IntRect& rect)
 {
-    IntRect borderBox = borderBoxRect();
-    if (borderBox.contains(rect))
+    IntRect clientBox = clientBoxRect();
+    if (clientBox.contains(rect) || rect.isEmpty())
         return;
-        
-    if (!m_overflow)
-        m_overflow.set(new RenderOverflow(borderBox));
     
-    m_overflow->addLayoutOverflow(rect);
+    // For overflow clip objects, we don't want to propagate overflow into unreachable areas.
+    IntRect overflowRect(rect);
+    if (hasOverflowClip() || isRenderView()) {
+        // Overflow is in the block's coordinate space and thus is flipped for horizontal-bt and vertical-rl 
+        // writing modes.  At this stage that is actually a simplification, since we can treat horizontal-tb/bt as the same
+        // and vertical-lr/rl as the same.
+        bool hasTopOverflow = !style()->isLeftToRightDirection() && !style()->isHorizontalWritingMode();
+        bool hasLeftOverflow = !style()->isLeftToRightDirection() && style()->isHorizontalWritingMode();
+        
+        if (!hasTopOverflow)
+            overflowRect.shiftTopEdgeTo(max(overflowRect.y(), clientBox.y()));
+        else
+            overflowRect.shiftBottomEdgeTo(min(overflowRect.bottom(), clientBox.bottom()));
+        if (!hasLeftOverflow)
+            overflowRect.shiftLeftEdgeTo(max(overflowRect.x(), clientBox.x()));
+        else
+            overflowRect.shiftRightEdgeTo(min(overflowRect.right(), clientBox.right()));
+        
+        // Now re-test with the adjusted rectangle and see if it has become unreachable or fully
+        // contained.
+        if (clientBox.contains(overflowRect) || overflowRect.isEmpty())
+            return;
+    }
+
+    if (!m_overflow)
+        m_overflow.set(new RenderOverflow(clientBox, borderBoxRect()));
+    
+    m_overflow->addLayoutOverflow(overflowRect);
 }
 
 void RenderBox::addVisualOverflow(const IntRect& rect)
 {
     IntRect borderBox = borderBoxRect();
-    if (borderBox.contains(rect))
+    if (borderBox.contains(rect) || rect.isEmpty())
         return;
         
     if (!m_overflow)
-        m_overflow.set(new RenderOverflow(borderBox));
+        m_overflow.set(new RenderOverflow(clientBoxRect(), borderBox));
     
     m_overflow->addVisualOverflow(rect);
 }
@@ -3205,20 +3196,89 @@ int RenderBox::baselinePosition(FontBaseline baselineType, bool /*firstLine*/, L
     return 0;
 }
 
-void RenderBox::blockDirectionOverflow(bool isLineHorizontal, int& logicalTopLayoutOverflow, int& logicalBottomLayoutOverflow,
-                                       int& logicalTopVisualOverflow, int& logicalBottomVisualOverflow)
+
+RenderLayer* RenderBox::enclosingFloatPaintingLayer() const
 {
-    if (isLineHorizontal) {
-        logicalTopLayoutOverflow = topLayoutOverflow();
-        logicalBottomLayoutOverflow = bottomLayoutOverflow();
-        logicalTopVisualOverflow = topVisualOverflow();
-        logicalBottomVisualOverflow = bottomVisualOverflow();
-    } else {
-        logicalTopLayoutOverflow = leftLayoutOverflow();
-        logicalBottomLayoutOverflow = rightLayoutOverflow();
-        logicalTopVisualOverflow = leftVisualOverflow();
-        logicalBottomVisualOverflow = rightVisualOverflow();
-    } 
+    const RenderObject* curr = this;
+    while (curr) {
+        RenderLayer* layer = curr->hasLayer() && curr->isBox() ? toRenderBoxModelObject(curr)->layer() : 0;
+        if (layer && layer->isSelfPaintingLayer())
+            return layer;
+        curr = curr->parent();
+    }
+    return 0;
+}
+
+IntRect RenderBox::logicalVisualOverflowRectForPropagation(RenderStyle* parentStyle) const
+{
+    IntRect rect = visualOverflowRectForPropagation(parentStyle);
+    if (!parentStyle->isHorizontalWritingMode())
+        return rect.transposedRect();
+    return rect;
+}
+
+IntRect RenderBox::visualOverflowRectForPropagation(RenderStyle* parentStyle) const
+{
+    // If the writing modes of the child and parent match, then we don't have to 
+    // do anything fancy. Just return the result.
+    IntRect rect = visualOverflowRect();
+    if (parentStyle->writingMode() == style()->writingMode())
+        return rect;
+    
+    // We are putting ourselves into our parent's coordinate space.  If there is a flipped block mismatch
+    // in a particular axis, then we have to flip the rect along that axis.
+    if (style()->writingMode() == RightToLeftWritingMode || parentStyle->writingMode() == RightToLeftWritingMode)
+        rect.setX(width() - rect.right());
+    else if (style()->writingMode() == BottomToTopWritingMode || parentStyle->writingMode() == BottomToTopWritingMode)
+        rect.setY(height() - rect.bottom());
+
+    return rect;
+}
+
+IntRect RenderBox::logicalLayoutOverflowRectForPropagation(RenderStyle* parentStyle) const
+{
+    IntRect rect = layoutOverflowRectForPropagation(parentStyle);
+    if (!parentStyle->isHorizontalWritingMode())
+        return rect.transposedRect();
+    return rect;
+}
+
+IntRect RenderBox::layoutOverflowRectForPropagation(RenderStyle* parentStyle) const
+{
+    // Only propagate interior layout overflow if we don't clip it.
+    IntRect rect = borderBoxRect();
+    if (!hasOverflowClip())
+        rect.unite(layoutOverflowRect());
+
+    if (isRelPositioned() || hasTransform()) {
+        // If we are relatively positioned or if we have a transform, then we have to convert
+        // this rectangle into physical coordinates, apply relative positioning and transforms
+        // to it, and then convert it back.
+        flipForWritingMode(rect);
+        
+        if (hasTransform())
+            rect = layer()->currentTransform().mapRect(rect);
+
+        if (isRelPositioned())
+            rect.move(relativePositionOffsetX(), relativePositionOffsetY());
+        
+        // Now we need to flip back.
+        flipForWritingMode(rect);
+    }
+    
+    // If the writing modes of the child and parent match, then we don't have to 
+    // do anything fancy. Just return the result.
+    if (parentStyle->writingMode() == style()->writingMode())
+        return rect;
+    
+    // We are putting ourselves into our parent's coordinate space.  If there is a flipped block mismatch
+    // in a particular axis, then we have to flip the rect along that axis.
+    if (style()->writingMode() == RightToLeftWritingMode || parentStyle->writingMode() == RightToLeftWritingMode)
+        rect.setX(width() - rect.right());
+    else if (style()->writingMode() == BottomToTopWritingMode || parentStyle->writingMode() == BottomToTopWritingMode)
+        rect.setY(height() - rect.bottom());
+
+    return rect;
 }
 
 IntPoint RenderBox::flipForWritingMode(const RenderBox* child, const IntPoint& point, FlippingAdjustment adjustment) const

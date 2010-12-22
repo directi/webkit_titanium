@@ -1,4 +1,3 @@
-
 # Copyright (C) 2005, 2006 Nikolas Zimmermann <zimmermann@kde.org>
 # Copyright (C) 2006 Anders Carlsson <andersca@mac.com>
 # Copyright (C) 2006 Samuel Weinig <sam.weinig@gmail.com>
@@ -27,7 +26,6 @@
 
 package CodeGeneratorV8;
 
-use File::stat;
 use Digest::MD5;
 
 my $module = "";
@@ -40,6 +38,7 @@ my @implFixedHeader = ();
 my @implContent = ();
 my @implContentDecls = ();
 my %implIncludes = ();
+my %headerIncludes = ();
 
 my @allParents = ();
 
@@ -202,11 +201,15 @@ sub GetSVGPropertyTypes
         $implIncludes{"SVGAnimatedPropertyTearOff.h"} = 1;
     } elsif ($svgNativeType =~ /SVGListPropertyTearOff/ or $svgNativeType =~ /SVGStaticListPropertyTearOff/) {
         $svgListPropertyType = $svgWrappedNativeType;
-        $implIncludes{"SVGAnimatedListPropertyTearOff.h"} = 1;
+        $headerIncludes{"SVGAnimatedListPropertyTearOff.h"} = 1;
+        $headerIncludes{"SVGStaticListPropertyTearOff.h"} = 1;
     } elsif ($svgNativeType =~ /SVGTransformListPropertyTearOff/) {
         $svgListPropertyType = $svgWrappedNativeType;
-        $implIncludes{"SVGAnimatedListPropertyTearOff.h"} = 1;
-        $implIncludes{"SVGTransformListPropertyTearOff.h"} = 1;
+        $headerIncludes{"SVGAnimatedListPropertyTearOff.h"} = 1;
+        $headerIncludes{"SVGTransformListPropertyTearOff.h"} = 1;
+    } elsif ($svgNativeType =~ /SVGPathSegListPropertyTearOff/) {
+        $svgListPropertyType = $svgWrappedNativeType;
+        $headerIncludes{"SVGPathSegListPropertyTearOff.h"} = 1;
     }
 
     if ($svgPropertyType) {
@@ -234,7 +237,6 @@ sub GenerateHeader
     # - Add default header template
     push(@headerContent, GenerateHeaderContentHeader($dataNode));
 
-    my %headerInclues = ();
     $headerIncludes{"wtf/text/StringHash.h"} = 1;
     $headerIncludes{"WrapperTypeInfo.h"} = 1;
     $headerIncludes{"V8DOMWrapper.h"} = 1;
@@ -250,7 +252,7 @@ sub GenerateHeader
 
     push(@headerContent, "#include <v8.h>\n");
     push(@headerContent, "#include <wtf/HashMap.h>\n");
-    
+
     push(@headerContent, "\nnamespace WebCore {\n");
     push(@headerContent, "\ntemplate<typename PropertyType> class SVGPropertyTearOff;\n") if $svgPropertyType;
     if ($svgNativeType) {
@@ -2527,7 +2529,6 @@ sub HasCustomToV8Implementation {
     # We don't generate a custom converter (but JSC does) for the following:
     return 0 if $interfaceName eq "AbstractWorker";
     return 0 if $interfaceName eq "CanvasRenderingContext";
-    return 0 if $interfaceName eq "ImageData";
     return 0 if $interfaceName eq "SVGElementInstance";
 
     # For everything else, do what JSC does.
@@ -2903,10 +2904,6 @@ sub JSValueToNative
         return "V8DOMWrapper::wrapNativeNodeFilter($value)";
     }
 
-    if ($type eq "SVGRect") {
-        $implIncludes{"FloatRect.h"} = 1;
-    }
-
     if ($type eq "MediaQueryListListener") {
         $implIncludes{"MediaQueryListListener.h"} = 1;
         return "MediaQueryListListener::create(" . $value . ")";
@@ -3088,9 +3085,16 @@ sub ReturnNativeToJSValue
     my $indent = shift;
     my $type = GetTypeFromSignature($signature);
 
-    return "return v8::Date::New(static_cast<double>($value))" if $type eq "DOMTimeStamp";
     return "return v8Boolean($value)" if $type eq "boolean";
     return "return v8::Handle<v8::Value>()" if $type eq "void";     # equivalent to v8::Undefined()
+
+    # HTML5 says that unsigned reflected attributes should be in the range
+    # [0, 2^31). When a value isn't in this range, a default value (or 0)
+    # should be returned instead.
+    if ($signature->extendedAttributes->{"Reflect"} and ($type eq "unsigned long" or $type eq "unsigned short")) {
+        $value =~ s/getUnsignedIntegralAttribute/getIntegralAttribute/g;
+        return "return v8::Integer::NewFromUnsigned(std::max(0, " . $value . "))";
+    }
 
     # For all the types where we use 'int' as the representation type,
     # we use Integer::New which has a fast Smi conversion check.
@@ -3100,7 +3104,7 @@ sub ReturnNativeToJSValue
 
     return "return v8DateOrNull($value)" if $type eq "Date";
     # long long and unsigned long long are not representable in ECMAScript.
-    return "return v8::Number::New(static_cast<double>($value))" if $type eq "long long" or $type eq "unsigned long long";
+    return "return v8::Number::New(static_cast<double>($value))" if $type eq "long long" or $type eq "unsigned long long" or $type eq "DOMTimeStamp";
     return "return v8::Number::New($value)" if $codeGenerator->IsPrimitiveType($type) or $type eq "SVGPaintType";
     return "return $value.v8Value()" if $nativeType eq "ScriptValue";
 

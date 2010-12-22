@@ -71,7 +71,6 @@ static const float MaxSkiaDim = 32767.0F; // Maximum width/height in CSS pixels.
 
 HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document* document)
     : HTMLElement(tagName, document)
-    , m_observer(0)
     , m_size(DefaultWidth, DefaultHeight)
     , m_ignoreReset(false)
     , m_pageScaleFactor(document->frame() ? document->frame()->page()->chrome()->scaleFactor() : 1)
@@ -93,8 +92,9 @@ PassRefPtr<HTMLCanvasElement> HTMLCanvasElement::create(const QualifiedName& tag
 
 HTMLCanvasElement::~HTMLCanvasElement()
 {
-    if (m_observer)
-        m_observer->canvasDestroyed(this);
+    HashSet<CanvasObserver*>::iterator end = m_observers.end();
+    for (HashSet<CanvasObserver*>::iterator it = m_observers.begin(); it != end; ++it)
+        (*it)->canvasDestroyed(this);
 }
 
 void HTMLCanvasElement::parseMappedAttribute(Attribute* attr)
@@ -115,6 +115,16 @@ RenderObject* HTMLCanvasElement::createRenderer(RenderArena* arena, RenderStyle*
 
     m_rendererIsCanvas = false;
     return HTMLElement::createRenderer(arena, style);
+}
+
+void HTMLCanvasElement::addObserver(CanvasObserver* observer)
+{
+    m_observers.add(observer);
+}
+
+void HTMLCanvasElement::removeObserver(CanvasObserver* observer)
+{
+    m_observers.remove(observer);
 }
 
 void HTMLCanvasElement::setHeight(int value)
@@ -200,8 +210,9 @@ void HTMLCanvasElement::didDraw(const FloatRect& rect)
         ro->repaintRectangle(enclosingIntRect(m_dirtyRect));
     }
 
-    if (m_observer)
-        m_observer->canvasChanged(this, rect);
+    HashSet<CanvasObserver*>::iterator end = m_observers.end();
+    for (HashSet<CanvasObserver*>::iterator it = m_observers.begin(); it != end; ++it)
+        (*it)->canvasChanged(this, rect);
 }
 
 void HTMLCanvasElement::reset()
@@ -238,8 +249,9 @@ void HTMLCanvasElement::reset()
         }
     }
 
-    if (m_observer)
-        m_observer->canvasResized(this);
+    HashSet<CanvasObserver*>::iterator end = m_observers.end();
+    for (HashSet<CanvasObserver*>::iterator it = m_observers.begin(); it != end; ++it)
+        (*it)->canvasResized(this);
 }
 
 void HTMLCanvasElement::paint(GraphicsContext* context, const IntRect& r)
@@ -322,31 +334,33 @@ String HTMLCanvasElement::toDataURL(const String& mimeType, const double* qualit
 
 IntRect HTMLCanvasElement::convertLogicalToDevice(const FloatRect& logicalRect) const
 {
-    return IntRect(convertLogicalToDevice(logicalRect.location()), convertLogicalToDevice(logicalRect.size()));
+    float left = floorf(logicalRect.left() * m_pageScaleFactor);
+    float top = floorf(logicalRect.top() * m_pageScaleFactor);
+    float right = ceilf(logicalRect.right() * m_pageScaleFactor);
+    float bottom = ceilf(logicalRect.bottom() * m_pageScaleFactor);
+    
+    return IntRect(IntPoint(left, top), convertToValidDeviceSize(right - left, bottom - top));
 }
 
 IntSize HTMLCanvasElement::convertLogicalToDevice(const FloatSize& logicalSize) const
 {
-    float wf = ceilf(logicalSize.width() * m_pageScaleFactor);
-    float hf = ceilf(logicalSize.height() * m_pageScaleFactor);
+    return convertToValidDeviceSize(logicalSize.width() * m_pageScaleFactor, logicalSize.height() * m_pageScaleFactor);
+}
 
-    if (!(wf >= 1 && hf >= 1 && wf * hf <= MaxCanvasArea))
+IntSize HTMLCanvasElement::convertToValidDeviceSize(float width, float height) const
+{
+    width = ceilf(width);
+    height = ceilf(height);
+    
+    if (width < 1 || height < 1 || width * height > MaxCanvasArea)
         return IntSize();
 
 #if PLATFORM(SKIA)
-    if (wf > MaxSkiaDim || hf > MaxSkiaDim)
+    if (width > MaxSkiaDim || height > MaxSkiaDim)
         return IntSize();
 #endif
 
-    return IntSize(static_cast<unsigned>(wf), static_cast<unsigned>(hf));
-}
-
-IntPoint HTMLCanvasElement::convertLogicalToDevice(const FloatPoint& logicalPos) const
-{
-    float xf = logicalPos.x() * m_pageScaleFactor;
-    float yf = logicalPos.y() * m_pageScaleFactor;
-
-    return IntPoint(static_cast<unsigned>(xf), static_cast<unsigned>(yf));
+    return IntSize(width, height);
 }
 
 const SecurityOrigin& HTMLCanvasElement::securityOrigin() const
@@ -370,7 +384,11 @@ void HTMLCanvasElement::createImageBuffer() const
     if (!size.width() || !size.height())
         return;
 
+#if defined(USE_IOSURFACE)
+    m_imageBuffer = ImageBuffer::create(size, ColorSpaceDeviceRGB, Accelerated);
+#else
     m_imageBuffer = ImageBuffer::create(size);
+#endif
     // The convertLogicalToDevice MaxCanvasArea check should prevent common cases
     // where ImageBuffer::create() returns 0, however we could still be low on memory.
     if (!m_imageBuffer)

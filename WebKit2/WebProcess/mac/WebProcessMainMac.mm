@@ -124,10 +124,10 @@ int WebProcessMain(const CommandLine& commandLine)
         NSString *applicationName = [NSString stringWithFormat:@"%@ Web Content", (NSString *)parentProcessName];
         WKSetVisibleApplicationName((CFStringRef)applicationName);
     }
-    
+
     // Create the connection.
     WebProcess::shared().initialize(serverPort, RunLoop::main());
-    
+
     [pool drain];
 
      // Initialize AppKit.

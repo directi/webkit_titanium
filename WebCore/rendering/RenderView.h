@@ -132,12 +132,12 @@ public:
 
     virtual void updateHitTestResult(HitTestResult&, const IntPoint&);
 
-    unsigned pageHeight() const { return m_pageHeight; }
-    void setPageHeight(unsigned height)
+    unsigned pageLogicalHeight() const { return m_pageLogicalHeight; }
+    void setPageLogicalHeight(unsigned height)
     {
-        if (m_pageHeight != height) {
-            m_pageHeight = height;
-            m_pageHeightChanged = true;
+        if (m_pageLogicalHeight != height) {
+            m_pageLogicalHeight = height;
+            m_pageLogicalHeightChanged = true;
         }
     }
 
@@ -166,17 +166,21 @@ public:
     bool usesCompositing() const;
 #endif
 
+    int docTop() const;
+    int docBottom() const;
+    int docHeight() const { return docBottom() - docTop(); }
+    int docLeft() const;
+    int docRight() const;
+    int docWidth() const { return docRight() - docLeft(); }
+    IntRect documentRect() const { return IntRect(docLeft(), docTop(), docWidth(), docHeight()); }
+
 protected:
     virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&) const;
     virtual void mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState&) const;
 
 private:
     bool shouldRepaint(const IntRect& r) const;
-        
-    int docHeight() const;
-    int docLeft() const;
-    int docWidth(int leftOverflow) const;
-
+    
     // These functions may only be accessed by LayoutStateMaintainer.
     bool pushLayoutState(RenderBox* renderer, const IntSize& offset, int pageHeight = 0, bool pageHeightChanged = false, ColumnInfo* colInfo = 0)
     {
@@ -229,8 +233,8 @@ protected:
     RenderWidgetSet m_widgets;
     
 private:
-    unsigned m_pageHeight;
-    bool m_pageHeightChanged;
+    unsigned m_pageLogicalHeight;
+    bool m_pageLogicalHeightChanged;
     LayoutState* m_layoutState;
     unsigned m_layoutStateDisableCount;
 #if USE(ACCELERATED_COMPOSITING)

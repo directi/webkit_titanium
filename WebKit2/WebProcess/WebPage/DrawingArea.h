@@ -26,7 +26,7 @@
 #ifndef DrawingArea_h
 #define DrawingArea_h
 
-#include "DrawingAreaBase.h"
+#include "DrawingAreaInfo.h"
 #include <WebCore/IntRect.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -41,10 +41,10 @@ namespace WebKit {
 
 class WebPage;
 
-class DrawingArea : public DrawingAreaBase, public RefCounted<DrawingArea> {
+class DrawingArea : public RefCounted<DrawingArea> {
 public:
     // FIXME: It might make sense to move this create function into a factory style class. 
-    static PassRefPtr<DrawingArea> create(Type, DrawingAreaID, WebPage*);
+    static PassRefPtr<DrawingArea> create(DrawingAreaInfo::Type, DrawingAreaInfo::Identifier, WebPage*);
 
     virtual ~DrawingArea();
     
@@ -56,6 +56,10 @@ public:
     virtual void setNeedsDisplay(const WebCore::IntRect&) = 0;
     virtual void display() = 0;
 
+    virtual void pageBackgroundTransparencyChanged() { }
+
+    virtual void onPageClose() { }
+    
 #if USE(ACCELERATED_COMPOSITING)
     virtual void attachCompositingContext() = 0;
     virtual void detachCompositingContext() = 0;
@@ -66,9 +70,12 @@ public:
 
     virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*) = 0;
 
-protected:
-    DrawingArea(Type, DrawingAreaID, WebPage*);
+    const DrawingAreaInfo& info() const { return m_info; }
 
+protected:
+    DrawingArea(DrawingAreaInfo::Type, DrawingAreaInfo::Identifier, WebPage*);
+
+    DrawingAreaInfo m_info;
     WebPage* m_webPage;
 };
 

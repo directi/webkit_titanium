@@ -497,48 +497,6 @@ WebInspector.Resource.prototype = {
         }
     },
 
-    get scripts()
-    {
-        if (!("_scripts" in this))
-            this._scripts = [];
-        return this._scripts;
-    },
-
-    addScript: function(script)
-    {
-        if (!script)
-            return;
-        this.scripts.unshift(script);
-        script.resource = this;
-    },
-
-    removeAllScripts: function()
-    {
-        if (!this._scripts)
-            return;
-
-        for (var i = 0; i < this._scripts.length; ++i) {
-            if (this._scripts[i].resource === this)
-                delete this._scripts[i].resource;
-        }
-
-        delete this._scripts;
-    },
-
-    removeScript: function(script)
-    {
-        if (!script)
-            return;
-
-        if (script.resource === this)
-            delete script.resource;
-
-        if (!this._scripts)
-            return;
-
-        this._scripts.remove(script);
-    },
-
     get errors()
     {
         return this._errors || 0;
@@ -608,7 +566,6 @@ WebInspector.Resource.prototype = {
                         WebInspector.ConsoleMessage.MessageLevel.Warning,
                         -1,
                         this.url,
-                        null,
                         1,
                         String.sprintf(WebInspector.Warnings.IncorrectMIMEType.message, WebInspector.Resource.Type.toUIString(this.type), this.mimeType),
                         null,
@@ -625,14 +582,6 @@ WebInspector.Resource.prototype = {
         return this._content;
     },
 
-    set content(content)
-    {
-        var data = { oldContent: this._content, oldContentTimestamp: this._contentTimestamp };
-        this._content = content;
-        this._contentTimestamp = new Date();
-        this.dispatchEventToListeners("content-changed", data);
-    },
-
     get contentTimestamp()
     {
         return this._contentTimestamp;
@@ -641,6 +590,61 @@ WebInspector.Resource.prototype = {
     setInitialContent: function(content)
     {
         this._content = content;
+    },
+
+    isLocallyModified: function()
+    {
+        return !!this._baseRevision;
+    },
+
+    setContent: function(newContent, onRevert)
+    {
+        var revisionResource = new WebInspector.Resource(null, this.url);
+        revisionResource.type = this.type;
+        revisionResource.loader = this.loader;
+        revisionResource.timestamp = this.timestamp;
+        revisionResource._content = this._content;
+        revisionResource._actualResource = this;
+        revisionResource._fireOnRevert = onRevert;
+
+        if (this.finished)
+            revisionResource.finished = true;
+        else {
+            function finished()
+            {
+                this.removeEventListener("finished", finished);
+                revisionResource.finished = true;
+            }
+            this.addEventListener("finished", finished.bind(this));
+        }
+
+        if (!this._baseRevision)
+            this._baseRevision = revisionResource;
+        else
+            revisionResource._baseRevision = this._baseRevision;
+
+        var data = { revision: revisionResource };
+        this._content = newContent;
+        this.timestamp = new Date();
+        this.dispatchEventToListeners("content-changed", data);
+    },
+
+    revertToThis: function()
+    {
+        if (!this._actualResource || !this._fireOnRevert)
+            return;
+
+        function callback(content)
+        {
+            if (content)
+                this._fireOnRevert(content);
+        }
+        this.requestContent(callback.bind(this));
+    },
+
+    get baseRevision()
+    {
+        return this._baseRevision;
     },
 
     requestContent: function(callback)

@@ -17,22 +17,18 @@
                     log("\n" + message + ": Success");
             }
             
-            function assertTrue(message, fact)
+            function assertClose(message, actual, expected)
             {
-                if (fact)
-                    log("\n" + message + ": Failure");
-                else
+                if ((actual >= expected && actual - expected < 5) ||
+                    (expected >= actual && expected - actual < 5))
                     log("\n" + message + ": Success");
+                else
+                    log("\n" + message + ": Failure, actual: " + actual + "; expected: " + expected);
             }
             
             var expectedScrollX = -1000;
             var expectedScrollY = 500;
 
-            function mousewheelHandler(e) 
-            {
-                assertEqual("wheel scroll preserves horizontal scroll position", window.scrollX, expectedScrollX);
-            }
-            
             onload = function()
             {
                 if (window.layoutTestController)
@@ -53,7 +49,7 @@
                     window.scrollTo(expectedScrollX, expectedScrollY);
                     eventSender.zoomPageIn();
                     eventSender.zoomPageOut();
-                    assertEqual("zoom in and out preserve scroll position", window.scrollX,expectedScrollX);
+                    assertClose("zoom in and out preserve scroll position", window.scrollX,expectedScrollX);
                 }
                
                 // Test resize wont reset scroll position.
@@ -61,15 +57,6 @@
                 window.scrollTo(expectedScrollX, expectedScrollY);
                 window.resizeTo(2000, window.innerHeight);
                 assertEqual("resize preserves scroll position", window.scrollX, expectedScrollX);
-                
-                // Test wheel scroll preserves horizontal scroll position.
-                window.scrollTo(expectedScrollX, expectedScrollY / 2);
-                var div = document.getElementById("div");
-                div.addEventListener("mousewheel", mousewheelHandler, false);
-                var wheelEvent = document.createEvent("WheelEvent");
-                wheelEvent.initWebKitWheelEvent(0, expectedScrollY / 2, window, 0, 0, 0, 0, false, false, false, false);
-                div.dispatchEvent(wheelEvent);
-            
                 // Test HOME/END operation.
                 if (window.eventSender) {
                     // Not using assert equal here since the behavior is different in each port. 

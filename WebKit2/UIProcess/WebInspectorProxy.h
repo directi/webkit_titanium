@@ -32,20 +32,30 @@
 #include "Connection.h"
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
+#include <wtf/RefPtr.h>
 
 #if PLATFORM(MAC)
 #include <wtf/RetainPtr.h>
 #ifdef __OBJC__
+@class NSWindow;
 @class WKView;
+@class WebInspectorProxyObjCAdapter;
 #else
+class NSWindow;
 class WKView;
+class WebInspectorProxyObjCAdapter;
 #endif
 #endif
 
 namespace WebKit {
 
+class WebPageGroup;
 class WebPageProxy;
 struct WebPageCreationParameters;
+
+#if PLATFORM(WIN)
+class WebView;
+#endif
 
 class WebInspectorProxy : public APIObject {
 public:
@@ -94,6 +104,8 @@ private:
     virtual Type type() const { return APIType; }
 
     WebPageProxy* platformCreateInspectorPage();
+    void platformOpen();
+    void platformClose();
 
     // Implemented the platform WebInspectorProxy file
     String inspectorPageURL() const;
@@ -101,6 +113,26 @@ private:
     // Called by WebInspectorProxy messages
     void createInspectorPage(uint64_t& inspectorPageID, WebPageCreationParameters&);
     void didLoadInspectorPage();
+    void didClose();
+
+    static WebPageGroup* inspectorPageGroup();
+
+#if PLATFORM(WIN)
+    static bool registerInspectorViewWindowClass();
+    static LRESULT CALLBACK InspectorViewWndProc(HWND, UINT, WPARAM, LPARAM);
+    LRESULT wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+
+    LRESULT onSizeEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
+    LRESULT onMinMaxInfoEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
+    LRESULT onSetFocusEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
+    LRESULT onCloseEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
+#endif
+
+    static const unsigned minimumWindowWidth = 500;
+    static const unsigned minimumWindowHeight = 400;
+
+    static const unsigned initialWindowWidth = 750;
+    static const unsigned initialWindowHeight = 650;
 
     WebPageProxy* m_page;
 
@@ -112,6 +144,11 @@ private:
 
 #if PLATFORM(MAC)
     RetainPtr<WKView> m_inspectorView;
+    RetainPtr<NSWindow> m_inspectorWindow;
+    RetainPtr<WebInspectorProxyObjCAdapter> m_inspectorProxyObjCAdapter;
+#elif PLATFORM(WIN)
+    HWND m_inspectorWindow;
+    RefPtr<WebView> m_inspectorView;
 #endif
 };
 

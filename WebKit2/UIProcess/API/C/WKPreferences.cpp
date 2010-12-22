@@ -44,9 +44,9 @@ WKPreferencesRef WKPreferencesCreate()
     return toAPI(preferences.release().leakRef());
 }
 
-WKPreferencesRef WKPreferencesCreateCopy(WKPreferencesRef preferencesRef)
+WKPreferencesRef WKPreferencesCreateWithIdentifier(WKStringRef identifierRef)
 {
-    RefPtr<WebPreferences> preferences = WebPreferences::copy(toImpl(preferencesRef));
+    RefPtr<WebPreferences> preferences = WebPreferences::create(toWTFString(identifierRef));
     return toAPI(preferences.release().releaseRef());
 }
 
@@ -90,6 +90,16 @@ bool WKPreferencesGetLocalStorageEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->localStorageEnabled();
 }
 
+void WKPreferencesSetDatabasesEnabled(WKPreferencesRef preferencesRef, bool databasesEnabled)
+{
+    toImpl(preferencesRef)->setDatabasesEnabled(databasesEnabled);
+}
+
+bool WKPreferencesGetDatabasesEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->databasesEnabled();
+}
+
 void WKPreferencesSetXSSAuditorEnabled(WKPreferencesRef preferencesRef, bool xssAuditorEnabled)
 {
     toImpl(preferencesRef)->setXSSAuditorEnabled(xssAuditorEnabled);
@@ -128,6 +138,26 @@ void WKPreferencesSetJavaEnabled(WKPreferencesRef preferencesRef, bool javaEnabl
 bool WKPreferencesGetJavaEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->javaEnabled();
+}
+
+void WKPreferencesSetJavaScriptCanOpenWindowsAutomatically(WKPreferencesRef preferencesRef, bool javaScriptCanOpenWindowsAutomatically)
+{
+    toImpl(preferencesRef)->setJavaScriptCanOpenWindowsAutomatically(javaScriptCanOpenWindowsAutomatically);
+}
+
+bool WKPreferencesGetJavaScriptCanOpenWindowsAutomatically(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->javaScriptCanOpenWindowsAutomatically();
+}
+
+void WKPreferencesSetHyperlinkAuditingEnabled(WKPreferencesRef preferencesRef, bool hyperlinkAuditingEnabled)
+{
+    toImpl(preferencesRef)->setHyperlinkAuditingEnabled(hyperlinkAuditingEnabled);
+}
+
+bool WKPreferencesGetHyperlinkAuditingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->hyperlinkAuditingEnabled();
 }
 
 void WKPreferencesSetStandardFontFamily(WKPreferencesRef preferencesRef, WKStringRef family)
@@ -190,6 +220,26 @@ WKStringRef WKPreferencesCopyFantasyFontFamily(WKPreferencesRef preferencesRef)
     return toCopiedAPI(toImpl(preferencesRef)->fantasyFontFamily());
 }
 
+void WKPreferencesSetDefaultFontSize(WKPreferencesRef preferencesRef, uint32_t size)
+{
+    toImpl(preferencesRef)->setDefaultFontSize(size);
+}
+
+uint32_t WKPreferencesGetDefaultFontSize(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->defaultFontSize();
+}
+
+void WKPreferencesSetDefaultFixedFontSize(WKPreferencesRef preferencesRef, uint32_t size)
+{
+    toImpl(preferencesRef)->setDefaultFixedFontSize(size);
+}
+
+uint32_t WKPreferencesGetDefaultFixedFontSize(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->defaultFixedFontSize();
+}
+
 void WKPreferencesSetMinimumFontSize(WKPreferencesRef preferencesRef, uint32_t size)
 {
     toImpl(preferencesRef)->setMinimumFontSize(size);
@@ -198,6 +248,16 @@ void WKPreferencesSetMinimumFontSize(WKPreferencesRef preferencesRef, uint32_t s
 uint32_t WKPreferencesGetMinimumFontSize(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->minimumFontSize();
+}
+
+void WKPreferencesSetDefaultTextEncodingName(WKPreferencesRef preferencesRef, WKStringRef name)
+{
+    toImpl(preferencesRef)->setDefaultTextEncodingName(toWTFString(name));
+}
+
+WKStringRef WKPreferencesCopyDefaultTextEncodingName(WKPreferencesRef preferencesRef)
+{
+    return toCopiedAPI(toImpl(preferencesRef)->defaultTextEncodingName());
 }
 
 void WKPreferencesSetPrivateBrowsingEnabled(WKPreferencesRef preferencesRef, bool enabled)
@@ -237,7 +297,7 @@ void WKPreferencesSetFontSmoothingLevel(WKPreferencesRef preferencesRef, WKFontS
 
 WKFontSmoothingLevel WKPreferencesGetFontSmoothingLevel(WKPreferencesRef preferencesRef)
 {
-    return toAPI(toImpl(preferencesRef)->fontSmoothingLevel());
+    return toAPI(static_cast<FontSmoothingLevel>(toImpl(preferencesRef)->fontSmoothingLevel()));
 }
 
 void WKPreferencesSetAcceleratedCompositingEnabled(WKPreferencesRef preferencesRef, bool flag)
@@ -278,4 +338,44 @@ void WKPreferencesSetNeedsSiteSpecificQuirks(WKPreferencesRef preferencesRef, bo
 bool WKPreferencesGetNeedsSiteSpecificQuirks(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->needsSiteSpecificQuirks();
+}
+
+void WKPreferencesSetForceFTPDirectoryListings(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setForceFTPDirectoryListings(flag);
+}
+
+bool WKPreferencesGetForceFTPDirectoryListings(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->forceFTPDirectoryListings();
+}
+
+void WKPreferencesSetFTPDirectoryTemplatePath(WKPreferencesRef preferencesRef, WKStringRef pathRef)
+{
+    toImpl(preferencesRef)->setFTPDirectoryTemplatePath(toWTFString(pathRef));
+}
+
+WKStringRef WKPreferencesCopyFTPDirectoryTemplatePath(WKPreferencesRef preferencesRef)
+{
+    return toCopiedAPI(toImpl(preferencesRef)->ftpDirectoryTemplatePath());
+}
+
+void WKPreferencesSetTabsToLinks(WKPreferencesRef preferencesRef, bool tabsToLinks)
+{
+    toImpl(preferencesRef)->setTabsToLinks(tabsToLinks);
+}
+
+bool WKPreferencesGetTabsToLinks(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->tabsToLinks();
+}
+
+void WKPreferencesSetDNSPrefetchingEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setDNSPrefetchingEnabled(enabled);
+}
+
+bool WKPreferencesGetDNSPrefetchingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->dnsPrefetchingEnabled();
 }

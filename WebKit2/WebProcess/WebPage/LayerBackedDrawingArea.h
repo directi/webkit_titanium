@@ -52,7 +52,7 @@ namespace WebKit {
 
 class LayerBackedDrawingArea : public DrawingArea, private WebCore::GraphicsLayerClient {
 public:
-    LayerBackedDrawingArea(DrawingAreaID identifier, WebPage*);
+    LayerBackedDrawingArea(DrawingAreaInfo::Identifier identifier, WebPage*);
     virtual ~LayerBackedDrawingArea();
 
     virtual void invalidateWindow(const WebCore::IntRect& rect, bool immediate);
@@ -61,6 +61,8 @@ public:
     virtual void scroll(const WebCore::IntSize& scrollDelta, const WebCore::IntRect& rectToScroll, const WebCore::IntRect& clipRect);
     virtual void setNeedsDisplay(const WebCore::IntRect&);
     virtual void display();
+
+    virtual void pageBackgroundTransparencyChanged();
 
     virtual void attachCompositingContext();
     virtual void detachCompositingContext();
@@ -80,6 +82,10 @@ public:
 private:
     virtual bool showDebugBorders() const;
     virtual bool showRepaintCounter() const;
+
+#if PLATFORM(MAC)
+    virtual void onPageClose();
+#endif
 
     void scheduleDisplay();
     

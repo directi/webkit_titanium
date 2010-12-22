@@ -1424,6 +1424,12 @@ body.inactive .placard.selected {
     text-decoration: none !important;
 }
 
+.child-editing {
+    color: black !important;
+    text-decoration: none !important;
+    overflow: visible !important;
+}
+
 .editing br {
     display: none;
 }
@@ -1486,10 +1492,6 @@ li.editing .swatch, li.editing .enabled-button,  li.editing-sub-part .delete-but
 
 .section .properties .number, .event-properties .number {
     color: blue;
-}
-
-.section .properties .priority {
-    color: rgb(128, 0, 0);
 }
 
 .section .properties .keyword, .event-properties .keyword {

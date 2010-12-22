@@ -45,6 +45,7 @@ public:
 
     void disconnectFromPage() { m_page = 0; }
     void didChangeSelectedIndex(int newIndex);
+    void setTextForIndex(int newIndex);
 
     virtual void show(const WebCore::IntRect&, WebCore::FrameView*, int index);
     virtual void hide();
@@ -55,7 +56,7 @@ private:
     WebPopupMenu(WebPage*, WebCore::PopupMenuClient*);
 
     Vector<WebPopupItem> populateItems();
-    void setUpPlatformData(PlatformPopupMenuData&);
+    void setUpPlatformData(const WebCore::IntRect& pageCoordinates, PlatformPopupMenuData&);
 
     WebCore::PopupMenuClient* m_popupClient;
     WebPage* m_page;

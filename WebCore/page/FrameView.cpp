@@ -435,15 +435,10 @@ void FrameView::adjustViewSize()
     if (!root)
         return;
 
-    int prevScrollOriginX = scrollOriginX();
-    ScrollView::setScrollOriginX(-root->leftLayoutOverflow());
-    IntSize size = IntSize(root->rightLayoutOverflow() - root->leftLayoutOverflow(), root->bottomLayoutOverflow());
-    // Take care of the case when contents remain but the RenderView's direction has changed.
-    // In which case, we need to update scroller position, for example, from leftmost to
-    // rightmost when direction changes from left-to-right to right-to-left.
-    bool directionChanged = (!prevScrollOriginX || !scrollOriginX()) && (scrollOriginX() != prevScrollOriginX);
-    if (size == contentsSize() && directionChanged)
-        ScrollView::updateScrollbars();
+    IntSize size = IntSize(root->docWidth(), root->docHeight());
+
+    ScrollView::setScrollOrigin(IntPoint(-root->docLeft(), -root->docTop()), size == contentsSize());
+    
     setContentsSize(size);
 }
 
@@ -488,6 +483,13 @@ void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, S
 
 void FrameView::calculateScrollbarModesForLayout(ScrollbarMode& hMode, ScrollbarMode& vMode)
 {
+    const HTMLFrameOwnerElement* owner = m_frame->ownerElement();
+    if (owner && (owner->scrollingMode() == ScrollbarAlwaysOff)) {
+        hMode = ScrollbarAlwaysOff;
+        vMode = ScrollbarAlwaysOff;
+        return;
+    }  
+    
     if (m_canHaveScrollbars) {
         hMode = ScrollbarAuto;
         vMode = ScrollbarAuto;
@@ -503,7 +505,6 @@ void FrameView::calculateScrollbarModesForLayout(ScrollbarMode& hMode, Scrollbar
         Node* body = document->body();
         if (body && body->renderer()) {
             if (body->hasTagName(framesetTag) && m_frame->settings() && !m_frame->settings()->frameFlatteningEnabled()) {
-                body->renderer()->setChildNeedsLayout(true);
                 vMode = ScrollbarAlwaysOff;
                 hMode = ScrollbarAlwaysOff;
             } else if (body->hasTagName(bodyTag)) {
@@ -514,27 +515,15 @@ void FrameView::calculateScrollbarModesForLayout(ScrollbarMode& hMode, Scrollbar
             }
         } else if (rootRenderer) {
 #if ENABLE(SVG)
-            if (documentElement->isSVGElement()) {
-                if (!m_firstLayout && (m_size.width() != layoutWidth() || m_size.height() != layoutHeight()))
-                    rootRenderer->setChildNeedsLayout(true);
-            } else
+            if (!documentElement->isSVGElement())
                 applyOverflowToViewport(rootRenderer, hMode, vMode);
 #else
             applyOverflowToViewport(rootRenderer, hMode, vMode);
 #endif
         }
-#ifdef INSTRUMENT_LAYOUT_SCHEDULING
-        if (m_firstLayout && !document->ownerElement())
-            printf("Elapsed time before first layout: %d\n", document->elapsedTime());
-#endif
-    }
-    
-    HTMLFrameOwnerElement* owner = m_frame->ownerElement();
-    if (owner && (owner->scrollingMode() == ScrollbarAlwaysOff)) {
-        hMode = ScrollbarAlwaysOff;
-        vMode = ScrollbarAlwaysOff;
-    }     
+    }    
 }
+
     
 #if USE(ACCELERATED_COMPOSITING)
 void FrameView::updateCompositingLayers()
@@ -759,9 +748,35 @@ void FrameView::layout(bool allowSubtree)
 
     m_nestedLayoutCount++;
 
-    ScrollbarMode hMode;
-    ScrollbarMode vMode;
+    if (!m_layoutRoot) {
+        Document* document = m_frame->document();
+        Node* documentElement = document->documentElement();
+        RenderObject* rootRenderer = documentElement ? documentElement->renderer() : 0;
+        Node* body = document->body();
+        if (body && body->renderer()) {
+            if (body->hasTagName(framesetTag) && m_frame->settings() && !m_frame->settings()->frameFlatteningEnabled()) {
+                body->renderer()->setChildNeedsLayout(true);
+            } else if (body->hasTagName(bodyTag)) {
+                if (!m_firstLayout && m_size.height() != layoutHeight() && body->renderer()->enclosingBox()->stretchesToViewport())
+                    body->renderer()->setChildNeedsLayout(true);
+            }
+        } else if (rootRenderer) {
+#if ENABLE(SVG)
+            if (documentElement->isSVGElement()) {
+                if (!m_firstLayout && (m_size.width() != layoutWidth() || m_size.height() != layoutHeight()))
+                    rootRenderer->setChildNeedsLayout(true);
+            }
+#endif
+        }
+        
+#ifdef INSTRUMENT_LAYOUT_SCHEDULING
+        if (m_firstLayout && !document->ownerElement())
+            printf("Elapsed time before first layout: %d\n", document->elapsedTime());
+#endif        
+    }
     
+    ScrollbarMode hMode;
+    ScrollbarMode vMode;    
     calculateScrollbarModesForLayout(hMode, vMode);
 
     m_doFullRepaint = !subtree && (m_firstLayout || toRenderView(root)->printing());
@@ -2216,7 +2231,7 @@ void FrameView::forceLayoutForPagination(const FloatSize& pageSize, float maximu
     if (root) {
         int pageW = ceilf(pageSize.width());
         root->setWidth(pageW);
-        root->setPageHeight(pageSize.height());
+        root->setPageLogicalHeight(pageSize.height());
         root->setNeedsLayoutAndPrefWidthsRecalc();
         forceLayout();
 
@@ -2224,15 +2239,15 @@ void FrameView::forceLayoutForPagination(const FloatSize& pageSize, float maximu
         // page width when shrunk, we will lay out at maximum shrink and clip extra content.
         // FIXME: We are assuming a shrink-to-fit printing implementation.  A cropping
         // implementation should not do this!
-        int rightmostPos = root->rightmostPosition();
-        if (rightmostPos > pageSize.width()) {
-            pageW = std::min<int>(rightmostPos, ceilf(pageSize.width() * maximumShrinkFactor));
+        int docWidth = root->docWidth();
+        if (docWidth > pageSize.width()) {
+            pageW = std::min<int>(docWidth, ceilf(pageSize.width() * maximumShrinkFactor));
             if (pageSize.height())
-                root->setPageHeight(pageW / pageSize.width() * pageSize.height());
+                root->setPageLogicalHeight(pageW / pageSize.width() * pageSize.height());
             root->setWidth(pageW);
             root->setNeedsLayoutAndPrefWidthsRecalc();
             forceLayout();
-            int docHeight = root->bottomLayoutOverflow();
+            int docHeight = root->docHeight();
             root->clearLayoutOverflow();
             root->addLayoutOverflow(IntRect(0, 0, pageW, docHeight)); // This is how we clip in case we overflow again.
         }
@@ -2422,4 +2437,30 @@ void FrameView::setRepaintThrottlingDeferredRepaintDelayIncrementDuringLoading(d
     s_deferredRepaintDelayIncrementDuringLoading = p;
 }
 
+bool FrameView::isVerticalDocument() const
+{
+    if (!m_frame)
+        return true;
+    Document* doc = m_frame->document();
+    if (!doc)
+        return true;
+    RenderObject* renderView = doc->renderer();
+    if (!renderView)
+        return true;
+    return renderView->style()->isHorizontalWritingMode();
+}
+
+bool FrameView::isFlippedDocument() const
+{
+    if (!m_frame)
+        return false;
+    Document* doc = m_frame->document();
+    if (!doc)
+        return false;
+    RenderObject* renderView = doc->renderer();
+    if (!renderView)
+        return false;
+    return renderView->style()->isFlippedBlocksWritingMode();
+}
+    
 } // namespace WebCore

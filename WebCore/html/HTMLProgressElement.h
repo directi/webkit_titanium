@@ -28,7 +28,7 @@ namespace WebCore {
 
 class HTMLProgressElement : public HTMLFormControlElement {
 public:
-    static PassRefPtr<HTMLProgressElement> create(const QualifiedName&, Document*, HTMLFormElement* = 0);
+    static PassRefPtr<HTMLProgressElement> create(const QualifiedName&, Document*, HTMLFormElement*);
 
     double value() const;
     void setValue(double, ExceptionCode&);
@@ -48,6 +48,8 @@ private:
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
 
     virtual void parseMappedAttribute(Attribute*);
+
+    virtual void attach();
 };
 
 } // namespace

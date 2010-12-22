@@ -31,6 +31,11 @@
 #include "WebPageProxy.h"
 #include "WebPageCreationParameters.h"
 #include "WebProcessProxy.h"
+#include "WebPageGroup.h"
+
+#if PLATFORM(WIN)
+#include "WebView.h"
+#endif
 
 #define DISABLE_NOT_IMPLEMENTED_WARNINGS 1
 #include "NotImplemented.h"
@@ -39,6 +44,12 @@ using namespace WebCore;
 
 namespace WebKit {
 
+WebPageGroup* WebInspectorProxy::inspectorPageGroup()
+{
+    static WebPageGroup* pageGroup = WebPageGroup::create("__WebInspectorPageGroup__", false).leakRef();
+    return pageGroup;
+}
+
 WebInspectorProxy::WebInspectorProxy(WebPageProxy* page)
     : m_page(page)
     , m_isVisible(false)
@@ -46,6 +57,9 @@ WebInspectorProxy::WebInspectorProxy(WebPageProxy* page)
     , m_isDebuggingJavaScript(false)
     , m_isProfilingJavaScript(false)
     , m_isProfilingPage(false)
+#if PLATFORM(WIN)
+    , m_inspectorWindow(0)
+#endif
 {
 }
 
@@ -55,7 +69,11 @@ WebInspectorProxy::~WebInspectorProxy()
 
 void WebInspectorProxy::invalidate()
 {
+    platformClose();
+
     m_page = 0;
+
+    m_isVisible = false;
     m_isDebuggingJavaScript = false;
     m_isProfilingJavaScript = false;
     m_isProfilingPage = false;
@@ -159,7 +177,16 @@ void WebInspectorProxy::createInspectorPage(uint64_t& inspectorPageID, WebPageCr
 
 void WebInspectorProxy::didLoadInspectorPage()
 {
-    // FIXME: show the window or attach the inspector here.
+    m_isVisible = true;
+
+    platformOpen();
+}
+
+void WebInspectorProxy::didClose()
+{
+    platformClose();
+
+    m_isVisible = false;
 }
 
 } // namespace WebKit

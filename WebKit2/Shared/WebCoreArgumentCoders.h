@@ -30,11 +30,15 @@
 #include "ArgumentDecoder.h"
 #include "ArgumentEncoder.h"
 #include "Arguments.h"
+#include <WebCore/AuthenticationChallenge.h>
+#include <WebCore/Credential.h>
 #include <WebCore/Cursor.h>
+#include <WebCore/Editor.h>
 #include <WebCore/FloatRect.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/PluginData.h>
+#include <WebCore/ProtectionSpace.h>
 #include <WebCore/ResourceError.h>
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/ViewportArguments.h>
@@ -106,6 +110,71 @@ template<> struct ArgumentCoder<WebCore::HTTPHeaderMap> {
     static bool decode(ArgumentDecoder* decoder, WebCore::HTTPHeaderMap& headerMap)
     {
         return decoder->decode(static_cast<HashMap<AtomicString, String, CaseFoldingHash>&>(headerMap));
+    }
+};
+
+template<> struct ArgumentCoder<WebCore::AuthenticationChallenge> {
+    static void encode(ArgumentEncoder* encoder, const WebCore::AuthenticationChallenge& challenge)
+    {
+        encoder->encode(CoreIPC::In(challenge.protectionSpace(), challenge.proposedCredential(), challenge.previousFailureCount(), challenge.failureResponse(), challenge.error()));
+    }
+
+    static bool decode(ArgumentDecoder* decoder, WebCore::AuthenticationChallenge& challenge)
+    {    
+        WebCore::ProtectionSpace protectionSpace;
+        WebCore::Credential proposedCredential;
+        unsigned previousFailureCount;
+        WebCore::ResourceResponse failureResponse;
+        WebCore::ResourceError error;
+
+        if (!decoder->decode(CoreIPC::Out(protectionSpace, proposedCredential, previousFailureCount, failureResponse, error)))
+            return false;
+        
+        challenge = WebCore::AuthenticationChallenge(protectionSpace, proposedCredential, previousFailureCount, failureResponse, error);
+
+        return true;
+    }
+};
+
+template<> struct ArgumentCoder<WebCore::ProtectionSpace> {
+    static void encode(ArgumentEncoder* encoder, const WebCore::ProtectionSpace& space)
+    {
+        encoder->encode(CoreIPC::In(space.host(), space.port(), static_cast<uint32_t>(space.serverType()), space.realm(), static_cast<uint32_t>(space.authenticationScheme())));
+    }
+
+    static bool decode(ArgumentDecoder* decoder, WebCore::ProtectionSpace& space)
+    {
+        String host;
+        int port;
+        uint32_t serverType;
+        String realm;
+        uint32_t authenticationScheme;
+
+        if (!decoder->decode(CoreIPC::Out(host, port, serverType, realm, authenticationScheme)))
+            return false;
+    
+        space = WebCore::ProtectionSpace(host, port, static_cast<WebCore::ProtectionSpaceServerType>(serverType), realm, static_cast<WebCore::ProtectionSpaceAuthenticationScheme>(authenticationScheme));
+
+        return true;
+    }
+};
+
+template<> struct ArgumentCoder<WebCore::Credential> {
+    static void encode(ArgumentEncoder* encoder, const WebCore::Credential& credential)
+    {
+        encoder->encode(CoreIPC::In(credential.user(), credential.password(), static_cast<uint32_t>(credential.persistence())));
+    }
+
+    static bool decode(ArgumentDecoder* decoder, WebCore::Credential& credential)
+    {
+        String user;
+        String password;
+        int persistence;
+        if (!decoder->decode(CoreIPC::Out(user, password, persistence)))
+            return false;
+        
+        credential = WebCore::Credential(user, password, static_cast<WebCore::CredentialPersistence>(persistence));
+        return true;
     }
 };
 
@@ -259,6 +328,22 @@ template<> struct ArgumentCoder<WebCore::KeypressCommand> {
     }
 };
 #endif
+
+template<> struct ArgumentCoder<WebCore::CompositionUnderline> {
+    static void encode(ArgumentEncoder* encoder, const WebCore::CompositionUnderline& underline)
+    {
+        encoder->encode(CoreIPC::In(underline.startOffset, underline.endOffset, underline.thick, underline.color.rgb()));
+    }
+    
+    static bool decode(ArgumentDecoder* decoder, WebCore::CompositionUnderline& underline)
+    {
+        uint32_t rgb;
+        if (!decoder->decode(CoreIPC::Out(underline.startOffset, underline.endOffset, underline.thick, rgb)))
+            return false;
+        underline.color = rgb;
+        return true;
+    }
+};
     
 } // namespace CoreIPC
 

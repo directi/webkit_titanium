@@ -158,8 +158,9 @@ bool WebPopupMenuProxyWin::registerWindowClass()
     return !!::RegisterClassEx(&wcex);
 }
 
-WebPopupMenuProxyWin::WebPopupMenuProxyWin(WebView* webView)
-    : m_webView(webView)
+WebPopupMenuProxyWin::WebPopupMenuProxyWin(WebView* webView, WebPopupMenuProxy::Client* client)
+    : WebPopupMenuProxy(client)
+    , m_webView(webView)
     , m_newSelectedIndex(0)
     , m_popup(0)
     , m_DC(0)
@@ -186,7 +187,7 @@ WebPopupMenuProxyWin::~WebPopupMenuProxyWin()
         m_scrollbar->setParent(0);
 }
 
-void WebPopupMenuProxyWin::showPopupMenu(const IntRect& rect, const Vector<WebPopupItem>& items, const PlatformPopupMenuData& data, int32_t selectedIndex, int32_t& newSelectedIndex)
+void WebPopupMenuProxyWin::showPopupMenu(const IntRect& rect, const Vector<WebPopupItem>& items, const PlatformPopupMenuData& data, int32_t selectedIndex)
 {
     m_items = items;
     m_data = data;
@@ -322,7 +323,7 @@ void WebPopupMenuProxyWin::showPopupMenu(const IntRect& rect, const Vector<WebPo
     m_showPopup = false;
     ::ShowWindow(m_popup, SW_HIDE);
 
-    newSelectedIndex = m_newSelectedIndex;
+    m_client->valueChangedForPopupMenu(this, m_newSelectedIndex);
 }
 
 void WebPopupMenuProxyWin::hidePopupMenu()
@@ -816,7 +817,7 @@ void WebPopupMenuProxyWin::paint(const IntRect& damageRect, HDC hdc)
     translatedDamageRect.move(IntSize(0, m_scrollOffset * m_itemHeight));
     m_data.m_notSelectedBackingStore->paint(context, damageRect.location(), translatedDamageRect);
 
-    IntRect selectedIndexRectInBackingStore(0, focusedIndex() * m_itemHeight, m_data.m_popupWidth, m_itemHeight);
+    IntRect selectedIndexRectInBackingStore(0, focusedIndex() * m_itemHeight, m_data.m_selectedBackingStore->size().width(), m_itemHeight);
     IntPoint selectedIndexDstPoint = selectedIndexRectInBackingStore.location();
     selectedIndexDstPoint.move(0, -m_scrollOffset * m_itemHeight);
 
@@ -846,9 +847,8 @@ bool WebPopupMenuProxyWin::setFocusedIndex(int i, bool hotTracking)
 
     m_focusedIndex = i;
 
-    // FIXME: If we are not hotTracking, we need to send a message back to the WebProcess to
-    // call the popupMenuClient's setTextFromItem function of this index.  This will update
-    // the currently displayed item at the top of the list.
+    if (!hotTracking)
+        m_client->setTextFromItemForPopupMenu(this, i);
 
     if (!scrollToRevealSelection())
         ::UpdateWindow(m_popup);

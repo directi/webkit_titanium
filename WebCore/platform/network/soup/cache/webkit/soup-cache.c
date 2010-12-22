@@ -1084,11 +1084,12 @@ webkit_soup_cache_init (WebKitSoupCache *cache)
 }
 
 static void
-remove_cache_item (gpointer key,
-		   gpointer value,
-		   WebKitSoupCache *cache)
+remove_cache_item (gpointer data,
+		   gpointer user_data)
 {
-	WebKitSoupCacheEntry *entry = g_hash_table_lookup (cache->priv->cache, (const gchar *)key);
+	WebKitSoupCache *cache = (WebKitSoupCache *) user_data;
+	WebKitSoupCacheEntry *entry = (WebKitSoupCacheEntry *) data;
+
 	if (webkit_soup_cache_entry_remove (cache, entry))
 		webkit_soup_cache_entry_free (entry, FALSE);
 }
@@ -1097,10 +1098,15 @@ static void
 webkit_soup_cache_finalize (GObject *object)
 {
 	WebKitSoupCachePrivate *priv;
+	GList *entries;
 
 	priv = WEBKIT_SOUP_CACHE (object)->priv;
 
-	g_hash_table_foreach (priv->cache, (GHFunc)remove_cache_item, object);
+	// Cannot use g_hash_table_foreach as callbacks must not modify the hash table
+	entries = g_hash_table_get_values (priv->cache);
+	g_list_foreach (entries, remove_cache_item, object);
+	g_list_free (entries);
+
 	g_hash_table_destroy (priv->cache);
 	g_free (priv->cache_dir);
 
@@ -1449,11 +1455,12 @@ webkit_soup_cache_flush (WebKitSoupCache *cache)
 }
 
 static void
-clear_cache_item (gpointer key,
-		  gpointer value,
-		  WebKitSoupCache *cache)
+clear_cache_item (gpointer data,
+		  gpointer user_data)
 {
-	WebKitSoupCacheEntry *entry = g_hash_table_lookup (cache->priv->cache, (const gchar *)key);
+	WebKitSoupCache *cache = (WebKitSoupCache *) user_data;
+	WebKitSoupCacheEntry *entry = (WebKitSoupCacheEntry *) data;
+
 	if (webkit_soup_cache_entry_remove (cache, entry))
 		webkit_soup_cache_entry_free (entry, TRUE);
 }
@@ -1469,13 +1476,17 @@ void
 webkit_soup_cache_clear (WebKitSoupCache *cache)
 {
 	GHashTable *hash;
+	GList *entries;
 
 	g_return_if_fail (WEBKIT_IS_SOUP_CACHE (cache));
 
 	hash = cache->priv->cache;
 	g_return_if_fail (hash);
 
-	g_hash_table_foreach (hash, (GHFunc)clear_cache_item, cache);
+	// Cannot use g_hash_table_foreach as callbacks must not modify the hash table
+	entries = g_hash_table_get_values (hash);
+	g_list_foreach (entries, clear_cache_item, cache);
+	g_list_free (entries);
 }
 
 SoupMessage *
@@ -1604,12 +1615,13 @@ webkit_soup_cache_load (WebKitSoupCache *cache)
 	filename = g_build_filename (priv->cache_dir, WEBKIT_SOUP_CACHE_FILE, NULL);
 	if (!g_file_get_contents (filename, &contents, &length, NULL)) {
 		g_free (filename);
+		g_free (contents);
 		return;
 	}
 	g_free (filename);
 
 	variant_format = g_variant_type_new (WEBKIT_SOUP_CACHE_ENTRIES_FORMAT);
-	cache_variant = g_variant_new_from_data (variant_format, (const gchar *)contents, length, FALSE, NULL, NULL);
+	cache_variant = g_variant_new_from_data (variant_format, (const gchar *)contents, length, FALSE, g_free, contents);
 	g_variant_type_free (variant_format);
 
 	g_variant_get (cache_variant, WEBKIT_SOUP_CACHE_ENTRIES_FORMAT, &entries_iter);

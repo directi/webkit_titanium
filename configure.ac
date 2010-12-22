@@ -2,7 +2,7 @@ AC_PREREQ(2.59)
 
 m4_define([webkit_major_version], [1])
 m4_define([webkit_minor_version], [3])
-m4_define([webkit_micro_version], [7])
+m4_define([webkit_micro_version], [8])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
@@ -35,7 +35,7 @@ AC_CONFIG_SRCDIR([WebCore/config.h])
 
 dnl # Libtool library version, not to confuse with API version
 dnl # see http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-LIBWEBKITGTK_VERSION=4:0:4
+LIBWEBKITGTK_VERSION=5:0:5
 AC_SUBST([LIBWEBKITGTK_VERSION])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects tar-ustar])
@@ -469,6 +469,14 @@ AC_ARG_ENABLE(video,
               [],[enable_video="yes"])
 AC_MSG_RESULT([$enable_video])
 
+# check whether to enable Javascript Fullscreen API support
+AC_MSG_CHECKING([whether to enable Fullscreen API support])
+AC_ARG_ENABLE(fullscreen_api,
+              AC_HELP_STRING([--enable-fullscreen-api],
+                             [enable the Fullscreen API support [default=yes]]),
+              [],[enable_fullscreen_api="yes"])
+AC_MSG_RESULT([$enable_fullscreen_api])
+
 # check whether to enable XHTML-MP support
 AC_MSG_CHECKING([whether to enable XHTML-MP support])
 AC_ARG_ENABLE(xhtmlmp,
@@ -634,6 +642,14 @@ AC_ARG_ENABLE(web_sockets,
                              [enable support for Web Sockets [default=yes]]),
               [],[enable_web_sockets="yes"])
 AC_MSG_RESULT([$enable_web_sockets])
+
+# check whether to enable Web Audio support
+AC_MSG_CHECKING([whether to enable Web Audio support])
+AC_ARG_ENABLE(web_audio,
+              AC_HELP_STRING([--enable-web-audio],
+                             [enable support for Web Audio [default=no]]),
+              [],[enable_web_audio="no"])
+AC_MSG_RESULT([$enable_web_audio])
 
 # check whether to enable Web Timing support
 AC_MSG_CHECKING([whether to enable Web Timing support])
@@ -867,8 +883,7 @@ if test "$enable_video" = "yes"; then
                      gstreamer-pbutils-0.10
                      gstreamer-plugins-base-0.10 >= $GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION
                      gstreamer-video-0.10],
-                     [have_gstreamer=yes],
-                     [have_gstreamer=no])
+                     [have_gstreamer=yes])
 
    AC_SUBST([GSTREAMER_CFLAGS])
    AC_SUBST([GSTREAMER_LIBS])
@@ -941,6 +956,7 @@ AM_CONDITIONAL([ENABLE_FILTERS],[test "$enable_filters" = "yes"])
 AM_CONDITIONAL([ENABLE_GEOLOCATION], [test "$enable_geolocation" = "yes"])
 AM_CONDITIONAL([ENABLE_MATHML], [test "$enable_mathml" = "yes"])
 AM_CONDITIONAL([ENABLE_VIDEO],[test "$enable_video" = "yes"])
+AM_CONDITIONAL([ENABLE_FULLSCREEN_API],[test "$enable_fullscreen_api" = "yes"])
 AM_CONDITIONAL([ENABLE_NOTIFICATIONS],[test "$enable_notifications" = "yes"])
 AM_CONDITIONAL([ENABLE_ORIENTATION_EVENTS],[test "$enable_orientation_events" = "yes"])
 AM_CONDITIONAL([ENABLE_SVG],[test "$enable_svg" = "yes"])
@@ -957,6 +973,7 @@ AM_CONDITIONAL([ENABLE_SHARED_WORKERS],[test "$enable_shared_workers" = "yes"])
 AM_CONDITIONAL([SVG_FLAGS],[test "$svg_flags" = "yes"])
 AM_CONDITIONAL([HTML_FLAGS],[test "$html_flags" = "yes"])
 AM_CONDITIONAL([ENABLE_WEB_SOCKETS],[test "$enable_web_sockets" = "yes"])
+AM_CONDITIONAL([ENABLE_WEB_AUDIO],[test "$enable_web_audio" = "yes"])
 AM_CONDITIONAL([ENABLE_WEB_TIMING],[test "$enable_web_timing" = "yes"])
 AM_CONDITIONAL([ENABLE_OPCODE_STATS],[test "$enable_opcode_stats" = "yes"])
 
@@ -1010,6 +1027,7 @@ Features:
  HTML5 sandboxed iframe support                           : $enable_sandbox
  HTML5 server-sent events support                         : $enable_eventsource
  HTML5 video element support                              : $enable_video
+ Fullscreen API support                                   : $enable_fullscreen_api
  Icon database support                                    : $enable_icon_database
  Image resizer support                                    : $enable_image_resizer
  Link prefetch support                                    : $enable_link_prefetch
@@ -1023,6 +1041,7 @@ Features:
  SVG as image support                                     : $enable_svg_as_image
  SVG use element support                                  : $enable_svg_use
  WML support                                              : $enable_wml
+ Web Audio support                                        : $enable_web_audio
  Web Sockets support                                      : $enable_web_sockets
  Web Timing support                                       : $enable_web_timing
  Web Workers support                                      : $enable_workers

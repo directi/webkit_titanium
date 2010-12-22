@@ -26,6 +26,7 @@
 #ifndef RenderLayerCompositor_h
 #define RenderLayerCompositor_h
 
+#include "ChromeClient.h"
 #include "RenderLayer.h"
 #include "RenderLayerBacking.h"
 
@@ -67,7 +68,9 @@ public:
     
     // Returns true if the accelerated compositing is enabled
     bool hasAcceleratedCompositing() const { return m_hasAcceleratedCompositing; }
-    
+
+    bool canRender3DTransforms() const;
+
     bool showDebugBorders() const { return m_showDebugBorders; }
     bool showRepaintCounter() const { return m_showRepaintCounter; }
     
@@ -140,7 +143,7 @@ public:
     void didMoveOnscreen();
     void willMoveOffscreen();
     
-    void didStartAcceleratedAnimation();
+    void didStartAcceleratedAnimation(CSSPropertyID);
     
 #if ENABLE(VIDEO)
     // Use by RenderVideo to ask if it should try to use accelerated compositing.
@@ -232,6 +235,8 @@ private:
     Timer<RenderLayerCompositor> m_updateCompositingLayersTimer;
 
     bool m_hasAcceleratedCompositing;
+    ChromeClient::CompositingTriggerFlags m_compositingTriggers;
+
     bool m_showDebugBorders;
     bool m_showRepaintCounter;
     bool m_compositingConsultsOverlap;

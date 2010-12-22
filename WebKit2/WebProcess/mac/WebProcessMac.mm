@@ -25,6 +25,7 @@
 
 #include "WebProcess.h"
 
+#include "WebProcessCreationParameters.h"
 #include <WebCore/MemoryCache.h>
 #include <WebCore/PageCache.h>
 #include <WebKitSystemInterface.h>
@@ -99,6 +100,26 @@ void WebProcess::platformSetCacheModel(CacheModel cacheModel)
 void WebProcess::platformClearResourceCaches()
 {
     [[NSURLCache sharedURLCache] removeAllCachedResponses];
+}
+
+void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters& parameters, CoreIPC::ArgumentDecoder*)
+{
+    if (!parameters.nsURLCachePath.isNull()) {
+        NSUInteger cacheMemoryCapacity = parameters.nsURLCacheMemoryCapacity;
+        NSUInteger cacheDiskCapacity = parameters.nsURLCacheDiskCapacity;
+
+        CString utf8CachePath = parameters.nsURLCachePath.utf8();
+        NSString *nsCachePath = [[NSFileManager defaultManager] stringWithFileSystemRepresentation:utf8CachePath.data() length:utf8CachePath.length()];
+
+        RetainPtr<NSURLCache> parentProcessURLCache(AdoptNS, [[NSURLCache alloc] initWithMemoryCapacity:cacheMemoryCapacity diskCapacity:cacheDiskCapacity diskPath:nsCachePath]);
+        [NSURLCache setSharedURLCache:parentProcessURLCache.get()];
+    }
+
+    m_compositingRenderServerPort = parameters.acceleratedCompositingPort.port();
+}
+
+void WebProcess::platformShutdown()
+{
 }
 
 } // namespace WebKit

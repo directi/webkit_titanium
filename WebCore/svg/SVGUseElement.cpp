@@ -37,8 +37,7 @@
 #include "SVGElementInstance.h"
 #include "SVGElementInstanceList.h"
 #include "SVGGElement.h"
-#include "SVGLength.h"
-#include "SVGPreserveAspectRatio.h"
+#include "SVGNames.h"
 #include "SVGSMILElement.h"
 #include "SVGSVGElement.h"
 #include "SVGShadowTreeElements.h"
@@ -56,6 +55,14 @@
 // #define DUMP_SHADOW_TREE
 
 namespace WebCore {
+
+// Animated property definitions
+DEFINE_ANIMATED_LENGTH(SVGUseElement, SVGNames::xAttr, X, x)
+DEFINE_ANIMATED_LENGTH(SVGUseElement, SVGNames::yAttr, Y, y)
+DEFINE_ANIMATED_LENGTH(SVGUseElement, SVGNames::widthAttr, Width, width)
+DEFINE_ANIMATED_LENGTH(SVGUseElement, SVGNames::heightAttr, Height, height)
+DEFINE_ANIMATED_STRING(SVGUseElement, XLinkNames::hrefAttr, Href, href)
+DEFINE_ANIMATED_BOOLEAN(SVGUseElement, SVGNames::externalResourcesRequiredAttr, ExternalResourcesRequired, externalResourcesRequired)
 
 inline SVGUseElement::SVGUseElement(const QualifiedName& tagName, Document* document)
     : SVGStyledTransformableElement(tagName, document)
@@ -486,12 +493,12 @@ void SVGUseElement::buildShadowAndInstanceTree(SVGShadowTreeRootElement* shadowR
     // The will be expanded soon anyway - see expandUseElementsInShadowTree().
     ContainerNode* parent = parentNode();
     while (parent) {
-        if (parent->isShadowNode())
+        if (parent->isShadowRoot())
             return;
 
-        parent = parent->parentNode();
+        parent = parent->parentNodeGuaranteedHostFree();
     }
- 
+
     SVGElement* target = 0;
     if (targetElement && targetElement->isSVGElement())
         target = static_cast<SVGElement*>(targetElement);

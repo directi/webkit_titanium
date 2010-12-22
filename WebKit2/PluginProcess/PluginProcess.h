@@ -31,6 +31,7 @@
 #include "ChildProcess.h"
 #include "RunLoop.h"
 #include <wtf/Forward.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebKit {
 
@@ -45,10 +46,14 @@ public:
     void initializeConnection(CoreIPC::Connection::Identifier);
     void removeWebProcessConnection(WebProcessConnection* webProcessConnection);
 
-    NetscapePluginModule* netscapePluginModule() const { return m_pluginModule.get(); }
+    NetscapePluginModule* netscapePluginModule();
 
-#if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
+#if PLATFORM(MAC)
+    void initializeShim();
+
+#if USE(ACCELERATED_COMPOSITING)
     mach_port_t compositingRenderServerPort() const { return m_compositingRenderServerPort; }
+#endif
 #endif
 
 private:
@@ -72,6 +77,9 @@ private:
 
     // Our web process connections.
     Vector<RefPtr<WebProcessConnection> > m_webProcessConnections;
+
+    // The plug-in path.
+    String m_pluginPath;
 
     // The plug-in module.
     RefPtr<NetscapePluginModule> m_pluginModule;

@@ -636,7 +636,7 @@ PassOwnPtr<AudioBus> ChromiumBridge::loadPlatformAudioResource(const char* name,
 PassOwnPtr<AudioBus> ChromiumBridge::decodeAudioFileData(const char* data, size_t size, double sampleRate)
 {
     WebAudioBus webAudioBus;
-    if (webKitClient()->decodeAudioFileData(&webAudioBus, data, size, sampleRate))
+    if (webKitClient()->loadAudioResource(&webAudioBus, data, size, sampleRate))
         return webAudioBus.release();
     return 0;
 }
@@ -677,6 +677,16 @@ void ChromiumBridge::decrementStatsCounter(const char* name)
 void ChromiumBridge::incrementStatsCounter(const char* name)
 {
     webKitClient()->incrementStatsCounter(name);
+}
+
+void ChromiumBridge::histogramCustomCounts(const char* name, int sample, int min, int max, int bucketCount)
+{
+    webKitClient()->histogramCustomCounts(name, sample, min, max, bucketCount);
+}
+
+void ChromiumBridge::histogramEnumeration(const char* name, int sample, int boundaryValue)
+{
+    webKitClient()->histogramEnumeration(name, sample, boundaryValue);
 }
 
 // Sudden Termination ---------------------------------------------------------

@@ -28,6 +28,8 @@
 
 #include <WebKit2/WKBase.h>
 #include <WebKit2/WKEvent.h>
+#include <WebKit2/WKFindOptions.h>
+#include <WebKit2/WKPageLoadTypes.h>
 
 #ifndef __cplusplus
 #include <stdbool.h>
@@ -72,6 +74,7 @@ typedef void (*WKBundlePageDidDocumentFinishLoadForFrameCallback)(WKBundlePageRe
 typedef void (*WKBundlePageDidFinishLoadForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, WKTypeRef* userData, const void *clientInfo);
 typedef void (*WKBundlePageDidFinishDocumentLoadForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, WKTypeRef* userData, const void *clientInfo);
 typedef void (*WKBundlePageDidFailLoadWithErrorForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, WKErrorRef error, WKTypeRef* userData, const void *clientInfo);
+typedef void (*WKBundlePageDidSameDocumentNavigationForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, WKSameDocumentNavigationType type, WKTypeRef* userData, const void *clientInfo);
 typedef void (*WKBundlePageDidReceiveTitleForFrameCallback)(WKBundlePageRef page, WKStringRef title, WKBundleFrameRef frame, WKTypeRef* userData, const void *clientInfo);
 typedef void (*WKBundlePageDidFirstLayoutForFrame)(WKBundlePageRef page, WKBundleFrameRef frame, WKTypeRef* userData, const void *clientInfo);
 typedef void (*WKBundlePageDidFirstVisuallyNonEmptyLayoutForFrame)(WKBundlePageRef page, WKBundleFrameRef frame, WKTypeRef* userData, const void *clientInfo);
@@ -82,7 +85,6 @@ typedef void (*WKBundlePageDidRunInsecureContentForFrameCallback)(WKBundlePageRe
 typedef void (*WKBundlePageDidClearWindowObjectForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, WKBundleScriptWorldRef world, const void *clientInfo);
 typedef void (*WKBundlePageDidCancelClientRedirectForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, const void *clientInfo);
 typedef void (*WKBundlePageWillPerformClientRedirectForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, WKURLRef url, double delay, double date, const void *clientInfo);
-typedef void (*WKBundlePageDidChangeLocationWithinPageForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, const void *clientInfo);
 typedef void (*WKBundlePageDidHandleOnloadEventsForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, const void *clientInfo);
 
 
@@ -96,6 +98,7 @@ struct WKBundlePageLoaderClient {
     WKBundlePageDidFinishDocumentLoadForFrameCallback                   didFinishDocumentLoadForFrame;
     WKBundlePageDidFinishLoadForFrameCallback                           didFinishLoadForFrame;
     WKBundlePageDidFailLoadWithErrorForFrameCallback                    didFailLoadWithErrorForFrame;
+    WKBundlePageDidSameDocumentNavigationForFrameCallback               didSameDocumentNavigationForFrame;
     WKBundlePageDidReceiveTitleForFrameCallback                         didReceiveTitleForFrame;
     WKBundlePageDidFirstLayoutForFrame                                  didFirstLayoutForFrame;
     WKBundlePageDidFirstVisuallyNonEmptyLayoutForFrame                  didFirstVisuallyNonEmptyLayoutForFrame;
@@ -107,7 +110,6 @@ struct WKBundlePageLoaderClient {
     WKBundlePageDidClearWindowObjectForFrameCallback                    didClearWindowObjectForFrame;
     WKBundlePageDidCancelClientRedirectForFrameCallback                 didCancelClientRedirectForFrame;
     WKBundlePageWillPerformClientRedirectForFrameCallback               willPerformClientRedirectForFrame;
-    WKBundlePageDidChangeLocationWithinPageForFrameCallback             didChangeLocationWithinPageForFrame;
     WKBundlePageDidHandleOnloadEventsForFrameCallback                   didHandleOnloadEventsForFrame;
 };
 typedef struct WKBundlePageLoaderClient WKBundlePageLoaderClient;
@@ -199,6 +201,7 @@ WK_EXPORT void WKBundlePageSetFormClient(WKBundlePageRef page, WKBundlePageFormC
 WK_EXPORT void WKBundlePageSetLoaderClient(WKBundlePageRef page, WKBundlePageLoaderClient* client);
 WK_EXPORT void WKBundlePageSetUIClient(WKBundlePageRef page, WKBundlePageUIClient* client);
 
+WK_EXPORT WKBundlePageGroupRef WKBundlePageGetPageGroup(WKBundlePageRef page);
 WK_EXPORT WKBundleFrameRef WKBundlePageGetMainFrame(WKBundlePageRef page);
 
 WK_EXPORT WKBundleBackForwardListRef WKBundlePageGetBackForwardList(WKBundlePageRef page);
@@ -208,6 +211,8 @@ WK_EXPORT void WKBundlePageUninstallPageOverlay(WKBundlePageRef page, WKBundlePa
 
 WK_EXPORT bool WKBundlePageHasLocalDataForURL(WKBundlePageRef page, WKURLRef url);
 WK_EXPORT bool WKBundlePageCanHandleRequest(WKURLRequestRef request);
+
+WK_EXPORT bool WKBundlePageFindString(WKBundlePageRef page, WKStringRef target, WKFindOptions findOptions);
 
 #ifdef __cplusplus
 }

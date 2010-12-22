@@ -26,7 +26,6 @@
 #include "TiledDrawingAreaProxy.h"
 #include "UpdateChunk.h"
 #include "WKAPICast.h"
-#include "WebPageNamespace.h"
 #include "qwkpage.h"
 #include "qwkpage_p.h"
 #include <QCursor>
@@ -57,7 +56,7 @@ struct QGraphicsWKViewPrivate {
     bool m_isChangingScale;
 };
 
-QGraphicsWKView::QGraphicsWKView(WKPageNamespaceRef pageNamespaceRef, BackingStoreType backingStoreType, QGraphicsItem* parent)
+QGraphicsWKView::QGraphicsWKView(QWKContext* context, BackingStoreType backingStoreType, QGraphicsItem* parent)
     : QGraphicsWidget(parent)
     , d(new QGraphicsWKViewPrivate(this))
 {
@@ -66,20 +65,21 @@ QGraphicsWKView::QGraphicsWKView(WKPageNamespaceRef pageNamespaceRef, BackingSto
 
     PassOwnPtr<DrawingAreaProxy> drawingAreaProxy;
 
+    d->page = new QWKPage(context);
+
     switch (backingStoreType) {
 #if ENABLE(TILED_BACKING_STORE)
     case Tiled:
-        drawingAreaProxy = TiledDrawingAreaProxy::create(this);
+        drawingAreaProxy = TiledDrawingAreaProxy::create(this, toImpl(page()->pageRef()));
         connect(this, SIGNAL(scaleChanged()), this, SLOT(onScaleChanged()));
         break;
 #endif
     case Simple:
     default:
-        drawingAreaProxy = ChunkedUpdateDrawingAreaProxy::create(this);
+        drawingAreaProxy = ChunkedUpdateDrawingAreaProxy::create(this, toImpl(page()->pageRef()));
         break;
     }
 
-    d->page = new QWKPage(pageNamespaceRef);
     d->page->d->init(size().toSize(), drawingAreaProxy);
     connect(d->page, SIGNAL(titleChanged(QString)), this, SIGNAL(titleChanged(QString)));
     connect(d->page, SIGNAL(loadStarted()), this, SIGNAL(loadStarted()));
@@ -326,7 +326,7 @@ void QGraphicsWKView::takeSnapshot(const QSize& size, const QRect& contentsRect)
 {
 #if ENABLE(TILED_BACKING_STORE)
     DrawingAreaProxy* drawingArea = page()->d->page->drawingArea();
-    if (drawingArea->info().type != DrawingAreaProxy::TiledDrawingAreaType)
+    if (drawingArea->info().type != DrawingAreaInfo::Tiled)
         return;
     TiledDrawingAreaProxy* tiledDrawingArea = static_cast<TiledDrawingAreaProxy*>(drawingArea);
     tiledDrawingArea->takeSnapshot(size, contentsRect);
@@ -386,7 +386,7 @@ void QGraphicsWKViewPrivate::commitScale()
 #if ENABLE(TILED_BACKING_STORE)
     DrawingAreaProxy* drawingArea = page->d->page->drawingArea();
     float newScale = q->scale();
-    if (drawingArea->info().type == DrawingAreaProxy::TiledDrawingAreaType) {
+    if (drawingArea->info().type == DrawingAreaInfo::Tiled) {
         TiledDrawingAreaProxy* tiledDrawingArea = static_cast<TiledDrawingAreaProxy*>(drawingArea);
         if (tiledDrawingArea->contentsScale() == newScale)
             return;

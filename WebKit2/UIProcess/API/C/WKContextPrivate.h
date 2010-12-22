@@ -34,19 +34,21 @@ extern "C" {
 #endif
 
 struct WKContextStatistics {
-    size_t numberOfWKPageNamespaces;
-    size_t numberOfWKPages;
-    size_t numberOfWKFrames;
+    unsigned wkViewCount;
+    unsigned wkPageCount;
+    unsigned wkFrameCount;
 };
 typedef struct WKContextStatistics WKContextStatistics;
 
-WK_EXPORT void WKContextGetStatistics(WKContextRef context, WKContextStatistics* statistics);
+WK_EXPORT void WKContextGetGlobalStatistics(WKContextStatistics* statistics);
 
 WK_EXPORT WKContextRef WKContextGetSharedThreadContext();
 
 WK_EXPORT void _WKContextSetAdditionalPluginsDirectory(WKContextRef context, WKStringRef pluginsDirectory);
 
 WK_EXPORT void _WKContextRegisterURLSchemeAsEmptyDocument(WKContextRef context, WKStringRef urlScheme);
+
+WK_EXPORT void _WKContextSetAlwaysUsesComplexTextCodePath(WKContextRef context, bool alwaysUseComplexTextCodePath);
 
 WK_EXPORT void WKContextRegisterURLSchemeAsSecure(WKContextRef context, WKStringRef urlScheme);
 

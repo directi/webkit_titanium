@@ -28,7 +28,6 @@
 
 #include "WKAPICast.h"
 #include "WebContext.h"
-#include "WebPreferences.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
@@ -62,16 +61,6 @@ WKContextRef WKContextGetSharedThreadContext()
     return toAPI(WebContext::sharedThreadContext());
 }
 
-void WKContextSetPreferences(WKContextRef contextRef, WKPreferencesRef preferencesRef)
-{
-    toImpl(contextRef)->setPreferences(toImpl(preferencesRef));
-}
-
-WKPreferencesRef WKContextGetPreferences(WKContextRef contextRef)
-{
-    return toAPI(toImpl(contextRef)->preferences());
-}
-
 void WKContextSetInjectedBundleClient(WKContextRef contextRef, const WKContextInjectedBundleClient* wkClient)
 {
     if (wkClient && wkClient->version)
@@ -103,9 +92,13 @@ void WKContextPostMessageToInjectedBundle(WKContextRef contextRef, WKStringRef m
     toImpl(contextRef)->postMessageToInjectedBundle(toImpl(messageNameRef)->string(), toImpl(messageBodyRef));
 }
 
-void WKContextGetStatistics(WKContextRef contextRef, WKContextStatistics* statistics)
+void WKContextGetGlobalStatistics(WKContextStatistics* statistics)
 {
-    toImpl(contextRef)->getStatistics(statistics);
+    const WebContext::Statistics& webContextStatistics = WebContext::statistics();
+
+    statistics->wkViewCount = webContextStatistics.wkViewCount;
+    statistics->wkPageCount = webContextStatistics.wkPageCount;
+    statistics->wkFrameCount = webContextStatistics.wkViewCount;
 }
 
 void WKContextAddVisitedLink(WKContextRef contextRef, WKStringRef visitedURL)
@@ -121,6 +114,11 @@ void WKContextSetCacheModel(WKContextRef contextRef, WKCacheModel cacheModel)
 WKCacheModel WKContextGetCacheModel(WKContextRef contextRef)
 {
     return toAPI(toImpl(contextRef)->cacheModel());
+}
+
+void _WKContextSetAlwaysUsesComplexTextCodePath(WKContextRef contextRef, bool alwaysUseComplexTextCodePath)
+{
+    toImpl(contextRef)->setAlwaysUsesComplexTextCodePath(alwaysUseComplexTextCodePath);
 }
 
 void _WKContextSetAdditionalPluginsDirectory(WKContextRef contextRef, WKStringRef pluginsDirectory)
@@ -151,4 +149,9 @@ void WKContextClearResourceCaches(WKContextRef contextRef)
 void WKContextClearApplicationCache(WKContextRef contextRef)
 {
     toImpl(contextRef)->clearApplicationCache();
+}
+
+WKDatabaseManagerRef WKContextGetDatabaseManager(WKContextRef contextRef)
+{
+    return toAPI(toImpl(contextRef)->databaseManagerProxy());
 }

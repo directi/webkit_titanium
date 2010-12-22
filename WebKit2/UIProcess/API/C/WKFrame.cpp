@@ -76,6 +76,11 @@ WKStringRef WKFrameCopyMIMEType(WKFrameRef frameRef)
     return toCopiedAPI(toImpl(frameRef)->mimeType());
 }
 
+WKStringRef WKFrameCopyTitle(WKFrameRef frameRef)
+{
+    return toCopiedAPI(toImpl(frameRef)->title());
+}
+
 WKPageRef WKFrameGetPage(WKFrameRef frameRef)
 {
     return toAPI(toImpl(frameRef)->page());
@@ -89,6 +94,21 @@ WKCertificateInfoRef WKFrameGetCertificateInfo(WKFrameRef frameRef)
 bool WKFrameCanProvideSource(WKFrameRef frameRef)
 {
     return toImpl(frameRef)->canProvideSource();
+}
+
+bool WKFrameCanShowMIMEType(WKFrameRef frameRef, WKStringRef mimeTypeRef)
+{
+    return toImpl(frameRef)->canShowMIMEType(toWTFString(mimeTypeRef));
+}
+
+bool WKFrameIsDisplayingStandaloneImageDocument(WKFrameRef frameRef)
+{
+    return toImpl(frameRef)->isDisplayingStandaloneImageDocument();
+}
+
+bool WKFrameIsDisplayingMarkupDocument(WKFrameRef frameRef)
+{
+    return toImpl(frameRef)->isDisplayingMarkupDocument();
 }
 
 bool WKFrameIsFrameSet(WKFrameRef frameRef)

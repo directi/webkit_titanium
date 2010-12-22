@@ -56,12 +56,23 @@ struct WebProcessCreationParameters {
     Vector<String> urlSchemesRegisteredAsSecure;
     Vector<String> urlSchemesForWhichDomainRelaxationIsForbidden;
 
+    // MIME types for which the UI process will handle showing the data.
+    Vector<String> mimeTypesWithCustomRepresentation;
+
     CacheModel cacheModel;
     bool shouldTrackVisitedLinks;
+    
+    bool clearResourceCaches;
+    bool clearApplicationCache;
+
+    bool shouldAlwaysUseComplexTextCodePath;
 
     String languageCode;
 
 #if PLATFORM(MAC)
+    String nsURLCachePath;
+    uint64_t nsURLCacheMemoryCapacity;
+    uint64_t nsURLCacheDiskCapacity;
     CoreIPC::MachPort acceleratedCompositingPort;
 #elif PLATFORM(WIN)
     bool shouldPaintNativeControls;

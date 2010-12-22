@@ -57,19 +57,19 @@ typedef QGraphicsWKView PlatformWebView;
 
 class ChunkedUpdateDrawingAreaProxy : public DrawingAreaProxy {
 public:
-    static PassOwnPtr<ChunkedUpdateDrawingAreaProxy> create(PlatformWebView*);
+    static PassOwnPtr<ChunkedUpdateDrawingAreaProxy> create(PlatformWebView*, WebPageProxy*);
 
     virtual ~ChunkedUpdateDrawingAreaProxy();
 
 private:
-    ChunkedUpdateDrawingAreaProxy(PlatformWebView*);
+    ChunkedUpdateDrawingAreaProxy(PlatformWebView*, WebPageProxy*);
 
     WebPageProxy* page();
 
     // DrawingAreaProxy
     virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
     virtual void paint(const WebCore::IntRect&, PlatformDrawingContext);
-    virtual void setSize(const WebCore::IntSize&);
+    virtual void sizeDidChange();
     virtual void setPageIsVisible(bool isVisible);
     
     void ensureBackingStore();
@@ -79,6 +79,8 @@ private:
     void didSetSize(UpdateChunk*);
     void update(UpdateChunk*);
 
+    void sendSetSize();
+
 #if USE(ACCELERATED_COMPOSITING)
     virtual void attachCompositingContext(uint32_t) { }
     virtual void detachCompositingContext() { }
@@ -87,8 +89,6 @@ private:
     bool m_isWaitingForDidSetFrameNotification;
     bool m_isVisible;
     bool m_forceRepaintWhenResumingPainting;
-
-    WebCore::IntSize m_lastSetViewSize;
 
 #if PLATFORM(MAC)
     // BackingStore

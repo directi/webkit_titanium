@@ -530,6 +530,9 @@
 #if PLATFORM(MAC) && !PLATFORM(IOS)
 #define WTF_PLATFORM_CI 1
 #endif
+#if PLATFORM(MAC) || PLATFORM(IOS) || (PLATFORM(WIN) && PLATFORM(CG))
+#define WTF_PLATFORM_CA 1
+#endif
 
 /* PLATFORM(SKIA) for Win/Linux, CG/CI for Mac */
 #if PLATFORM(CHROMIUM)
@@ -818,13 +821,6 @@
 
 #endif
 
-#if HAVE(MMAP) || (HAVE(VIRTUALALLOC) && HAVE(ALIGNED_MALLOC))
-#define HAVE_PAGE_ALLOCATE_ALIGNED 1
-#endif
-#if HAVE(MMAP)
-#define HAVE_PAGE_ALLOCATE_AT 1
-#endif
-
 /* ENABLE macro defaults */
 
 #if PLATFORM(QT)
@@ -1101,6 +1097,10 @@
 /* FIXME: Eventually we should enable this for all platforms and get rid of the define. */
 #if PLATFORM(MAC) || PLATFORM(WIN) || PLATFORM(QT)
 #define WTF_USE_PLATFORM_STRATEGIES 1
+#endif
+
+#if PLATFORM(WIN)
+#define WTF_USE_CROSS_PLATFORM_CONTEXT_MENUS 1
 #endif
 
 /* Geolocation request policy. pre-emptive policy is to acquire user permission before acquiring location.

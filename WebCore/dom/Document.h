@@ -76,6 +76,8 @@ class Element;
 class EntityReference;
 class Event;
 class EventListener;
+class EventQueue;
+class FormAssociatedElement;
 class Frame;
 class FrameView;
 class HTMLCanvasElement;
@@ -490,8 +492,8 @@ public:
     bool hasStateForNewFormElements() const;
     bool takeStateForFormElement(AtomicStringImpl* name, AtomicStringImpl* type, String& state);
 
-    void registerFormElementWithFormAttribute(Element*);
-    void unregisterFormElementWithFormAttribute(Element*);
+    void registerFormElementWithFormAttribute(FormAssociatedElement*);
+    void unregisterFormElementWithFormAttribute(FormAssociatedElement*);
     void resetFormElementsOwner(HTMLFormElement*);
 
     FrameView* view() const; // can be NULL
@@ -683,6 +685,7 @@ public:
 
     void attachNodeIterator(NodeIterator*);
     void detachNodeIterator(NodeIterator*);
+    void moveNodeIteratorsToNewDocument(Node*, Document*);
 
     void attachRange(Range*);
     void detachRange(Range*);
@@ -1003,7 +1006,7 @@ public:
     bool processingLoadEvent() const { return m_processingLoadEvent; }
 
 #if ENABLE(DATABASE)
-    virtual bool isDatabaseReadOnly() const;
+    virtual bool allowDatabaseAccess() const;
     virtual void databaseExceededQuota(const String& name);
 #endif
 
@@ -1024,10 +1027,11 @@ public:
     bool containsValidityStyleRules() const { return m_containsValidityStyleRules; }
     void setContainsValidityStyleRules() { m_containsValidityStyleRules = true; }
 
-    void enqueueEvent(PassRefPtr<Event>);
+    void enqueueWindowEvent(PassRefPtr<Event>);
     void enqueuePageshowEvent(PageshowEventPersistence);
     void enqueueHashchangeEvent(const String& oldURL, const String& newURL);
     void enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject);
+    EventQueue* eventQueue() const { return m_eventQueue.get(); }
 
     void addMediaCanStartListener(MediaCanStartListener*);
     void removeMediaCanStartListener(MediaCanStartListener*);
@@ -1061,6 +1065,8 @@ public:
     const DocumentTiming* timing() const { return &m_documentTiming; }
 
     bool mayCauseFlashOfUnstyledContent() const;
+
+    void initDNSPrefetch();
 
 protected:
     Document(Frame*, const KURL& url, bool isXHTML, bool isHTML, const KURL& baseURL = KURL());
@@ -1114,8 +1120,6 @@ private:
     virtual const KURL& virtualURL() const; // Same as url(), but needed for ScriptExecutionContext to implement it without a performance loss for direct calls.
     virtual KURL virtualCompleteURL(const String&) const; // Same as completeURL() for the same reason as above.
 
-    void initDNSPrefetch();
-
     String encoding() const;
 
     void updateTitle();
@@ -1125,8 +1129,6 @@ private:
     void cacheDocumentElement() const;
 
     void createStyleSelector();
-
-    void pendingEventTimerFired(Timer<Document>*);
 
     PassRefPtr<NodeList> handleZeroPadding(const HitTestRequest&, HitTestResult&) const;
 
@@ -1211,7 +1213,8 @@ private:
 
     typedef ListHashSet<Element*, 64> FormElementListHashSet;
     FormElementListHashSet m_formElementsWithState;
-    FormElementListHashSet m_formElementsWithFormAttribute;
+    typedef ListHashSet<FormAssociatedElement*, 32> FormAssociatedElementListHashSet;
+    FormAssociatedElementListHashSet m_formElementsWithFormAttribute;
 
     typedef HashMap<FormElementKey, Vector<String>, FormElementKeyHash, FormElementKeyHashTraits> FormElementStateMap;
     FormElementStateMap m_stateForNewFormElements;
@@ -1349,9 +1352,8 @@ private:
 #endif
 
     bool m_usingGeolocation;
-
-    Timer<Document> m_pendingEventTimer;
-    Vector<RefPtr<Event> > m_pendingEventQueue;
+    
+    OwnPtr<EventQueue> m_eventQueue;
 
 #if ENABLE(WML)
     bool m_containsWMLContent;

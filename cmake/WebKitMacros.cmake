@@ -51,7 +51,7 @@ MACRO (GENERATE_DOM_NAMES _namespace _attrs)
     ADD_CUSTOM_COMMAND(
         OUTPUT  ${_outputfiles}
         DEPENDS ${NAMES_GENERATOR} ${SCRIPTS_BINDINGS} ${_attrs} ${_tags}
-        COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${NAMES_GENERATOR} --outputDir ${DERIVED_SOURCES_DIR} ${_arguments} ${_additionArguments}
+        COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${NAMES_GENERATOR} --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" --outputDir ${DERIVED_SOURCES_DIR} ${_arguments} ${_additionArguments}
         VERBATIM)
 ENDMACRO ()
 
@@ -118,13 +118,4 @@ MACRO (WEBKIT_WRAP_SOURCELIST _input)
             ENDIF ()
         ENDFOREACH ()
     ENDIF ()
-ENDMACRO ()
-
-
-MACRO (GENERATE_ENTITIES _input _output _script)
-    ADD_CUSTOM_COMMAND(
-        OUTPUT ${_output}
-        MAIN_DEPENDENCY ${_input} ${_script}
-        COMMAND ${PYTHON_EXECUTABLE} ${_script} -o ${_output} ${_input}
-        VERBATIM)
 ENDMACRO ()

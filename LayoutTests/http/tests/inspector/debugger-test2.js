@@ -7,15 +7,15 @@ InspectorTest.startDebuggerTest = function(callback)
     if (WebInspector.panels.scripts._debuggerEnabled)
         startTest();
     else {
-        InspectorTest._addSniffer(WebInspector, "debuggerWasEnabled", startTest);
+        InspectorTest._addSniffer(WebInspector.debuggerModel, "debuggerWasEnabled", startTest);
         WebInspector.panels.scripts._toggleDebugging(false);
     }
 
     function startTest()
     {
         InspectorTest.addResult("Debugger was enabled.");
-        InspectorTest._addSniffer(WebInspector, "pausedScript", InspectorTest._pausedScript, true);
-        InspectorTest._addSniffer(WebInspector, "resumedScript", InspectorTest._resumedScript, true);
+        InspectorTest._addSniffer(WebInspector.debuggerModel, "pausedScript", InspectorTest._pausedScript, true);
+        InspectorTest._addSniffer(WebInspector.debuggerModel, "resumedScript", InspectorTest._resumedScript, true);
         callback();
     }
 };
@@ -34,7 +34,7 @@ InspectorTest.completeDebuggerTest = function()
         if (!scriptsPanel._debuggerEnabled)
             completeTest();
         else {
-            InspectorTest._addSniffer(WebInspector, "debuggerWasDisabled", completeTest);
+            InspectorTest._addSniffer(WebInspector.debuggerModel, "debuggerWasDisabled", completeTest);
             scriptsPanel._toggleDebugging(false);
         }
     }
@@ -82,7 +82,8 @@ InspectorTest.captureStackTrace = function(callFrames)
     InspectorTest.addResult("Call stack:");
     for (var i = 0; i < callFrames.length; i++) {
         var frame = callFrames[i];
-        var scriptOrResource = WebInspector.panels.scripts._sourceIDMap[frame.sourceID];
+        var script = WebInspector.debuggerModel.scriptForSourceID(frame.sourceID);
+        var scriptOrResource = script.resource || script;
         var url = scriptOrResource && WebInspector.displayNameForURL(scriptOrResource.sourceURL || scriptOrResource.url);
         var s = "    " + i + ") " + frame.functionName + " (" + url + ":" + frame.line + ")";
         InspectorTest.addResult(s);
@@ -116,7 +117,7 @@ InspectorTest.showScriptSource = function(scriptName, callback)
     if (InspectorTest._scriptsAreParsed([scriptName]))
         InspectorTest._showScriptSource(scriptName, callback);
     else
-        InspectorTest._addSniffer(WebInspector, "parsedScriptSource", InspectorTest.showScriptSource.bind(InspectorTest, scriptName, callback));
+        InspectorTest._addSniffer(WebInspector.debuggerModel, "parsedScriptSource", InspectorTest.showScriptSource.bind(InspectorTest, scriptName, callback));
 };
 
 InspectorTest.waitUntilCurrentSourceFrameIsLoaded = function(callback)

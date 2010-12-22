@@ -34,6 +34,7 @@
 #include <servers/bootstrap.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
+#include <WebKitSystemInterface.h>
 
 // FIXME: We should be doing this another way.
 extern "C" kern_return_t bootstrap_look_up2(mach_port_t, const name_t, mach_port_t*, pid_t, uint64_t);
@@ -47,6 +48,10 @@ namespace WebKit {
 
 int PluginProcessMain(const CommandLine& commandLine)
 {
+    // Unset DYLD_INSERT_LIBRARIES. We don't want our plug-in process shim to be loaded 
+    // by any child processes that the plug-in may launch.
+    unsetenv("DYLD_INSERT_LIBRARIES");
+
     String serviceName = commandLine["servicename"];
     if (serviceName.isEmpty())
         return EXIT_FAILURE;
@@ -67,10 +72,17 @@ int PluginProcessMain(const CommandLine& commandLine)
     signal(SIGSEGV, _exit);
 #endif
 
+    // FIXME: It would be better to proxy set cursor calls over to the UI process instead of
+    // allowing plug-ins to change the mouse cursor at any time.
+    WKEnableSettingCursorWhenInBackground();
+
     JSC::initializeThreading();
     WTF::initializeMainThread();
     RunLoop::initializeMainRunLoop();
 
+    // Initialize the shim.
+    PluginProcess::shared().initializeShim();
+    
     // Initialize the plug-in process connection.
     PluginProcess::shared().initializeConnection(serverPort);
 

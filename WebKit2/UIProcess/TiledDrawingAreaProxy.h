@@ -65,9 +65,9 @@ typedef QGraphicsWKView PlatformWebView;
 
 class TiledDrawingAreaProxy : public DrawingAreaProxy {
 public:
-    static PassOwnPtr<TiledDrawingAreaProxy> create(PlatformWebView* webView);
+    static PassOwnPtr<TiledDrawingAreaProxy> create(PlatformWebView* webView, WebPageProxy*);
 
-    TiledDrawingAreaProxy(PlatformWebView*);
+    TiledDrawingAreaProxy(PlatformWebView*, WebPageProxy*);
     virtual ~TiledDrawingAreaProxy();
 
     float contentsScale() const { return m_contentsScale; }
@@ -116,7 +116,7 @@ private:
     virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
     virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder&);
     virtual void paint(const WebCore::IntRect&, PlatformDrawingContext);
-    virtual void setSize(const WebCore::IntSize&);
+    virtual void sizeDidChange();
     virtual void setPageIsVisible(bool isVisible);
 
     void didSetSize(const WebCore::IntSize&);

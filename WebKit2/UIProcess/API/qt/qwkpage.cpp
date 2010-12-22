@@ -24,6 +24,8 @@
 #include "qwkpreferences_p.h"
 
 #include "ClientImpl.h"
+#include "qwkcontext.h"
+#include "qwkcontext_p.h"
 #include "qwkhistory.h"
 #include "qwkhistory_p.h"
 #include "FindIndicator.h"
@@ -32,7 +34,6 @@
 #include "WebContext.h"
 #include "WebContextMenuProxyQt.h"
 #include "WebEventFactoryQt.h"
-#include "WebPlatformStrategies.h"
 #include "WebPopupMenuProxyQt.h"
 #include "WKStringQt.h"
 #include "WKURLQt.h"
@@ -46,29 +47,20 @@
 #include <WebCore/Cursor.h>
 #include <WebCore/FloatRect.h>
 #include <WebKit2/WKFrame.h>
+#include <WebKit2/WKPageGroup.h>
 #include <WebKit2/WKRetainPtr.h>
 
 using namespace WebKit;
 using namespace WebCore;
 
-static inline void initializePlatformStrategiesIfNeeded()
-{
-    static bool initialized = false;
-    if (initialized)
-        return;
-
-    WebPlatformStrategies::initialize();
-    initialized = true;
-}
-
-QWKPagePrivate::QWKPagePrivate(QWKPage* qq, WKPageNamespaceRef namespaceRef)
+QWKPagePrivate::QWKPagePrivate(QWKPage* qq, QWKContext* c)
     : q(qq)
+    , context(c)
     , preferences(0)
     , createNewPageFn(0)
 {
-    initializePlatformStrategiesIfNeeded();
     memset(actions, 0, sizeof(actions));
-    page = toImpl(namespaceRef)->createWebPage(); // Page gets a ref to namespace.
+    page = context->d->context->createWebPage(0);
     page->setPageClient(this);
     history = QWKHistoryPrivate::createHistory(page->backForwardList());
 }
@@ -144,7 +136,7 @@ void QWKPagePrivate::didNotHandleKeyEvent(const NativeWebKeyboardEvent&)
 {
 }
 
-PassRefPtr<WebPopupMenuProxy> QWKPagePrivate::createPopupMenuProxy()
+PassRefPtr<WebPopupMenuProxy> QWKPagePrivate::createPopupMenuProxy(WebPageProxy*)
 {
     return WebPopupMenuProxyQt::create();
 }
@@ -158,17 +150,20 @@ void QWKPagePrivate::setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut)
 {
 }
 
+void QWKPagePrivate::didCommitLoadForMainFrame(bool useCustomRepresentation)
+{
+}
+
+void QWKPagePrivate::didFinishLoadingDataForCustomRepresentation(const CoreIPC::DataReference&)
+{
+}
+
 void QWKPagePrivate::paint(QPainter* painter, QRect area)
 {
-    painter->save();
-
-    painter->setBrush(Qt::white);
-    painter->drawRect(area);
-
     if (page->isValid() && page->drawingArea())
         page->drawingArea()->paint(IntRect(area), painter);
-
-    painter->restore();
+    else
+        painter->fillRect(area, Qt::white);
 }
 
 void QWKPagePrivate::keyPressEvent(QKeyEvent* ev)
@@ -303,8 +298,8 @@ void QWKPagePrivate::touchEvent(QTouchEvent* event)
 #endif
 }
 
-QWKPage::QWKPage(WKPageNamespaceRef namespaceRef)
-    : d(new QWKPagePrivate(this, namespaceRef))
+QWKPage::QWKPage(QWKContext* context)
+    : d(new QWKPagePrivate(this, context))
 {
     WKPageLoaderClient loadClient = {
         0,      /* version */
@@ -316,12 +311,15 @@ QWKPage::QWKPage(WKPageNamespaceRef namespaceRef)
         qt_wk_didFinishDocumentLoadForFrame,
         qt_wk_didFinishLoadForFrame,
         qt_wk_didFailLoadWithErrorForFrame,
+        0, /* didSameDocumentNavigationForFrame */
         qt_wk_didReceiveTitleForFrame,
         qt_wk_didFirstLayoutForFrame,
         qt_wk_didFirstVisuallyNonEmptyLayoutForFrame,
         qt_wk_didRemoveFrameFromHierarchy,
         0, /* didDisplayInsecureContentForFrame */
         0, /* didRunInsecureContentForFrame */
+        0, /* canAuthenticateAgainstProtectionSpaceInFrame */
+        0, /* didReceiveAuthenticationChallengeInFrame */
         qt_wk_didStartProgress,
         qt_wk_didChangeProgress,
         qt_wk_didFinishProgress,
@@ -343,6 +341,7 @@ QWKPage::QWKPage(WKPageNamespaceRef namespaceRef)
         0,  /* runJavaScriptPrompt */
         0,  /* setStatusText */
         0,  /* mouseDidMoveOverElement */
+        0,  /* missingPluginButtonClicked */
         0,  /* didNotHandleKeyEvent */
         0,  /* toolbarsAreVisible */
         0,  /* setToolbarsAreVisible */
@@ -356,7 +355,9 @@ QWKPage::QWKPage(WKPageNamespaceRef namespaceRef)
         0,  /* setWindowFrame */
         0,  /* runBeforeUnloadConfirmPanel */
         0,  /* didDraw */
-        0   /* pageDidScroll */
+        0,  /* pageDidScroll */
+        0,  /* exceededDatabaseQuota */
+        0   /* runOpenPanel */
     };
     WKPageSetPageUIClient(pageRef(), &uiClient);
 }
@@ -442,7 +443,9 @@ QWKPage::ViewportAttributes QWKPage::viewportAttributesForSize(const QSize& avai
 
 void QWKPage::setActualVisibleContentsRect(const QRect& rect) const
 {
+#if ENABLE(TILED_BACKING_STORE)
     d->page->setActualVisibleContentRect(rect);
+#endif
 }
 
 void QWKPage::timerEvent(QTimerEvent* ev)
@@ -462,8 +465,8 @@ WKPageRef QWKPage::pageRef() const
 QWKPreferences* QWKPage::preferences() const
 {
     if (!d->preferences) {
-        WKContextRef contextRef = WKPageNamespaceGetContext(toAPI(d->page->pageNamespace()));
-        d->preferences = QWKPreferencesPrivate::createPreferences(contextRef);
+        WKPageGroupRef pageGroupRef = WKPageGetPageGroup(pageRef());
+        d->preferences = QWKPreferencesPrivate::createPreferences(pageGroupRef);
     }
 
     return d->preferences;

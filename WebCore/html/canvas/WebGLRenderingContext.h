@@ -32,6 +32,7 @@
 #include "GraphicsContext3D.h"
 #include "Int32Array.h"
 #include "PlatformString.h"
+#include "Timer.h"
 #include "Uint8Array.h"
 #include "WebGLGetInfo.h"
 
@@ -42,6 +43,7 @@ namespace WebCore {
 class WebGLActiveInfo;
 class WebGLBuffer;
 class WebGLContextAttributes;
+class WebGLExtension;
 class WebGLFramebuffer;
 class WebGLObject;
 class WebGLProgram;
@@ -54,6 +56,7 @@ class HTMLVideoElement;
 class ImageBuffer;
 class ImageData;
 class IntSize;
+class OESTextureFloat;
 
 class WebGLRenderingContext : public CanvasRenderingContext {
 public:
@@ -144,6 +147,8 @@ public:
 
     unsigned long getError();
 
+    WebGLExtension* getExtension(const String& name);
+
     WebGLGetInfo getFramebufferAttachmentParameter(unsigned long target, unsigned long attachment, unsigned long pname, ExceptionCode&);
 
     WebGLGetInfo getParameter(unsigned long pname, ExceptionCode&);
@@ -163,6 +168,8 @@ public:
 
     String getShaderSource(WebGLShader*, ExceptionCode&);
 
+    Vector<String> getSupportedExtensions();
+
     WebGLGetInfo getTexParameter(unsigned long target, unsigned long pname, ExceptionCode&);
 
     WebGLGetInfo getUniform(WebGLProgram*, const WebGLUniformLocation*, ExceptionCode&);
@@ -175,7 +182,7 @@ public:
 
     void hint(unsigned long target, unsigned long mode);
     bool isBuffer(WebGLBuffer*);
-    bool isContextLost() const;
+    bool isContextLost();
     bool isEnabled(unsigned long cap);
     bool isFramebuffer(WebGLFramebuffer*);
     bool isProgram(WebGLProgram*);
@@ -291,10 +298,14 @@ public:
 
     void removeObject(WebGLObject*);
 
+    // Helpers for JSC bindings.
+    int getNumberOfExtensions();
+    WebGLExtension* getExtensionNumber(int i);
+
   private:
     friend class WebGLObject;
 
-    WebGLRenderingContext(HTMLCanvasElement*, PassRefPtr<GraphicsContext3D>);
+    WebGLRenderingContext(HTMLCanvasElement*, PassRefPtr<GraphicsContext3D>, GraphicsContext3D::Attributes);
     void initializeNewContext();
     void setupFlags();
 
@@ -343,6 +354,17 @@ public:
     PassRefPtr<Image> videoFrameToImage(HTMLVideoElement* video);
 
     RefPtr<GraphicsContext3D> m_context;
+
+    class WebGLRenderingContextRestoreTimer : public TimerBase {
+    public:
+        WebGLRenderingContextRestoreTimer(WebGLRenderingContext* context) : m_context(context) { }
+    private:
+        virtual void fired();
+        WebGLRenderingContext* m_context;
+    };
+
+    WebGLRenderingContextRestoreTimer m_restoreTimer;
+
     bool m_needsUpdate;
     bool m_markedCanvasDirty;
     HashSet<RefPtr<WebGLObject> > m_canvasObjects;
@@ -431,6 +453,7 @@ public:
     bool m_unpackPremultiplyAlpha;
     unsigned long m_unpackColorspaceConversion;
     bool m_contextLost;
+    GraphicsContext3D::Attributes m_attributes;
 
     long m_stencilBits;
     unsigned long m_stencilMask;
@@ -442,6 +465,9 @@ public:
     bool m_isErrorGeneratedOnOutOfBoundsAccesses;
     bool m_isResourceSafe;
     bool m_isDepthStencilSupported;
+
+    // Enabled extension objects.
+    RefPtr<OESTextureFloat> m_oesTextureFloat;
 
     // Helpers for getParameter and others
     WebGLGetInfo getBooleanParameter(unsigned long pname);

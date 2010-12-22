@@ -33,8 +33,12 @@ WK_EXPORT
     WKViewData *_data;
 }
 
-- (id)initWithFrame:(NSRect)frame pageNamespaceRef:(WKPageNamespaceRef)pageNamespaceRef;
+- (id)initWithFrame:(NSRect)frame contextRef:(WKContextRef)contextRef;
+- (id)initWithFrame:(NSRect)frame contextRef:(WKContextRef)contextRef pageGroupRef:(WKPageGroupRef)pageGroupRef;
 
-- (WKPageRef)pageRef;
+@property(readonly) WKPageRef pageRef;
+
+@property BOOL drawsBackground;
+@property BOOL drawsTransparentBackground;
 
 @end

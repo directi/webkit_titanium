@@ -54,7 +54,7 @@ class PluginControllerProxy : PluginController {
     WTF_MAKE_NONCOPYABLE(PluginControllerProxy);
 
 public:
-    static PassOwnPtr<PluginControllerProxy> create(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled);
+    static PassOwnPtr<PluginControllerProxy> create(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled, bool isAcceleratedCompositingEnabled);
     ~PluginControllerProxy();
 
     uint64_t pluginInstanceID() const { return m_pluginInstanceID; }
@@ -70,7 +70,7 @@ public:
 #endif
 
 private:
-    PluginControllerProxy(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled);
+    PluginControllerProxy(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled, bool isAcceleratedCompositingEnabled);
 
     void startPaintTimer();
     void paint();
@@ -87,18 +87,29 @@ private:
     virtual void setStatusbarText(const String&);
     virtual bool isAcceleratedCompositingEnabled();
     virtual void pluginProcessCrashed();
+
+#if PLATFORM(MAC)
+    virtual void setComplexTextInputEnabled(bool);
+#endif
+
     virtual String proxiesForURL(const String&);
     virtual String cookiesForURL(const String&);
     virtual void setCookiesForURL(const String& urlString, const String& cookieString);
     virtual bool isPrivateBrowsingEnabled();
     
     // Message handlers.
+    void frameDidFinishLoading(uint64_t requestID);
+    void frameDidFail(uint64_t requestID, bool wasCancelled);
     void geometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect, const SharedMemory::Handle& backingStoreHandle);
     void didEvaluateJavaScript(uint64_t requestID, const String& requestURLString, const String& result);
     void streamDidReceiveResponse(uint64_t streamID, const String& responseURLString, uint32_t streamLength, uint32_t lastModifiedTime, const String& mimeType, const String& headers);
     void streamDidReceiveData(uint64_t streamID, const CoreIPC::DataReference& data);
     void streamDidFinishLoading(uint64_t streamID);
     void streamDidFail(uint64_t streamID, bool wasCancelled);
+    void manualStreamDidReceiveResponse(const String& responseURLString, uint32_t streamLength, uint32_t lastModifiedTime, const String& mimeType, const String& headers);
+    void manualStreamDidReceiveData(const CoreIPC::DataReference& data);
+    void manualStreamDidFinishLoading();
+    void manualStreamDidFail(bool wasCancelled);
     void handleMouseEvent(const WebMouseEvent&, bool& handled);
     void handleWheelEvent(const WebWheelEvent&, bool& handled);
     void handleMouseEnterEvent(const WebMouseEvent&, bool& handled);
@@ -111,9 +122,11 @@ private:
 
 #if PLATFORM(MAC)
     void windowFocusChanged(bool);
-    void windowFrameChanged(const WebCore::IntRect&);
+    void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
     void windowVisibilityChanged(bool);
+    void sendComplexTextInput(const String& textInput);
 #endif
+
     void privateBrowsingStateChanged(bool);
 
     void platformInitialize();
@@ -125,6 +138,7 @@ private:
 
     String m_userAgent;
     bool m_isPrivateBrowsingEnabled;
+    bool m_isAcceleratedCompositingEnabled;
 
     RefPtr<Plugin> m_plugin;
 
@@ -142,13 +156,19 @@ private:
     // backing store into the web process backing store.
     bool m_waitingForDidUpdate;
 
-    // The backing store that this plug-in draws into.
-    RefPtr<BackingStore> m_backingStore;
+    // Whether the plug-in has canceled the manual stream load.
+    bool m_pluginCanceledManualStreamLoad;
 
 #if PLATFORM(MAC)
+    // Whether complex text input is enabled for this plug-in.
+    bool m_isComplexTextInputEnabled;
+
     // For CA plug-ins, this holds the information needed to export the layer hierarchy to the UI process.
     RetainPtr<WKCARemoteLayerClientRef> m_remoteLayerClient;
 #endif
+    
+    // The backing store that this plug-in draws into.
+    RefPtr<BackingStore> m_backingStore;
 };
 
 } // namespace WebKit

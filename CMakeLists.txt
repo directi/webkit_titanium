@@ -12,11 +12,11 @@ SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 SET(JAVASCRIPTCORE_DIR "${CMAKE_SOURCE_DIR}/JavaScriptCore")
 SET(WEBCORE_DIR "${CMAKE_SOURCE_DIR}/WebCore")
 SET(WEBKIT_DIR "${CMAKE_SOURCE_DIR}/WebKit")
-SET(WEBKITTOOLS_DIR "${CMAKE_SOURCE_DIR}/WebKitTools")
+SET(TOOLS_DIR "${CMAKE_SOURCE_DIR}/Tools")
 SET(DERIVED_SOURCES_DIR "${CMAKE_BINARY_DIR}/DerivedSources")
 
 INCLUDE(WebKitMacros)
-INCLUDE(WebKitGenerators)
+INCLUDE(WebKitFS)
 INCLUDE(WebKitHelpers)
 INCLUDE(WebKitFeatures)
 
@@ -38,11 +38,12 @@ FIND_PACKAGE(PythonInterp REQUIRED)
 # -----------------------------------------------------------------------------
 # Determine the target processor
 # -----------------------------------------------------------------------------
-IF (CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+STRING(TOLOWER ${CMAKE_SYSTEM_PROCESSOR} LOWERCASE_CMAKE_SYSTEM_PROCESSOR)
+IF (LOWERCASE_CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
     SET(WTF_CPU_ARM 1)
-ELSEIF (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)")
+ELSEIF (LOWERCASE_CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)")
     SET(WTF_CPU_X86_64 1)
-ELSEIF (CMAKE_SYSTEM_PROCESSOR MATCHES "(i[3-6]86|x86)")
+ELSEIF (LOWERCASE_CMAKE_SYSTEM_PROCESSOR MATCHES "(i[3-6]86|x86)")
     SET(WTF_CPU_X86 1)
 ELSE ()
     MESSAGE(FATAL_ERROR "Unknown CPU '${CMAKE_SYSTEM_PROCESSOR}'")
@@ -110,7 +111,7 @@ ADD_SUBDIRECTORY(WebKit)
 # -----------------------------------------------------------------------------
 # Add test browser if exists
 # -----------------------------------------------------------------------------
-INCLUDE_IF_EXISTS(${WEBKITTOOLS_DIR}/CMakeLists${PORT}.txt)
+INCLUDE_IF_EXISTS(${TOOLS_DIR}/CMakeLists${PORT}.txt)
 
 # -----------------------------------------------------------------------------
 # Set compiler flags for all targets

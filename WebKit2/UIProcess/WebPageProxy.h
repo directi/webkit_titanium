@@ -31,7 +31,6 @@
 #include "GenericCallback.h"
 #include "SharedMemory.h"
 #include "WKBase.h"
-#include "WebPageContextMenuClient.h"
 #include "WebContextMenuItemData.h"
 #include "WebEvent.h"
 #include "WebFindClient.h"
@@ -41,9 +40,13 @@
 #include "WebHistoryClient.h"
 #include "WebInspectorProxy.h"
 #include "WebLoaderClient.h"
+#include "WebPageContextMenuClient.h"
 #include "WebPolicyClient.h"
+#include "WebPopupMenuProxy.h"
+#include "WebResourceLoadClient.h"
 #include "WebUIClient.h"
 #include <WebCore/EditAction.h>
+#include <WebCore/Editor.h>
 #include <WebCore/FrameLoaderTypes.h>
 #include <WebCore/KeyboardEvent.h>
 #include <wtf/HashMap.h>
@@ -61,14 +64,14 @@ namespace CoreIPC {
 }
 
 namespace WebCore {
+    class AuthenticationChallenge;
     class Cursor;
     class FloatRect;
     class IntSize;
+    class ProtectionSpace;
     struct ViewportArguments;
     struct WindowFeatures;
 }
-
-struct WKContextStatistics;
 
 namespace WebKit {
 
@@ -77,6 +80,7 @@ class NativeWebKeyboardEvent;
 class PageClient;
 class PlatformCertificateInfo;
 class StringPairVector;
+class WebOpenPanelResultListenerProxy;
 class WebBackForwardList;
 class WebBackForwardListItem;
 class WebContextMenuProxy;
@@ -84,13 +88,12 @@ class WebData;
 class WebEditCommandProxy;
 class WebKeyboardEvent;
 class WebMouseEvent;
-class WebPageNamespace;
+class WebPageGroup;
 class WebPopupMenuProxy;
 class WebProcessProxy;
 class WebURLRequest;
 class WebWheelEvent;
 struct PlatformPopupMenuData;
-struct WebNavigationDataStore;
 struct WebPageCreationParameters;
 struct WebPopupItem;
 
@@ -99,11 +102,11 @@ typedef GenericCallback<WKStringRef, StringImpl*> RenderTreeExternalRepresentati
 typedef GenericCallback<WKStringRef, StringImpl*> ScriptReturnValueCallback;
 typedef GenericCallback<WKStringRef, StringImpl*> ContentsAsStringCallback;
 
-class WebPageProxy : public APIObject {
+class WebPageProxy : public APIObject, public WebPopupMenuProxy::Client {
 public:
     static const Type APIType = TypePage;
 
-    static PassRefPtr<WebPageProxy> create(WebPageNamespace*, uint64_t pageID);
+    static PassRefPtr<WebPageProxy> create(WebContext*, WebPageGroup*, uint64_t pageID);
 
     virtual ~WebPageProxy();
 
@@ -114,9 +117,6 @@ public:
 
     DrawingAreaProxy* drawingArea() { return m_drawingArea.get(); }
     void setDrawingArea(PassOwnPtr<DrawingAreaProxy>);
-
-    bool visibleToInjectedBundle() const { return m_visibleToInjectedBundle; }
-    void setVisibleToInjectedBundle(bool visible) { m_visibleToInjectedBundle = visible; }
 
     WebBackForwardList* backForwardList() { return m_backForwardList.get(); }
 
@@ -130,6 +130,7 @@ public:
     void initializeFormClient(const WKPageFormClient*);
     void initializeLoaderClient(const WKPageLoaderClient*);
     void initializePolicyClient(const WKPagePolicyClient*);
+    void initializeResourceLoadClient(const WKPageResourceLoadClient*);
     void initializeUIClient(const WKPageUIClient*);
     void relaunch();
 
@@ -159,9 +160,16 @@ public:
 
     bool canShowMIMEType(const String& mimeType) const;
 
-    void setFocused(bool isFocused);
-    void setActive(bool active);
-    void setIsInWindow(bool isInWindow);
+    bool drawsBackground() const { return m_drawsBackground; }
+    void setDrawsBackground(bool);
+
+    bool drawsTransparentBackground() const { return m_drawsTransparentBackground; }
+    void setDrawsTransparentBackground(bool);
+
+    void setFocused(bool);
+    void setInitialFocus(bool);
+    void setActive(bool);
+    void setIsInWindow(bool);
     void setWindowResizerSize(const WebCore::IntSize&);
 
     void executeEditCommand(const String& commandName);
@@ -170,9 +178,22 @@ public:
 // These are only used on Mac currently.
 #if PLATFORM(MAC)
     void updateWindowIsVisible(bool windowIsVisible);
-    void updateWindowFrame(const WebCore::IntRect&);
+    void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
+    void getMarkedRange(uint64_t& location, uint64_t& length);
+    uint64_t characterIndexForPoint(const WebCore::IntPoint);
+    WebCore::IntRect firstRectForCharacterRange(uint64_t, uint64_t);
+    void didSelectionChange(bool, bool, bool, bool, uint64_t, uint64_t);
+    void sendComplexTextInputToPlugin(uint64_t pluginComplexTextInputIdentifier, const String& textInput);
+#else
+    void didChangeSelection(bool, bool, bool, bool);
 #endif
-
+#if PLATFORM(WIN)
+    void didChangeCompositionSelection(bool);
+    void confirmComposition(const String&);
+    void setComposition(const String&, Vector<WebCore::CompositionUnderline>&, int);
+    WebCore::IntRect firstRectForCharacterInSelectedRange(int);
+    String getSelectedText();
+#endif
 #if ENABLE(TILED_BACKING_STORE)
     void setActualVisibleContentRect(const WebCore::IntRect& rect);
 #endif
@@ -184,13 +205,21 @@ public:
     void handleTouchEvent(const WebTouchEvent&);
 #endif
 
-    const String& pageTitle() const { return m_pageTitle; }
+    String pageTitle() const;
     const String& toolTip() const { return m_toolTip; }
+
+    void setUserAgent(const String&);
+    const String& userAgent() const { return m_userAgent; }
+    void setApplicationNameForUserAgent(const String&);
+    const String& applicationNameForUserAgent() const { return m_applicationNameForUserAgent; }
+    void setCustomUserAgent(const String&);
     const String& customUserAgent() const { return m_customUserAgent; }
 
-    double estimatedProgress() const { return m_estimatedProgress; }
+    bool supportsTextEncoding() const;
+    void setCustomTextEncodingName(const String&);
+    String customTextEncodingName() const { return m_customTextEncodingName; }
 
-    void setCustomUserAgent(const String&);
+    double estimatedProgress() const { return m_estimatedProgress; }
 
     void terminateProcess();
 
@@ -237,10 +266,11 @@ public:
     void addEditCommand(WebEditCommandProxy*);
     void removeEditCommand(WebEditCommandProxy*);
     void registerEditCommand(PassRefPtr<WebEditCommandProxy>, UndoOrRedo);
-    void didSelectionChange(bool, bool, bool, bool);
 
     WebProcessProxy* process() const;
-    WebPageNamespace* pageNamespace() const { return m_pageNamespace.get(); }
+    WebContext* context() const { return m_context.get(); }
+
+    WebPageGroup* pageGroup() const { return m_pageGroup.get(); }
 
     bool isValid();
 
@@ -249,13 +279,16 @@ public:
 
     void preferencesDidChange();
 
-    void getStatistics(WKContextStatistics*);
-
 #if ENABLE(TILED_BACKING_STORE)
     void setResizesToContentsUsingLayoutSize(const WebCore::IntSize&);
 #endif
 
+    // Called by the WebContextMenuProxy.
     void contextMenuItemSelected(const WebContextMenuItemData&);
+
+    // Called by the WebOpenPanelResultListenerProxy.
+    void didChooseFilesForOpenPanel(const Vector<String>&);
+    void didCancelForOpenPanel();
 
     WebPageCreationParameters creationParameters(const WebCore::IntSize&) const;
 
@@ -263,10 +296,17 @@ public:
     void findZoomableAreaForPoint(const WebCore::IntPoint&);
 #endif
 
+    void unmarkAllMisspellings();
+    void unmarkAllBadGrammar();
+
 private:
-    WebPageProxy(WebPageNamespace*, uint64_t pageID);
+    WebPageProxy(WebContext*, WebPageGroup*, uint64_t pageID);
 
     virtual Type type() const { return APIType; }
+
+    // WebPopupMenuProxy::Client
+    virtual void valueChangedForPopupMenu(WebPopupMenuProxy*, int32_t newSelectedIndex);
+    virtual void setTextFromItemForPopupMenu(WebPopupMenuProxy*, int32_t index);
 
     // Implemented in generated WebPageProxyMessageReceiver.cpp
     void didReceiveWebPageProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
@@ -278,10 +318,11 @@ private:
     void didStartProvisionalLoadForFrame(uint64_t frameID, const String&, bool loadingSubstituteDataForUnreachableURL, CoreIPC::ArgumentDecoder*);
     void didReceiveServerRedirectForProvisionalLoadForFrame(uint64_t frameID, const String&, CoreIPC::ArgumentDecoder*);
     void didFailProvisionalLoadForFrame(uint64_t frameID, const WebCore::ResourceError&, CoreIPC::ArgumentDecoder*);
-    void didCommitLoadForFrame(uint64_t frameID, const String& mimeType, const PlatformCertificateInfo&, CoreIPC::ArgumentDecoder*);
+    void didCommitLoadForFrame(uint64_t frameID, const String& mimeType, bool frameHasCustomRepresentation, const PlatformCertificateInfo&, CoreIPC::ArgumentDecoder*);
     void didFinishDocumentLoadForFrame(uint64_t frameID, CoreIPC::ArgumentDecoder*);
     void didFinishLoadForFrame(uint64_t frameID, CoreIPC::ArgumentDecoder*);
     void didFailLoadForFrame(uint64_t frameID, const WebCore::ResourceError&, CoreIPC::ArgumentDecoder*);
+    void didSameDocumentNavigationForFrame(uint64_t frameID, uint32_t sameDocumentNavigationType, const String&, CoreIPC::ArgumentDecoder*);
     void didReceiveTitleForFrame(uint64_t frameID, const String&, CoreIPC::ArgumentDecoder*);
     void didFirstLayoutForFrame(uint64_t frameID, CoreIPC::ArgumentDecoder*);
     void didFirstVisuallyNonEmptyLayoutForFrame(uint64_t frameID, CoreIPC::ArgumentDecoder*);
@@ -299,6 +340,14 @@ private:
 
     void willSubmitForm(uint64_t frameID, uint64_t sourceFrameID, const StringPairVector& textFieldValues, uint64_t listenerID, CoreIPC::ArgumentDecoder*);
 
+    // Resource load client
+    void didInitiateLoadForResource(uint64_t frameID, uint64_t resourceIdentifier, const WebCore::ResourceRequest&);
+    void didSendRequestForResource(uint64_t frameID, uint64_t resourceIdentifier, const WebCore::ResourceRequest&, const WebCore::ResourceResponse& redirectResponse);
+    void didReceiveResponseForResource(uint64_t frameID, uint64_t resourceIdentifier, const WebCore::ResourceResponse&);
+    void didReceiveContentLengthForResource(uint64_t frameID, uint64_t resourceIdentifier, uint64_t contentLength);
+    void didFinishLoadForResource(uint64_t frameID, uint64_t resourceIdentifier);
+    void didFailLoadForResource(uint64_t frameID, uint64_t resourceIdentifier, const WebCore::ResourceError&);
+
     // UI client
     void createNewPage(const WebCore::WindowFeatures&, uint32_t modifiers, int32_t mouseButton, uint64_t& newPageID, WebPageCreationParameters&);
     void showPage();
@@ -308,6 +357,7 @@ private:
     void runJavaScriptPrompt(uint64_t frameID, const String&, const String&, String& result);
     void setStatusText(const String&);
     void mouseDidMoveOverElement(uint32_t modifiers, CoreIPC::ArgumentDecoder*);
+    void missingPluginButtonClicked(const String& mimeType, const String& url);
     void setToolbarsAreVisible(bool toolbarsAreVisible);
     void getToolbarsAreVisible(bool& toolbarsAreVisible);
     void setMenuBarIsVisible(bool menuBarIsVisible);
@@ -322,9 +372,12 @@ private:
     void runBeforeUnloadConfirmPanel(const String& message, uint64_t frameID, bool& shouldClose);
     void didChangeViewportData(const WebCore::ViewportArguments&);
     void pageDidScroll();
+    void runOpenPanel(uint64_t frameID, const WebOpenPanelParameters::Data&);
+
 #if ENABLE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntSize&);
 #endif
+    void exceededDatabaseQuota(uint64_t frameID, const String& originIdentifier, const String& databaseName, const String& displayName, uint64_t currentQuota, uint64_t currentUsage, uint64_t expectedUsage, uint64_t& newQuota);
 #if PLATFORM(QT)
     void didChangeContentsSize(const WebCore::IntSize&);
     void didFindZoomableArea(const WebCore::IntRect&);
@@ -344,7 +397,7 @@ private:
 
 #if PLATFORM(MAC)
     // Keyboard handling
-    void interpretKeyEvent(uint32_t eventType, Vector<WebCore::KeypressCommand>&);
+    void interpretKeyEvent(uint32_t eventType, Vector<WebCore::KeypressCommand>&, uint32_t selectionStart, uint32_t selectionEnd, Vector<WebCore::CompositionUnderline>& underlines);
 #endif
     
     // Find.
@@ -375,24 +428,39 @@ private:
     void focusedFrameChanged(uint64_t frameID);
 
 #if USE(ACCELERATED_COMPOSITING)
-    void didChangeAcceleratedCompositing(bool compositing, DrawingAreaBase::DrawingAreaInfo&);
+    void didChangeAcceleratedCompositing(bool compositing, DrawingAreaInfo&);
 #endif
+
+    void canAuthenticateAgainstProtectionSpaceInFrame(uint64_t frameID, const WebCore::ProtectionSpace&, bool& canAuthenticate);
+    void didReceiveAuthenticationChallenge(uint64_t frameID, const WebCore::AuthenticationChallenge&, uint64_t challengeID);
+
+    void didFinishLoadingDataForCustomRepresentation(const CoreIPC::DataReference& data);
+
+#if PLATFORM(MAC)
+    void setComplexTextInputEnabled(uint64_t pluginComplexTextInputIdentifier, bool complexTextInputEnabled);
+#endif
+
+    static String standardUserAgent(const String& applicationName = String());
 
     PageClient* m_pageClient;
     WebLoaderClient m_loaderClient;
     WebPolicyClient m_policyClient;
     WebFormClient m_formClient;
+    WebResourceLoadClient m_resourceLoadClient;
     WebUIClient m_uiClient;
     WebFindClient m_findClient;
     WebPageContextMenuClient m_contextMenuClient;
 
     OwnPtr<DrawingAreaProxy> m_drawingArea;
-    RefPtr<WebPageNamespace> m_pageNamespace;
+    RefPtr<WebContext> m_context;
+    RefPtr<WebPageGroup> m_pageGroup;
     RefPtr<WebFrameProxy> m_mainFrame;
     RefPtr<WebFrameProxy> m_focusedFrame;
-    String m_pageTitle;
 
+    String m_userAgent;
+    String m_applicationNameForUserAgent;
     String m_customUserAgent;
+    String m_customTextEncodingName;
 
 #if ENABLE(INSPECTOR)
     RefPtr<WebInspectorProxy> m_inspector;
@@ -407,6 +475,7 @@ private:
 
     RefPtr<WebPopupMenuProxy> m_activePopupMenu;
     RefPtr<WebContextMenuProxy> m_activeContextMenu;
+    RefPtr<WebOpenPanelResultListenerProxy> m_openPanelResultListener;
 
     double m_estimatedProgress;
 
@@ -426,7 +495,8 @@ private:
     double m_pageZoomFactor;
     double m_viewScaleFactor;
 
-    bool m_visibleToInjectedBundle;
+    bool m_drawsBackground;
+    bool m_drawsTransparentBackground;
 
     // If the process backing the web page is alive and kicking.
     bool m_isValid;
@@ -439,9 +509,13 @@ private:
     WebCore::PolicyAction m_syncMimeTypePolicyAction;
     uint64_t m_syncMimeTypePolicyDownloadID;
 
+    Deque<NativeWebKeyboardEvent> m_keyEventQueue;
+    bool m_processingWheelEvent;
+    OwnPtr<WebWheelEvent> m_nextWheelEvent;
+
     uint64_t m_pageID;
 
-    Deque<NativeWebKeyboardEvent> m_keyEventQueue;
+    bool m_mainFrameHasCustomRepresentation;
 };
 
 } // namespace WebKit

@@ -23,7 +23,9 @@
 VPATH = \
     $(WebKit2)/PluginProcess \
     $(WebKit2)/Shared/Plugins \
+    $(WebKit2)/WebProcess/Authentication \
     $(WebKit2)/WebProcess/Plugins \
+    $(WebKit2)/WebProcess/WebCoreSupport \
     $(WebKit2)/WebProcess/WebPage \
     $(WebKit2)/WebProcess \
     $(WebKit2)/UIProcess \
@@ -32,6 +34,7 @@ VPATH = \
 #
 
 MESSAGE_RECEIVERS = \
+    AuthenticationManager \
     DownloadProxy \
     NPObjectMessageReceiver \
     PluginControllerProxy \
@@ -39,6 +42,8 @@ MESSAGE_RECEIVERS = \
     PluginProcessProxy \
     PluginProxy \
     WebContext \
+    WebDatabaseManager \
+    WebDatabaseManagerProxy \
     WebInspector \
     WebInspectorProxy \
     WebPage \

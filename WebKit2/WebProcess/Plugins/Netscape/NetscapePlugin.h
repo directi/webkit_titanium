@@ -45,10 +45,7 @@ class NetscapePluginStream;
     
 class NetscapePlugin : public Plugin {
 public:
-    static PassRefPtr<NetscapePlugin> create(PassRefPtr<NetscapePluginModule> pluginModule)
-    {
-        return adoptRef(new NetscapePlugin(pluginModule));
-    }
+    static PassRefPtr<NetscapePlugin> create(PassRefPtr<NetscapePluginModule> pluginModule);
     virtual ~NetscapePlugin();
 
     static PassRefPtr<NetscapePlugin> fromNPP(NPP);
@@ -56,15 +53,22 @@ public:
 #if PLATFORM(MAC)
     NPError setDrawingModel(NPDrawingModel);
     NPError setEventModel(NPEventModel);
+    NPBool convertPoint(double sourceX, double sourceY, NPCoordinateSpace sourceSpace, double& destX, double& destY, NPCoordinateSpace destSpace);
+
 #ifndef NP_NO_CARBON
     WindowRef windowRef() const;
+    bool isWindowActive() const { return m_windowHasFocus; }
+
+    static NetscapePlugin* netscapePluginFromWindow(WindowRef);
+    static unsigned buttonState();
 #endif
+
 #elif PLATFORM(WIN)
     HWND containingWindow() const;
 #endif
 
     void invalidate(const NPRect*);
-    const char* userAgent();
+    static const char* userAgent(NPP);
     void loadURL(const String& method, const String& urlString, const String& target, const WebCore::HTTPHeaderMap& headerFields,
                  const Vector<uint8_t>& httpBody, bool sendNotification, void* notificationData);
     NPError destroyStream(NPStream*, NPReason);
@@ -109,6 +113,8 @@ private:
     NetscapePluginStream* streamFromID(uint64_t streamID);
     void stopAllStreams();
     bool allowPopups() const;
+
+    const char* userAgent();
 
     bool platformPostInitialize();
     void platformDestroy();
@@ -155,8 +161,11 @@ private:
 
 #if PLATFORM(MAC)
     virtual void windowFocusChanged(bool);
-    virtual void windowFrameChanged(const WebCore::IntRect&);
+    virtual void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
     virtual void windowVisibilityChanged(bool);
+
+    virtual uint64_t pluginComplexTextInputIdentifier() const;
+    virtual void sendComplexTextInput(const String& textInput);
 #endif
 
     virtual void privateBrowsingStateChanged(bool);
@@ -191,6 +200,13 @@ private:
     NPDrawingModel m_drawingModel;
     NPEventModel m_eventModel;
     RetainPtr<PlatformLayer> m_pluginLayer;
+
+    bool m_pluginHasFocus;
+    bool m_windowHasFocus;
+
+    WebCore::IntRect m_windowFrameInScreenCoordinates;
+    WebCore::IntRect m_viewFrameInWindowCoordinates;
+
 #ifndef NP_NO_CARBON
     void nullEventTimerFired();
 

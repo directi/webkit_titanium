@@ -35,9 +35,9 @@ WKTypeID WKViewGetTypeID()
     return toAPI(APIObject::TypeView);
 }
 
-WKViewRef WKViewCreate(RECT rect, WKPageNamespaceRef pageNamespaceRef, HWND parentWindow)
+WKViewRef WKViewCreate(RECT rect, WKContextRef contextRef, WKPageGroupRef pageGroupRef, HWND parentWindow)
 {
-    RefPtr<WebView> view = WebView::create(rect, toImpl(pageNamespaceRef), parentWindow, VisibleToInjectedBundle);
+    RefPtr<WebView> view = WebView::create(rect, toImpl(contextRef), toImpl(pageGroupRef), parentWindow);
     return toAPI(view.release().releaseRef());
 }
 
@@ -64,4 +64,9 @@ void WKViewWindowAncestryDidChange(WKViewRef viewRef)
 void WKViewSetIsInWindow(WKViewRef viewRef, bool isInWindow)
 {
     toImpl(viewRef)->setIsInWindow(isInWindow);
+}
+
+void WKViewSetInitialFocus(WKViewRef viewRef, bool forward)
+{
+    toImpl(viewRef)->setInitialFocus(forward);
 }

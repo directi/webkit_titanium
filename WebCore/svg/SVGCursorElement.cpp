@@ -25,10 +25,15 @@
 
 #include "Attr.h"
 #include "Document.h"
-#include "SVGLength.h"
 #include "SVGNames.h"
 
 namespace WebCore {
+
+// Animated property definitions
+DEFINE_ANIMATED_LENGTH(SVGCursorElement, SVGNames::xAttr, X, x)
+DEFINE_ANIMATED_LENGTH(SVGCursorElement, SVGNames::yAttr, Y, y)
+DEFINE_ANIMATED_STRING(SVGCursorElement, XLinkNames::hrefAttr, Href, href)
+DEFINE_ANIMATED_BOOLEAN(SVGCursorElement, SVGNames::externalResourcesRequiredAttr, ExternalResourcesRequired, externalResourcesRequired)
 
 inline SVGCursorElement::SVGCursorElement(const QualifiedName& tagName, Document* document)
     : SVGElement(tagName, document)
@@ -46,7 +51,7 @@ SVGCursorElement::~SVGCursorElement()
 {
     HashSet<SVGElement*>::iterator end = m_clients.end();
     for (HashSet<SVGElement*>::iterator it = m_clients.begin(); it != end; ++it)
-        (*it)->setCursorElement(0);
+        (*it)->cursorElementRemoved();
 }
 
 void SVGCursorElement::parseMappedAttribute(Attribute* attr)
@@ -76,7 +81,12 @@ void SVGCursorElement::addClient(SVGElement* element)
 void SVGCursorElement::removeClient(SVGElement* element)
 {
     m_clients.remove(element);
-    element->setCursorElement(0);
+    element->cursorElementRemoved();
+}
+
+void SVGCursorElement::removeReferencedElement(SVGElement* element)
+{
+    m_clients.remove(element);
 }
 
 void SVGCursorElement::svgAttributeChanged(const QualifiedName& attrName)

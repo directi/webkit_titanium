@@ -26,19 +26,24 @@
 #ifndef WKSharedAPICast_h
 #define WKSharedAPICast_h
 
+#include "SameDocumentNavigationType.h"
 #include "WKBase.h"
 #include "WKContextMenuItemTypes.h"
 #include "WKEvent.h"
+#include "WKFindOptions.h"
 #include "WKGeometry.h"
+#include "WKPageLoadTypes.h"
 #include "WebError.h"
 #include "WebEvent.h"
+#include "WebFindOptions.h"
 #include "WebNumber.h"
 #include "WebString.h"
 #include "WebURL.h"
 #include <WebCore/ContextMenuItem.h>
-#include <WebCore/IntRect.h>
 #include <WebCore/FloatRect.h>
+#include <WebCore/FrameLoaderTypes.h>
 #include <WebCore/IntPoint.h>
+#include <WebCore/IntRect.h>
 #include <wtf/TypeTraits.h>
 
 namespace WebKit {
@@ -50,6 +55,7 @@ class MutableDictionary;
 class WebCertificateInfo;
 class WebContextMenuItem;
 class WebData;
+class WebSecurityOrigin;
 class WebSerializedScriptValue;
 class WebURLRequest;
 class WebURLResponse;
@@ -72,6 +78,7 @@ WK_ADD_API_MAPPING(WKDoubleRef, WebDouble)
 WK_ADD_API_MAPPING(WKErrorRef, WebError)
 WK_ADD_API_MAPPING(WKMutableArrayRef, MutableArray)
 WK_ADD_API_MAPPING(WKMutableDictionaryRef, MutableDictionary)
+WK_ADD_API_MAPPING(WKSecurityOriginRef, WebSecurityOrigin)
 WK_ADD_API_MAPPING(WKSerializedScriptValueRef, WebSerializedScriptValue)
 WK_ADD_API_MAPPING(WKStringRef, WebString)
 WK_ADD_API_MAPPING(WKTypeRef, APIObject)
@@ -617,6 +624,78 @@ inline WKContextMenuItemType toAPI(WebCore::ContextMenuItemType type)
         ASSERT_NOT_REACHED();
         return kWKContextMenuItemTypeAction;
     }
+}
+
+inline FindOptions toFindOptions(WKFindOptions wkFindOptions)
+{
+    unsigned findOptions = 0;
+
+    if (wkFindOptions & kWKFindOptionsCaseInsensitive)
+        findOptions |= FindOptionsCaseInsensitive;
+    if (wkFindOptions & kWKFindOptionsAtWordStarts)
+        findOptions |= FindOptionsAtWordStarts;
+    if (wkFindOptions & kWKFindOptionsTreatMedialCapitalAsWordStart)
+        findOptions |= FindOptionsTreatMedialCapitalAsWordStart;
+    if (wkFindOptions & kWKFindOptionsBackwards)
+        findOptions |= FindOptionsBackwards;
+    if (wkFindOptions & kWKFindOptionsWrapAround)
+        findOptions |= FindOptionsWrapAround;
+    if (wkFindOptions & kWKFindOptionsShowOverlay)
+        findOptions |= FindOptionsShowOverlay;
+    if (wkFindOptions & kWKFindOptionsShowFindIndicator)
+        findOptions |= FindOptionsShowFindIndicator;
+
+    return static_cast<FindOptions>(findOptions);
+}
+
+inline WKFrameNavigationType toAPI(WebCore::NavigationType type)
+{
+    WKFrameNavigationType wkType = kWKFrameNavigationTypeOther;
+
+    switch (type) {
+    case WebCore::NavigationTypeLinkClicked:
+        wkType = kWKFrameNavigationTypeLinkClicked;
+        break;
+    case WebCore::NavigationTypeFormSubmitted:
+        wkType = kWKFrameNavigationTypeFormSubmitted;
+        break;
+    case WebCore::NavigationTypeBackForward:
+        wkType = kWKFrameNavigationTypeBackForward;
+        break;
+    case WebCore::NavigationTypeReload:
+        wkType = kWKFrameNavigationTypeReload;
+        break;
+    case WebCore::NavigationTypeFormResubmitted:
+        wkType = kWKFrameNavigationTypeFormResubmitted;
+        break;
+    case WebCore::NavigationTypeOther:
+        wkType = kWKFrameNavigationTypeOther;
+        break;
+    }
+    
+    return wkType;
+}
+
+inline WKSameDocumentNavigationType toAPI(SameDocumentNavigationType type)
+{
+    WKFrameNavigationType wkType = kWKSameDocumentNavigationAnchorNavigation;
+
+    switch (type) {
+    case SameDocumentNavigationAnchorNavigation:
+        wkType = kWKSameDocumentNavigationAnchorNavigation;
+        break;
+    case SameDocumentNavigationSessionStatePush:
+        wkType = kWKSameDocumentNavigationSessionStatePush;
+        break;
+    case SameDocumentNavigationSessionStateReplace:
+        wkType = kWKSameDocumentNavigationSessionStateReplace;
+        break;
+    case SameDocumentNavigationSessionStatePop:
+        wkType = kWKSameDocumentNavigationSessionStatePop;
+        break;
+    }
+    
+    return wkType;
 }
 
 } // namespace WebKit

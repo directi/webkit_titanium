@@ -24,7 +24,6 @@
 #include "DrawingAreaProxy.h"
 #include "PageClient.h"
 #include "qwkpage.h"
-#include "WebPageNamespace.h"
 #include "WebPageProxy.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
@@ -36,7 +35,7 @@ class QWKPreferences;
 
 class QWKPagePrivate : WebKit::PageClient {
 public:
-    QWKPagePrivate(QWKPage*, WKPageNamespaceRef);
+    QWKPagePrivate(QWKPage*, QWKContext*);
     ~QWKPagePrivate();
 
     static QWKPagePrivate* get(QWKPage* page) { return page->d; }
@@ -63,10 +62,13 @@ public:
     virtual WebCore::FloatRect convertToUserSpace(const WebCore::FloatRect&);
     virtual void didNotHandleKeyEvent(const WebKit::NativeWebKeyboardEvent&);
     virtual void selectionChanged(bool, bool, bool, bool);
-    virtual PassRefPtr<WebKit::WebPopupMenuProxy> createPopupMenuProxy();
+    virtual PassRefPtr<WebKit::WebPopupMenuProxy> createPopupMenuProxy(WebKit::WebPageProxy*);
     virtual PassRefPtr<WebKit::WebContextMenuProxy> createContextMenuProxy(WebKit::WebPageProxy*);
 
     virtual void setFindIndicator(PassRefPtr<WebKit::FindIndicator>, bool fadeOut);
+
+    virtual void didCommitLoadForMainFrame(bool useCustomRepresentation);
+    virtual void didFinishLoadingDataForCustomRepresentation(const CoreIPC::DataReference&);
 
     void paint(QPainter* painter, QRect);
 
@@ -89,6 +91,7 @@ public:
 
     QWKPage* q;
 
+    QWKContext* context;
     QWKHistory* history;
 
     QAction* actions[QWKPage::WebActionCount];

@@ -48,7 +48,7 @@ namespace WebKit {
 
 class WebBackForwardListItem;
 class WebContext;
-class WebPageNamespace;
+class WebPageGroup;
 struct WebNavigationDataStore;
 
 class WebProcessProxy : public RefCounted<WebProcessProxy>, CoreIPC::Connection::Client, ResponsivenessTimer::Client, ProcessLauncher::Client, ThreadLauncher::Client {
@@ -64,6 +64,7 @@ public:
 
     template<typename E, typename T> bool send(E messageID, uint64_t destinationID, const T& arguments);
     template<typename T> bool send(const T& message, uint64_t destinationID);
+    template<typename U> bool sendSync(const U& message, const typename U::Reply& reply, uint64_t destinationID, double timeout = 1);
     
     CoreIPC::Connection* connection() const
     { 
@@ -77,7 +78,7 @@ public:
     PlatformProcessIdentifier processIdentifier() const { return m_processLauncher->processIdentifier(); }
 
     WebPageProxy* webPage(uint64_t pageID) const;
-    WebPageProxy* createWebPage(WebPageNamespace*);
+    WebPageProxy* createWebPage(WebContext*, WebPageGroup*);
     void addExistingWebPage(WebPageProxy*, uint64_t pageID);
     void removeWebPage(uint64_t pageID);
 
@@ -142,10 +143,7 @@ private:
 
     WebContext* m_context;
 
-    // NOTE: This map is for WebPageProxies in all WebPageNamespaces that use this process.
     WebPageProxyMap m_pageMap;
-
-    // NOTE: This map is for WebBackForwardListItems in all WebPageNamespaces and WebPageProxies that use this process.
     WebBackForwardListItemMap m_backForwardListItemMap;
 
     HashMap<uint64_t, RefPtr<WebFrameProxy> > m_frameMap;
@@ -169,6 +167,12 @@ bool WebProcessProxy::send(const T& message, uint64_t destinationID)
     return sendMessage(CoreIPC::MessageID(T::messageID), argumentEncoder.release());
 }
 
+template<typename U> 
+bool WebProcessProxy::sendSync(const U& message, const typename U::Reply& reply, uint64_t destinationID, double timeout)
+{
+    return m_connection->sendSync(message, reply, destinationID, timeout);
+}
+    
 } // namespace WebKit
 
 #endif // WebProcessProxy_h

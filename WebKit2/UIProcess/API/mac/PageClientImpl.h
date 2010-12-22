@@ -58,15 +58,15 @@ private:
     virtual void registerEditCommand(PassRefPtr<WebEditCommandProxy>, WebPageProxy::UndoOrRedo);
     virtual void clearAllEditCommands();
     virtual void setEditCommandState(const String& commandName, bool isEnabled, int state);
-    virtual void interceptKeyEvent(const NativeWebKeyboardEvent& event, Vector<WebCore::KeypressCommand>& commandName);
+    virtual void interceptKeyEvent(const NativeWebKeyboardEvent& event, Vector<WebCore::KeypressCommand>& commandName, uint32_t selectionStart, uint32_t selectionEnd, Vector<WebCore::CompositionUnderline>& underlines);
 
     virtual WebCore::FloatRect convertToDeviceSpace(const WebCore::FloatRect&);
     virtual WebCore::FloatRect convertToUserSpace(const WebCore::FloatRect&);
 
     virtual void didNotHandleKeyEvent(const NativeWebKeyboardEvent&);
-    virtual void selectionChanged(bool, bool, bool, bool);
+    virtual void selectionChanged(bool, bool, bool, bool, uint64_t, uint64_t);
 
-    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy();
+    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*);
     virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*);
 
     void setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut);
@@ -75,6 +75,11 @@ private:
     virtual void pageDidEnterAcceleratedCompositing();
     virtual void pageDidLeaveAcceleratedCompositing();
 #endif
+
+    virtual void setComplexTextInputEnabled(uint64_t pluginComplexTextInputIdentifier, bool complexTextInputEnabled);
+
+    virtual void didCommitLoadForMainFrame(bool useCustomRepresentation);
+    virtual void didFinishLoadingDataForCustomRepresentation(const CoreIPC::DataReference&);
 
     WKView* m_wkView;
     RetainPtr<WebEditorUndoTargetObjC> m_undoTarget;

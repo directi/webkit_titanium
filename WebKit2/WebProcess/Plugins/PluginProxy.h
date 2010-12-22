@@ -52,7 +52,7 @@ class PluginProcessConnection;
 
 class PluginProxy : public Plugin {
 public:
-    static PassRefPtr<PluginProxy> create(PassRefPtr<PluginProcessConnection>);
+    static PassRefPtr<PluginProxy> create(const String& pluginPath);
     ~PluginProxy();
 
     uint64_t pluginInstanceID() const { return m_pluginInstanceID; }
@@ -62,7 +62,7 @@ public:
     CoreIPC::SyncReplyMode didReceiveSyncPluginProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
 
 private:
-    explicit PluginProxy(PassRefPtr<PluginProcessConnection>);
+    explicit PluginProxy(const String& pluginPath);
 
     // Plugin
     virtual bool initialize(PluginController*, const Parameters&);
@@ -93,8 +93,10 @@ private:
     virtual NPObject* pluginScriptableNPObject();
 #if PLATFORM(MAC)
     virtual void windowFocusChanged(bool);
-    virtual void windowFrameChanged(const WebCore::IntRect&);
+    virtual void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
     virtual void windowVisibilityChanged(bool);
+    virtual uint64_t pluginComplexTextInputIdentifier() const;
+    virtual void sendComplexTextInput(const String& textInput);
 #endif
 
     virtual void privateBrowsingStateChanged(bool);
@@ -112,6 +114,14 @@ private:
     void getWindowScriptNPObject(uint64_t& windowScriptNPObjectID);
     void getPluginElementNPObject(uint64_t& pluginElementNPObjectID);
     void evaluate(const NPVariantData& npObjectAsVariantData, const String& scriptString, bool allowPopups, bool& returnValue, NPVariantData& resultData);
+    void cancelStreamLoad(uint64_t streamID);
+    void cancelManualStreamLoad();
+    void setStatusbarText(const String& statusbarText);
+#if PLATFORM(MAC)
+    void setComplexTextInputEnabled(bool);
+#endif
+
+    String m_pluginPath;
 
     RefPtr<PluginProcessConnection> m_connection;
     uint64_t m_pluginInstanceID;

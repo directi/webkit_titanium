@@ -176,7 +176,6 @@
 			ConfigurationType="4"
 			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefinesCairo.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\WinCairo.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\WinCairo.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\cURL.vsprops;.\WebKitLibCommon.vsprops"
 			CharacterSet="1"
-			WholeProgramOptimization="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -442,10 +441,6 @@
 			</File>
 			<File
 				RelativePath="..\ProgIDMacros.h"
-				>
-			</File>
-			<File
-				RelativePath="..\QuickCurlSettingsExport.h"
 				>
 			</File>
 			<File
@@ -1120,10 +1115,6 @@
 		<Filter
 			Name="API"
 			>
-			<File
-				RelativePath="..\QuickCurlSettingsExport.cpp"
-				>
-			</File>
 			<File
 				RelativePath="..\WebKitCOMAPI.cpp"
 				>

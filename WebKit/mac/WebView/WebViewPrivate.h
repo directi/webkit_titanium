@@ -182,6 +182,7 @@ typedef NSUInteger WebFindOptions;
 // These methods are still in flux; don't rely on them yet.
 - (BOOL)canMarkAllTextMatches;
 - (WebNSUInteger)countMatchesForText:(NSString *)string options:(WebFindOptions)options highlight:(BOOL)highlight limit:(WebNSUInteger)limit markMatches:(BOOL)markMatches;
+- (WebNSUInteger)countMatchesForText:(NSString *)string inDOMRange:(DOMRange *)range options:(WebFindOptions)options highlight:(BOOL)highlight limit:(WebNSUInteger)limit markMatches:(BOOL)markMatches;
 - (void)unmarkAllTextMatches;
 - (NSArray *)rectsForTextMatches;
 
@@ -522,6 +523,9 @@ Could be worth adding to the API.
 + (void)_removeUserScriptsFromGroup:(NSString *)groupName world:(WebScriptWorld *)world;
 + (void)_removeUserStyleSheetsFromGroup:(NSString *)groupName world:(WebScriptWorld *)world;
 + (void)_removeAllUserContentFromGroup:(NSString *)groupName;
+
+// SPI for DumpRenderTree
++ (void)_setLoadResourcesSerially:(BOOL)serialize;
 
 /*!
     @method cssAnimationsSuspended

@@ -27,6 +27,7 @@
 
 #include "PluginInfoStore.h"
 
+#include "NetscapePluginModule.h"
 #include "PluginDatabase.h"
 #include "PluginPackage.h"
 
@@ -59,34 +60,7 @@ Vector<String> PluginInfoStore::individualPluginPaths()
 
 bool PluginInfoStore::getPluginInfo(const String& pluginPath, Plugin& plugin)
 {
-    // We are loading the plugin here since it does not seem to be a standardized way to
-    // get the needed informations from a UNIX plugin without loading it.
-
-    RefPtr<PluginPackage> package = PluginPackage::createPackage(pluginPath, 0 /*lastModified*/);
-    if (!package)
-        return false;
-
-    plugin.path = pluginPath;
-    plugin.info.desc = package->description();
-    plugin.info.file = package->fileName();
-
-    const MIMEToDescriptionsMap& descriptions = package->mimeToDescriptions();
-    const MIMEToExtensionsMap& extensions = package->mimeToExtensions();
-    MIMEToDescriptionsMap::const_iterator descEnd = descriptions.end();
-    plugin.info.mimes.reserveCapacity(descriptions.size());
-    unsigned i = 0;
-    for (MIMEToDescriptionsMap::const_iterator it = descriptions.begin(); it != descEnd; ++it) {
-        plugin.info.mimes.uncheckedAppend(MimeClassInfo());
-        MimeClassInfo& mime = plugin.info.mimes[i++];
-        mime.type = it->first;
-        mime.desc = it->second;
-        MIMEToExtensionsMap::const_iterator extensionIt = extensions.find(it->first);
-        ASSERT(extensionIt != extensions.end());
-        mime.extensions = extensionIt->second;
-    }
-
-    package->unload();
-    return true;
+    return NetscapePluginModule::getPluginInfo(pluginPath, plugin);
 }
 
 bool PluginInfoStore::shouldUsePlugin(const Plugin& plugin)

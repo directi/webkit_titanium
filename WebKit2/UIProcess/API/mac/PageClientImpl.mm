@@ -147,9 +147,9 @@ void PageClientImpl::setViewportArguments(const WebCore::ViewportArguments&)
 
 }
 
-void PageClientImpl::selectionChanged(bool isNone, bool isContentEditable, bool isPasswordField, bool hasComposition)
+void PageClientImpl::selectionChanged(bool isNone, bool isContentEditable, bool isPasswordField, bool hasComposition, uint64_t location, uint64_t length)
 {
-    [m_wkView _selectionChanged:isNone isEditable:isContentEditable isPassword:isPasswordField hasMarkedText:hasComposition];
+    [m_wkView _selectionChanged:isNone isEditable:isContentEditable isPassword:isPasswordField hasMarkedText:hasComposition range:NSMakeRange(location, length)];
 }
 
 static NSString* nameForEditAction(EditAction editAction)
@@ -222,9 +222,10 @@ void PageClientImpl::setEditCommandState(const String& commandName, bool isEnabl
     [m_wkView _setUserInterfaceItemState:nsStringFromWebCoreString(commandName) enabled:isEnabled state:newState];
 }
 
-void PageClientImpl::interceptKeyEvent(const NativeWebKeyboardEvent& event, Vector<WebCore::KeypressCommand>& commandsList)
+void PageClientImpl::interceptKeyEvent(const NativeWebKeyboardEvent& event, Vector<WebCore::KeypressCommand>& commandsList, uint32_t selectionStart, uint32_t selectionEnd, Vector<WebCore::CompositionUnderline>& underlines)
 {
     commandsList = [m_wkView _interceptKeyEvent:event.nativeEvent()];
+    [m_wkView _getTextInputState:selectionStart selectionEnd:selectionEnd underlines:underlines];
 }
 
 FloatRect PageClientImpl::convertToDeviceSpace(const FloatRect& rect)
@@ -246,9 +247,9 @@ void PageClientImpl::didNotHandleKeyEvent(const NativeWebKeyboardEvent& event)
     }
 }
 
-PassRefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy()
+PassRefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy* page)
 {
-    return WebPopupMenuProxyMac::create(m_wkView);
+    return WebPopupMenuProxyMac::create(m_wkView, page);
 }
 
 PassRefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy* page)
@@ -272,5 +273,20 @@ void PageClientImpl::pageDidLeaveAcceleratedCompositing()
     [m_wkView _pageDidLeaveAcceleratedCompositing];
 }
 #endif // USE(ACCELERATED_COMPOSITING)
+
+void PageClientImpl::setComplexTextInputEnabled(uint64_t pluginComplexTextInputIdentifier, bool complexTextInputEnabled)
+{
+    [m_wkView _setComplexTextInputEnabled:complexTextInputEnabled pluginComplexTextInputIdentifier:pluginComplexTextInputIdentifier];
+}
+
+void PageClientImpl::didCommitLoadForMainFrame(bool useCustomRepresentation)
+{
+    [m_wkView _setPageHasCustomRepresentation:useCustomRepresentation];
+}
+
+void PageClientImpl::didFinishLoadingDataForCustomRepresentation(const CoreIPC::DataReference& dataReference)
+{
+    [m_wkView _didFinishLoadingDataForCustomRepresentation:dataReference];
+}
 
 } // namespace WebKit

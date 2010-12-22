@@ -35,7 +35,7 @@ extern "C" {
 
 WK_EXPORT WKTypeID WKViewGetTypeID();
 
-WK_EXPORT WKViewRef WKViewCreate(RECT rect, WKPageNamespaceRef pageNamespace, HWND parentWindow);
+WK_EXPORT WKViewRef WKViewCreate(RECT rect, WKContextRef context, WKPageGroupRef pageGroup, HWND parentWindow);
 
 WK_EXPORT HWND WKViewGetWindow(WKViewRef view);
 
@@ -44,6 +44,7 @@ WK_EXPORT WKPageRef WKViewGetPage(WKViewRef view);
 WK_EXPORT void WKViewSetParentWindow(WKViewRef view, HWND parentWindow);
 WK_EXPORT void WKViewWindowAncestryDidChange(WKViewRef view);
 WK_EXPORT void WKViewSetIsInWindow(WKViewRef view, bool isInWindow);
+WK_EXPORT void WKViewSetInitialFocus(WKViewRef view, bool forward);
 
 #ifdef __cplusplus
 }

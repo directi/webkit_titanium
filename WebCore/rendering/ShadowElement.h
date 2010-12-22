@@ -41,16 +41,23 @@ protected:
         : BaseElement(name, shadowParent->document())
         , m_shadowParent(shadowParent)
     {
+        BaseElement::setShadowHost(shadowParent);
     }
 
-    HTMLElement* shadowParent() const { return m_shadowParent.get(); }
+public:
+    virtual void detach();
 
 private:
-    virtual bool isShadowNode() const { return true; }
-    virtual ContainerNode* shadowParentNode() { return m_shadowParent.get(); }
-
     RefPtr<HTMLElement> m_shadowParent;
 };
+
+template<class BaseElement>
+void ShadowElement<BaseElement>::detach()
+{
+    BaseElement::detach();
+    // FIXME: Remove once shadow DOM uses Element::setShadowRoot().
+    BaseElement::setShadowHost(0);
+}
 
 class ShadowBlockElement : public ShadowElement<HTMLDivElement> {
 public:
@@ -58,11 +65,11 @@ public:
     static PassRefPtr<ShadowBlockElement> createForPart(HTMLElement*, PseudoId);
     static bool partShouldHaveStyle(const RenderObject* parentRenderer, PseudoId pseudoId);
     void layoutAsPart(const IntRect& partRect);
-    void updateStyleForPart(PseudoId);
+    virtual void updateStyleForPart(PseudoId);
 
 protected:
     ShadowBlockElement(HTMLElement*);
-
+    void initAsPart(PseudoId pasuedId);
 private:
     static PassRefPtr<RenderStyle> createStyleForPart(RenderObject*, PseudoId);
 };

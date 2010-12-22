@@ -36,11 +36,9 @@ IF(NOT DEFINED CPACK_SOURCE_IGNORE_FILES)
     "/\\\\.gitattributes$"
 
     # SVN-only files should be ignored (site, examples...)
-    "/PlanetWebKit/"
     "/SunSpider/"
-    "/WebKitExamplePlugins/"
-    "/WebKitSite/"
-    "/BugsSite/"
+    "/Examples/"
+    "/Websites/"
 
     # Other build systems:
     # - Makefiles (.mk/Makefile)
@@ -74,7 +72,7 @@ IF(NOT DEFINED CPACK_SOURCE_IGNORE_FILES)
     "/cmake-build/"
     "/build/"
     "/WebKitBuild/"
-    "/WebKitTools/Scripts/webkitpy/thirdparty/autoinstalled/"
+    "/Tools/Scripts/webkitpy/thirdparty/autoinstalled/"
     )
 
   IF(NOT WEBKIT_CPACK_ADD_TESTS)
@@ -88,7 +86,7 @@ IF(NOT DEFINED CPACK_SOURCE_IGNORE_FILES)
 
   IF(NOT WEBKIT_CPACK_ADD_TOOLS)
     LIST(APPEND CPACK_SOURCE_IGNORE_FILES
-      "/WebKitTools/"
+      "/Tools/"
       "/manual-tools/"
       "/tools/"
       "/PageLoadTools/"

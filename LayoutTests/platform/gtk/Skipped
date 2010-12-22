@@ -56,12 +56,10 @@ http/tests/incremental/split-hex-entities.pl
 # An implementation of accessibilityController is required.
 #   Tests failing
 accessibility/aria-combobox.html
-accessibility/aria-disabled.html
 accessibility/ellipsis-text.html
 accessibility/aria-help.html
 accessibility/aria-hidden.html
 accessibility/aria-hidden-with-elements.html
-accessibility/aria-label.html
 accessibility/aria-labelledby-overrides-label.html
 accessibility/aria-labelledby-stay-within.html
 accessibility/aria-link-supports-press.html
@@ -74,8 +72,6 @@ accessibility/button-press-action.html
 accessibility/canvas.html
 accessibility/editable-webarea-context-menu-point.html
 accessibility/ignore-spacer-elements.html
-accessibility/img-aria-button-alt-tag.html
-accessibility/input-image-alt.html
 accessibility/input-slider.html
 accessibility/language-attribute.html
 accessibility/media-element.html
@@ -101,7 +97,6 @@ accessibility/aria-labelledby-on-input.html
 accessibility/aria-roles.html
 accessibility/aria-tables.html
 accessibility/image-link.html
-accessibility/image-link-inline-cont.html
 accessibility/image-map1.html
 accessibility/image-map2.html
 accessibility/inline-continuations.html
@@ -120,9 +115,6 @@ accessibility/table-sections.html
 accessibility/table-with-aria-role.html
 accessibility/table-with-rules.html
 accessibility/aria-list-and-listitem.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=36146 - GTK: AX: implement press in DRT 
-accessibility/label-element-press.html
 
 # Tests in css2.1/ directory
 #   Tests generating new results
@@ -916,6 +908,7 @@ editing/selection/end-of-document.html
 editing/selection/expanding-selections2.html
 editing/selection/expanding-selections.html
 editing/selection/extend-by-character-001.html
+editing/selection/extend-by-character-002.html
 editing/selection/extend-by-character-006.html
 editing/selection/extend-by-sentence-001.html
 editing/selection/extend-by-word-001.html
@@ -979,6 +972,7 @@ editing/spelling/spelling-backspace-between-lines.html
 editing/spelling/spelling-linebreak.html
 editing/spelling/spelling-attribute-change.html
 editing/spelling/spelling-attribute-at-child.html
+editing/spelling/spellcheck-paste.html
 editing/style/5065910.html
 editing/style/apple-style-editable-mix.html
 editing/style/block-style-001.html
@@ -1090,8 +1084,6 @@ fast/fast-mobile-scrolling/fixed-position-element.html
 fast/fast-mobile-scrolling/no-fixed-position-elements.html
 fast/notifications
 http/tests/notifications
-fast/regex/test1.html
-fast/regex/test4.html
 fast/replaced/table-percent-height-text-controls.html
 fast/replaced/table-percent-height.html
 fast/selectors/lang-inheritance2.html
@@ -1130,6 +1122,12 @@ http/tests/xmlhttprequest/web-apps/010.html
 
 # Possible bug in eventSender.zoomPageOut() ? https://bugs.webkit.org/show_bug.cgi?id=30575
 fast/dom/elementFromPoint-relative-to-viewport.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=51213
+fast/dom/gc-11.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=51242
+fast/dom/global-constructors.html
 
 #   Tests generating new results
 fast/block/basic/001.html
@@ -2091,7 +2089,6 @@ fast/parser/001.html
 fast/parser/bad-xml-slash.html
 fast/parser/broken-comments-vs-parsing-mode.html
 fast/parser/comment-in-script.html
-fast/parser/comment-in-style.html
 fast/parser/comment-in-textarea.html
 fast/parser/comments.html
 fast/parser/document-write-option.html
@@ -2101,8 +2098,6 @@ fast/parser/fonts.html
 fast/parser/nofoo-tags-inside-paragraph.html
 fast/parser/open-comment-in-style.html
 fast/parser/open-comment-in-textarea.html
-fast/parser/parseCommentsInTitles.html
-fast/parser/remove-block-in-residual-style.html
 fast/parser/style-script-head-test.html
 fast/parser/tabs-in-scripts.html
 fast/parser/title-error-test.html
@@ -2674,8 +2669,6 @@ fast/tokenizer/external-script-document-write.html
 fast/tokenizer/external-script-document-write_2.html
 fast/tokenizer/missing-style-end-tag-1.html
 fast/tokenizer/missing-style-end-tag-2.html
-fast/tokenizer/missing-title-end-tag-1.html
-fast/tokenizer/missing-title-end-tag-2.html
 fast/tokenizer/script-after-frameset.html
 fast/tokenizer/script_extra_close.html
 fast/transforms/bounding-rect-zoom.html
@@ -2775,6 +2768,7 @@ http/tests/security/XFrameOptions/x-frame-options-parent-same-origin-deny.html
 http/tests/xmlhttprequest/abort-should-cancel-load.html
 http/tests/xmlhttprequest/access-control-basic-whitelist-request-headers.html
 http/tests/xmlhttprequest/basic-auth.html
+http/tests/xmlhttprequest/logout.html
 #We don't seem to support neither of these for now
 http/tests/xmlhttprequest/cross-origin-authorization.html
 http/tests/xmlhttprequest/cross-origin-cookie-storage.html
@@ -2796,6 +2790,9 @@ http/tests/xmlhttprequest/xml-encoding.html
 http/tests/xmlhttprequest/xmlhttprequest-contenttype-empty.html
 http/tests/xmlhttprequest/workers/methods-async.html
 http/tests/xmlhttprequest/workers/methods.html
+# Tests crashing - https://bugs.webkit.org/show_bug.cgi?id=51104
+http/tests/cache/subresource-fragment-identifier.html
+http/tests/misc/authentication-sent-to-redirect.html
 
 #   Tests crashing
 http/tests/security/cross-origin-xsl-BLOCKED.html
@@ -2846,9 +2843,6 @@ media/video-source-error.html
 media/video-aspect-ratio.html
 # This test requires media controls has a volume slider.
 media/video-volume-slider.html
-# Tests requiring fullscreen <video> support
-media/media-fullscreen-inline.html
-media/media-fullscreen-not-in-document.html
 # Requires media engine closed caption support
 media/media-captions.html
 
@@ -4660,11 +4654,6 @@ http/tests/misc/will-send-request-returns-null-on-redirect.html
 # Canvas security issues https://bugs.webkit.org/show_bug.cgi?id=30580
 http/tests/security/canvas-remote-read-data-url-svg-image.html
 
-# xmlhttprequest https://bugs.webkit.org/show_bug.cgi?id=30582
-http/tests/xmlhttprequest/logout.html
-http/tests/xmlhttprequest/re-login-async.html
-http/tests/xmlhttprequest/re-login.html
-
 # https://bugs.webkit.org/show_bug.cgi?id=30577
 editing/selection/move-left-right.html
 
@@ -4695,9 +4684,6 @@ fast/dom/Document/CaretRangeFromPoint/caretRangeFromPoint-in-zoom-and-scroll.htm
 # https://bugs.webkit.org/show_bug.cgi?id=30818
 fast/css/opacity-float.html 
 
-# Media tests that keep failing on the bot
-media/video-play-pause-events.html
-
 # New events failing; see https://bugs.webkit.org/show_bug.cgi?id=28823
 fast/events/pageshow-pagehide-on-back-cached.html
 fast/events/pageshow-pagehide-on-back-uncached.html
@@ -4714,7 +4700,16 @@ fast/events/ime-composition-events-001.html
 fast/dom/tab-in-right-alignment.html
 
 # No User Scripts
-userscripts
+userscripts/script-not-run-for-fragments.html
+userscripts/script-run-at-end.html
+userscripts/script-run-at-start.html
+userscripts/user-script-all-frames.html
+userscripts/user-script-audio-document.html
+userscripts/user-script-image-document.html
+userscripts/user-script-plugin-document.html
+userscripts/user-script-top-frame-only.html
+userscripts/user-script-video-document.html
+userscripts/user-style-top-frame-only.html
 
 # XHR sends sometimes yield null bytes sent instead of 0.
 http/tests/xmlhttprequest/workers/shared-worker-methods.html
@@ -4858,6 +4853,9 @@ fast/loader/api-test-go-to-current-back-forward-item.html
 fast/xmlhttprequest/xmlhttprequest-no-file-access.html
 fast/xmlhttprequest/xmlhttprequest-nonexistent-file.html
 
+# Fails on GTK release bots, see https://bugs.webkit.org/show_bug.cgi?id=51027
+plugins/refcount-leaks.html
+
 # Fails on GTK bots, see https://bugs.webkit.org/show_bug.cgi?id=35144
 plugins/set-status.html
 
@@ -4882,6 +4880,8 @@ fast/forms/multiple-form-submission-protection-mouse.html
 fast/events/remove-child-onscroll.html
 fast/events/platform-wheelevent-in-scrolling-div.html
 fast/events/continuous-platform-wheelevent-in-scrolling-div.html
+fast/events/wheelevent-in-horizontal-scrollbar-in-rtl.html
+fast/events/wheelevent-in-vertical-scrollbar-in-rtl.html
 
 # meter element is not supported
 # http://bugs.webkit.org/show_bug.cgi?id=48713
@@ -4957,10 +4957,8 @@ http/tests/media/video-play-suspend.html
 # Need to add functionality to DumpRenderTree to handle scrollbar police changes
 fast/overflow/scrollbar-restored-and-then-locked.html
 
-# Failing constantly on 64bits release bot since r57284,
-# which is completely unrelated
-# See https://bugs.webkit.org/show_bug.cgi?id=37344
-media/video-src-invalid-remove.html
+# This test is crashing in the GTK 32-bit Release bot. See https://bugs.webkit.org/show_bug.cgi?id=51038
+fast/history/history_reload.html
 
 # See https://bugs.webkit.org/show_bug.cgi?id=37526
 fast/history/multiple-classes-visited.html
@@ -4974,8 +4972,9 @@ fast/js/kde/string-2-n.html
 # https://bugs.webkit.org/show_bug.cgi?id=37535
 inspector/console-format.html
 
-# https://bugs.webkit.org/show_bug.cgi?id=37536
-media/video-reverse-play-duration.html
+# https://bugs.webkit.org/show_bug.cgi?id=50868
+inspector/debugger-step-out.html
+inspector/styles-source-lines-inline.html
 
 #https://bugs.webkit.org/show_bug.cgi?id=37537
 plugins/npruntime/round-trip-npobject.html
@@ -4989,26 +4988,8 @@ svg/custom/use-instanceRoot-as-event-target.xhtml
 # https://bugs.webkit.org/show_bug.cgi?id=37546
 media/audio-delete-while-slider-thumb-clicked.html
 
-# https://bugs.webkit.org/show_bug.cgi?id=37547
-media/video-currentTime-set2.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=37548
-media/video-seekable.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=37549
-media/video-currentTime-set.html
-
 # https://bugs.webkit.org/show_bug.cgi?id=37550
 fast/dom/Window/HTMLBodyElement-window-eventListener-attributes.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=37551
-media/video-seeking.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=37552
-media/video-timeupdate-reverse-play.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=37556
-media/video-played-reset.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=37557
 http/tests/misc/image-blocked-src-change.html
@@ -5025,14 +5006,8 @@ svg/dom/SVGScriptElement/script-set-href.svg
 # https://bugs.webkit.org/show_bug.cgi?id=37562
 plugins/update-widgets-crash.html
 
-# https://bugs.webkit.org/show_bug.cgi?id=37564
-media/audio-data-url.html
-
 # https://bugs.webkit.org/show_bug.cgi?id=37572
 plugins/open-and-close-window-with-plugin.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=37573
-media/video-played-ranges-1.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=37574
 plugins/window-open.html
@@ -5052,12 +5027,6 @@ scrollbars/scrollbar-crash-on-refresh.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=37752
 inspector/timeline-paint.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=37753
-media/audio-constructor-preload.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=40819
-media/audio-constructor-src.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=37914
 fast/frames/frame-crash-with-page-cache.html
@@ -5095,14 +5064,10 @@ svg/css/stars-with-shadow.html
 svg/custom/gradient-with-1d-boundingbox.svg
 svg/custom/relative-sized-inner-svg.xhtml
 svg/custom/relative-sized-use-without-attributes-on-symbol.xhtml
-
 # New test needs enhanced frameloader delegate logging in DRT
 # Discussed in https://bugs.webkit.org/show_bug.cgi?id=38928
 fast/loader/recursive-before-unload-crash.html 
 fast/loader/null-request-after-willSendRequest.html
-
-# Skip this, it's pending on one patch in the commit queue
-accessibility/aria-controls-with-tabs.html
 
 # Need to dump context menu items on eventSender.contextClick(true).
 # https://bugs.webkit.org/show_bug.cgi?id=39102
@@ -5126,13 +5091,9 @@ fast/forms/slider-mouse-events.html
 fast/forms/slider-zoomed.html
 
 # Link prefetch is disabled by default
+fast/dom/HTMLLinkElement/link-and-subresource-test.html
 fast/dom/HTMLLinkElement/prefetch.html
-
-# LayoutTestController::pageProperty is not implemented for GTK yet.
-printing/page-rule-selection.html
-
-# LayoutTestController::isPageBoxVisible, pageAreaRectInPixels, and preferredPageSizeInPixels are not implemented yet for GTK.
-printing/page-format-data.html
+fast/dom/HTMLLinkElement/prefetch-onload.html
 
 # Gtk seems to be pumping the lexer an extra time revealed by turning on the
 # HTML5 Lexer in r61234.
@@ -5288,16 +5249,8 @@ fast/forms/textarea-metrics.html
 # Fake italics do not work: https://bugs.webkit.org/show_bug.cgi?id=40856
 fast/text/fake-italic.html
 
-# This test crashes randomly on some of our bots
-# https://bugs.webkit.org/show_bug.cgi?id=40859
-media/video-controls-rendering.html
-
 # https://bugs.webkit.org/show_bug.cgi?id=44235
-media/video-layer-crash.html
 media/video-zoom-controls.html
-media/adopt-node-crash.html
-media/video-transformed.html
-media/controls-styling.html
 
 # Need to implement inner-spin-button or outer-spin-button
 fast/forms/input-appearance-spinbutton-disabled-readonly.html
@@ -5357,6 +5310,7 @@ fast/dom/webtiming.html
 fast/dom/webtiming-navigate-within-document.html
 fast/dom/webtiming-document-open.html
 http/tests/misc/webtiming-one-redirect.php
+http/tests/misc/webtiming-ssl.php
 http/tests/misc/webtiming-two-redirects.php
 
 # Accuracy problems in the results
@@ -5421,6 +5375,9 @@ inspector/debugger-pause-on-breakpoint.html
 # register as a triple-click even though the mouse have moved
 # outside of the double-click distance.
 editing/selection/5195166-1.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=51325
+editing/selection/extend-by-character-003.html
 
 # Remaining Sputnik failures
 # https://bugs.webkit.org/show_bug.cgi?id=43568
@@ -5490,21 +5447,19 @@ platform/gtk/accessibility/title-and-alt.html
 fast/text/hyphenate-first-word.html
 fast/text/hyphenate-locale.html
 
-# fails on and off on the 64-bits debug bot
-# see also: https://bugzilla.gnome.org/show_bug.cgi?id=628020
-media/video-buffered.html
+# fails on 32-bits debug bot
+# https://bugs.webkit.org/show_bug.cgi?id=50389
+media/video-volume.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=44784
 fast/history/history-subframe-with-name.html
-
-# Full Screen support is not yet enabled.
-fullscreen/
 
 # https://bugs.webkit.org/show_bug.cgi?id=44932
 canvas/philip/tests/2d.path.isPointInPath.edge.html
 
 # viewport meta tag support
-fast/viewport
+# https://bugs.webkit.org/show_bug.cgi?id=47481
+fast/viewport/viewport-45.html
 
 # Pre-HMTL5 parser quirks only apply to the mac port for now.
 fast/parser/pre-html5-parser-quirks.html
@@ -5522,7 +5477,7 @@ fast/text/large-text-composed-char-dos.html
 # LayoutTestController::addUserScript not implemented for gtk
 plugins/plugin-document-load-prevented-userscript.html
 
-# Missing layoutTestController.findString()
+# Missing layoutTestController.findString() http://webkit.org/b/50237
 editing/text-iterator/findString.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=46942
@@ -5540,6 +5495,16 @@ fast/images/webp-image-decoding.html
 # https://bugs.webkit.org/show_bug.cgi?id=47832
 http/tests/inspector/console-xhr-logging.html
 
+# https://bugs.webkit.org/show_bug.cgi?id=50872
+http/tests/misc/dns-prefetch-control.html
+
+# The following tests requires the DRT's dumpUserGestureInFrameLoadCallbacks
+# method. But that method is not implemented in gtk port since gtk port can't
+# not get user gesture in frameload callbacks.
+# The related bugs are https://bugs.webkit.org/show_bug.cgi?id=47849/47817.
+fast/frames/location-redirect-user-gesture.html
+fast/frames/meta-refresh-user-gesture.html
+
 # This test passes locally, but does not pass on the bots. Perhaps
 # it is an issue with the version of Cairo on the bots.
 # https://bugs.webkit.org/show_bug.cgi?id=49052
@@ -5550,10 +5515,6 @@ fast/events/scroll-after-click-on-tab-index.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=49179
 animations/stop-animation-on-suspend.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=49529
-svg/dynamic-updates/SVGLineElement-dom-requiredFeatures.html
-svg/dynamic-updates/SVGLineElement-svgdom-requiredFeatures.html
 
 # computedStyleIncludingVisitedInfo is not implemented
 # https://bugs.webkit.org/show_bug.cgi?id=37336
@@ -5569,14 +5530,57 @@ fast/text/font-size-zero.html
 # https://bugs.webkit.org/show_bug.cgi?id=49801
 fast/profiler/throw-exception-from-eval.html
 
+# Rounding color problems inside pixman
 # https://bugs.webkit.org/show_bug.cgi?id=49964
 fast/canvas/canvas-fillPath-shadow.html
 fast/canvas/canvas-strokePath-shadow.html
+fast/canvas/canvas-transforms-fillRect-shadow.html
+fast/canvas/canvas-scale-strokePath-shadow.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=47727
 mathml/presentation
 
-# REGRESSION(r72861): editing/selection/click-left-of-rtl-wrapping-text.html and modify-up-on-rtl-wrapping-text.html fail on all but Mac platform
-# https://bugs.webkit.org/show_bug.cgi?id=50204
-editing/selection/click-left-of-rtl-wrapping-text.html
-editing/selection/modify-up-on-rtl-wrapping-text.html
+# While zooming we sometimes appear to have ~1 pixel differences
+# with font metrics to other ports
+# https://bugs.webkit.org/show_bug.cgi?id=50313
+css3/zoom-coords.xhtml
+svg/zoom/page/zoom-zoom-coords.xhtml
+
+# https://bugs.webkit.org/show_bug.cgi?id=50441
+media/controls-drag-timebar.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=50518
+media/controls-without-preload.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=50678
+fast/history/history-back-initial-vs-final-url.html
+http/tests/navigation/post-frames-goback1.html
+http/tests/navigation/postredirect-frames-goback1.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=50740
+editing/spelling/spelling-backspace-between-lines.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=50873
+fast/dom/StyleSheet/detached-style-2.html
+fast/dom/StyleSheet/detached-style-pi-2.xhtml
+fast/dom/StyleSheet/detached-style-pi.xhtml
+fast/dom/StyleSheet/detached-style.html
+
+# The test times out, we have to improve the performance of the
+# rendering in these situations to
+# https://bugs.webkit.org/show_bug.cgi?id=50869
+fast/canvas/canvas-largedraws.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=50886
+fast/dom/Window/timer-resume-on-navigation-back.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=50887
+fast/events/pageshow-pagehide-on-back-cached-with-frames.html
+
+# For https://bugs.webkit.org/show_bug.cgi?id=50758
+# These require DRT setSerializeHTTPLoads implementation to be reliable.
+http/tests/local/link-stylesheet-load-order.html
+http/tests/local/link-stylesheet-load-order-preload.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=51380
+http/tests/inspector/console-websocket-error.html

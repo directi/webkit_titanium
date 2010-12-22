@@ -48,6 +48,27 @@ WebIDBKey WebIDBKey::createNull()
     return key;
 }
 
+WebIDBKey WebIDBKey::createString(const WebString& string)
+{
+    WebIDBKey key;
+    key.assignString(string);
+    return key;
+}
+
+WebIDBKey WebIDBKey::createDate(double date)
+{
+    WebIDBKey key;
+    key.assignDate(date);
+    return key;
+}
+
+WebIDBKey WebIDBKey::createNumber(double number)
+{
+    WebIDBKey key;
+    key.assignNumber(number);
+    return key;
+}
+
 WebIDBKey WebIDBKey::createInvalid()
 {
     WebIDBKey key;
@@ -69,17 +90,22 @@ void WebIDBKey::assign(const WebIDBKey& value)
 
 void WebIDBKey::assignNull()
 {
-    m_private = IDBKey::create();
+    m_private = IDBKey::createNull();
 }
 
-void WebIDBKey::assign(const WebString& string)
+void WebIDBKey::assignString(const WebString& string)
 {
-    m_private = IDBKey::create(string);
+    m_private = IDBKey::createString(string);
 }
 
-void WebIDBKey::assign(int32_t number)
+void WebIDBKey::assignDate(double date)
 {
-    m_private = IDBKey::create(number);
+    m_private = IDBKey::createDate(date);
+}
+
+void WebIDBKey::assignNumber(double number)
+{
+    m_private = IDBKey::createNumber(number);
 }
 
 void WebIDBKey::assignInvalid()
@@ -104,7 +130,12 @@ WebString WebIDBKey::string() const
     return m_private->string();
 }
 
-int32_t WebIDBKey::number() const
+double WebIDBKey::date() const
+{
+    return m_private->date();
+}
+
+double WebIDBKey::number() const
 {
     return m_private->number();
 }

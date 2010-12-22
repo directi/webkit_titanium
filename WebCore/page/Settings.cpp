@@ -147,6 +147,11 @@ Settings::Settings(Page* page)
     , m_downloadableBinaryFontsEnabled(true)
     , m_xssAuditorEnabled(false)
     , m_acceleratedCompositingEnabled(true)
+    , m_acceleratedCompositingFor3DTransformsEnabled(true)
+    , m_acceleratedCompositingForVideoEnabled(true)
+    , m_acceleratedCompositingForPluginsEnabled(true)
+    , m_acceleratedCompositingForCanvasEnabled(true)
+    , m_acceleratedCompositingForAnimationEnabled(true)
     , m_showDebugBorders(false)
     , m_showRepaintCounter(false)
     , m_experimentalNotificationsEnabled(false)
@@ -155,10 +160,11 @@ Settings::Settings(Page* page)
     , m_loadDeferringEnabled(true)
     , m_tiledBackingStoreEnabled(false)
     , m_paginateDuringLayoutEnabled(false)
-    , m_dnsPrefetchingEnabled(true)
+    , m_dnsPrefetchingEnabled(false)
 #if ENABLE(FULLSCREEN_API)
     , m_fullScreenAPIEnabled(false)
 #endif
+    , m_asynchronousSpellCheckingEnabled(false)
     , m_memoryInfoEnabled(false)
     , m_interactiveFormValidation(false)
     , m_usePreHTML5ParserQuirks(false)
@@ -552,7 +558,11 @@ void Settings::setUsesEncodingDetector(bool usesEncodingDetector)
 
 void Settings::setDNSPrefetchingEnabled(bool dnsPrefetchingEnabled)
 {
+    if (m_dnsPrefetchingEnabled == dnsPrefetchingEnabled)
+        return;
+
     m_dnsPrefetchingEnabled = dnsPrefetchingEnabled;
+    m_page->dnsPrefetchingStateChanged();
 }
 
 void Settings::setAllowScriptsToCloseWindows(bool allowScriptsToCloseWindows)
@@ -582,6 +592,31 @@ void Settings::setAcceleratedCompositingEnabled(bool enabled)
         
     m_acceleratedCompositingEnabled = enabled;
     setNeedsRecalcStyleInAllFrames(m_page);
+}
+
+void Settings::setAcceleratedCompositingFor3DTransformsEnabled(bool enabled)
+{
+    m_acceleratedCompositingFor3DTransformsEnabled = enabled;
+}
+
+void Settings::setAcceleratedCompositingForVideoEnabled(bool enabled)
+{
+    m_acceleratedCompositingForVideoEnabled = enabled;
+}
+
+void Settings::setAcceleratedCompositingForPluginsEnabled(bool enabled)
+{
+    m_acceleratedCompositingForPluginsEnabled = enabled;
+}
+
+void Settings::setAcceleratedCompositingForCanvasEnabled(bool enabled)
+{
+    m_acceleratedCompositingForCanvasEnabled = enabled;
+}
+
+void Settings::setAcceleratedCompositingForAnimationEnabled(bool enabled)
+{
+    m_acceleratedCompositingForAnimationEnabled = enabled;
 }
 
 void Settings::setShowDebugBorders(bool enabled)

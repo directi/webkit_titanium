@@ -38,6 +38,7 @@
 #include "Plugin.h"
 #include "SandboxExtension.h"
 #include "WebEditCommand.h"
+#include <WebCore/Editor.h>
 #include <WebCore/FrameLoaderTypes.h>
 #include <WebCore/IntRect.h>
 #include <wtf/HashMap.h>
@@ -77,6 +78,8 @@ class WebFrame;
 class WebInspector;
 class WebKeyboardEvent;
 class WebMouseEvent;
+class WebOpenPanelResultListener;
+class WebPageGroupProxy;
 class WebPopupMenu;
 class WebWheelEvent;
 
@@ -109,6 +112,8 @@ public:
     InjectedBundleBackForwardList* backForwardList();
     DrawingArea* drawingArea() const { return m_drawingArea.get(); }
 
+    WebPageGroupProxy* pageGroup() const { return m_pageGroup.get(); }
+
 #if ENABLE(INSPECTOR)
     WebInspector* inspector();
 #endif
@@ -123,8 +128,9 @@ public:
     bool handleEditingKeyboardEvent(WebCore::KeyboardEvent*);
 #endif
     void show();
-    String userAgent() const;
+    String userAgent() const { return m_userAgent; }
     WebCore::IntRect windowResizerRect() const;
+    bool tabsToLinks() const { return m_tabToLinks; }
 
     WebEditCommand* webEditCommand(uint64_t);
     void addWebEditCommand(uint64_t, WebEditCommand*);
@@ -132,9 +138,13 @@ public:
     bool isInRedo() const { return m_isInRedo; }
 
     void setActivePopupMenu(WebPopupMenu*);
+    
+    WebOpenPanelResultListener* activeOpenPanelResultListener() const { return m_activeOpenPanelResultListener.get(); }
+    void setActiveOpenPanelResultListener(PassRefPtr<WebOpenPanelResultListener>);
 
     // -- Called from WebProcess.
     void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    CoreIPC::SyncReplyMode didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
 
     // -- InjectedBundle methods
     void initializeInjectedBundleContextMenuClient(WKBundlePageContextMenuClient*);
@@ -148,6 +158,8 @@ public:
     InjectedBundlePageFormClient& injectedBundleFormClient() { return m_formClient; }
     InjectedBundlePageLoaderClient& injectedBundleLoaderClient() { return m_loaderClient; }
     InjectedBundlePageUIClient& injectedBundleUIClient() { return m_uiClient; }
+
+    bool findStringFromInjectedBundle(const String&, FindOptions);
 
     WebFrame* mainFrame() const { return m_mainFrame.get(); }
     PassRefPtr<Plugin> createPlugin(const Plugin::Parameters&);
@@ -167,6 +179,9 @@ public:
     void scaleWebView(double scale, const WebCore::IntPoint& origin);
     double viewScaleFactor() const;
 
+    bool drawsBackground() const { return m_drawsBackground; }
+    bool drawsTransparentBackground() const { return m_drawsTransparentBackground; }
+
     void stopLoading();
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -180,7 +195,8 @@ public:
     void removePluginView(PluginView*);
 
     bool windowIsVisible() const { return m_windowIsVisible; }
-    const WebCore::IntRect& windowFrame() const { return m_windowFrame; }
+    const WebCore::IntRect& windowFrameInScreenCoordinates() const { return m_windowFrameInScreenCoordinates; }
+    const WebCore::IntRect& viewFrameInWindowCoordinates() const { return m_viewFrameInWindowCoordinates; }
     bool windowIsFocused() const;
     bool interceptEditingKeyboardEvent(WebCore::KeyboardEvent*, bool);
 #elif PLATFORM(WIN)
@@ -228,6 +244,21 @@ public:
     };
 
     SandboxExtensionTracker& sandboxExtensionTracker() { return m_sandboxExtensionTracker; }
+    
+#if PLATFORM(MAC)
+    void sendComplexTextInputToPlugin(uint64_t pluginComplexTextInputIdentifier, const String& textInput);
+
+    void getMarkedRange(uint64_t& location, uint64_t& length);
+    void characterIndexForPoint(const WebCore::IntPoint point, uint64_t& result);
+    void firstRectForCharacterRange(uint64_t location, uint64_t length, WebCore::IntRect& resultRect);
+    static void convertRangeToPlatformRange(WebCore::Frame* frame, WebCore::Range *range, uint64_t& location, uint64_t& length);
+#elif PLATFORM(WIN)
+    void confirmComposition(const String& compositionString);
+    void setComposition(const WTF::String& compositionString, const WTF::Vector<WebCore::CompositionUnderline>& underlines, uint64_t cursorPosition);
+    void firstRectForCharacterInSelectedRange(const uint64_t characterPosition, WebCore::IntRect& resultRect);
+    void getSelectedText(WTF::String&);
+#endif
+    void dummy(bool&);
 
 private:
     WebPage(uint64_t pageID, const WebPageCreationParameters&);
@@ -237,6 +268,7 @@ private:
     void platformInitialize();
 
     void didReceiveWebPageMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    CoreIPC::SyncReplyMode didReceiveSyncWebPageMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
 
     static const char* interpretKeyEvent(const WebCore::KeyboardEvent*);
     bool performDefaultBehaviorForKeyEvent(const WebKeyboardEvent&);
@@ -244,6 +276,8 @@ private:
     String sourceForFrame(WebFrame*);
 
     void loadData(PassRefPtr<WebCore::SharedBuffer>, const String& MIMEType, const String& encodingName, const WebCore::KURL& baseURL, const WebCore::KURL& failingURL);
+
+    bool platformHasLocalDataForURL(const WebCore::KURL&);
 
     // Actions
     void tryClose();
@@ -258,6 +292,7 @@ private:
     void goToBackForwardItem(uint64_t);
     void setActive(bool);
     void setFocused(bool);
+    void setInitialFocus(bool);
     void setWindowResizerSize(const WebCore::IntSize&);
     void setIsInWindow(bool);
     void mouseEvent(const WebMouseEvent&);
@@ -269,6 +304,9 @@ private:
     void touchEvent(const WebTouchEvent&);
 #endif
 
+    void setDrawsBackground(bool);
+    void setDrawsTransparentBackground(bool);
+
     void getContentsAsString(uint64_t callbackID);
     void getRenderTreeExternalRepresentation(uint64_t callbackID);
     void getSourceForFrame(uint64_t frameID, uint64_t callbackID);
@@ -279,11 +317,12 @@ private:
     void updatePreferences(const WebPreferencesStore&);
 
     void didReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction, uint64_t downloadID);
-    void setCustomUserAgent(const String&);
+    void setUserAgent(const String&);
+    void setCustomTextEncodingName(const String&);
 
 #if PLATFORM(MAC)
     void setWindowIsVisible(bool windowIsVisible);
-    void setWindowFrame(const WebCore::IntRect&);
+    void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
 #endif
 
     void unapplyEditCommand(uint64_t commandID);
@@ -299,6 +338,13 @@ private:
 #endif
 
     void didChangeSelectedIndexForActivePopupMenu(int32_t newIndex);
+    void setTextForActivePopupMenu(int32_t index);
+
+    void didChooseFilesForOpenPanel(const Vector<String>&);
+    void didCancelForOpenPanel();
+
+    void unmarkAllMisspellings();
+    void unmarkAllBadGrammar();
 
 #if ENABLE(CONTEXT_MENUS)
     void didSelectItemFromActiveContextMenu(const WebContextMenuItemData&);
@@ -308,21 +354,30 @@ private:
     RefPtr<WebFrame> m_mainFrame;
     RefPtr<InjectedBundleBackForwardList> m_backForwardList;
 
-    String m_customUserAgent;
+    RefPtr<WebPageGroupProxy> m_pageGroup;
+
+    String m_userAgent;
 
     WebCore::IntSize m_viewSize;
     RefPtr<DrawingArea> m_drawingArea;
 
+    bool m_drawsBackground;
+    bool m_drawsTransparentBackground;
+
     bool m_isInRedo;
     bool m_isClosed;
-    bool m_isVisibleToInjectedBundle;
+
+    bool m_tabToLinks;
 
 #if PLATFORM(MAC)
     // Whether the containing window is visible or not.
     bool m_windowIsVisible;
 
-    // The frame of the containing window.
-    WebCore::IntRect m_windowFrame;
+    // The frame of the containing window in screen coordinates.
+    WebCore::IntRect m_windowFrameInScreenCoordinates;
+
+    // The frame of the view in window coordinates.
+    WebCore::IntRect m_viewFrameInWindowCoordinates;
 
     // All plug-in views on this web page.
     HashSet<PluginView*> m_pluginViews;
@@ -353,6 +408,7 @@ private:
 #endif
     RefPtr<WebPopupMenu> m_activePopupMenu;
     RefPtr<WebContextMenu> m_contextMenu;
+    RefPtr<WebOpenPanelResultListener> m_activeOpenPanelResultListener;
 
     SandboxExtensionTracker m_sandboxExtensionTracker;
     uint64_t m_pageID;

@@ -164,11 +164,23 @@ WebInspector.CSSStyleModel.prototype = {
         {
             var resource = WebInspector.resourceManager.resourceForURL(href);
             if (resource && resource.type === WebInspector.Resource.Type.Stylesheet)
-                resource.content = content;
+                resource.setContent(content, this._onRevert.bind(this, styleSheetId));
         }
-        InspectorBackend.getStyleSheetText2(styleSheetId, callback);
+        InspectorBackend.getStyleSheetText2(styleSheetId, callback.bind(this));
+    },
+
+    _onRevert: function(styleSheetId, contentToRevertTo)
+    {
+        function callback(success)
+        {
+            this._styleSheetChanged(styleSheetId, true);
+            this.dispatchEventToListeners("stylesheet changed");
+        }
+        InspectorBackend.setStyleSheetText2(styleSheetId, contentToRevertTo, callback.bind(this));
     }
 }
+
+WebInspector.CSSStyleModel.prototype.__proto__ = WebInspector.Object.prototype;
 
 WebInspector.CSSStyleDeclaration = function(payload)
 {

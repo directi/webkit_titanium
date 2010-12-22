@@ -279,6 +279,21 @@ namespace WebCore {
         void setAcceleratedCompositingEnabled(bool);
         bool acceleratedCompositingEnabled() const { return m_acceleratedCompositingEnabled; }
 
+        void setAcceleratedCompositingFor3DTransformsEnabled(bool);
+        bool acceleratedCompositingFor3DTransformsEnabled() const { return m_acceleratedCompositingFor3DTransformsEnabled; }
+
+        void setAcceleratedCompositingForVideoEnabled(bool);
+        bool acceleratedCompositingForVideoEnabled() const { return m_acceleratedCompositingForVideoEnabled; }
+
+        void setAcceleratedCompositingForPluginsEnabled(bool);
+        bool acceleratedCompositingForPluginsEnabled() const { return m_acceleratedCompositingForPluginsEnabled; }
+
+        void setAcceleratedCompositingForCanvasEnabled(bool);
+        bool acceleratedCompositingForCanvasEnabled() const { return m_acceleratedCompositingForCanvasEnabled; }
+
+        void setAcceleratedCompositingForAnimationEnabled(bool);
+        bool acceleratedCompositingForAnimationEnabled() const { return m_acceleratedCompositingForAnimationEnabled; }
+
         void setShowDebugBorders(bool);
         bool showDebugBorders() const { return m_showDebugBorders; }
 
@@ -315,6 +330,9 @@ namespace WebCore {
         void setFullScreenEnabled(bool flag) { m_fullScreenAPIEnabled = flag; }
         bool fullScreenEnabled() const  { return m_fullScreenAPIEnabled; }
 #endif
+
+        void setAsynchronousSpellCheckingEnabled(bool flag) { m_asynchronousSpellCheckingEnabled = flag; }
+        bool asynchronousSpellCheckingEnabled() const  { return m_asynchronousSpellCheckingEnabled; }
 
         void setMemoryInfoEnabled(bool flag) { m_memoryInfoEnabled = flag; }
         bool memoryInfoEnabled() const { return m_memoryInfoEnabled; }
@@ -406,6 +424,11 @@ namespace WebCore {
         bool m_downloadableBinaryFontsEnabled : 1;
         bool m_xssAuditorEnabled : 1;
         bool m_acceleratedCompositingEnabled : 1;
+        bool m_acceleratedCompositingFor3DTransformsEnabled : 1;
+        bool m_acceleratedCompositingForVideoEnabled : 1;
+        bool m_acceleratedCompositingForPluginsEnabled : 1;
+        bool m_acceleratedCompositingForCanvasEnabled : 1;
+        bool m_acceleratedCompositingForAnimationEnabled : 1;
         bool m_showDebugBorders : 1;
         bool m_showRepaintCounter : 1;
         bool m_experimentalNotificationsEnabled : 1;
@@ -418,6 +441,7 @@ namespace WebCore {
 #if ENABLE(FULLSCREEN_API)
         bool m_fullScreenAPIEnabled : 1;
 #endif
+        bool m_asynchronousSpellCheckingEnabled: 1;
         bool m_memoryInfoEnabled: 1;
         bool m_interactiveFormValidation: 1;
         bool m_usePreHTML5ParserQuirks: 1;

@@ -32,10 +32,10 @@
 #include "NPRemoteObjectMap.h"
 #include "NPRuntimeUtilities.h"
 #include "NPVariantData.h"
-#include "NotImplemented.h"
 #include "PluginController.h"
 #include "PluginControllerProxyMessages.h"
 #include "PluginProcessConnection.h"
+#include "PluginProcessConnectionManager.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebEvent.h"
 #include "WebProcessConnectionMessages.h"
@@ -51,13 +51,13 @@ static uint64_t generatePluginInstanceID()
     return ++uniquePluginInstanceID;
 }
 
-PassRefPtr<PluginProxy> PluginProxy::create(PassRefPtr<PluginProcessConnection> connection)
+PassRefPtr<PluginProxy> PluginProxy::create(const String& pluginPath)
 {
-    return adoptRef(new PluginProxy(connection));
+    return adoptRef(new PluginProxy(pluginPath));
 }
 
-PluginProxy::PluginProxy(PassRefPtr<PluginProcessConnection> connection)
-    : m_connection(connection)
+PluginProxy::PluginProxy(const String& pluginPath)
+    : m_pluginPath(pluginPath)
     , m_pluginInstanceID(generatePluginInstanceID())
     , m_pluginController(0)
     , m_pluginBackingStoreContainsValidData(false)
@@ -84,6 +84,12 @@ bool PluginProxy::initialize(PluginController* pluginController, const Parameter
 
     m_pluginController = pluginController;
 
+    ASSERT(!m_connection);
+    m_connection = PluginProcessConnectionManager::shared().getPluginProcessConnection(m_pluginPath);
+    
+    if (!m_connection)
+        return false;
+    
     // Add the plug-in proxy before creating the plug-in; it needs to be in the map because CreatePlugin
     // can call back out to the plug-in proxy.
     m_connection->addPluginProxy(this);
@@ -92,7 +98,7 @@ bool PluginProxy::initialize(PluginController* pluginController, const Parameter
     bool result = false;
 
     uint32_t remoteLayerClientID = 0;
-    if (!m_connection->connection()->sendSync(Messages::WebProcessConnection::CreatePlugin(m_pluginInstanceID, parameters, pluginController->userAgent(), pluginController->isPrivateBrowsingEnabled()), Messages::WebProcessConnection::CreatePlugin::Reply(result, remoteLayerClientID), 0) || !result) {
+    if (!m_connection->connection()->sendSync(Messages::WebProcessConnection::CreatePlugin(m_pluginInstanceID, parameters, pluginController->userAgent(), pluginController->isPrivateBrowsingEnabled(), pluginController->isAcceleratedCompositingEnabled()), Messages::WebProcessConnection::CreatePlugin::Reply(result, remoteLayerClientID), 0) || !result) {
         m_connection->removePluginProxy(this);
         return false;
     }
@@ -132,7 +138,7 @@ void PluginProxy::paint(GraphicsContext* graphicsContext, const IntRect& dirtyRe
     IntRect dirtyRectInPluginCoordinates = dirtyRect;
     dirtyRectInPluginCoordinates.move(-m_frameRect.x(), -m_frameRect.y());
 
-    m_backingStore->paint(*graphicsContext, m_frameRect.location(), dirtyRectInPluginCoordinates);
+    m_backingStore->paint(*graphicsContext, dirtyRect.location(), dirtyRectInPluginCoordinates);
 
     if (m_waitingForPaintInResponseToUpdate) {
         m_waitingForPaintInResponseToUpdate = false;
@@ -187,12 +193,12 @@ void PluginProxy::geometryDidChange(const IntRect& frameRect, const IntRect& cli
 
 void PluginProxy::frameDidFinishLoading(uint64_t requestID)
 {
-    notImplemented();
+    m_connection->connection()->send(Messages::PluginControllerProxy::FrameDidFinishLoading(requestID), m_pluginInstanceID);
 }
 
 void PluginProxy::frameDidFail(uint64_t requestID, bool wasCancelled)
 {
-    notImplemented();
+    m_connection->connection()->send(Messages::PluginControllerProxy::FrameDidFail(requestID, wasCancelled), m_pluginInstanceID);
 }
 
 void PluginProxy::didEvaluateJavaScript(uint64_t requestID, const WTF::String& requestURLString, const WTF::String& result)
@@ -222,22 +228,22 @@ void PluginProxy::streamDidFail(uint64_t streamID, bool wasCancelled)
 
 void PluginProxy::manualStreamDidReceiveResponse(const KURL& responseURL, uint32_t streamLength,  uint32_t lastModifiedTime, const WTF::String& mimeType, const WTF::String& headers)
 {
-    notImplemented();
+    m_connection->connection()->send(Messages::PluginControllerProxy::ManualStreamDidReceiveResponse(responseURL.string(), streamLength, lastModifiedTime, mimeType, headers), m_pluginInstanceID);
 }
 
 void PluginProxy::manualStreamDidReceiveData(const char* bytes, int length)
 {
-    notImplemented();
+    m_connection->connection()->send(Messages::PluginControllerProxy::ManualStreamDidReceiveData(CoreIPC::DataReference(reinterpret_cast<const uint8_t*>(bytes), length)), m_pluginInstanceID);
 }
 
 void PluginProxy::manualStreamDidFinishLoading()
 {
-    notImplemented();
+    m_connection->connection()->send(Messages::PluginControllerProxy::ManualStreamDidFinishLoading(), m_pluginInstanceID);
 }
 
 void PluginProxy::manualStreamDidFail(bool wasCancelled)
 {
-    notImplemented();
+    m_connection->connection()->send(Messages::PluginControllerProxy::ManualStreamDidFail(wasCancelled), m_pluginInstanceID);
 }
 
 bool PluginProxy::handleMouseEvent(const WebMouseEvent& mouseEvent)
@@ -309,16 +315,26 @@ void PluginProxy::windowFocusChanged(bool hasFocus)
     m_connection->connection()->send(Messages::PluginControllerProxy::WindowFocusChanged(hasFocus), m_pluginInstanceID);
 }
 
-void PluginProxy::windowFrameChanged(const IntRect& windowFrame)
+void PluginProxy::windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates)
 {
-    m_connection->connection()->send(Messages::PluginControllerProxy::WindowFrameChanged(windowFrame), m_pluginInstanceID);
-    notImplemented();
+    m_connection->connection()->send(Messages::PluginControllerProxy::WindowAndViewFramesChanged(windowFrameInScreenCoordinates, viewFrameInWindowCoordinates), m_pluginInstanceID);
 }
 
 void PluginProxy::windowVisibilityChanged(bool isVisible)
 {
     m_connection->connection()->send(Messages::PluginControllerProxy::WindowVisibilityChanged(isVisible), m_pluginInstanceID);
 }
+
+uint64_t PluginProxy::pluginComplexTextInputIdentifier() const
+{
+    return m_pluginInstanceID;
+}
+
+void PluginProxy::sendComplexTextInput(const String& textInput)
+{
+    m_connection->connection()->send(Messages::PluginControllerProxy::SendComplexTextInput(textInput), m_pluginInstanceID);
+}
+
 #endif
 
 void PluginProxy::privateBrowsingStateChanged(bool isPrivateBrowsingEnabled)
@@ -394,6 +410,28 @@ void PluginProxy::evaluate(const NPVariantData& npObjectAsVariantData, const Str
     releaseNPVariantValue(&npObjectAsVariant);
 }
 
+void PluginProxy::cancelStreamLoad(uint64_t streamID)
+{
+    m_pluginController->cancelStreamLoad(streamID);
+}
+
+void PluginProxy::cancelManualStreamLoad()
+{
+    m_pluginController->cancelManualStreamLoad();
+}
+
+void PluginProxy::setStatusbarText(const String& statusbarText)
+{
+    m_pluginController->setStatusbarText(statusbarText);
+}
+
+#if PLATFORM(MAC)
+void PluginProxy::setComplexTextInputEnabled(bool complexTextInputEnabled)
+{
+    m_pluginController->setComplexTextInputEnabled(complexTextInputEnabled);
+}
+#endif
+    
 void PluginProxy::update(const IntRect& paintedRect)
 {
     if (paintedRect == m_frameRect)
@@ -406,7 +444,8 @@ void PluginProxy::update(const IntRect& paintedRect)
         // Blit the plug-in backing store into our own backing store.
         OwnPtr<GraphicsContext> graphicsContext = m_backingStore->createGraphicsContext();
 
-        m_pluginBackingStore->paint(*graphicsContext, IntPoint(), paintedRectPluginCoordinates);
+        m_pluginBackingStore->paint(*graphicsContext, paintedRectPluginCoordinates.location(), 
+                                    paintedRectPluginCoordinates);
     }
 
     // Ask the controller to invalidate the rect for us.

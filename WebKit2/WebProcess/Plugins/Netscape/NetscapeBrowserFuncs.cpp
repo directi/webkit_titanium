@@ -327,11 +327,7 @@ static void NPN_Status(NPP npp, const char* message)
     
 static const char* NPN_UserAgent(NPP npp)
 {
-    if (!npp)
-        return 0;
-    
-    RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
-    return plugin->userAgent();
+    return NetscapePlugin::userAgent(npp);
 }
 
 static void* NPN_MemAlloc(uint32_t size)
@@ -436,6 +432,12 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
             *(NPBool*)value = true;
             break;
 
+#ifndef NP_NO_QUICKDRAW
+        case NPNVsupportsQuickDrawBool:
+            // We don't support the QuickDraw drawing model.
+            *(NPBool*)value = false;
+            break;
+#endif
 #ifndef NP_NO_CARBON
        case NPNVsupportsCarbonBool:
             // FIXME: We should support the Carbon event model.
@@ -761,17 +763,30 @@ static void NPN_UnscheduleTimer(NPP instance, uint32_t timerID)
     notImplemented();
 }
 
+#if PLATFORM(MAC)
 static NPError NPN_PopUpContextMenu(NPP instance, NPMenu* menu)
 {
     notImplemented();
     return NPERR_GENERIC_ERROR;
 }
 
-static NPBool NPN_ConvertPoint(NPP instance, double sourceX, double sourceY, NPCoordinateSpace sourceSpace, double* destX, double* destY, NPCoordinateSpace destSpace)
+static NPBool NPN_ConvertPoint(NPP npp, double sourceX, double sourceY, NPCoordinateSpace sourceSpace, double* destX, double* destY, NPCoordinateSpace destSpace)
 {
-    notImplemented();
-    return false;
+    RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+
+    double destinationX;
+    double destinationY;
+
+    bool returnValue = plugin->convertPoint(sourceX, sourceY, sourceSpace, destinationX, destinationY, destSpace);
+
+    if (destX)
+        *destX = destinationX;
+    if (destY)
+        *destY = destinationY;
+
+    return returnValue;
 }
+#endif
 
 static void initializeBrowserFuncs(NPNetscapeFuncs &netscapeFuncs)
 {
@@ -829,8 +844,13 @@ static void initializeBrowserFuncs(NPNetscapeFuncs &netscapeFuncs)
     netscapeFuncs.getauthenticationinfo = NPN_GetAuthenticationInfo;
     netscapeFuncs.scheduletimer = NPN_ScheduleTimer;
     netscapeFuncs.unscheduletimer = NPN_UnscheduleTimer;
+#if PLATFORM(MAC)
     netscapeFuncs.popupcontextmenu = NPN_PopUpContextMenu;
     netscapeFuncs.convertpoint = NPN_ConvertPoint;
+#else
+    netscapeFuncs.popupcontextmenu = 0;
+    netscapeFuncs.convertpoint = 0;
+#endif
 }
     
 NPNetscapeFuncs* netscapeBrowserFuncs()

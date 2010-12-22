@@ -41,7 +41,7 @@ static const int separatorPadding = 4;
 static const int separatorHeight = 1;
 static const int popupWindowBorderWidth = 1;
 
-void WebPopupMenu::setUpPlatformData(PlatformPopupMenuData& data)
+void WebPopupMenu::setUpPlatformData(const WebCore::IntRect& pageCoordinates, PlatformPopupMenuData& data)
 {
     int itemCount = m_popupClient->listSize();
 
@@ -68,18 +68,21 @@ void WebPopupMenu::setUpPlatformData(PlatformPopupMenuData& data)
         popupWidth = std::max(popupWidth, itemFont.width(TextRun(text.characters(), text.length())));
     }
 
-    // FIXME: popupWidth should probably take into account monitor constraits as is done with WebPopupMenuProxyWin::calculatePositionAndSize.
+    // FIXME: popupWidth should probably take into account monitor constraints as is done with WebPopupMenuProxyWin::calculatePositionAndSize.
 
     popupWidth += max(0, data.m_clientPaddingRight - data.m_clientInsetRight) + max(0, data.m_clientPaddingLeft - data.m_clientInsetLeft);
     popupWidth += 2 * popupWindowBorderWidth;
     data.m_popupWidth = popupWidth;
 
-    data.m_backingStoreSize = IntSize(data.m_popupWidth, (itemCount * data.m_itemHeight));
+    // The backing stores should be drawn at least as wide as the control on the page to match the width of the popup window we'll create.
+    int backingStoreWidth = max(pageCoordinates.width() - m_popupClient->clientInsetLeft() - m_popupClient->clientInsetRight(), popupWidth);
+
+    data.m_backingStoreSize = IntSize(backingStoreWidth, (itemCount * data.m_itemHeight));
     data.m_notSelectedBackingStore = BackingStore::createSharable(data.m_backingStoreSize);
     data.m_selectedBackingStore = BackingStore::createSharable(data.m_backingStoreSize);
 
-    OwnPtr<GraphicsContext> notSelectedBackingStoreContext = data.m_notSelectedBackingStore->createFlippedGraphicsContext();
-    OwnPtr<GraphicsContext> selectedBackingStoreContext = data.m_selectedBackingStore->createFlippedGraphicsContext();
+    OwnPtr<GraphicsContext> notSelectedBackingStoreContext = data.m_notSelectedBackingStore->createGraphicsContext();
+    OwnPtr<GraphicsContext> selectedBackingStoreContext = data.m_selectedBackingStore->createGraphicsContext();
 
     Color activeOptionBackgroundColor = RenderTheme::defaultTheme()->activeListBoxSelectionBackgroundColor();
     Color activeOptionTextColor = RenderTheme::defaultTheme()->activeListBoxSelectionForegroundColor();
@@ -92,7 +95,7 @@ void WebPopupMenu::setUpPlatformData(PlatformPopupMenuData& data)
         Color optionBackgroundColor = itemStyle.backgroundColor();
         Color optionTextColor = itemStyle.foregroundColor();
 
-        IntRect itemRect(0, y, data.m_popupWidth, data.m_itemHeight);
+        IntRect itemRect(0, y, backingStoreWidth, data.m_itemHeight);
 
         // Draw the background for this menu item
         if (itemStyle.isVisible()) {

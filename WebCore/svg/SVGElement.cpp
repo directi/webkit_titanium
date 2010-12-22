@@ -118,12 +118,12 @@ void SVGElement::setXmlbase(const String& value, ExceptionCode&)
 
 SVGSVGElement* SVGElement::ownerSVGElement() const
 {
-    ContainerNode* n = isShadowNode() ? const_cast<SVGElement*>(this)->shadowParentNode() : parentNode();
+    ContainerNode* n = parentOrHostNode();
     while (n) {
         if (n->hasTagName(SVGNames::svgTag))
             return static_cast<SVGSVGElement*>(n);
 
-        n = n->isShadowNode() ? n->shadowParentNode() : n->parentNode();
+        n = n->parentOrHostNode();
     }
 
     return 0;
@@ -133,12 +133,12 @@ SVGElement* SVGElement::viewportElement() const
 {
     // This function needs shadow tree support - as RenderSVGContainer uses this function
     // to determine the "overflow" property. <use> on <symbol> wouldn't work otherwhise.
-    ContainerNode* n = isShadowNode() ? const_cast<SVGElement*>(this)->shadowParentNode() : parentNode();
+    ContainerNode* n = parentOrHostNode();
     while (n) {
         if (n->hasTagName(SVGNames::svgTag) || n->hasTagName(SVGNames::imageTag) || n->hasTagName(SVGNames::symbolTag))
             return static_cast<SVGElement*>(n);
 
-        n = n->isShadowNode() ? n->shadowParentNode() : n->parentNode();
+        n = n->parentOrHostNode();
     }
 
     return 0;
@@ -196,12 +196,36 @@ bool SVGElement::boundingBox(FloatRect& rect, SVGLocatable::StyleUpdateStrategy 
 
 void SVGElement::setCursorElement(SVGCursorElement* cursorElement)
 {
-    ensureRareSVGData()->setCursorElement(cursorElement);
+    SVGElementRareData* rareData = ensureRareSVGData();
+    if (SVGCursorElement* oldCursorElement = rareData->cursorElement()) {
+        if (cursorElement == oldCursorElement)
+            return;
+        oldCursorElement->removeReferencedElement(this);
+    }
+    rareData->setCursorElement(cursorElement);
+}
+
+void SVGElement::cursorElementRemoved() 
+{
+    ASSERT(hasRareSVGData());
+    rareSVGData()->setCursorElement(0);
 }
 
 void SVGElement::setCursorImageValue(CSSCursorImageValue* cursorImageValue)
 {
-    ensureRareSVGData()->setCursorImageValue(cursorImageValue);
+    SVGElementRareData* rareData = ensureRareSVGData();
+    if (CSSCursorImageValue* oldCursorImageValue = rareData->cursorImageValue()) {
+        if (cursorImageValue == oldCursorImageValue)
+            return;
+        oldCursorImageValue->removeReferencedElement(this);
+    }
+    rareData->setCursorImageValue(cursorImageValue);
+}
+
+void SVGElement::cursorImageElementRemoved()
+{
+    ASSERT(hasRareSVGData());
+    rareSVGData()->setCursorImageValue(0);
 }
 
 void SVGElement::parseMappedAttribute(Attribute* attr)

@@ -19,7 +19,7 @@ function shouldBeAround(a, b)
         evalA = e;
     }
 
-    if (Math.abs(evalA - b) < 10)
+    if (Math.abs(evalA - b) < 20)
         print("PASS " + a + " is around " + b , "green")
     else
         print("FAIL " + a + " is not around " + b + " (actual: " + evalA + ")", "red");
@@ -27,14 +27,15 @@ function shouldBeAround(a, b)
 
 var canvas = document.createElement('canvas');
 document.body.appendChild(canvas);
-canvas.setAttribute('width', '1000');
-canvas.setAttribute('height', '1000');
+canvas.setAttribute('width', '600');
+canvas.setAttribute('height', '600');
 var ctx = canvas.getContext('2d');
 
 ctx.scale(2, 2);
 ctx.shadowOffsetX = 100;
 ctx.shadowOffsetY = 100;
 ctx.strokeStyle = 'rgba(0, 0, 255, 1)';
+ctx.lineWidth = 5;
 
 ctx.shadowColor = 'rgba(255, 0, 0, 1.0)';
 ctx.beginPath();
@@ -76,79 +77,79 @@ ctx.stroke();
 var d; // imageData.data
 
 // Verify solid shadow.
-d = ctx.getImageData(200, 205, 1, 1).data;
+d = ctx.getImageData(250, 200, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
 shouldBe('d[3]', '255');
 
-d = ctx.getImageData(299, 295, 1, 1).data;
+d = ctx.getImageData(300, 290, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
 shouldBe('d[3]', '255');
 
-d = ctx.getImageData(201, 299, 1, 1).data;
+d = ctx.getImageData(200, 250, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
 shouldBe('d[3]', '255');
 
 // Verify solid alpha shadow.
-d = ctx.getImageData(200, 405, 1, 1).data;
+d = ctx.getImageData(201, 405, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
 shouldBeAround('d[3]', '76');
 
-d = ctx.getImageData(299, 405, 1, 1).data;
+d = ctx.getImageData(201, 500, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
 shouldBeAround('d[3]', '76');
 
-d = ctx.getImageData(205, 499, 1, 1).data;
+d = ctx.getImageData(300, 499, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
 shouldBeAround('d[3]', '76');
 
 // Verify blurry shadow.
-d = ctx.getImageData(394, 208, 1, 1).data;
+d = ctx.getImageData(398, 210, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
-shouldBeAround('d[3]', '20');
+shouldBeAround('d[3]', '200');
 
-d = ctx.getImageData(503, 301, 1, 1).data;
+d = ctx.getImageData(508, 250, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
-shouldBeAround('d[3]', '22');
+shouldBeAround('d[3]', '49');
 
-d = ctx.getImageData(504, 250, 1, 1).data;
+d = ctx.getImageData(450, 198, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
-shouldBeAround('d[3]', '28');
+shouldBeAround('d[3]', '199');
 
 // Verify blurry alpha shadow.
-d = ctx.getImageData(405, 405, 1, 1).data;
+d = ctx.getImageData(505, 450, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
-shouldBeAround('d[3]', '22');
+shouldBeAround('d[3]', '70');
 
-d = ctx.getImageData(415, 495, 1, 1).data;
+d = ctx.getImageData(505, 450, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
-shouldBeAround('d[3]', '15');
+shouldBeAround('d[3]', '70');
 
-d = ctx.getImageData(450, 504, 1, 1).data;
+d = ctx.getImageData(450, 405, 1, 1).data;
 shouldBe('d[0]', '255');
 shouldBe('d[1]', '0');
 shouldBe('d[2]', '0');
-shouldBeAround('d[3]', '17');
+shouldBeAround('d[3]', '69');
 
 var successfullyParsed = true;

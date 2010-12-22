@@ -25,12 +25,21 @@
 #include "SVGFESpecularLightingElement.h"
 
 #include "Attribute.h"
+#include "RenderStyle.h"
 #include "SVGColor.h"
 #include "SVGFELightElement.h"
 #include "SVGNames.h"
 #include "SVGParserUtilities.h"
 
 namespace WebCore {
+
+// Animated property definitions
+DEFINE_ANIMATED_STRING(SVGFESpecularLightingElement, SVGNames::inAttr, In1, in1)
+DEFINE_ANIMATED_NUMBER(SVGFESpecularLightingElement, SVGNames::specularConstantAttr, SpecularConstant, specularConstant)
+DEFINE_ANIMATED_NUMBER(SVGFESpecularLightingElement, SVGNames::specularExponentAttr, SpecularExponent, specularExponent)
+DEFINE_ANIMATED_NUMBER(SVGFESpecularLightingElement, SVGNames::surfaceScaleAttr, SurfaceScale, surfaceScale)
+DEFINE_ANIMATED_NUMBER_MULTIPLE_WRAPPERS(SVGFESpecularLightingElement, SVGNames::kernelUnitLengthAttr, kernelUnitLengthXIdentifier(), KernelUnitLengthX, kernelUnitLengthX)
+DEFINE_ANIMATED_NUMBER_MULTIPLE_WRAPPERS(SVGFESpecularLightingElement, SVGNames::kernelUnitLengthAttr, kernelUnitLengthYIdentifier(), KernelUnitLengthY, kernelUnitLengthY)
 
 inline SVGFESpecularLightingElement::SVGFESpecularLightingElement(const QualifiedName& tagName, Document* document)
     : SVGFilterPrimitiveStandardAttributes(tagName, document)

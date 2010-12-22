@@ -55,11 +55,11 @@ typedef WebView PlatformWebView;
 
 class LayerBackedDrawingAreaProxy : public DrawingAreaProxy {
 public:
-    static PassOwnPtr<LayerBackedDrawingAreaProxy> create(PlatformWebView*);
+    static PassOwnPtr<LayerBackedDrawingAreaProxy> create(PlatformWebView*, WebPageProxy*);
     virtual ~LayerBackedDrawingAreaProxy();
 
 private:
-    LayerBackedDrawingAreaProxy(PlatformWebView*);
+    LayerBackedDrawingAreaProxy(PlatformWebView*, WebPageProxy*);
 
     WebPageProxy* page();
 
@@ -68,13 +68,13 @@ private:
     virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, CoreIPC::ArgumentEncoder*);
 
     virtual void paint(const WebCore::IntRect&, PlatformDrawingContext);
-    virtual void setSize(const WebCore::IntSize&);
+    virtual void sizeDidChange();
     virtual void setPageIsVisible(bool isVisible);
 
     virtual void attachCompositingContext(uint32_t contextID);
     virtual void detachCompositingContext();
     
-    void didSetSize();
+    void didSetSize(const WebCore::IntSize&);
     void update();
     
     void platformSetSize();

@@ -29,6 +29,7 @@
 #include "APIClient.h"
 #include "WKPage.h"
 #include "WebEvent.h"
+#include "WebOpenPanelParameters.h"
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 
@@ -44,6 +45,8 @@ class APIObject;
 class NativeWebKeyboardEvent;
 class WebFrameProxy;
 class WebPageProxy;
+class WebSecurityOrigin;
+class WebOpenPanelResultListenerProxy;
 
 class WebUIClient : public APIClient<WKPageUIClient> {
 public:
@@ -57,7 +60,7 @@ public:
 
     void setStatusText(WebPageProxy*, const String&);
     void mouseDidMoveOverElement(WebPageProxy*, WebEvent::Modifiers, APIObject*);
-
+    void missingPluginButtonClicked(WebPageProxy*, const String& mimeType, const String& url);
     void didNotHandleKeyEvent(WebPageProxy*, const NativeWebKeyboardEvent&);
 
     bool toolbarsAreVisible(WebPageProxy*);
@@ -77,6 +80,10 @@ public:
 
     void didDraw(WebPageProxy*);
     void pageDidScroll(WebPageProxy*);
+
+    unsigned long long exceededDatabaseQuota(WebPageProxy*, WebFrameProxy*, WebSecurityOrigin*, const String& databaseName, const String& databaseDisplayName, unsigned long long currentQuota, unsigned long long currentUsage, unsigned long long expectedUsage);
+
+    bool runOpenPanel(WebPageProxy*, WebFrameProxy*, const WebOpenPanelParameters::Data&, WebOpenPanelResultListenerProxy*);
 };
 
 } // namespace WebKit

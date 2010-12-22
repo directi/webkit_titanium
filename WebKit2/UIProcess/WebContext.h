@@ -42,14 +42,12 @@
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
-struct WKContextStatistics;
-
 namespace WebKit {
 
 class DownloadProxy;
-class WebPageNamespace;
+class WebDatabaseManagerProxy;
+class WebPageGroup;
 class WebPageProxy;
-class WebPreferences;
 struct WebProcessCreationParameters;
 
 class WebContext : public APIObject {
@@ -72,16 +70,9 @@ public:
     void processDidFinishLaunching(WebProcessProxy*);
     void processDidClose(WebProcessProxy*);
 
-    WebPageProxy* createWebPage(WebPageNamespace*);
+    WebPageProxy* createWebPage(WebPageGroup* = 0);
 
     void relaunchProcessIfNecessary();
-
-    WebPageNamespace* createPageNamespace();
-    void pageNamespaceWasDestroyed(WebPageNamespace*);
-
-    void setPreferences(WebPreferences*);
-    WebPreferences* preferences() const;
-    void preferencesDidChange();
 
     const String& injectedBundlePath() const { return m_injectedBundlePath; }
 
@@ -96,11 +87,12 @@ public:
 
     void populateVisitedLinks();
     
-    void getStatistics(WKContextStatistics* statistics);
     void setAdditionalPluginsDirectory(const String&);
 
     PluginInfoStore* pluginInfoStore() { return &m_pluginInfoStore; }
     String applicationCacheDirectory();
+
+    void setAlwaysUsesComplexTextCodePath(bool);
     
     void registerURLSchemeAsEmptyDocument(const String&);
     void registerURLSchemeAsSecure(const String&);
@@ -125,6 +117,17 @@ public:
     uint64_t createDownloadProxy();
     WebDownloadClient& downloadClient() { return m_downloadClient; }
     void downloadFinished(DownloadProxy*);
+
+    static HashSet<String, CaseFoldingHash> pdfAndPostScriptMIMETypes();
+
+    WebDatabaseManagerProxy* databaseManagerProxy() const { return m_databaseManagerProxy.get(); }
+
+    struct Statistics {
+        unsigned wkViewCount;
+        unsigned wkPageCount;
+        unsigned wkFrameCount;
+    };
+    static Statistics& statistics();
 
 private:
     WebContext(ProcessModel, const String& injectedBundlePath);
@@ -157,8 +160,7 @@ private:
     // FIXME: In the future, this should be one or more WebProcessProxies.
     RefPtr<WebProcessProxy> m_process;
 
-    HashSet<WebPageNamespace*> m_pageNamespaces;
-    RefPtr<WebPreferences> m_preferences;
+    RefPtr<WebPageGroup> m_defaultPageGroup;
 
     RefPtr<APIObject> m_injectedBundleInitializationUserData;
     String m_injectedBundlePath;
@@ -173,12 +175,19 @@ private:
     HashSet<String> m_schemesToRegisterAsSecure;
     HashSet<String> m_schemesToSetDomainRelaxationForbiddenFor;
 
+    bool m_alwaysUsesComplexTextCodePath;
+
     Vector<pair<String, RefPtr<APIObject> > > m_pendingMessagesToPostToInjectedBundle;
 
     CacheModel m_cacheModel;
 
     WebDownloadClient m_downloadClient;
     HashMap<uint64_t, RefPtr<DownloadProxy> > m_downloads;
+
+    bool m_clearResourceCachesForNewWebProcess;
+    bool m_clearApplicationCacheForNewWebProcess;
+
+    RefPtr<WebDatabaseManagerProxy> m_databaseManagerProxy;
 
 #if PLATFORM(WIN)
     bool m_shouldPaintNativeControls;

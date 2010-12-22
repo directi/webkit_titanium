@@ -49,16 +49,20 @@ WK_EXPORT bool WKFrameIsMainFrame(WKFrameRef frame);
 WK_EXPORT WKFrameLoadState WKFrameGetFrameLoadState(WKFrameRef frame);
 WK_EXPORT WKURLRef WKFrameCopyProvisionalURL(WKFrameRef frame);
 WK_EXPORT WKURLRef WKFrameCopyURL(WKFrameRef frame);
-
 WK_EXPORT WKURLRef WKFrameCopyUnreachableURL(WKFrameRef frame);
 
 WK_EXPORT WKStringRef WKFrameCopyMIMEType(WKFrameRef frame);
+WK_EXPORT WKStringRef WKFrameCopyTitle(WKFrameRef frame);
 
 WK_EXPORT WKPageRef WKFrameGetPage(WKFrameRef frame);
 
 WK_EXPORT WKCertificateInfoRef WKFrameGetCertificateInfo(WKFrameRef frame);
 
 WK_EXPORT bool WKFrameCanProvideSource(WKFrameRef frame);
+WK_EXPORT bool WKFrameCanShowMIMEType(WKFrameRef frame, WKStringRef mimeType);
+
+WK_EXPORT bool WKFrameIsDisplayingStandaloneImageDocument(WKFrameRef frame);
+WK_EXPORT bool WKFrameIsDisplayingMarkupDocument(WKFrameRef frame);
 
 WK_EXPORT bool WKFrameIsFrameSet(WKFrameRef frame);
 

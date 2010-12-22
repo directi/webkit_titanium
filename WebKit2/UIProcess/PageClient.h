@@ -69,15 +69,20 @@ public:
     virtual void clearAllEditCommands() = 0;
     virtual void setEditCommandState(const String& commandName, bool isEnabled, int state) = 0;
 #if PLATFORM(MAC)
-    virtual void interceptKeyEvent(const NativeWebKeyboardEvent&, Vector<WebCore::KeypressCommand>&) = 0;
+    virtual void interceptKeyEvent(const NativeWebKeyboardEvent&, Vector<WebCore::KeypressCommand>&, uint32_t, uint32_t, Vector<WebCore::CompositionUnderline>&) = 0;
+    virtual void selectionChanged(bool, bool, bool, bool, uint64_t, uint64_t) = 0;
+#else
+    virtual void selectionChanged(bool, bool, bool, bool) = 0;
+#endif
+#if PLATFORM(WIN)
+    virtual void compositionSelectionChanged(bool) = 0;
 #endif
     virtual WebCore::FloatRect convertToDeviceSpace(const WebCore::FloatRect&) = 0;
     virtual WebCore::FloatRect convertToUserSpace(const WebCore::FloatRect&) = 0;
 
     virtual void didNotHandleKeyEvent(const NativeWebKeyboardEvent&) = 0;
-    virtual void selectionChanged(bool, bool, bool, bool) = 0;
 
-    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy() = 0;
+    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) = 0;
     virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) = 0;
 
     virtual void setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut) = 0;
@@ -90,6 +95,14 @@ public:
 #if PLATFORM(WIN)
     virtual HWND nativeWindow() = 0;
 #endif
+
+#if PLATFORM(MAC)
+    virtual void setComplexTextInputEnabled(uint64_t pluginComplexTextInputIdentifier, bool complexTextInputEnabled) = 0;
+#endif
+
+    // Custom representations.
+    virtual void didCommitLoadForMainFrame(bool useCustomRepresentation) = 0;
+    virtual void didFinishLoadingDataForCustomRepresentation(const CoreIPC::DataReference&) = 0;
 };
 
 } // namespace WebKit

@@ -130,12 +130,13 @@ private:
     virtual void updateSpellingUIWithMisspelledWord(const String&);
     virtual void showSpellingUI(bool show);
     virtual bool spellingUIIsShowing();
-    virtual void getGuessesForWord(const String&, Vector<String>& guesses);
+    virtual void getGuessesForWord(const String& word, const String& context, Vector<String>& guesses);
     virtual void willSetInputMethodState();
     virtual void setInputMethodState(bool enabled);
+    virtual void requestCheckingOfString(WebCore::SpellChecker*, int, const WTF::String&);
 #if PLATFORM(MAC) && !defined(BUILDING_ON_TIGER) && !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
-    virtual void showCorrectionPanel(WebCore::CorrectionPanelInfo::PanelType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, WebCore::Editor*);
-    virtual void dismissCorrectionPanel(WebCore::CorrectionWasRejectedOrNot);
+    virtual void showCorrectionPanel(WebCore::CorrectionPanelInfo::PanelType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings, WebCore::Editor*);
+    virtual void dismissCorrectionPanel(WebCore::ReasonForDismissingCorrectionPanel);
     virtual bool isShowingCorrectionPanel();
 #endif
     WebPage* m_page;

@@ -62,7 +62,6 @@ public:
 
     // Create a graphics context that can be used to paint into the backing store.
     PassOwnPtr<WebCore::GraphicsContext> createGraphicsContext();
-    PassOwnPtr<WebCore::GraphicsContext> createFlippedGraphicsContext();
 
     // Paint the backing store into the given context.
     void paint(WebCore::GraphicsContext&, const WebCore::IntPoint& dstPoint, const WebCore::IntRect& srcRect);
@@ -72,7 +71,10 @@ private:
     BackingStore(const WebCore::IntSize&, PassRefPtr<SharedMemory>);
 
     bool isBackedBySharedMemory() const { return m_sharedMemory; }
+    static size_t numBytesForSize(const WebCore::IntSize& size) { return size.width() * size.height() * 4; }
+
     void* data() const;
+    size_t sizeInBytes() const { return numBytesForSize(m_size); }
 
     WebCore::IntSize m_size;
 

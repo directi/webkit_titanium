@@ -159,7 +159,6 @@ public:
     // properly added and removed.  Since containership can be implemented by any subclass, and since a hierarchy
     // can contain a mixture of boxes and other object types, these functions need to be in the base class.
     RenderLayer* enclosingLayer() const;
-    RenderLayer* enclosingSelfPaintingLayer() const;
     void addLayers(RenderLayer* parentLayer, RenderObject* newObject);
     void removeLayers(RenderLayer* parentLayer);
     void moveLayers(RenderLayer* oldParent, RenderLayer* newParent);
@@ -240,6 +239,8 @@ public:
     virtual bool isBlockFlow() const { return false; }
     virtual bool isBoxModelObject() const { return false; }
     virtual bool isCounter() const { return false; }
+    virtual bool isDetails() const { return false; }
+    virtual bool isDetailsMarker() const { return false; }
     virtual bool isEmbeddedObject() const { return false; }
     virtual bool isFieldset() const { return false; }
     virtual bool isFileUploadControl() const { return false; }
@@ -273,6 +274,7 @@ public:
     virtual bool isRubyText() const { return false; }
 
     virtual bool isSlider() const { return false; }
+    virtual bool isSummary() const { return false; }
     virtual bool isTable() const { return false; }
     virtual bool isTableCell() const { return false; }
     virtual bool isTableCol() const { return false; }
@@ -672,6 +674,7 @@ public:
     // Obtains the selection colors that should be used when painting a selection.
     Color selectionBackgroundColor() const;
     Color selectionForegroundColor() const;
+    Color selectionEmphasisMarkColor() const;
 
     // Whether or not a given block needs to paint selection gaps.
     virtual bool shouldPaintSelectionGaps() const { return false; }
@@ -793,6 +796,8 @@ protected:
 private:
     RenderStyle* firstLineStyleSlowCase() const;
     StyleDifference adjustStyleDifference(StyleDifference, unsigned contextSensitiveProperties) const;
+
+    Color selectionColor(int colorProperty) const;
     
     RefPtr<RenderStyle> m_style;
 

@@ -26,6 +26,7 @@
 #ifndef IDBDatabaseError_h
 #define IDBDatabaseError_h
 
+#include "IDBDatabaseException.h"
 #include "PlatformString.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -38,8 +39,17 @@ class IDBDatabaseError : public RefCounted<IDBDatabaseError> {
 public:
     static PassRefPtr<IDBDatabaseError> create(unsigned short code, const String& message)
     {
+        ASSERT(code >= IDBDatabaseException::IDBDatabaseExceptionOffset);
+        ASSERT(code < IDBDatabaseException::IDBDatabaseExceptionMax);
+        return adoptRef(new IDBDatabaseError(code - IDBDatabaseException::IDBDatabaseExceptionOffset, message));
+    }
+
+    static PassRefPtr<IDBDatabaseError> createWithoutOffset(unsigned short code, const String& message)
+    {
+        ASSERT(code < IDBDatabaseException::IDBDatabaseExceptionOffset);
         return adoptRef(new IDBDatabaseError(code, message));
     }
+
     ~IDBDatabaseError() { }
 
     unsigned short code() const { return m_code; }

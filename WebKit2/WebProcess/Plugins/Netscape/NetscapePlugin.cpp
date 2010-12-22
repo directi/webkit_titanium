@@ -40,6 +40,17 @@ using namespace std;
 
 namespace WebKit {
 
+// The plug-in that we're currently calling NPP_New for.
+static NetscapePlugin* currentNPPNewPlugin;
+
+PassRefPtr<NetscapePlugin> NetscapePlugin::create(PassRefPtr<NetscapePluginModule> pluginModule)
+{
+    if (!pluginModule)
+        return 0;
+
+    return adoptRef(new NetscapePlugin(pluginModule));
+}
+    
 NetscapePlugin::NetscapePlugin(PassRefPtr<NetscapePluginModule> pluginModule)
     : m_pluginController(0)
     , m_nextRequestID(0)
@@ -56,6 +67,8 @@ NetscapePlugin::NetscapePlugin(PassRefPtr<NetscapePluginModule> pluginModule)
 #if PLATFORM(MAC)
     , m_drawingModel(static_cast<NPDrawingModel>(-1))
     , m_eventModel(static_cast<NPEventModel>(-1))
+    , m_pluginHasFocus(false)
+    , m_windowHasFocus(false)
 #ifndef NP_NO_CARBON
     , m_nullEventTimer(RunLoop::main(), this, &NetscapePlugin::nullEventTimerFired)
     , m_npCGContext()
@@ -99,6 +112,17 @@ void NetscapePlugin::invalidate(const NPRect* invalidRect)
         return;
 
     m_pluginController->invalidate(rect);
+}
+
+const char* NetscapePlugin::userAgent(NPP npp)
+{
+    if (npp)
+        return fromNPP(npp)->userAgent();
+
+    if (currentNPPNewPlugin)
+        return currentNPPNewPlugin->userAgent();
+
+    return 0;
 }
 
 const char* NetscapePlugin::userAgent()
@@ -358,7 +382,6 @@ bool NetscapePlugin::initialize(PluginController* pluginController, const Parame
     uint16_t mode = parameters.loadManually ? NP_FULL : NP_EMBED;
     
     m_loadManually = parameters.loadManually;
-    m_inNPPNew = true;
 
     CString mimeTypeCString = parameters.mimeType.utf8();
 
@@ -378,10 +401,17 @@ bool NetscapePlugin::initialize(PluginController* pluginController, const Parame
         names.append(paramNames[i].data());
         values.append(paramValues[i].data());
     }
+
+    NetscapePlugin* previousNPPNewPlugin = currentNPPNewPlugin;
     
+    m_inNPPNew = true;
+    currentNPPNewPlugin = this;
+
     NPError error = NPP_New(const_cast<char*>(mimeTypeCString.data()), mode, names.size(),
                             const_cast<char**>(names.data()), const_cast<char**>(values.data()), 0);
+
     m_inNPPNew = false;
+    currentNPPNewPlugin = previousNPPNewPlugin;
 
     if (error != NPERR_NO_ERROR)
         return false;
@@ -443,6 +473,8 @@ void NetscapePlugin::geometryDidChange(const IntRect& frameRect, const IntRect& 
 
 void NetscapePlugin::frameDidFinishLoading(uint64_t requestID)
 {
+    ASSERT(m_isStarted);
+    
     PendingURLNotifyMap::iterator it = m_pendingURLNotifications.find(requestID);
     if (it == m_pendingURLNotifications.end())
         return;
@@ -457,6 +489,8 @@ void NetscapePlugin::frameDidFinishLoading(uint64_t requestID)
 
 void NetscapePlugin::frameDidFail(uint64_t requestID, bool wasCancelled)
 {
+    ASSERT(m_isStarted);
+    
     PendingURLNotifyMap::iterator it = m_pendingURLNotifications.find(requestID);
     if (it == m_pendingURLNotifications.end())
         return;
@@ -471,6 +505,8 @@ void NetscapePlugin::frameDidFail(uint64_t requestID, bool wasCancelled)
 
 void NetscapePlugin::didEvaluateJavaScript(uint64_t requestID, const String& requestURLString, const String& result)
 {
+    ASSERT(m_isStarted);
+    
     if (NetscapePluginStream* pluginStream = streamFromID(requestID))
         pluginStream->sendJavaScriptStream(requestURLString, result);
 }
@@ -478,24 +514,32 @@ void NetscapePlugin::didEvaluateJavaScript(uint64_t requestID, const String& req
 void NetscapePlugin::streamDidReceiveResponse(uint64_t streamID, const KURL& responseURL, uint32_t streamLength, 
                                               uint32_t lastModifiedTime, const String& mimeType, const String& headers)
 {
+    ASSERT(m_isStarted);
+    
     if (NetscapePluginStream* pluginStream = streamFromID(streamID))
         pluginStream->didReceiveResponse(responseURL, streamLength, lastModifiedTime, mimeType, headers);
 }
 
 void NetscapePlugin::streamDidReceiveData(uint64_t streamID, const char* bytes, int length)
 {
+    ASSERT(m_isStarted);
+    
     if (NetscapePluginStream* pluginStream = streamFromID(streamID))
         pluginStream->didReceiveData(bytes, length);
 }
 
 void NetscapePlugin::streamDidFinishLoading(uint64_t streamID)
 {
+    ASSERT(m_isStarted);
+    
     if (NetscapePluginStream* pluginStream = streamFromID(streamID))
         pluginStream->didFinishLoading();
 }
 
 void NetscapePlugin::streamDidFail(uint64_t streamID, bool wasCancelled)
 {
+    ASSERT(m_isStarted);
+    
     if (NetscapePluginStream* pluginStream = streamFromID(streamID))
         pluginStream->didFail(wasCancelled);
 }
@@ -503,6 +547,7 @@ void NetscapePlugin::streamDidFail(uint64_t streamID, bool wasCancelled)
 void NetscapePlugin::manualStreamDidReceiveResponse(const KURL& responseURL, uint32_t streamLength, uint32_t lastModifiedTime, 
                                                     const String& mimeType, const String& headers)
 {
+    ASSERT(m_isStarted);
     ASSERT(m_loadManually);
     ASSERT(!m_manualStream);
     
@@ -512,6 +557,7 @@ void NetscapePlugin::manualStreamDidReceiveResponse(const KURL& responseURL, uin
 
 void NetscapePlugin::manualStreamDidReceiveData(const char* bytes, int length)
 {
+    ASSERT(m_isStarted);
     ASSERT(m_loadManually);
     ASSERT(m_manualStream);
 
@@ -520,6 +566,7 @@ void NetscapePlugin::manualStreamDidReceiveData(const char* bytes, int length)
 
 void NetscapePlugin::manualStreamDidFinishLoading()
 {
+    ASSERT(m_isStarted);
     ASSERT(m_loadManually);
     ASSERT(m_manualStream);
 
@@ -528,6 +575,7 @@ void NetscapePlugin::manualStreamDidFinishLoading()
 
 void NetscapePlugin::manualStreamDidFail(bool wasCancelled)
 {
+    ASSERT(m_isStarted);
     ASSERT(m_loadManually);
     ASSERT(m_manualStream);
 
@@ -536,36 +584,49 @@ void NetscapePlugin::manualStreamDidFail(bool wasCancelled)
 
 bool NetscapePlugin::handleMouseEvent(const WebMouseEvent& mouseEvent)
 {
+    ASSERT(m_isStarted);
+    
     return platformHandleMouseEvent(mouseEvent);
 }
     
 bool NetscapePlugin::handleWheelEvent(const WebWheelEvent& wheelEvent)
 {
+    ASSERT(m_isStarted);
+
     return platformHandleWheelEvent(wheelEvent);
 }
 
 bool NetscapePlugin::handleMouseEnterEvent(const WebMouseEvent& mouseEvent)
 {
+    ASSERT(m_isStarted);
+
     return platformHandleMouseEnterEvent(mouseEvent);
 }
 
 bool NetscapePlugin::handleMouseLeaveEvent(const WebMouseEvent& mouseEvent)
 {
+    ASSERT(m_isStarted);
+
     return platformHandleMouseLeaveEvent(mouseEvent);
 }
 
 bool NetscapePlugin::handleKeyboardEvent(const WebKeyboardEvent& keyboardEvent)
 {
+    ASSERT(m_isStarted);
+
     return platformHandleKeyboardEvent(keyboardEvent);
 }
 
 void NetscapePlugin::setFocus(bool hasFocus)
 {
+    ASSERT(m_isStarted);
+
     platformSetFocus(hasFocus);
 }
 
 NPObject* NetscapePlugin::pluginScriptableNPObject()
 {
+    ASSERT(m_isStarted);
     NPObject* scriptableNPObject = 0;
     
     if (NPP_GetValue(NPPVpluginScriptableNPObject, &scriptableNPObject) != NPERR_NO_ERROR)
@@ -576,6 +637,8 @@ NPObject* NetscapePlugin::pluginScriptableNPObject()
 
 void NetscapePlugin::privateBrowsingStateChanged(bool privateBrowsingEnabled)
 {
+    ASSERT(m_isStarted);
+
     // From https://wiki.mozilla.org/Plugins:PrivateMode
     //   When the browser turns private mode on or off it will call NPP_SetValue for "NPNVprivateModeBool" 
     //   (assigned enum value 18) with a pointer to an NPBool value on all applicable instances.

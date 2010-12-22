@@ -33,6 +33,8 @@
 #include "WebFrame.h"
 
 #include <WebCore/MediaCanStartListener.h>
+#include <WebCore/ResourceError.h>
+#include <WebCore/ResourceResponse.h>
 #include <WebCore/PluginViewBase.h>
 #include <wtf/Deque.h>
 
@@ -61,7 +63,8 @@ public:
 #if PLATFORM(MAC)
     void setWindowIsVisible(bool);
     void setWindowIsFocused(bool);
-    void setWindowFrame(const WebCore::IntRect&);
+    void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
+    bool sendComplexTextInput(uint64_t pluginComplexTextInputIdentifier, const String& textInput);
 #endif
 
 private:
@@ -89,6 +92,8 @@ private:
     void addStream(Stream*);
     void removeStream(Stream*);
     void cancelAllStreams();
+
+    void redeliverManualStream();
 
     // WebCore::PluginViewBase
 #if PLATFORM(MAC)
@@ -125,6 +130,9 @@ private:
 #if PLATFORM(WIN)
     virtual HWND nativeParentWindow();
 #endif
+#if PLATFORM(MAC)
+    virtual void setComplexTextInputEnabled(bool);
+#endif
     virtual String proxiesForURL(const String&);
     virtual String cookiesForURL(const String&);
     virtual void setCookiesForURL(const String& urlString, const String& cookieString);
@@ -156,6 +164,20 @@ private:
 
     // A map of all related NPObjects for this plug-in view.
     NPRuntimeObjectMap m_npRuntimeObjectMap;
+
+    // The manual stream state. This is used so we can deliver a manual stream to a plug-in
+    // when it is initialized.
+    enum ManualStreamState {
+        StreamStateInitial,
+        StreamStateHasReceivedResponse,
+        StreamStateFinished,
+        StreamStateFailed
+    };
+    ManualStreamState m_manualStreamState;
+
+    WebCore::ResourceResponse m_manualStreamResponse;
+    WebCore::ResourceError m_manualStreamError;
+    RefPtr<WebCore::SharedBuffer> m_manualStreamData;
 };
 
 } // namespace WebKit

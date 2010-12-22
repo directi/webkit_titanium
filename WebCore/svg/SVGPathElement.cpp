@@ -26,6 +26,7 @@
 #include "Attribute.h"
 #include "RenderSVGPath.h"
 #include "RenderSVGResource.h"
+#include "SVGNames.h"
 #include "SVGPathParserFactory.h"
 #include "SVGPathSegArc.h"
 #include "SVGPathSegClosePath.h"
@@ -43,6 +44,10 @@
 #include "SVGSVGElement.h"
 
 namespace WebCore {
+
+// Animated property definitions
+DEFINE_ANIMATED_NUMBER(SVGPathElement, SVGNames::pathLengthAttr, PathLength, pathLength)
+DEFINE_ANIMATED_BOOLEAN(SVGPathElement, SVGNames::externalResourcesRequiredAttr, ExternalResourcesRequired, externalResourcesRequired)
 
 inline SVGPathElement::SVGPathElement(const QualifiedName& tagName, Document* document)
     : SVGStyledTransformableElement(tagName, document)

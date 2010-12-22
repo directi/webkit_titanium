@@ -25,17 +25,22 @@
 
 #include "NetscapePlugin.h"
 
-#include "NotImplemented.h"
+#include "PluginController.h"
 #include "WebEvent.h"
 #include <WebCore/GraphicsContext.h>
+#include <Carbon/Carbon.h>
+#include <WebKitSystemInterface.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-#ifndef NP_NO_QUICKDRAW
+#ifndef NP_NO_CARBON
 static const double nullEventIntervalActive = 0.02;
 static const double nullEventIntervalNotActive = 0.25;
+
+static unsigned buttonStateFromLastMouseEvent;
+
 #endif
 
 NPError NetscapePlugin::setDrawingModel(NPDrawingModel drawingModel)
@@ -80,6 +85,88 @@ NPError NetscapePlugin::setEventModel(NPEventModel eventModel)
     
     return NPERR_NO_ERROR;
 }
+
+static double flipScreenYCoordinate(double y)
+{
+    return [[[NSScreen screens] objectAtIndex:0] frame].size.height - y;
+}
+
+NPBool NetscapePlugin::convertPoint(double sourceX, double sourceY, NPCoordinateSpace sourceSpace, double& destX, double& destY, NPCoordinateSpace destSpace)
+{
+    if (sourceSpace == destSpace) {
+        destX = sourceX;
+        destY = sourceY;
+        return true;
+    }
+
+    double sourceXInScreenSpace;
+    double sourceYInScreenSpace;
+
+    FloatPoint sourceInScreenSpace;
+    switch (sourceSpace) {
+    case NPCoordinateSpacePlugin:
+        sourceXInScreenSpace = sourceX + m_windowFrameInScreenCoordinates.x() + m_viewFrameInWindowCoordinates.x() + m_npWindow.x;
+        sourceYInScreenSpace = m_windowFrameInScreenCoordinates.y() + m_viewFrameInWindowCoordinates.y() + m_viewFrameInWindowCoordinates.height() - (sourceY + m_npWindow.y);
+        break;
+    case NPCoordinateSpaceWindow:
+        sourceXInScreenSpace = sourceX + m_windowFrameInScreenCoordinates.x();
+        sourceYInScreenSpace = sourceY + m_windowFrameInScreenCoordinates.y();
+        break;
+    case NPCoordinateSpaceFlippedWindow:
+        sourceXInScreenSpace = sourceX + m_windowFrameInScreenCoordinates.x();
+        sourceYInScreenSpace = m_windowFrameInScreenCoordinates.y() + m_windowFrameInScreenCoordinates.height() - sourceY;
+        break;
+    case NPCoordinateSpaceScreen:
+        sourceXInScreenSpace = sourceX;
+        sourceYInScreenSpace = sourceY;
+        break;
+    case NPCoordinateSpaceFlippedScreen:
+        sourceXInScreenSpace = sourceX;
+        sourceYInScreenSpace = flipScreenYCoordinate(sourceY);
+    default:
+        return false;
+    }
+
+    // Now convert back.
+    switch (destSpace) {
+    case NPCoordinateSpacePlugin:
+        destX = sourceXInScreenSpace - (m_windowFrameInScreenCoordinates.x() + m_viewFrameInWindowCoordinates.x() + m_npWindow.x);
+        destY = m_windowFrameInScreenCoordinates.y() + m_viewFrameInWindowCoordinates.y() + m_viewFrameInWindowCoordinates.height() - (sourceYInScreenSpace + m_npWindow.y);
+        break;
+    case NPCoordinateSpaceWindow:
+        destX = sourceXInScreenSpace - m_windowFrameInScreenCoordinates.x();
+        destY = sourceYInScreenSpace - m_windowFrameInScreenCoordinates.y();
+        break;
+    case NPCoordinateSpaceFlippedWindow:
+        destX = sourceXInScreenSpace - m_windowFrameInScreenCoordinates.x();
+        destY = sourceYInScreenSpace - m_windowFrameInScreenCoordinates.y();
+        destY = m_windowFrameInScreenCoordinates.height() - destY;
+        break;
+    case NPCoordinateSpaceScreen:
+        destX = sourceXInScreenSpace;
+        destY = sourceYInScreenSpace;
+        break;
+    case NPCoordinateSpaceFlippedScreen:
+        destX = sourceXInScreenSpace;
+        destY = flipScreenYCoordinate(sourceYInScreenSpace);
+        break;
+    default:
+        return false;
+    }
+
+    return true;
+}
+
+#ifndef NP_NO_CARBON
+typedef HashMap<WindowRef, NetscapePlugin*> WindowMap;
+
+static WindowMap& windowMap()
+{
+    DEFINE_STATIC_LOCAL(WindowMap, windowMap, ());
+
+    return windowMap;
+}
+#endif
 
 bool NetscapePlugin::platformPostInitialize()
 {
@@ -131,12 +218,15 @@ bool NetscapePlugin::platformPostInitialize()
     if (m_eventModel == NPEventModelCarbon) {
         // Initialize the fake Carbon window.
         ::Rect bounds = { 0, 0, 0, 0 };
-        CreateNewWindow(kDocumentWindowClass, 0, &bounds, reinterpret_cast<WindowRef*>(&m_npCGContext.window));
+        CreateNewWindow(kDocumentWindowClass, kWindowNoTitleBarAttribute, &bounds, reinterpret_cast<WindowRef*>(&m_npCGContext.window));
         ASSERT(m_npCGContext.window);
 
         // FIXME: Disable the backing store.
 
         m_npWindow.window = &m_npCGContext;
+
+        ASSERT(!windowMap().contains(windowRef()));
+        windowMap().set(windowRef(), this);
 
         // Start the null event timer.
         // FIXME: Throttle null events when the plug-in isn't visible on screen.
@@ -151,9 +241,13 @@ void NetscapePlugin::platformDestroy()
 {
 #ifndef NP_NO_CARBON
     if (m_eventModel == NPEventModelCarbon) {
-        // Destroy the fake Carbon window.
-        if (m_npCGContext.window)
-            DisposeWindow(static_cast<WindowRef>(m_npCGContext.window));
+        if (WindowRef window = windowRef()) {
+            // Destroy the fake Carbon window.
+            DisposeWindow(window);
+
+            ASSERT(windowMap().contains(window));
+            windowMap().remove(window);
+        }
 
         // Stop the null event timer.
         m_nullEventTimer.stop();
@@ -181,11 +275,21 @@ static inline NPCocoaEvent initializeEvent(NPCocoaEventType type)
 }
 
 #ifndef NP_NO_CARBON
+NetscapePlugin* NetscapePlugin::netscapePluginFromWindow(WindowRef windowRef)
+{
+    return windowMap().get(windowRef);
+}
+
 WindowRef NetscapePlugin::windowRef() const
 {
     ASSERT(m_eventModel == NPEventModelCarbon);
 
     return reinterpret_cast<WindowRef>(m_npCGContext.window);
+}
+
+unsigned NetscapePlugin::buttonState()
+{
+    return buttonStateFromLastMouseEvent;
 }
 
 static inline EventRecord initializeEventRecord(EventKind eventKind)
@@ -362,7 +466,6 @@ static NPCocoaEvent initializeMouseEvent(const WebMouseEvent& mouseEvent, const 
 
     NPCocoaEvent event = initializeEvent(eventType);
     fillInCocoaEventFromMouseEvent(event, mouseEvent, pluginLocation);
-
     return event;
 }
 
@@ -381,9 +484,11 @@ bool NetscapePlugin::platformHandleMouseEvent(const WebMouseEvent& mouseEvent)
             switch (mouseEvent.type()) {
             case WebEvent::MouseDown:
                 eventKind = mouseDown;
+                buttonStateFromLastMouseEvent |= (1 << buttonNumber(mouseEvent.button()));
                 break;
             case WebEvent::MouseUp:
                 eventKind = mouseUp;
+                buttonStateFromLastMouseEvent &= ~(1 << buttonNumber(mouseEvent.button()));
                 break;
             case WebEvent::MouseMove:
                 eventKind = nullEvent;
@@ -393,8 +498,10 @@ bool NetscapePlugin::platformHandleMouseEvent(const WebMouseEvent& mouseEvent)
             }
 
             EventRecord event = initializeEventRecord(eventKind);
+            event.modifiers = modifiersForEvent(mouseEvent);
             event.where.h = mouseEvent.globalPosition().x();
             event.where.v = mouseEvent.globalPosition().y();
+
             return NPP_HandleEvent(&event);
         }
 #endif
@@ -533,13 +640,35 @@ static NPCocoaEvent initializeKeyboardEvent(const WebKeyboardEvent& keyboardEven
 bool NetscapePlugin::platformHandleKeyboardEvent(const WebKeyboardEvent& keyboardEvent)
 {
     switch (m_eventModel) {
-        case NPEventModelCocoa: {
-            NPCocoaEvent event  = initializeKeyboardEvent(keyboardEvent);
-            return NPP_HandleEvent(&event);
-        }
+    case NPEventModelCocoa: {
+        NPCocoaEvent event = initializeKeyboardEvent(keyboardEvent);
+        return NPP_HandleEvent(&event);
+    }
 
+#ifndef NP_NO_CARBON
+    case NPEventModelCarbon: {
+        EventKind eventKind = nullEvent;
+
+        switch (keyboardEvent.type()) {
+        case WebEvent::KeyDown:
+            eventKind = keyboardEvent.isAutoRepeat() ? autoKey : keyDown;
+            break;
+        case WebEvent::KeyUp:
+            eventKind = keyUp;
+            break;
         default:
             ASSERT_NOT_REACHED();
+        }
+
+        EventRecord event = initializeEventRecord(eventKind);
+        event.modifiers = modifiersForEvent(keyboardEvent);
+        event.message = keyboardEvent.nativeVirtualKeyCode() << 8 | keyboardEvent.macCharCode();
+        return NPP_HandleEvent(&event);
+    }
+#endif
+
+    default:
+        ASSERT_NOT_REACHED();
     }
 
     return false;
@@ -547,6 +676,9 @@ bool NetscapePlugin::platformHandleKeyboardEvent(const WebKeyboardEvent& keyboar
 
 void NetscapePlugin::platformSetFocus(bool hasFocus)
 {
+    m_pluginHasFocus = hasFocus;
+    m_pluginController->setComplexTextInputEnabled(m_pluginHasFocus && m_windowHasFocus);
+
     switch (m_eventModel) {
         case NPEventModelCocoa: {
             NPCocoaEvent event = initializeEvent(NPCocoaEventFocusChanged);
@@ -572,6 +704,9 @@ void NetscapePlugin::platformSetFocus(bool hasFocus)
 
 void NetscapePlugin::windowFocusChanged(bool hasFocus)
 {
+    m_windowHasFocus = hasFocus;
+    m_pluginController->setComplexTextInputEnabled(m_pluginHasFocus && m_windowHasFocus);
+
     switch (m_eventModel) {
         case NPEventModelCocoa: {
             NPCocoaEvent event = initializeEvent(NPCocoaEventWindowFocusChanged);
@@ -602,8 +737,31 @@ void NetscapePlugin::windowFocusChanged(bool hasFocus)
     }
 }
 
-void NetscapePlugin::windowFrameChanged(const IntRect& windowFrame)
+#ifndef NP_NO_CARBON
+static Rect computeFakeWindowBoundsRect(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates)
 {
+    // Carbon global coordinates has the origin set at the top left corner of the main viewing screen, so we want to flip the y coordinate.
+    CGFloat maxY = NSMaxY([[[NSScreen screens] objectAtIndex:0] frame]);
+
+    int flippedWindowFrameYCoordinate = maxY - windowFrameInScreenCoordinates.bottom();
+    int flippedViewFrameYCoordinate = windowFrameInScreenCoordinates.height() - viewFrameInWindowCoordinates.bottom();
+
+    Rect bounds;
+    
+    bounds.top = flippedWindowFrameYCoordinate + flippedViewFrameYCoordinate;
+    bounds.left = windowFrameInScreenCoordinates.x();
+    bounds.right = bounds.left + viewFrameInWindowCoordinates.width();
+    bounds.bottom = bounds.top + viewFrameInWindowCoordinates.height();
+    
+    return bounds;
+}
+#endif
+
+void NetscapePlugin::windowAndViewFramesChanged(const IntRect& windowFrameInScreenCoordinates, const IntRect& viewFrameInWindowCoordinates)
+{
+    m_windowFrameInScreenCoordinates = windowFrameInScreenCoordinates;
+    m_viewFrameInWindowCoordinates = viewFrameInWindowCoordinates;
+
     switch (m_eventModel) {
         case NPEventModelCocoa:
             // Nothing to do.
@@ -611,11 +769,7 @@ void NetscapePlugin::windowFrameChanged(const IntRect& windowFrame)
 
 #ifndef NP_NO_CARBON
         case NPEventModelCarbon: {
-            ::Rect bounds;
-            bounds.top = windowFrame.y() + windowFrame.height();
-            bounds.left = windowFrame.x();
-            bounds.right = windowFrame.right();
-            bounds.bottom = windowFrame.y();
+            Rect bounds = computeFakeWindowBoundsRect(windowFrameInScreenCoordinates, viewFrameInWindowCoordinates);
 
             ::SetWindowBounds(windowRef(), kWindowStructureRgn, &bounds);
             break;
@@ -631,7 +785,87 @@ void NetscapePlugin::windowVisibilityChanged(bool)
 {
     // FIXME: Implement.
 }
+
+uint64_t NetscapePlugin::pluginComplexTextInputIdentifier() const
+{
+    // This is never called for NetscapePlugin.
+    ASSERT_NOT_REACHED();
+    return 0;
+}
+
+
+#ifndef NP_NO_CARBON
+static bool convertStringToKeyCodes(const String& string, ScriptCode scriptCode, Vector<UInt8>& keyCodes)
+{
+    // Create the mapping.
+    UnicodeMapping mapping;
+
+    if (GetTextEncodingFromScriptInfo(scriptCode, kTextLanguageDontCare, kTextRegionDontCare, &mapping.otherEncoding) != noErr)
+        return false;
+
+    mapping.unicodeEncoding = CreateTextEncoding(kTextEncodingUnicodeDefault, kTextEncodingDefaultVariant, kTextEncodingDefaultFormat);
+    mapping.mappingVersion = kUnicodeUseLatestMapping;
     
+    // Create the converter
+    UnicodeToTextInfo textInfo;
+    
+    if (CreateUnicodeToTextInfo(&mapping, &textInfo) != noErr)
+        return false;
+    
+    ByteCount inputLength = string.length() * sizeof(UniChar);
+    ByteCount inputRead;
+    ByteCount outputLength;
+    ByteCount maxOutputLength = string.length() * sizeof(UniChar);
+
+    Vector<UInt8> outputData(maxOutputLength);
+    OSStatus status = ConvertFromUnicodeToText(textInfo, inputLength, string.characters(), kNilOptions, 0, 0, 0, 0, maxOutputLength, &inputRead, &outputLength, outputData.data());
+    
+    DisposeUnicodeToTextInfo(&textInfo);
+    
+    if (status != noErr)
+        return false;
+
+    outputData.swap(keyCodes);
+    return true;
+}
+#endif
+
+void NetscapePlugin::sendComplexTextInput(const String& textInput)
+{
+    switch (m_eventModel) {
+    case NPEventModelCocoa: {
+        NPCocoaEvent event = initializeEvent(NPCocoaEventTextInput);
+        event.data.text.text = reinterpret_cast<NPNSString*>(static_cast<NSString*>(textInput));
+        NPP_HandleEvent(&event);
+        break;
+    }
+#ifndef NP_NO_CARBON
+    case NPEventModelCarbon: {
+        ScriptCode scriptCode = WKGetScriptCodeFromCurrentKeyboardInputSource();
+        Vector<UInt8> keyCodes;
+
+        if (!convertStringToKeyCodes(textInput, scriptCode, keyCodes))
+            return;
+
+        // Set the script code as the keyboard script. Normally Carbon does this whenever the input source changes.
+        // However, this is only done for the process that has the keyboard focus. We cheat and do it here instead.
+        SetScriptManagerVariable(smKeyScript, scriptCode);
+        
+        EventRecord event = initializeEventRecord(keyDown);
+        event.modifiers = 0;
+
+        for (size_t i = 0; i < keyCodes.size(); i++) {
+            event.message = keyCodes[i];
+            NPP_HandleEvent(&event);
+        }
+        break;
+    }
+#endif
+    default:
+        ASSERT_NOT_REACHED();
+    }
+}
+
 PlatformLayer* NetscapePlugin::pluginLayer()
 {
     return static_cast<PlatformLayer*>(m_pluginLayer.get());

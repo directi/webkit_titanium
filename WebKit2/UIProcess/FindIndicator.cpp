@@ -149,9 +149,8 @@ void FindIndicator::draw(GraphicsContext& graphicsContext, const IntRect& dirtyR
         graphicsContext.save();
         FloatRect outerPathRect = inflateRect(textRect, horizontalOutsetToCenterOfLightBorder, verticalOutsetToCenterOfLightBorder);
         graphicsContext.setShadow(FloatSize(shadowOffsetX, shadowOffsetY), shadowBlurRadius, shadowColor(), ColorSpaceSRGB);
-        graphicsContext.addPath(pathWithRoundedRect(outerPathRect, cornerRadius));
         graphicsContext.setFillColor(lightBorderColor(), ColorSpaceDeviceRGB);
-        graphicsContext.fillPath();
+        graphicsContext.fillPath(pathWithRoundedRect(outerPathRect, cornerRadius));
         graphicsContext.restore();
 
         graphicsContext.save();
@@ -165,8 +164,7 @@ void FindIndicator::draw(GraphicsContext& graphicsContext, const IntRect& dirtyR
         graphicsContext.restore();
 
         graphicsContext.save();
-        graphicsContext.translate(FloatSize(roundf(leftBorderThickness), roundf(topBorderThickness) + m_contentImage->bounds().height()));
-        graphicsContext.scale(FloatSize(1, -1));
+        graphicsContext.translate(FloatSize(roundf(leftBorderThickness), roundf(topBorderThickness)));
         m_contentImage->paint(graphicsContext, IntPoint(0, 0), m_contentImage->bounds());
         graphicsContext.restore();
     }

@@ -32,8 +32,6 @@
 #include "MessageID.h"
 #include "NetscapePlugin.h"
 #include "PageOverlay.h"
-#include "PluginProcessConnection.h"
-#include "PluginProcessConnectionManager.h"
 #include "PluginProxy.h"
 #include "PluginView.h"
 #include "WebBackForwardListProxy.h"
@@ -42,6 +40,7 @@
 #include "WebContextMenuClient.h"
 #include "WebContextMessages.h"
 #include "WebCoreArgumentCoders.h"
+#include "WebOpenPanelResultListener.h"
 #include "WebDragClient.h"
 #include "WebEditorClient.h"
 #include "WebEvent.h"
@@ -50,14 +49,18 @@
 #include "WebInspector.h"
 #include "WebInspectorClient.h"
 #include "WebPageCreationParameters.h"
+#include "WebPageGroupProxy.h"
 #include "WebPageProxyMessages.h"
 #include "WebPopupMenu.h"
 #include "WebPreferencesStore.h"
 #include "WebProcess.h"
-#include "WebProcessProxyMessages.h"
 #include "WebProcessProxyMessageKinds.h"
+#include "WebProcessProxyMessages.h"
+#include <WebCore/AbstractDatabase.h>
+#include <WebCore/ArchiveResource.h>
 #include <WebCore/Chrome.h>
 #include <WebCore/ContextMenuController.h>
+#include <WebCore/DocumentLoader.h>
 #include <WebCore/EventHandler.h>
 #include <WebCore/FocusController.h>
 #include <WebCore/Frame.h>
@@ -101,7 +104,7 @@ PassRefPtr<WebPage> WebPage::create(uint64_t pageID, const WebPageCreationParame
 {
     RefPtr<WebPage> page = adoptRef(new WebPage(pageID, parameters));
 
-    if (parameters.visibleToInjectedBundle && WebProcess::shared().injectedBundle())
+    if (page->pageGroup()->isVisibleToInjectedBundle() && WebProcess::shared().injectedBundle())
         WebProcess::shared().injectedBundle()->didCreatePage(page.get());
 
     return page.release();
@@ -109,9 +112,11 @@ PassRefPtr<WebPage> WebPage::create(uint64_t pageID, const WebPageCreationParame
 
 WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     : m_viewSize(parameters.viewSize)
+    , m_drawsBackground(true)
+    , m_drawsTransparentBackground(false)
     , m_isInRedo(false)
     , m_isClosed(false)
-    , m_isVisibleToInjectedBundle(parameters.visibleToInjectedBundle)
+    , m_tabToLinks(false)
 #if PLATFORM(MAC)
     , m_windowIsVisible(false)
 #elif PLATFORM(WIN)
@@ -143,14 +148,19 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 
     updatePreferences(parameters.store);
 
-    m_page->setGroupName("WebKit2Group");
+    m_pageGroup = WebProcess::shared().webPageGroup(parameters.pageGroupData);
+    m_page->setGroupName(m_pageGroup->identifier());
 
     platformInitialize();
     Settings::setMinDOMTimerInterval(0.004);
 
-    m_drawingArea = DrawingArea::create(parameters.drawingAreaInfo.type, parameters.drawingAreaInfo.id, this);
-
+    m_drawingArea = DrawingArea::create(parameters.drawingAreaInfo.type, parameters.drawingAreaInfo.identifier, this);
     m_mainFrame = WebFrame::createMainFrame(this);
+
+    setDrawsBackground(parameters.drawsBackground);
+    setDrawsTransparentBackground(parameters.drawsTransparentBackground);
+
+    m_userAgent = parameters.userAgent;
 
 #ifndef NDEBUG
     webPageCounter.increment();
@@ -173,6 +183,10 @@ WebPage::~WebPage()
 #ifndef NDEBUG
     webPageCounter.decrement();
 #endif
+}
+
+void WebPage::dummy(bool&)
+{
 }
 
 CoreIPC::Connection* WebPage::connection() const
@@ -219,18 +233,9 @@ PassRefPtr<Plugin> WebPage::createPlugin(const Plugin::Parameters& parameters)
         return 0;
 
 #if ENABLE(PLUGIN_PROCESS)
-    PluginProcessConnection* pluginProcessConnection = PluginProcessConnectionManager::shared().getPluginProcessConnection(pluginPath);
-
-    if (!pluginProcessConnection)
-        return 0;
-
-    return PluginProxy::create(pluginProcessConnection);
+    return PluginProxy::create(pluginPath);
 #else
-    RefPtr<NetscapePluginModule> pluginModule = NetscapePluginModule::getOrCreate(pluginPath);
-    if (!pluginModule)
-        return 0;
-
-    return NetscapePlugin::create(pluginModule.release());
+    return NetscapePlugin::create(NetscapePluginModule::getOrCreate(pluginPath));
 #endif
 }
 
@@ -272,15 +277,15 @@ void WebPage::changeAcceleratedCompositingMode(WebCore::GraphicsLayer* layer)
     
     // Tell the UI process that accelerated compositing changed. It may respond by changing
     // drawing area types.
-    DrawingArea::DrawingAreaInfo newDrawingAreaInfo;
+    DrawingAreaInfo newDrawingAreaInfo;
 
     if (!WebProcess::shared().connection()->sendSync(Messages::WebPageProxy::DidChangeAcceleratedCompositing(compositing), Messages::WebPageProxy::DidChangeAcceleratedCompositing::Reply(newDrawingAreaInfo), m_pageID))
         return;
     
     if (newDrawingAreaInfo.type != drawingArea()->info().type) {
         m_drawingArea = 0;
-        if (newDrawingAreaInfo.type != DrawingArea::None) {
-            m_drawingArea = DrawingArea::create(newDrawingAreaInfo.type, newDrawingAreaInfo.id, this);
+        if (newDrawingAreaInfo.type != DrawingAreaInfo::None) {
+            m_drawingArea = DrawingArea::create(newDrawingAreaInfo.type, newDrawingAreaInfo.identifier, this);
             m_drawingArea->setNeedsDisplay(IntRect(IntPoint(0, 0), m_viewSize));
         }
     }
@@ -305,7 +310,7 @@ void WebPage::close()
 
     m_isClosed = true;
 
-    if (m_isVisibleToInjectedBundle && WebProcess::shared().injectedBundle())
+    if (pageGroup()->isVisibleToInjectedBundle() && WebProcess::shared().injectedBundle())
         WebProcess::shared().injectedBundle()->willDestroyPage(this);
 
 #if ENABLE(INSPECTOR)
@@ -317,10 +322,18 @@ void WebPage::close()
         m_activePopupMenu = 0;
     }
 
+    if (m_activeOpenPanelResultListener) {
+        m_activeOpenPanelResultListener->disconnectFromPage();
+        m_activeOpenPanelResultListener = 0;
+    }
+
     m_sandboxExtensionTracker.invalidate();
 
     m_mainFrame->coreFrame()->loader()->detachFromParent();
     m_page.clear();
+
+    m_drawingArea->onPageClose();
+    m_drawingArea.clear();
 
     WebProcess::shared().removeWebPage(m_pageID);
 }
@@ -441,6 +454,9 @@ void WebPage::setActualVisibleContentRect(const IntRect& rect)
 
 void WebPage::setResizesToContentsUsingLayoutSize(const IntSize& targetLayoutSize)
 {
+    if (m_resizesToContentsLayoutSize == targetLayoutSize)
+        return;
+
     m_resizesToContentsLayoutSize = targetLayoutSize;
 
     Frame* frame = m_page->mainFrame();
@@ -618,6 +634,20 @@ private:
     const WebEvent* m_previousCurrentEvent;
 };
 
+static bool isContextClick(const PlatformMouseEvent& event)
+{
+    if (event.button() == WebCore::RightButton)
+        return true;
+
+#if PLATFORM(MAC)
+    // FIXME: this really should be about OSX-style UI, not about the Mac port
+    if (event.button() == WebCore::LeftButton && event.ctrlKey())
+        return true;
+#endif
+
+    return false;
+}
+
 static bool handleMouseEvent(const WebMouseEvent& mouseEvent, Page* page)
 {
     Frame* frame = page->mainFrame();
@@ -629,12 +659,12 @@ static bool handleMouseEvent(const WebMouseEvent& mouseEvent, Page* page)
     switch (platformMouseEvent.eventType()) {
         case WebCore::MouseEventPressed:
         {
-            if (platformMouseEvent.button() == WebCore::RightButton)
+            if (isContextClick(platformMouseEvent))
                 page->contextMenuController()->clearContextMenu();
             
             bool handled = frame->eventHandler()->handleMousePressEvent(platformMouseEvent);
             
-            if (platformMouseEvent.button() == WebCore::RightButton) {
+            if (isContextClick(platformMouseEvent)) {
                 handled = frame->eventHandler()->sendContextMenuEvent(platformMouseEvent);
                 if (handled)
                     page->chrome()->showContextMenu();
@@ -693,6 +723,8 @@ static bool handleKeyEvent(const WebKeyboardEvent& keyboardEvent, Page* page)
     if (!page->mainFrame()->view())
         return false;
 
+    if (keyboardEvent.type() == WebEvent::Char && keyboardEvent.isSystemKey())
+        return page->focusController()->focusedOrMainFrame()->eventHandler()->handleAccessKey(platform(keyboardEvent));
     return page->focusController()->focusedOrMainFrame()->eventHandler()->keyEvent(platform(keyboardEvent));
 }
 
@@ -757,9 +789,52 @@ void WebPage::setActive(bool isActive)
 #endif
 }
 
+void WebPage::setDrawsBackground(bool drawsBackground)
+{
+    if (m_drawsBackground == drawsBackground)
+        return;
+
+    m_drawsBackground = drawsBackground;
+
+    for (Frame* coreFrame = m_mainFrame->coreFrame(); coreFrame; coreFrame = coreFrame->tree()->traverseNext()) {
+        if (FrameView* view = coreFrame->view())
+            view->setTransparent(!drawsBackground);
+    }
+
+    m_drawingArea->pageBackgroundTransparencyChanged();
+    m_drawingArea->setNeedsDisplay(IntRect(IntPoint(0, 0), m_viewSize));
+}
+
+void WebPage::setDrawsTransparentBackground(bool drawsTransparentBackground)
+{
+    if (m_drawsTransparentBackground == drawsTransparentBackground)
+        return;
+
+    m_drawsTransparentBackground = drawsTransparentBackground;
+
+    Color backgroundColor = drawsTransparentBackground ? Color::transparent : Color::white;
+    for (Frame* coreFrame = m_mainFrame->coreFrame(); coreFrame; coreFrame = coreFrame->tree()->traverseNext()) {
+        if (FrameView* view = coreFrame->view())
+            view->setBaseBackgroundColor(backgroundColor);
+    }
+
+    m_drawingArea->pageBackgroundTransparencyChanged();
+    m_drawingArea->setNeedsDisplay(IntRect(IntPoint(0, 0), m_viewSize));
+}
+
 void WebPage::setFocused(bool isFocused)
 {
     m_page->focusController()->setFocused(isFocused);
+}
+
+void WebPage::setInitialFocus(bool forward)
+{
+    if (!m_page || !m_page->focusController())
+        return;
+
+    Frame* frame = m_page->focusController()->focusedOrMainFrame();
+    frame->document()->setFocusedNode(0);
+    m_page->focusController()->setInitialFocus(forward ? FocusDirectionForward : FocusDirectionBackward, 0);
 }
 
 void WebPage::setWindowResizerSize(const IntSize& windowResizerSize)
@@ -800,18 +875,9 @@ void WebPage::show()
     send(Messages::WebPageProxy::ShowPage());
 }
 
-void WebPage::setCustomUserAgent(const String& customUserAgent)
+void WebPage::setUserAgent(const String& userAgent)
 {
-    m_customUserAgent = customUserAgent;
-}
-
-String WebPage::userAgent() const
-{
-    if (!m_customUserAgent.isEmpty())
-        return m_customUserAgent;
-
-    // FIXME: This should be based on an application name.
-    return "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6; en-us) AppleWebKit/531.4 (KHTML, like Gecko) Version/4.0.3 Safari/531.4";
+    m_userAgent = userAgent;
 }
 
 IntRect WebPage::windowResizerRect() const
@@ -873,40 +939,54 @@ void WebPage::preferencesDidChange(const WebPreferencesStore& store)
 void WebPage::updatePreferences(const WebPreferencesStore& store)
 {
     Settings* settings = m_page->settings();
-    
-    settings->setJavaScriptEnabled(store.javaScriptEnabled);
-    settings->setLoadsImagesAutomatically(store.loadsImagesAutomatically);
-    settings->setPluginsEnabled(store.pluginsEnabled);
-    settings->setJavaEnabled(store.javaEnabled);
-    settings->setOfflineWebApplicationCacheEnabled(store.offlineWebApplicationCacheEnabled);
-    settings->setLocalStorageEnabled(store.localStorageEnabled);
-    settings->setXSSAuditorEnabled(store.xssAuditorEnabled);
-    settings->setFrameFlatteningEnabled(store.frameFlatteningEnabled);
-    settings->setPrivateBrowsingEnabled(store.privateBrowsingEnabled);
-    settings->setDeveloperExtrasEnabled(store.developerExtrasEnabled);
-    settings->setTextAreasAreResizable(store.textAreasAreResizable);
-    settings->setNeedsSiteSpecificQuirks(store.needsSiteSpecificQuirks);
-    settings->setMinimumFontSize(store.minimumFontSize);
-    settings->setMinimumLogicalFontSize(store.minimumLogicalFontSize);
-    settings->setDefaultFontSize(store.defaultFontSize);
-    settings->setDefaultFixedFontSize(store.defaultFixedFontSize);
-    settings->setStandardFontFamily(store.standardFontFamily);
-    settings->setCursiveFontFamily(store.cursiveFontFamily);
-    settings->setFantasyFontFamily(store.fantasyFontFamily);
-    settings->setFixedFontFamily(store.fixedFontFamily);
-    settings->setSansSerifFontFamily(store.sansSerifFontFamily);
-    settings->setSerifFontFamily(store.serifFontFamily);
-    settings->setJavaScriptCanOpenWindowsAutomatically(true);
+
+    m_tabToLinks = store.getBoolValueForKey(WebPreferencesKey::tabsToLinksKey());
+
+    // FIXME: This should be generated from macro expansion for all preferences,
+    // but we currently don't match the naming of WebCore exactly so we are
+    // handrolling the boolean and integer preferences until that is fixed.
+
+#define INITIALIZE_SETTINGS(KeyUpper, KeyLower, TypeName, Type, DefaultValue) settings->set##KeyUpper(store.get##TypeName##ValueForKey(WebPreferencesKey::KeyLower##Key()));
+
+    FOR_EACH_WEBKIT_STRING_PREFERENCE(INITIALIZE_SETTINGS)
+
+#undef INITIALIZE_SETTINGS
+
+    settings->setJavaScriptEnabled(store.getBoolValueForKey(WebPreferencesKey::javaScriptEnabledKey()));
+    settings->setLoadsImagesAutomatically(store.getBoolValueForKey(WebPreferencesKey::loadsImagesAutomaticallyKey()));
+    settings->setPluginsEnabled(store.getBoolValueForKey(WebPreferencesKey::pluginsEnabledKey()));
+    settings->setJavaEnabled(store.getBoolValueForKey(WebPreferencesKey::javaEnabledKey()));
+    settings->setOfflineWebApplicationCacheEnabled(store.getBoolValueForKey(WebPreferencesKey::offlineWebApplicationCacheEnabledKey()));
+    settings->setLocalStorageEnabled(store.getBoolValueForKey(WebPreferencesKey::localStorageEnabledKey()));
+    settings->setXSSAuditorEnabled(store.getBoolValueForKey(WebPreferencesKey::xssAuditorEnabledKey()));
+    settings->setFrameFlatteningEnabled(store.getBoolValueForKey(WebPreferencesKey::frameFlatteningEnabledKey()));
+    settings->setPrivateBrowsingEnabled(store.getBoolValueForKey(WebPreferencesKey::privateBrowsingEnabledKey()));
+    settings->setDeveloperExtrasEnabled(store.getBoolValueForKey(WebPreferencesKey::developerExtrasEnabledKey()));
+    settings->setTextAreasAreResizable(store.getBoolValueForKey(WebPreferencesKey::textAreasAreResizableKey()));
+    settings->setNeedsSiteSpecificQuirks(store.getBoolValueForKey(WebPreferencesKey::needsSiteSpecificQuirksKey()));
+    settings->setJavaScriptCanOpenWindowsAutomatically(store.getBoolValueForKey(WebPreferencesKey::javaScriptCanOpenWindowsAutomaticallyKey()));
+    settings->setForceFTPDirectoryListings(store.getBoolValueForKey(WebPreferencesKey::forceFTPDirectoryListingsKey()));
+    settings->setMinimumFontSize(store.getUInt32ValueForKey(WebPreferencesKey::minimumFontSizeKey()));
+    settings->setMinimumLogicalFontSize(store.getUInt32ValueForKey(WebPreferencesKey::minimumLogicalFontSizeKey()));
+    settings->setDefaultFontSize(store.getUInt32ValueForKey(WebPreferencesKey::defaultFontSizeKey()));
+    settings->setDefaultFixedFontSize(store.getUInt32ValueForKey(WebPreferencesKey::defaultFixedFontSizeKey()));
+    settings->setDNSPrefetchingEnabled(store.getBoolValueForKey(WebPreferencesKey::dnsPrefetchingEnabledKey()));
 
 #if PLATFORM(WIN)
     // Temporarily turn off accelerated compositing until we have a good solution for rendering it.
     settings->setAcceleratedCompositingEnabled(false);
 #else
-    settings->setAcceleratedCompositingEnabled(store.acceleratedCompositingEnabled);
+    settings->setAcceleratedCompositingEnabled(store.getBoolValueForKey(WebPreferencesKey::acceleratedCompositingEnabledKey()));
 #endif
-    settings->setShowDebugBorders(store.compositingBordersVisible);
-    settings->setShowRepaintCounter(store.compositingRepaintCountersVisible);
-    
+    settings->setShowDebugBorders(store.getBoolValueForKey(WebPreferencesKey::compositingBordersVisibleKey()));
+    settings->setShowRepaintCounter(store.getBoolValueForKey(WebPreferencesKey::compositingRepaintCountersVisibleKey()));
+
+#if ENABLE(DATABASE)
+    AbstractDatabase::setIsAvailable(store.getBoolValueForKey(WebPreferencesKey::databasesEnabledKey()));
+#endif
+
+    settings->setUsesPageCache(true);
+
     platformPreferencesDidChange(store);
 }
 
@@ -952,7 +1032,7 @@ bool WebPage::handleEditingKeyboardEvent(KeyboardEvent* evt)
     return frame->editor()->insertText(evt->keyEvent()->text(), evt);
 }
 #endif
-    
+
 WebEditCommand* WebPage::webEditCommand(uint64_t commandID)
 {
     return m_editCommandMap.get(commandID).get();
@@ -998,6 +1078,16 @@ void WebPage::setActivePopupMenu(WebPopupMenu* menu)
     m_activePopupMenu = menu;
 }
 
+void WebPage::setActiveOpenPanelResultListener(PassRefPtr<WebOpenPanelResultListener> openPanelResultListener)
+{
+    m_activeOpenPanelResultListener = openPanelResultListener;
+}
+
+bool WebPage::findStringFromInjectedBundle(const String& target, FindOptions options)
+{
+    return m_page->findString(target, options);
+}
+
 void WebPage::findString(const String& string, uint32_t options, uint32_t maxMatchCount)
 {
     m_findController.findString(string, static_cast<FindOptions>(options), maxMatchCount);
@@ -1020,6 +1110,44 @@ void WebPage::didChangeSelectedIndexForActivePopupMenu(int32_t newIndex)
 
     m_activePopupMenu->didChangeSelectedIndex(newIndex);
     m_activePopupMenu = 0;
+}
+
+void WebPage::didChooseFilesForOpenPanel(const Vector<String>& files)
+{
+    if (!m_activeOpenPanelResultListener)
+        return;
+
+    m_activeOpenPanelResultListener->didChooseFiles(files);
+    m_activeOpenPanelResultListener = 0;
+}
+
+void WebPage::didCancelForOpenPanel()
+{
+    m_activeOpenPanelResultListener = 0;
+}
+
+void WebPage::unmarkAllMisspellings()
+{
+    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+        if (Document* document = frame->document())
+            document->markers()->removeMarkers(DocumentMarker::Spelling);
+    }
+}
+
+void WebPage::unmarkAllBadGrammar()
+{
+    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+        if (Document* document = frame->document())
+            document->markers()->removeMarkers(DocumentMarker::Grammar);
+    }
+}
+
+void WebPage::setTextForActivePopupMenu(int32_t index)
+{
+    if (!m_activePopupMenu)
+        return;
+
+    m_activePopupMenu->setTextForIndex(index);
 }
 
 void WebPage::didSelectItemFromActiveContextMenu(const WebContextMenuItemData& item)
@@ -1054,13 +1182,14 @@ void WebPage::setWindowIsVisible(bool windowIsVisible)
         (*it)->setWindowIsVisible(windowIsVisible);
 }
 
-void WebPage::setWindowFrame(const IntRect& windowFrame)
+void WebPage::windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates)
 {
-    m_windowFrame = windowFrame;
+    m_windowFrameInScreenCoordinates = windowFrameInScreenCoordinates;
+    m_viewFrameInWindowCoordinates = viewFrameInWindowCoordinates;
 
-    // Tell all our plug-in views that the window frame changed.
+    // Tell all our plug-in views that the window and view frames have changed.
     for (HashSet<PluginView*>::const_iterator it = m_pluginViews.begin(), end = m_pluginViews.end(); it != end; ++it)
-        (*it)->setWindowFrame(windowFrame);
+        (*it)->windowAndViewFramesChanged(windowFrameInScreenCoordinates, viewFrameInWindowCoordinates);
 }
 
 bool WebPage::windowIsFocused() const
@@ -1089,6 +1218,11 @@ void WebPage::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::Messag
     didReceiveWebPageMessage(connection, messageID, arguments);
 }
 
+CoreIPC::SyncReplyMode WebPage::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, CoreIPC::ArgumentEncoder* reply)
+{   
+    return didReceiveSyncWebPageMessage(connection, messageID, arguments, reply);
+}
+    
 InjectedBundleBackForwardList* WebPage::backForwardList()
 {
     if (!m_backForwardList)
@@ -1186,6 +1320,24 @@ void WebPage::SandboxExtensionTracker::didFailProvisionalLoad(WebFrame* frame)
 
     m_provisionalSandboxExtension->invalidate();
     m_provisionalSandboxExtension = 0;
+}
+
+bool WebPage::hasLocalDataForURL(const KURL& url)
+{
+    if (url.isLocalFile())
+        return true;
+
+    FrameLoader* frameLoader = m_page->mainFrame()->loader();
+    DocumentLoader* documentLoader = frameLoader ? frameLoader->documentLoader() : 0;
+    if (documentLoader && documentLoader->subresource(url))
+        return true;
+
+    return platformHasLocalDataForURL(url);
+}
+
+void WebPage::setCustomTextEncodingName(const String& encoding)
+{
+    m_page->mainFrame()->loader()->reloadWithOverrideEncoding(encoding);
 }
 
 } // namespace WebKit

@@ -1390,8 +1390,12 @@ static bool fastDocumentTeardownEnabled()
     // <https://bugs.webkit.org/show_bug.cgi?id=46334>.
     static bool isApplicationNeedingParserQuirks = !WebKitLinkedOnOrAfter(WEBKIT_FIRST_VERSION_WITH_HTML5_PARSER)
         && (applicationIsAOLInstantMessenger() || applicationIsMicrosoftMyDay());
+    
+    // Mail.app must continue to display HTML email that contains quirky markup.
+    static bool isAppleMail = applicationIsAppleMail();
 
     return isApplicationNeedingParserQuirks
+        || isAppleMail
 #if ENABLE(DASHBOARD_SUPPORT)
         // Pre-HTML5 parser quirks are required to remain compatible with many
         // Dashboard widgets. See <rdar://problem/8175982>.
@@ -1500,6 +1504,10 @@ static bool fastDocumentTeardownEnabled()
     settings->setPaginateDuringLayoutEnabled([preferences paginateDuringLayoutEnabled]);
 #if ENABLE(FULLSCREEN_API)
     settings->setFullScreenEnabled([preferences fullScreenEnabled]);
+#endif
+#if !defined(BUILDING_ON_TIGER) && !defined(BUILDING_ON_LEOPARD)
+    // Asynchronous spell checking API is available for 10.6 or later.
+    settings->setAsynchronousSpellCheckingEnabled([preferences asynchronousSpellCheckingEnabled]);
 #endif
     settings->setMemoryInfoEnabled([preferences memoryInfoEnabled]);
     settings->setHyperlinkAuditingEnabled([preferences hyperlinkAuditingEnabled]);
@@ -2658,6 +2666,11 @@ static PassOwnPtr<Vector<String> > toStringVector(NSArray* patterns)
 - (BOOL)searchFor:(NSString *)string direction:(BOOL)forward caseSensitive:(BOOL)caseFlag wrap:(BOOL)wrapFlag startInSelection:(BOOL)startInSelection
 {
     return [self findString:string options:((forward ? 0 : WebFindOptionsBackwards) | (caseFlag ? 0 : WebFindOptionsCaseInsensitive) | (wrapFlag ? WebFindOptionsWrapAround : 0) | (startInSelection ? WebFindOptionsStartInSelection : 0))];
+}
+
++ (void)_setLoadResourcesSerially:(BOOL)serialize 
+{
+    resourceLoadScheduler()->setSerialLoadingEnabled(serialize);
 }
 
 @end
@@ -4518,6 +4531,11 @@ static NSAppleEventDescriptor* aeDescFromJSValue(ExecState* exec, JSValue jsValu
 
 - (NSUInteger)countMatchesForText:(NSString *)string options:(WebFindOptions)options highlight:(BOOL)highlight limit:(NSUInteger)limit markMatches:(BOOL)markMatches
 {
+    return [self countMatchesForText:string inDOMRange:nil options:options highlight:highlight limit:limit markMatches:markMatches];
+}
+
+- (NSUInteger)countMatchesForText:(NSString *)string inDOMRange:(DOMRange *)range options:(WebFindOptions)options highlight:(BOOL)highlight limit:(NSUInteger)limit markMatches:(BOOL)markMatches
+{
     if (_private->closed)
         return 0;
 
@@ -4530,7 +4548,7 @@ static NSAppleEventDescriptor* aeDescFromJSValue(ExecState* exec, JSValue jsValu
                 [(NSView <WebMultipleTextMatches>*)view setMarkedTextMatchesAreHighlighted:highlight];
         
             ASSERT(limit == 0 || matchCount < limit);
-            matchCount += [(NSView <WebMultipleTextMatches>*)view countMatchesForText:string options:options limit:(limit == 0 ? 0 : limit - matchCount) markMatches:markMatches];
+            matchCount += [(NSView <WebMultipleTextMatches>*)view countMatchesForText:string inDOMRange:range options:options limit:(limit == 0 ? 0 : limit - matchCount) markMatches:markMatches];
 
             // Stop looking if we've reached the limit. A limit of 0 means no limit.
             if (limit > 0 && matchCount >= limit)

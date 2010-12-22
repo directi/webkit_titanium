@@ -33,18 +33,22 @@
 #import "FindIndicator.h"
 #import "FindIndicatorWindow.h"
 #import "LayerBackedDrawingAreaProxy.h"
+#import "Logging.h"
 #import "NativeWebKeyboardEvent.h"
+#import "PDFViewController.h"
 #import "PageClientImpl.h"
 #import "RunLoop.h"
+#import "TextChecker.h"
+#import "WKTextInputWindowController.h"
 #import "WebContext.h"
 #import "WebEventFactory.h"
 #import "WebPage.h"
-#import "WebPageNamespace.h"
 #import "WebPageProxy.h"
 #import "WebProcessManager.h"
 #import "WebProcessProxy.h"
 #import "WebSystemInterface.h"
 #import <QuartzCore/QuartzCore.h>
+#import <WebCore/ColorMac.h>
 #import <WebCore/FloatRect.h>
 #import <WebCore/IntRect.h>
 #import <WebCore/KeyboardEvent.h>
@@ -63,13 +67,6 @@ extern "C" {
 
 using namespace WebKit;
 using namespace WebCore;
-
-struct EditCommandState {
-    EditCommandState() : m_isEnabled(false), m_state(0) {};
-    EditCommandState(bool isEnabled, int state) : m_isEnabled(isEnabled), m_state(state) { }
-    bool m_isEnabled;
-    int m_state;
-};
 
 @interface NSWindow (Details)
 - (NSRect)_growBoxRect;
@@ -90,11 +87,9 @@ struct EditCommandState {
     NSView *_layerHostingView;
 #endif
     // For Menus.
-    int _menuEntriesCount;
-    Vector<RetainPtr<NSMenu> > _menuList;
-    bool _isPerformingUpdate;
-    
-    HashMap<String, EditCommandState> _menuMap;
+    HashMap<String, RetainPtr<NSMenuItem> > _menuItemsMap;
+
+    OwnPtr<PDFViewController> _pdfViewController;
 
     OwnPtr<FindIndicatorWindow> _findIndicatorWindow;
     // We keep here the event when resending it to
@@ -102,19 +97,42 @@ struct EditCommandState {
     // that has been already sent to WebCore.
     NSEvent *_keyDownEventBeingResent;
     Vector<KeypressCommand> _commandsList;
+
+    // The identifier of the plug-in we want to send complex text input to, or 0 if there is none.
+    uint64_t _pluginComplexTextInputIdentifier;
+
     BOOL _isSelectionNone;
     BOOL _isSelectionEditable;
     BOOL _isSelectionInPasswordField;
     BOOL _hasMarkedText;
+    Vector<CompositionUnderline> _underlines;
+    unsigned _selectionStart;
+    unsigned _selectionEnd;
+    NSRange _selectedRange;
 }
 @end
 
 @implementation WKViewData
 @end
 
+@interface NSObject (NSTextInputContextDetails)
+- (BOOL)wantsToHandleMouseEvents;
+- (BOOL)handleMouseEvent:(NSEvent *)event;
+@end
+
 @implementation WKView
 
-- (id)initWithFrame:(NSRect)frame pageNamespaceRef:(WKPageNamespaceRef)pageNamespaceRef hiddenFromInjectedBundle:(BOOL)hiddenFromInjectedBundle
+- (id)initWithFrame:(NSRect)frame
+{
+    return [self initWithFrame:frame contextRef:toAPI(WebContext::sharedProcessContext())];
+}
+
+- (id)initWithFrame:(NSRect)frame contextRef:(WKContextRef)contextRef
+{   
+    return [self initWithFrame:frame contextRef:contextRef pageGroupRef:nil];
+}
+
+- (id)initWithFrame:(NSRect)frame contextRef:(WKContextRef)contextRef pageGroupRef:(WKPageGroupRef)pageGroupRef
 {
     self = [super initWithFrame:frame];
     if (!self)
@@ -133,32 +151,21 @@ struct EditCommandState {
     _data = [[WKViewData alloc] init];
 
     _data->_pageClient = PageClientImpl::create(self);
-    _data->_page = toImpl(pageNamespaceRef)->createWebPage();
+    _data->_page = toImpl(contextRef)->createWebPage(toImpl(pageGroupRef));
     _data->_page->setPageClient(_data->_pageClient.get());
-    _data->_page->setDrawingArea(ChunkedUpdateDrawingAreaProxy::create(self));
-    _data->_page->setVisibleToInjectedBundle(!hiddenFromInjectedBundle);
+    _data->_page->setDrawingArea(ChunkedUpdateDrawingAreaProxy::create(self, _data->_page.get()));
     _data->_page->initializeWebPage(IntSize(frame.size));
     _data->_page->setIsInWindow([self window]);
 
-    _data->_menuEntriesCount = 0;
-    _data->_isPerformingUpdate = false;
     _data->_isSelectionNone = YES;
     _data->_isSelectionEditable = NO;
     _data->_isSelectionInPasswordField = NO;
     _data->_hasMarkedText = NO;
+    _data->_selectedRange = NSMakeRange(NSNotFound, 0);
+
+    WebContext::statistics().wkViewCount++;
 
     return self;
-}
-
-- (id)initWithFrame:(NSRect)frame pageNamespaceRef:(WKPageNamespaceRef)pageNamespaceRef
-{
-    return [self initWithFrame:frame pageNamespaceRef:pageNamespaceRef hiddenFromInjectedBundle:NO];
-}
-
-- (id)initWithFrame:(NSRect)frame
-{
-    WebContext* context = WebContext::sharedProcessContext();
-    return [self initWithFrame:frame pageNamespaceRef:toAPI(context->createPageNamespace())];
 }
 
 - (void)dealloc
@@ -166,12 +173,35 @@ struct EditCommandState {
     _data->_page->close();
 
     [_data release];
+
+    WebContext::statistics().wkViewCount--;
+
     [super dealloc];
 }
 
 - (WKPageRef)pageRef
 {
     return toAPI(_data->_page.get());
+}
+
+- (void)setDrawsBackground:(BOOL)drawsBackground
+{
+    _data->_page->setDrawsBackground(drawsBackground);
+}
+
+- (BOOL)drawsBackground
+{
+    return _data->_page->drawsBackground();
+}
+
+- (void)setDrawsTransparentBackground:(BOOL)drawsTransparentBackground
+{
+    _data->_page->setDrawsTransparentBackground(drawsTransparentBackground);
+}
+
+- (BOOL)drawsTransparentBackground
+{
+    return _data->_page->drawsTransparentBackground();
 }
 
 - (BOOL)acceptsFirstResponder
@@ -203,13 +233,29 @@ struct EditCommandState {
     _data->_page->drawingArea()->setSize(IntSize(size));
 }
 
+- (void)_updateWindowAndViewFrames
+{
+    NSWindow *window = [self window];
+    ASSERT(window);
+    
+    NSRect windowFrameInScreenCoordinates = [window frame];
+    NSRect viewFrameInWindowCoordinates = [self convertRect:[self frame] toView:nil];
+    
+    _data->_page->windowAndViewFramesChanged(enclosingIntRect(windowFrameInScreenCoordinates), enclosingIntRect(viewFrameInWindowCoordinates));
+}
+
 - (void)renewGState
 {
     // Hide the find indicator.
     _data->_findIndicatorWindow = nullptr;
 
+    // Update the view frame.
+    if ([self window])
+        [self _updateWindowAndViewFrames];
+
     [super renewGState];
 }
+
 typedef HashMap<SEL, String> SelectorNameMap;
 
 // Map selectors into Editor command names.
@@ -258,6 +304,7 @@ WEBCORE_COMMAND(paste)
 WEBCORE_COMMAND(delete)
 WEBCORE_COMMAND(pasteAsPlainText)
 WEBCORE_COMMAND(selectAll)
+WEBCORE_COMMAND(takeFindStringFromSelection)
 
 #undef WEBCORE_COMMAND
 
@@ -265,27 +312,55 @@ WEBCORE_COMMAND(selectAll)
 
 - (BOOL)validateUserInterfaceItem:(id <NSValidatedUserInterfaceItem>)item
 {
-    String commandName = commandNameForSelector([item action]);
     NSMenuItem *menuItem = (NSMenuItem *)item;
     if (![menuItem isKindOfClass:[NSMenuItem class]])
         return NO; // FIXME: We need to be able to handle other user interface elements.
+
+    SEL action = [item action];
+
+    if (action == @selector(toggleContinuousSpellChecking:)) {
+        bool checkMark = false;
+        bool returnValue = false;
+        if (TextChecker::isContinuousSpellCheckingAllowed())
+            checkMark = TextChecker::isContinuousSpellCheckingEnabled();
+        returnValue = true;
+
+        [menuItem setState:checkMark ? NSOnState : NSOffState];
+        return returnValue;
+    }
+
+    if (action == @selector(toggleGrammarChecking:)) {
+        bool checkMark = TextChecker::isGrammarCheckingEnabled();
+        [menuItem setState:checkMark ? NSOnState : NSOffState];
+        return YES;
+    }
     
-    RetainPtr<NSMenu> menu = [menuItem menu];
-    if (!_data->_isPerformingUpdate) {
-        if (_data->_menuList.find(menu) == notFound)
-            _data->_menuList.append(menu);
-        _data->_menuMap.add(commandName, EditCommandState(false, 0));
-        _data->_menuEntriesCount++;
+    String commandName = commandNameForSelector([item action]);
+
+    if (_data->_menuItemsMap.find(commandName) == _data->_menuItemsMap.end()) {
+        _data->_menuItemsMap.add(commandName, menuItem);
         _data->_page->validateMenuItem(commandName);
-    } else {
-        EditCommandState info = _data->_menuMap.take(commandName);
-        [menuItem setState:info.m_state];
-        if (_data->_menuMap.isEmpty())
-            _data->_isPerformingUpdate = false;
-        return info.m_isEnabled;
     }
 
     return YES;
+}
+
+- (IBAction)toggleContinuousSpellChecking:(id)sender
+{
+    bool spellCheckingEnabled = !TextChecker::isContinuousSpellCheckingEnabled();
+    TextChecker::setContinuousSpellCheckingEnabled(spellCheckingEnabled);
+
+    if (!spellCheckingEnabled)
+        _data->_page->unmarkAllMisspellings();
+}
+
+- (void)toggleGrammarChecking:(id)sender
+{
+    bool grammarCheckingEnabled = !TextChecker::isGrammarCheckingEnabled();
+    TextChecker::setGrammarCheckingEnabled(grammarCheckingEnabled);
+
+    if (!grammarCheckingEnabled)
+        _data->_page->unmarkAllBadGrammar();
 }
 
 // Events
@@ -305,12 +380,9 @@ WEBCORE_COMMAND(selectAll)
         _data->_page->handle##Type##Event(webEvent); \
     }
 
-EVENT_HANDLER(mouseDown, Mouse)
-EVENT_HANDLER(mouseDragged, Mouse)
 EVENT_HANDLER(mouseEntered, Mouse)
 EVENT_HANDLER(mouseExited, Mouse)
 EVENT_HANDLER(mouseMoved, Mouse)
-EVENT_HANDLER(mouseUp, Mouse)
 EVENT_HANDLER(otherMouseDown, Mouse)
 EVENT_HANDLER(otherMouseDragged, Mouse)
 EVENT_HANDLER(otherMouseMoved, Mouse)
@@ -323,6 +395,22 @@ EVENT_HANDLER(scrollWheel, Wheel)
 
 #undef EVENT_HANDLER
 
+#define MOUSE_EVENT_HANDLER(Selector) \
+    - (void)Selector:(NSEvent *)theEvent \
+    { \
+        NSInputManager *currentInputManager = [NSInputManager currentInputManager]; \
+        if ([currentInputManager wantsToHandleMouseEvents] && [currentInputManager handleMouseEvent:theEvent]) \
+            return; \
+        WebMouseEvent webEvent = WebEventFactory::createWebMouseEvent(theEvent, self); \
+        _data->_page->handleMouseEvent(webEvent); \
+    }
+
+MOUSE_EVENT_HANDLER(mouseDown)
+MOUSE_EVENT_HANDLER(mouseDragged)
+MOUSE_EVENT_HANDLER(mouseUp)
+
+#undef MOUSE_EVENT_HANDLER
+
 - (void)doCommandBySelector:(SEL)selector
 {
     if (selector != @selector(noop:))
@@ -331,7 +419,33 @@ EVENT_HANDLER(scrollWheel, Wheel)
 
 - (void)insertText:(id)string
 {
-    _data->_commandsList.append(KeypressCommand("insertText", string));
+    BOOL isAttributedString = [string isKindOfClass:[NSAttributedString class]]; // Otherwise, NSString
+    
+    LOG(TextInput, "insertText:\"%@\"", isAttributedString ? [string string] : string);
+    NSString *text;
+    bool isFromInputMethod = _data->_hasMarkedText;
+
+    if (isAttributedString) {
+        text = [string string];
+        // We deal with the NSTextInputReplacementRangeAttributeName attribute from NSAttributedString here
+        // simply because it is used by at least one Input Method -- it corresonds to the kEventParamTextInputSendReplaceRange
+        // event in TSM.  This behaviour matches that of -[WebHTMLView setMarkedText:selectedRange:] when it receives an
+        // NSAttributedString
+        NSString *rangeString = [string attribute:NSTextInputReplacementRangeAttributeName atIndex:0 longestEffectiveRange:NULL inRange:NSMakeRange(0, [text length])];
+        LOG(TextInput, "ReplacementRange: %@", rangeString);
+        if (rangeString)
+            isFromInputMethod = YES;
+    } else
+        text = string;
+    
+    String eventText = text;
+    
+    if (!isFromInputMethod)
+        _data->_commandsList.append(KeypressCommand("insertText", text));
+    else {
+        eventText.replace(NSBackTabCharacter, NSTabCharacter); // same thing is done in KeyEventMac.mm in WebCore
+        _data->_commandsList.append(KeypressCommand("insertText", eventText));
+    }
 }
 
 - (BOOL)_handleStyleKeyEquivalent:(NSEvent *)event
@@ -365,10 +479,7 @@ EVENT_HANDLER(scrollWheel, Wheel)
     [[event retain] autorelease];
     
     BOOL eventWasSentToWebCore = (_data->_keyDownEventBeingResent == event);
-    BOOL ret = NO;
-    
-    [self retain];
-    
+
     // Pass key combos through WebCore if there is a key binding available for
     // this event. This lets web pages have a crack at intercepting key-modified keypresses.
     // But don't do it if we have already handled the event.
@@ -381,11 +492,7 @@ EVENT_HANDLER(scrollWheel, Wheel)
         return YES;
     }
     
-    ret = [self _handleStyleKeyEquivalent:event] || [super performKeyEquivalent:event];
-    
-    [self release];
-    
-    return ret;
+    return [self _handleStyleKeyEquivalent:event] || [super performKeyEquivalent:event];
 }
 
 - (void)_setEventBeingResent:(NSEvent *)event
@@ -393,22 +500,29 @@ EVENT_HANDLER(scrollWheel, Wheel)
     _data->_keyDownEventBeingResent = [event retain];
 }
 
-- (void)_selectionChanged:(BOOL)isNone isEditable:(BOOL)isContentEditable isPassword:(BOOL)isPasswordField hasMarkedText:(BOOL)hasComposition
+- (void)_selectionChanged:(BOOL)isNone isEditable:(BOOL)isContentEditable isPassword:(BOOL)isPasswordField hasMarkedText:(BOOL)hasComposition range:(NSRange)newrange
 {
     _data->_isSelectionNone = isNone;
     _data->_isSelectionEditable = isContentEditable;
     _data->_isSelectionInPasswordField = isPasswordField;
     _data->_hasMarkedText = hasComposition;
+    _data->_selectedRange = newrange;
 }
 
-- (Vector<KeypressCommand>&)_interceptKeyEvent:(NSEvent *)theEvent
+- (Vector<KeypressCommand>&)_interceptKeyEvent:(NSEvent *)theEvent 
 {
     _data->_commandsList.clear();
     // interpretKeyEvents will trigger one or more calls to doCommandBySelector or setText
     // that will populate the commandsList vector.
     [self interpretKeyEvents:[NSArray arrayWithObject:theEvent]];
-    
     return _data->_commandsList;
+}
+
+- (void)_getTextInputState:(unsigned)start selectionEnd:(unsigned)end underlines:(Vector<WebCore::CompositionUnderline>&)lines
+{
+    start = _data->_selectionStart;
+    end = _data->_selectionEnd;
+    lines = _data->_underlines;
 }
 
 - (void)keyUp:(NSEvent *)theEvent
@@ -418,6 +532,19 @@ EVENT_HANDLER(scrollWheel, Wheel)
 
 - (void)keyDown:(NSEvent *)theEvent
 {
+    if (_data->_pluginComplexTextInputIdentifier) {
+        // Try feeding the keyboard event directly to the plug-in.
+        NSString *string = nil;
+        if ([[WKTextInputWindowController sharedTextInputWindowController] interpretKeyEvent:theEvent string:&string]) {
+            if (string)
+                _data->_page->sendComplexTextInputToPlugin(_data->_pluginComplexTextInputIdentifier, string);
+            return;
+        }
+    }
+
+    _data->_underlines.clear();
+    _data->_selectionStart = 0;
+    _data->_selectionEnd = 0;
     // We could be receiving a key down from AppKit if we have re-sent an event
     // that maps to an action that is currently unavailable (for example a copy when
     // there is no range selection).
@@ -431,19 +558,33 @@ EVENT_HANDLER(scrollWheel, Wheel)
     _data->_page->handleKeyboardEvent(NativeWebKeyboardEvent(theEvent, self));
 }
 
+- (NSTextInputContext *)inputContext {
+    if (_data->_pluginComplexTextInputIdentifier)
+        return [[WKTextInputWindowController sharedTextInputWindowController] inputContext];
+
+    return [super inputContext];
+}
+
 - (NSRange)selectedRange
 {
-    return NSMakeRange(NSNotFound, 0);
+    if (_data->_isSelectionNone || !_data->_isSelectionEditable)
+        return NSMakeRange(NSNotFound, 0);
+    
+    LOG(TextInput, "selectedRange -> (%u, %u)", _data->_selectedRange.location, _data->_selectedRange.length);
+    return _data->_selectedRange;
 }
 
 - (BOOL)hasMarkedText
 {
+    LOG(TextInput, "hasMarkedText -> %u", _data-> _hasMarkedText);
     return _data->_hasMarkedText;
 }
 
 - (void)unmarkText
 {
-    // Not implemented
+    LOG(TextInput, "unmarkText");
+    
+    _data->_commandsList.append(KeypressCommand("unmarkText"));
 }
 
 - (NSArray *)validAttributesForMarkedText
@@ -460,41 +601,95 @@ EVENT_HANDLER(scrollWheel, Wheel)
         //     NSBackgroundColorAttributeName, NSLanguageAttributeName.
         CFRetain(validAttributes);
     }
+    LOG(TextInput, "validAttributesForMarkedText -> (...)");
     return validAttributes;
+}
+
+static void extractUnderlines(NSAttributedString *string, Vector<CompositionUnderline>& result)
+{
+    int length = [[string string] length];
+    
+    int i = 0;
+    while (i < length) {
+        NSRange range;
+        NSDictionary *attrs = [string attributesAtIndex:i longestEffectiveRange:&range inRange:NSMakeRange(i, length - i)];
+        
+        if (NSNumber *style = [attrs objectForKey:NSUnderlineStyleAttributeName]) {
+            Color color = Color::black;
+            if (NSColor *colorAttr = [attrs objectForKey:NSUnderlineColorAttributeName])
+                color = colorFromNSColor([colorAttr colorUsingColorSpaceName:NSDeviceRGBColorSpace]);
+            result.append(CompositionUnderline(range.location, NSMaxRange(range), color, [style intValue] > 1));
+        }
+        
+        i = range.location + range.length;
+    }
 }
 
 - (void)setMarkedText:(id)string selectedRange:(NSRange)newSelRange
 {
-    // Not implemented
+    BOOL isAttributedString = [string isKindOfClass:[NSAttributedString class]]; // Otherwise, NSString
+    
+    LOG(TextInput, "setMarkedText:\"%@\" selectedRange:(%u, %u)", isAttributedString ? [string string] : string, newSelRange.location, newSelRange.length);
+    
+    NSString *text = string;
+    
+    if (isAttributedString) {
+        text = [string string];
+        extractUnderlines(string, _data->_underlines);
+    }
+    
+    _data->_commandsList.append(KeypressCommand("setMarkedText", text));
+    _data->_selectionStart = newSelRange.location;
+    _data->_selectionEnd = NSMaxRange(newSelRange);
 }
 
 - (NSRange)markedRange
 {
-    // Not implemented
-    return NSMakeRange(0, 0);
+    uint64_t location;
+    uint64_t length;
+
+    _data->_page->getMarkedRange(location, length);
+    LOG(TextInput, "markedRange -> (%u, %u)", location, length);
+    return NSMakeRange(location, length);
 }
 
 - (NSAttributedString *)attributedSubstringFromRange:(NSRange)nsRange
 {
-    // Not implemented
+    // This is not implemented for now. Need to figure out how to serialize the attributed string across processes.
+    LOG(TextInput, "attributedSubstringFromRange");
     return nil;
-}
-
-- (NSInteger)conversationIdentifier
-{
-    return (NSInteger)self;
 }
 
 - (NSUInteger)characterIndexForPoint:(NSPoint)thePoint
 {
-    // Not implemented
-    return NSNotFound;
+    NSWindow *window = [self window];
+    
+    if (window)
+        thePoint = [window convertScreenToBase:thePoint];
+    thePoint = [self convertPoint:thePoint fromView:nil];  // the point is relative to the main frame 
+    
+    uint64_t result = _data->_page->characterIndexForPoint(IntPoint(thePoint));
+    LOG(TextInput, "characterIndexForPoint:(%f, %f) -> %u", thePoint.x, thePoint.y, result);
+    return result;
 }
 
 - (NSRect)firstRectForCharacterRange:(NSRange)theRange
 { 
-    // Not implemented
-    return NSMakeRect(0, 0, 0, 0);
+    // Just to match NSTextView's behavior. Regression tests cannot detect this;
+    // to reproduce, use a test application from http://bugs.webkit.org/show_bug.cgi?id=4682
+    // (type something; try ranges (1, -1) and (2, -1).
+    if ((theRange.location + theRange.length < theRange.location) && (theRange.location + theRange.length != 0))
+        theRange.length = 0;
+    
+    NSRect resultRect = _data->_page->firstRectForCharacterRange(theRange.location, theRange.length);
+    resultRect = [self convertRect:resultRect toView:nil];
+    
+    NSWindow *window = [self window];
+    if (window)
+        resultRect.origin = [window convertBaseToScreen:resultRect.origin];
+    
+    LOG(TextInput, "firstRectForCharacterRange:(%u, %u) -> (%f, %f, %f, %f)", theRange.location, theRange.length, resultRect.origin.x, resultRect.origin.y, resultRect.size.width, resultRect.size.height);
+    return resultRect;
 }
 
 - (void)_updateActiveState
@@ -599,31 +794,6 @@ static bool isViewVisible(NSView *view)
         area->setPageIsVisible(isViewVisible(self));
 }
 
-static NSScreen *screenForWindow(NSWindow *window)
-{
-    if (NSScreen *screen = [window screen]) // nil if the window is off-screen
-        return screen;
-    
-    NSArray *screens = [NSScreen screens];
-    if ([screens count] > 0)
-        return [screens objectAtIndex:0]; // screen containing the menubar
-    
-    return nil;
-}
-
-- (void)_updateWindowFrame
-{
-    NSWindow *window = [self window];
-    ASSERT(window);
-
-    // We want the window frame in Carbon coordinates, so flip the Y coordinate.
-    NSRect windowFrame = [window frame];
-    NSScreen *screen = ::screenForWindow(window);
-    windowFrame.origin.y = NSMaxY([screen frame]) - windowFrame.origin.y;
-
-    _data->_page->updateWindowFrame(enclosingIntRect(windowFrame));
-}
-
 - (void)viewWillMoveToWindow:(NSWindow *)window
 {
     if (window != [self window]) {
@@ -641,7 +811,7 @@ static NSScreen *screenForWindow(NSWindow *window)
         [self _updateActiveState];
         [self _updateVisibility];
         [self _updateWindowVisibility];
-        [self _updateWindowFrame];
+        [self _updateWindowAndViewFrames];
     } else {
         [self _updateVisibility];
         [self _updateActiveState];
@@ -675,25 +845,24 @@ static NSScreen *screenForWindow(NSWindow *window)
 
 - (void)_windowFrameDidChange:(NSNotification *)notification
 {
-    [self _updateWindowFrame];
+    [self _updateWindowAndViewFrames];
 }
 
 - (void)drawRect:(NSRect)rect
-{    
-    [[NSColor whiteColor] set];
-    NSRectFill(rect);
-
+{
     if (_data->_page->isValid() && _data->_page->drawingArea()) {
         CGContextRef context = static_cast<CGContextRef>([[NSGraphicsContext currentContext] graphicsPort]);
         _data->_page->drawingArea()->paint(IntRect(rect), context);
         _data->_page->didDraw();
+    } else if (_data->_page->drawsBackground()) {
+        [_data->_page->drawsTransparentBackground() ? [NSColor clearColor] : [NSColor whiteColor] set];
+        NSRectFill(rect);
     }
 }
 
-- (BOOL)isOpaque 
+- (BOOL)isOpaque
 {
-    // FIXME: Return NO if we have a transparent background.
-    return YES;
+    return _data->_page->drawsBackground();
 }
 
 - (void)viewDidHide
@@ -704,6 +873,21 @@ static NSScreen *screenForWindow(NSWindow *window)
 - (void)viewDidUnhide
 {
     [self _updateVisibility];
+}
+
+- (NSView *)hitTest:(NSPoint)point
+{
+    NSView *hitView = [super hitTest:point];
+#if USE(ACCELERATED_COMPOSITING)
+    if (hitView && _data && hitView == _data->_layerHostingView)
+        hitView = self;
+#endif
+    return hitView;
+}
+
+- (NSInteger)conversationIdentifier
+{
+    return (NSInteger)self;
 }
 
 @end
@@ -742,19 +926,9 @@ static NSScreen *screenForWindow(NSWindow *window)
 
 - (void)_setUserInterfaceItemState:(NSString *)commandName enabled:(BOOL)isEnabled state:(int)newState
 {
-    ASSERT(_data->_menuEntriesCount);
-    _data->_menuMap.set(commandName, EditCommandState(isEnabled, newState));
-    if (--_data->_menuEntriesCount)
-        return;
-    
-    // All the menu entries have been validated.
-    // Calling update will trigger the validation
-    // to be performed with the acquired data.
-    _data->_isPerformingUpdate = true;
-    for (size_t i = 0; i < _data->_menuList.size(); i++)
-        [_data->_menuList[i].get() update];
-    
-    _data->_menuList.clear();
+    NSMenuItem *menuItem = _data->_menuItemsMap.take(commandName).get();
+    [menuItem setState:newState];
+    [menuItem setEnabled:isEnabled];
 }
 
 - (NSRect)_convertToDeviceSpace:(NSRect)rect
@@ -956,22 +1130,22 @@ static NSScreen *screenForWindow(NSWindow *window)
     }
 }
 
-- (void)_switchToDrawingAreaTypeIfNecessary:(DrawingAreaProxy::Type)type
+- (void)_switchToDrawingAreaTypeIfNecessary:(DrawingAreaInfo::Type)type
 {
-    DrawingAreaProxy::Type existingDrawingAreaType = _data->_page->drawingArea() ? _data->_page->drawingArea()->info().type : DrawingAreaProxy::None;
+    DrawingAreaInfo::Type existingDrawingAreaType = _data->_page->drawingArea() ? _data->_page->drawingArea()->info().type : DrawingAreaInfo::None;
     if (existingDrawingAreaType == type)
         return;
 
     OwnPtr<DrawingAreaProxy> newDrawingArea;
     switch (type) {
-        case DrawingAreaProxy::None:
+        case DrawingAreaInfo::None:
             break;
-        case DrawingAreaProxy::ChunkedUpdateDrawingAreaType: {
-            newDrawingArea = ChunkedUpdateDrawingAreaProxy::create(self);
+        case DrawingAreaInfo::ChunkedUpdate: {
+            newDrawingArea = ChunkedUpdateDrawingAreaProxy::create(self, _data->_page.get());
             break;
         }
-        case DrawingAreaProxy::LayerBackedDrawingAreaType: {
-            newDrawingArea = LayerBackedDrawingAreaProxy::create(self);
+        case DrawingAreaInfo::LayerBacked: {
+            newDrawingArea = LayerBackedDrawingAreaProxy::create(self, _data->_page.get());
             break;
         }
     }
@@ -984,14 +1158,54 @@ static NSScreen *screenForWindow(NSWindow *window)
 
 - (void)_pageDidEnterAcceleratedCompositing
 {
-    [self _switchToDrawingAreaTypeIfNecessary:DrawingAreaProxy::LayerBackedDrawingAreaType];
+    [self _switchToDrawingAreaTypeIfNecessary:DrawingAreaInfo::LayerBacked];
 }
 
 - (void)_pageDidLeaveAcceleratedCompositing
 {
     // FIXME: we may want to avoid flipping back to the non-layer-backed drawing area until the next page load, to avoid thrashing.
-    [self _switchToDrawingAreaTypeIfNecessary:DrawingAreaProxy::ChunkedUpdateDrawingAreaType];
+    [self _switchToDrawingAreaTypeIfNecessary:DrawingAreaInfo::ChunkedUpdate];
 }
 #endif // USE(ACCELERATED_COMPOSITING)
+
+- (void)_setComplexTextInputEnabled:(BOOL)complexTextInputEnabled pluginComplexTextInputIdentifier:(uint64_t)pluginComplexTextInputIdentifier
+{
+    BOOL inputSourceChanged = _data->_pluginComplexTextInputIdentifier;
+
+    if (complexTextInputEnabled) {
+        // Check if we're already allowing text input for this plug-in.
+        if (pluginComplexTextInputIdentifier == _data->_pluginComplexTextInputIdentifier)
+            return;
+
+        _data->_pluginComplexTextInputIdentifier = pluginComplexTextInputIdentifier;
+
+    } else {
+        // Check if we got a request to disable complex text input for a plug-in that is not the current plug-in.
+        if (pluginComplexTextInputIdentifier != _data->_pluginComplexTextInputIdentifier)
+            return;
+
+        _data->_pluginComplexTextInputIdentifier = 0;
+    }
+
+    if (inputSourceChanged) {
+        // Inform the out of line window that the input source changed.
+        [[WKTextInputWindowController sharedTextInputWindowController] keyboardInputSourceChanged];
+    }
+}
+
+- (void)_setPageHasCustomRepresentation:(BOOL)pageHasCustomRepresentation
+{
+    _data->_pdfViewController = nullptr;
+
+    if (pageHasCustomRepresentation)
+        _data->_pdfViewController = PDFViewController::create(self);
+}
+
+- (void)_didFinishLoadingDataForCustomRepresentation:(const CoreIPC::DataReference&)dataReference
+{
+    ASSERT(_data->_pdfViewController);
+
+    _data->_pdfViewController->setPDFDocumentData(_data->_page->mainFrame()->mimeType(), dataReference);
+}
 
 @end

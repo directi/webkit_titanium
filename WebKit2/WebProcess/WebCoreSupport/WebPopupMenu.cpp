@@ -63,6 +63,14 @@ void WebPopupMenu::didChangeSelectedIndex(int newIndex)
         m_popupClient->valueChanged(newIndex);
 }
 
+void WebPopupMenu::setTextForIndex(int index)
+{
+    if (!m_popupClient)
+        return;
+
+    m_popupClient->setTextFromItem(index);
+}
+
 Vector<WebPopupItem> WebPopupMenu::populateItems()
 {
     size_t size = m_popupClient->listSize();
@@ -100,7 +108,7 @@ void WebPopupMenu::show(const IntRect& rect, FrameView* view, int index)
     IntRect pageCoordinates(view->contentsToWindow(rect.location()), rect.size());
 
     PlatformPopupMenuData platformData;
-    setUpPlatformData(platformData);
+    setUpPlatformData(pageCoordinates, platformData);
 
     WebProcess::shared().connection()->send(Messages::WebPageProxy::ShowPopupMenu(pageCoordinates, items, index, platformData), m_page->pageID());
 }

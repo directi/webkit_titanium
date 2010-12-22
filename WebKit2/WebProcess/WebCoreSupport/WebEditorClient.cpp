@@ -178,6 +178,7 @@ void WebEditorClient::respondToChangedContents()
     notImplemented();
 }
 
+#if !PLATFORM(MAC)
 void WebEditorClient::respondToChangedSelection()
 {
     static const String WebViewDidChangeSelectionNotification = "WebViewDidChangeSelectionNotification";
@@ -185,9 +186,19 @@ void WebEditorClient::respondToChangedSelection()
     Frame* frame = m_page->corePage()->focusController()->focusedFrame();
     if (!frame)
         return;
-    m_page->send(Messages::WebPageProxy::DidSelectionChange(frame->selection()->isNone(), frame->selection()->isContentEditable(), frame->selection()->isInPasswordField(), frame->editor()->hasComposition()));
-}
 
+    m_page->send(Messages::WebPageProxy::DidChangeSelection(frame->selection()->isNone(), frame->selection()->isContentEditable(), frame->selection()->isInPasswordField(), frame->editor()->hasComposition()));
+#if PLATFORM(WIN)
+    if (!frame->editor()->hasComposition() || frame->editor()->ignoreCompositionSelectionChange())
+        return;
+
+    unsigned start;
+    unsigned end;
+    m_page->send(Messages::WebPageProxy::DidChangeCompositionSelection(frame->editor()->getCompositionSelection(start, end)));
+#endif
+}
+#endif
+    
 void WebEditorClient::didEndEditing()
 {
     static const String WebViewDidEndEditingNotification = "WebViewDidEndEditingNotification";
@@ -393,7 +404,7 @@ bool WebEditorClient::spellingUIIsShowing()
     return false;
 }
 
-void WebEditorClient::getGuessesForWord(const String&, Vector<String>&)
+void WebEditorClient::getGuessesForWord(const String&, const String&, Vector<String>&)
 {
     notImplemented();
 }
@@ -404,6 +415,11 @@ void WebEditorClient::willSetInputMethodState()
 }
 
 void WebEditorClient::setInputMethodState(bool)
+{
+    notImplemented();
+}
+
+void WebEditorClient::requestCheckingOfString(WebCore::SpellChecker*, int, const WTF::String&)
 {
     notImplemented();
 }

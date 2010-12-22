@@ -29,6 +29,7 @@
 #include "NativeWebKeyboardEvent.h"
 #include "WKAPICast.h"
 #include "WebNumber.h"
+#include "WebOpenPanelResultListenerProxy.h"
 #include "WebPageProxy.h"
 #include <WebCore/FloatRect.h>
 #include <WebCore/IntSize.h>
@@ -127,6 +128,14 @@ void WebUIClient::mouseDidMoveOverElement(WebPageProxy* page, WebEvent::Modifier
         return;
 
     m_client.mouseDidMoveOverElement(toAPI(page), toAPI(modifiers), toAPI(userData), m_client.clientInfo);
+}
+
+void WebUIClient::missingPluginButtonClicked(WebPageProxy* page, const String& mimeType, const String& url)
+{
+    if (!m_client.missingPluginButtonClicked)
+        return;
+
+    m_client.missingPluginButtonClicked(toAPI(page), toAPI(mimeType.impl()), toAPI(url.impl()), m_client.clientInfo);
 }
 
 void WebUIClient::didNotHandleKeyEvent(WebPageProxy* page, const NativeWebKeyboardEvent& event)
@@ -235,6 +244,24 @@ void WebUIClient::pageDidScroll(WebPageProxy* page)
         return;
 
     m_client.pageDidScroll(toAPI(page), m_client.clientInfo);
+}
+
+unsigned long long WebUIClient::exceededDatabaseQuota(WebPageProxy* page, WebFrameProxy* frame, WebSecurityOrigin* origin, const String& databaseName, const String& databaseDisplayName, unsigned long long currentQuota, unsigned long long currentUsage, unsigned long long expectedUsage)
+{
+    if (!m_client.exceededDatabaseQuota)
+        return currentQuota;
+
+    return m_client.exceededDatabaseQuota(toAPI(page), toAPI(frame), toAPI(origin), toAPI(databaseName.impl()), toAPI(databaseDisplayName.impl()), currentQuota, currentUsage, expectedUsage, m_client.clientInfo);
+}
+
+bool WebUIClient::runOpenPanel(WebPageProxy* page, WebFrameProxy* frame, const WebOpenPanelParameters::Data& parameterData, WebOpenPanelResultListenerProxy* listener)
+{
+    if (!m_client.runOpenPanel)
+        return false;
+
+    RefPtr<WebOpenPanelParameters> parameters = WebOpenPanelParameters::create(parameterData);
+    m_client.runOpenPanel(toAPI(page), toAPI(frame), toAPI(parameters.get()), toAPI(listener), m_client.clientInfo);
+    return true;
 }
 
 } // namespace WebKit

@@ -29,71 +29,61 @@
 #include "CacheModel.h"
 #include "FontSmoothingLevel.h"
 #include "WKContext.h"
+#include "WKCredentialTypes.h"
 #include "WKPage.h"
 #include "WKPreferencesPrivate.h"
+#include "WKProtectionSpaceTypes.h"
 #include "WKSharedAPICast.h"
-#include "WebFindOptions.h"
+#include <WebCore/Credential.h>
 #include <WebCore/FrameLoaderTypes.h>
+#include <WebCore/ProtectionSpace.h>
 
 namespace WebKit {
 
+class AuthenticationChallengeProxy;
+class AuthenticationDecisionListener;
 class DownloadProxy;
 class WebBackForwardList;
 class WebBackForwardListItem;
 class WebContext;
+class WebCredential;
+class WebDatabaseManagerProxy;
 class WebFormSubmissionListenerProxy;
 class WebFramePolicyListenerProxy;
 class WebFrameProxy;
 class WebInspectorProxy;
 class WebNavigationData;
-class WebPageNamespace;
+class WebOpenPanelParameters;
+class WebOpenPanelResultListenerProxy;
+class WebPageGroup;
 class WebPageProxy;
 class WebPreferences;
+class WebProtectionSpace;
 
+WK_ADD_API_MAPPING(WKAuthenticationChallengeRef, AuthenticationChallengeProxy)
+WK_ADD_API_MAPPING(WKAuthenticationDecisionListenerRef, AuthenticationDecisionListener)
 WK_ADD_API_MAPPING(WKBackForwardListItemRef, WebBackForwardListItem)
 WK_ADD_API_MAPPING(WKBackForwardListRef, WebBackForwardList)
 WK_ADD_API_MAPPING(WKContextRef, WebContext)
+WK_ADD_API_MAPPING(WKCredentialRef, WebCredential)
+WK_ADD_API_MAPPING(WKDatabaseManagerRef, WebDatabaseManagerProxy)
 WK_ADD_API_MAPPING(WKDownloadRef, DownloadProxy)
 WK_ADD_API_MAPPING(WKFormSubmissionListenerRef, WebFormSubmissionListenerProxy)
 WK_ADD_API_MAPPING(WKFramePolicyListenerRef, WebFramePolicyListenerProxy)
 WK_ADD_API_MAPPING(WKFrameRef, WebFrameProxy)
+WK_ADD_API_MAPPING(WKNavigationDataRef, WebNavigationData)
+WK_ADD_API_MAPPING(WKOpenPanelParametersRef, WebOpenPanelParameters)
+WK_ADD_API_MAPPING(WKOpenPanelResultListenerRef, WebOpenPanelResultListenerProxy)
+WK_ADD_API_MAPPING(WKPageGroupRef, WebPageGroup)
+WK_ADD_API_MAPPING(WKPageRef, WebPageProxy)
+WK_ADD_API_MAPPING(WKPreferencesRef, WebPreferences)
+WK_ADD_API_MAPPING(WKProtectionSpaceRef, WebProtectionSpace)
+
 #if ENABLE(INSPECTOR)
 WK_ADD_API_MAPPING(WKInspectorRef, WebInspectorProxy)
 #endif
-WK_ADD_API_MAPPING(WKNavigationDataRef, WebNavigationData)
-WK_ADD_API_MAPPING(WKPageNamespaceRef, WebPageNamespace)
-WK_ADD_API_MAPPING(WKPageRef, WebPageProxy)
-WK_ADD_API_MAPPING(WKPreferencesRef, WebPreferences)
 
 /* Enum conversions */
-
-inline WKFrameNavigationType toAPI(WebCore::NavigationType type)
-{
-    WKFrameNavigationType wkType = kWKFrameNavigationTypeOther;
-
-    switch (type) {
-    case WebCore::NavigationTypeLinkClicked:
-        wkType = kWKFrameNavigationTypeLinkClicked;
-        break;
-    case WebCore::NavigationTypeFormSubmitted:
-        wkType = kWKFrameNavigationTypeFormSubmitted;
-        break;
-    case WebCore::NavigationTypeBackForward:
-        wkType = kWKFrameNavigationTypeBackForward;
-        break;
-    case WebCore::NavigationTypeReload:
-        wkType = kWKFrameNavigationTypeReload;
-        break;
-    case WebCore::NavigationTypeFormResubmitted:
-        wkType = kWKFrameNavigationTypeFormResubmitted;
-        break;
-    case WebCore::NavigationTypeOther:
-        wkType = kWKFrameNavigationTypeOther;
-        break;
-    }
-    
-    return wkType;
-}
 
 inline CacheModel toCacheModel(WKCacheModel wkCacheModel)
 {
@@ -122,28 +112,6 @@ inline WKCacheModel toAPI(CacheModel cacheModel)
     }
     
     return kWKCacheModelDocumentViewer;
-}
-
-inline FindOptions toFindOptions(WKFindOptions wkFindOptions)
-{
-    unsigned findOptions = 0;
-
-    if (wkFindOptions & kWKFindOptionsCaseInsensitive)
-        findOptions |= FindOptionsCaseInsensitive;
-    if (wkFindOptions & kWKFindOptionsAtWordStarts)
-        findOptions |= FindOptionsAtWordStarts;
-    if (wkFindOptions & kWKFindOptionsTreatMedialCapitalAsWordStart)
-        findOptions |= FindOptionsTreatMedialCapitalAsWordStart;
-    if (wkFindOptions & kWKFindOptionsBackwards)
-        findOptions |= FindOptionsBackwards;
-    if (wkFindOptions & kWKFindOptionsWrapAround)
-        findOptions |= FindOptionsWrapAround;
-    if (wkFindOptions & kWKFindOptionsShowOverlay)
-        findOptions |= FindOptionsShowOverlay;
-    if (wkFindOptions & kWKFindOptionsShowFindIndicator)
-        findOptions |= FindOptionsShowFindIndicator;
-
-    return static_cast<FindOptions>(findOptions);
 }
 
 inline FontSmoothingLevel toFontSmoothingLevel(WKFontSmoothingLevel wkLevel)
@@ -187,6 +155,67 @@ inline WKFontSmoothingLevel toAPI(FontSmoothingLevel level)
 
     ASSERT_NOT_REACHED();
     return kWKFontSmoothingLevelMedium;
+}
+
+inline WKProtectionSpaceServerType toAPI(WebCore::ProtectionSpaceServerType type)
+{
+    switch (type) {
+    case WebCore::ProtectionSpaceServerHTTP:
+        return kWKProtectionSpaceServerTypeHTTP;
+    case WebCore::ProtectionSpaceServerHTTPS:
+        return kWKProtectionSpaceServerTypeHTTPS;
+    case WebCore::ProtectionSpaceServerFTP:
+        return kWKProtectionSpaceServerTypeFTP;
+    case WebCore::ProtectionSpaceServerFTPS:
+        return kWKProtectionSpaceServerTypeFTPS;
+    case WebCore::ProtectionSpaceProxyHTTP:
+        return kWKProtectionSpaceProxyTypeHTTP;
+    case WebCore::ProtectionSpaceProxyHTTPS:
+        return kWKProtectionSpaceProxyTypeHTTPS;
+    case WebCore::ProtectionSpaceProxyFTP:
+        return kWKProtectionSpaceProxyTypeFTP;
+    case WebCore::ProtectionSpaceProxySOCKS:
+        return kWKProtectionSpaceProxyTypeSOCKS;
+    }
+    return kWKProtectionSpaceServerTypeHTTP;
+}
+
+inline WKProtectionSpaceAuthenticationScheme toAPI(WebCore::ProtectionSpaceAuthenticationScheme type)
+{
+    switch (type) {
+    case WebCore::ProtectionSpaceAuthenticationSchemeDefault:
+        return kWKProtectionSpaceAuthenticationSchemeDefault;
+    case WebCore::ProtectionSpaceAuthenticationSchemeHTTPBasic:
+        return kWKProtectionSpaceAuthenticationSchemeHTTPBasic;
+    case WebCore::ProtectionSpaceAuthenticationSchemeHTTPDigest:
+        return kWKProtectionSpaceAuthenticationSchemeHTTPDigest;
+    case WebCore::ProtectionSpaceAuthenticationSchemeHTMLForm:
+        return kWKProtectionSpaceAuthenticationSchemeHTMLForm;
+    case WebCore::ProtectionSpaceAuthenticationSchemeNTLM:
+        return kWKProtectionSpaceAuthenticationSchemeNTLM;
+    case WebCore::ProtectionSpaceAuthenticationSchemeNegotiate:
+        return kWKProtectionSpaceAuthenticationSchemeNegotiate;
+    case WebCore::ProtectionSpaceAuthenticationSchemeClientCertificateRequested:
+        return kWKProtectionSpaceAuthenticationSchemeClientCertificateRequested;
+    case WebCore::ProtectionSpaceAuthenticationSchemeServerTrustEvaluationRequested:
+        return kWKProtectionSpaceAuthenticationSchemeServerTrustEvaluationRequested;
+    default:
+        return kWKProtectionSpaceAuthenticationSchemeUnknown;
+    }
+}
+
+inline WebCore::CredentialPersistence toCredentialPersistence(WKCredentialPersistence type)
+{
+    switch (type) {
+    case kWKCredentialPersistenceNone:
+        return WebCore::CredentialPersistenceNone;
+    case kWKCredentialPersistenceForSession:
+        return WebCore::CredentialPersistenceForSession;
+    case kWKCredentialPersistencePermanent:
+        return WebCore::CredentialPersistencePermanent;
+    default:
+        return WebCore::CredentialPersistenceNone;
+    }
 }
 
 } // namespace WebKit

@@ -35,6 +35,8 @@
 #include "WebCoreArgumentCoders.h"
 #include "WebFrame.h"
 #include "WebFrameLoaderClient.h"
+#include "WebOpenPanelParameters.h"
+#include "WebOpenPanelResultListener.h"
 #include "WebPage.h"
 #include "WebPageCreationParameters.h"
 #include "WebPageProxyMessages.h"
@@ -43,13 +45,17 @@
 #include "WebProcess.h"
 #include "WebProcessProxyMessageKinds.h"
 #include "WebSearchPopupMenu.h"
+#include <WebCore/DatabaseTracker.h>
 #include <WebCore/FileChooser.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameLoader.h>
+#include <WebCore/HTMLNames.h>
+#include <WebCore/HTMLPlugInImageElement.h>
 #include <WebCore/Page.h>
 #include <WebCore/SecurityOrigin.h>
 
 using namespace WebCore;
+using namespace HTMLNames;
 
 namespace WebKit {
 
@@ -309,8 +315,7 @@ bool WebChromeClient::shouldInterruptJavaScript()
 
 bool WebChromeClient::tabsToLinks() const
 {
-    notImplemented();
-    return false;
+    return m_page->tabsToLinks();
 }
 
 IntRect WebChromeClient::windowResizerRect() const
@@ -387,6 +392,22 @@ void WebChromeClient::scrollRectIntoView(const IntRect&, const ScrollView*) cons
     notImplemented();
 }
 
+bool WebChromeClient::shouldMissingPluginMessageBeButton() const
+{
+    // FIXME: <rdar://problem/8794397> We should only return true when there is a 
+    // missingPluginButtonClicked callback defined on the Page UI client.
+    return true;
+}
+    
+void WebChromeClient::missingPluginButtonClicked(Element* element) const
+{
+    ASSERT(element->hasTagName(objectTag) || element->hasTagName(embedTag));
+
+    HTMLPlugInImageElement* pluginElement = static_cast<HTMLPlugInImageElement*>(element);
+
+    m_page->send(Messages::WebPageProxy::MissingPluginButtonClicked(pluginElement->serviceType(), pluginElement->url()));
+}
+
 void WebChromeClient::scrollbarsModeDidChange() const
 {
     notImplemented();
@@ -420,9 +441,19 @@ void WebChromeClient::print(Frame*)
 }
 
 #if ENABLE(DATABASE)
-void WebChromeClient::exceededDatabaseQuota(Frame*, const String& databaseName)
+void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseName)
 {
-    notImplemented();
+    WebFrame* webFrame = static_cast<WebFrameLoaderClient*>(frame->loader()->client())->webFrame();
+    SecurityOrigin* origin = frame->document()->securityOrigin();
+
+    DatabaseDetails details = DatabaseTracker::tracker().detailsForNameAndOrigin(databaseName, origin);
+    uint64_t currentQuota = DatabaseTracker::tracker().quotaForOrigin(origin);
+    uint64_t newQuota = 0;
+    WebProcess::shared().connection()->sendSync(
+        Messages::WebPageProxy::ExceededDatabaseQuota(webFrame->frameID(), origin->databaseIdentifier(), databaseName, details.displayName(), currentQuota, details.currentUsage(), details.expectedUsage()),
+        Messages::WebPageProxy::ExceededDatabaseQuota::Reply(newQuota), m_page->pageID());
+
+    DatabaseTracker::tracker().setQuota(origin, newQuota);
 }
 #endif
 
@@ -498,9 +529,26 @@ void WebChromeClient::cancelGeolocationPermissionRequestForFrame(Frame*, Geoloca
     notImplemented();
 }
 
-void WebChromeClient::runOpenPanel(Frame*, PassRefPtr<FileChooser>)
+void WebChromeClient::runOpenPanel(Frame* frame, PassRefPtr<FileChooser> prpFileChooser)
 {
-    notImplemented();
+    if (m_page->activeOpenPanelResultListener())
+        return;
+
+    RefPtr<FileChooser> fileChooser = prpFileChooser;
+
+    m_page->setActiveOpenPanelResultListener(WebOpenPanelResultListener::create(m_page, fileChooser.get()));
+    
+    WebOpenPanelParameters::Data parameters;
+    parameters.allowMultipleFiles = fileChooser->allowsMultipleFiles();
+#if ENABLE(DIRECTORY_UPLOAD)
+    parameters.allowsDirectoryUpload = fileChooser->allowsDirectoryUpload();
+#else
+    parameters.allowsDirectoryUpload = false;
+#endif
+    parameters.acceptTypes = fileChooser->acceptTypes();
+    parameters.filenames = fileChooser->filenames();
+
+    m_page->send(Messages::WebPageProxy::RunOpenPanel(static_cast<WebFrameLoaderClient*>(frame->loader()->client())->webFrame()->frameID(), parameters));
 }
 
 void WebChromeClient::chooseIconForFiles(const Vector<String>&, FileChooser*)
@@ -508,7 +556,7 @@ void WebChromeClient::chooseIconForFiles(const Vector<String>&, FileChooser*)
     notImplemented();
 }
 
-void WebChromeClient::setCursor(const Cursor& cursor)
+void WebChromeClient::setCursor(const WebCore::Cursor& cursor)
 {
 #if USE(LAZY_NATIVE_CURSOR)
     m_page->send(Messages::WebPageProxy::SetCursor(cursor));

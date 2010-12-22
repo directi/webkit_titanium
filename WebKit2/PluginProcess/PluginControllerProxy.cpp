@@ -34,7 +34,6 @@
 #include "NPRuntimeUtilities.h"
 #include "NPVariantData.h"
 #include "NetscapePlugin.h"
-#include "NotImplemented.h"
 #include "PluginProcess.h"
 #include "PluginProxyMessages.h"
 #include "WebCoreArgumentCoders.h"
@@ -46,18 +45,23 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PassOwnPtr<PluginControllerProxy> PluginControllerProxy::create(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled)
+PassOwnPtr<PluginControllerProxy> PluginControllerProxy::create(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled, bool isAcceleratedCompositingEnabled)
 {
-    return adoptPtr(new PluginControllerProxy(connection, pluginInstanceID, userAgent, isPrivateBrowsingEnabled));
+    return adoptPtr(new PluginControllerProxy(connection, pluginInstanceID, userAgent, isPrivateBrowsingEnabled, isAcceleratedCompositingEnabled));
 }
 
-PluginControllerProxy::PluginControllerProxy(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled)
+PluginControllerProxy::PluginControllerProxy(WebProcessConnection* connection, uint64_t pluginInstanceID, const String& userAgent, bool isPrivateBrowsingEnabled, bool isAcceleratedCompositingEnabled)
     : m_connection(connection)
     , m_pluginInstanceID(pluginInstanceID)
     , m_userAgent(userAgent)
     , m_isPrivateBrowsingEnabled(isPrivateBrowsingEnabled)
+    , m_isAcceleratedCompositingEnabled(isAcceleratedCompositingEnabled)
     , m_paintTimer(RunLoop::main(), this, &PluginControllerProxy::paint)
     , m_waitingForDidUpdate(false)
+    , m_pluginCanceledManualStreamLoad(false)
+#if PLATFORM(MAC)
+    , m_isComplexTextInputEnabled(false)
+#endif
 {
 }
 
@@ -71,6 +75,9 @@ bool PluginControllerProxy::initialize(const Plugin::Parameters& parameters)
     ASSERT(!m_plugin);
 
     m_plugin = NetscapePlugin::create(PluginProcess::shared().netscapePluginModule());
+    if (!m_plugin)
+        return false;
+
     if (!m_plugin->initialize(this, parameters)) {
         m_plugin = 0;
         return false;
@@ -159,12 +166,14 @@ void PluginControllerProxy::loadURL(uint64_t requestID, const String& method, co
 
 void PluginControllerProxy::cancelStreamLoad(uint64_t streamID)
 {
-    notImplemented();
+    m_connection->connection()->send(Messages::PluginProxy::CancelStreamLoad(streamID), m_pluginInstanceID);
 }
 
 void PluginControllerProxy::cancelManualStreamLoad()
 {
-    notImplemented();
+    m_pluginCanceledManualStreamLoad = true;
+
+    m_connection->connection()->send(Messages::PluginProxy::CancelManualStreamLoad(), m_pluginInstanceID);
 }
 
 NPObject* PluginControllerProxy::windowScriptNPObject()
@@ -214,19 +223,30 @@ bool PluginControllerProxy::evaluate(NPObject* npObject, const String& scriptStr
     return true;
 }
 
-void PluginControllerProxy::setStatusbarText(const WTF::String&)
+void PluginControllerProxy::setStatusbarText(const String& statusbarText)
 {
-    notImplemented();
+    m_connection->connection()->send(Messages::PluginProxy::SetStatusbarText(statusbarText), m_pluginInstanceID);
 }
 
 bool PluginControllerProxy::isAcceleratedCompositingEnabled()
 {
-    return PluginProcess::shared().compositingRenderServerPort();
+    return m_isAcceleratedCompositingEnabled;
 }
 
 void PluginControllerProxy::pluginProcessCrashed()
 {
-    notImplemented();
+    // This should never be called from here.
+    ASSERT_NOT_REACHED();
+}
+
+void PluginControllerProxy::setComplexTextInputEnabled(bool complexTextInputEnabled)
+{
+    if (m_isComplexTextInputEnabled == complexTextInputEnabled)
+        return;
+
+    m_isComplexTextInputEnabled = complexTextInputEnabled;
+
+    m_connection->connection()->send(Messages::PluginProxy::SetComplexTextInputEnabled(complexTextInputEnabled), m_pluginInstanceID);
 }
 
 String PluginControllerProxy::proxiesForURL(const String& urlString)
@@ -258,7 +278,17 @@ bool PluginControllerProxy::isPrivateBrowsingEnabled()
 {
     return m_isPrivateBrowsingEnabled;
 }
-    
+
+void PluginControllerProxy::frameDidFinishLoading(uint64_t requestID)
+{
+    m_plugin->frameDidFinishLoading(requestID);
+}
+
+void PluginControllerProxy::frameDidFail(uint64_t requestID, bool wasCancelled)
+{
+    m_plugin->frameDidFail(requestID, wasCancelled);
+}
+
 void PluginControllerProxy::geometryDidChange(const IntRect& frameRect, const IntRect& clipRect, const SharedMemory::Handle& backingStoreHandle)
 {
     m_frameRect = frameRect;
@@ -299,6 +329,38 @@ void PluginControllerProxy::streamDidFinishLoading(uint64_t streamID)
 void PluginControllerProxy::streamDidFail(uint64_t streamID, bool wasCancelled)
 {
     m_plugin->streamDidFail(streamID, wasCancelled);
+}
+
+void PluginControllerProxy::manualStreamDidReceiveResponse(const String& responseURLString, uint32_t streamLength, uint32_t lastModifiedTime, const String& mimeType, const String& headers)
+{
+    if (m_pluginCanceledManualStreamLoad)
+        return;
+
+    m_plugin->manualStreamDidReceiveResponse(KURL(ParsedURLString, responseURLString), streamLength, lastModifiedTime, mimeType, headers);
+}
+
+void PluginControllerProxy::manualStreamDidReceiveData(const CoreIPC::DataReference& data)
+{
+    if (m_pluginCanceledManualStreamLoad)
+        return;
+
+    m_plugin->manualStreamDidReceiveData(reinterpret_cast<const char*>(data.data()), data.size());
+}
+
+void PluginControllerProxy::manualStreamDidFinishLoading()
+{
+    if (m_pluginCanceledManualStreamLoad)
+        return;
+    
+    m_plugin->manualStreamDidFinishLoading();
+}
+
+void PluginControllerProxy::manualStreamDidFail(bool wasCancelled)
+{
+    if (m_pluginCanceledManualStreamLoad)
+        return;
+    
+    m_plugin->manualStreamDidFail(wasCancelled);
 }
     
 void PluginControllerProxy::handleMouseEvent(const WebMouseEvent& mouseEvent, bool& handled)
@@ -361,15 +423,21 @@ void PluginControllerProxy::windowFocusChanged(bool hasFocus)
     m_plugin->windowFocusChanged(hasFocus);
 }
 
-void PluginControllerProxy::windowFrameChanged(const IntRect& windowFrame)
+void PluginControllerProxy::windowAndViewFramesChanged(const IntRect& windowFrameInScreenCoordinates, const IntRect& viewFrameInWindowCoordinates)
 {
-    m_plugin->windowFrameChanged(windowFrame);
+    m_plugin->windowAndViewFramesChanged(windowFrameInScreenCoordinates, viewFrameInWindowCoordinates);
 }
 
 void PluginControllerProxy::windowVisibilityChanged(bool isVisible)
 {
     m_plugin->windowVisibilityChanged(isVisible);
 }
+
+void PluginControllerProxy::sendComplexTextInput(const String& textInput)
+{
+    m_plugin->sendComplexTextInput(textInput);
+}
+
 #endif
 
 void PluginControllerProxy::privateBrowsingStateChanged(bool isPrivateBrowsingEnabled)

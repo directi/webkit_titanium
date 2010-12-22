@@ -37,18 +37,12 @@
 namespace WebKit {
 
 class DrawingAreaProxy;
-class WebPageNamespace;
-
-enum InjectedBundleVisibility {
-    HiddenFromInjectedBundle,
-    VisibleToInjectedBundle
-};
 
 class WebView : public APIObject, public PageClient, WebCore::WindowMessageListener {
 public:
-    static PassRefPtr<WebView> create(RECT rect, WebPageNamespace* pageNamespace, HWND parentWindow, InjectedBundleVisibility visibility)
+    static PassRefPtr<WebView> create(RECT rect, WebContext* context, WebPageGroup* pageGroup, HWND parentWindow)
     {
-        return adoptRef(new WebView(rect, pageNamespace, parentWindow, visibility));
+        return adoptRef(new WebView(rect, context, pageGroup, parentWindow));
     }
     ~WebView();
 
@@ -59,11 +53,12 @@ public:
     void windowAncestryDidChange();
     void setIsInWindow(bool);
     void setOverrideCursor(HCURSOR overrideCursor);
+    void setInitialFocus(bool forward);
 
     WebPageProxy* page() const { return m_page.get(); }
 
 private:
-    WebView(RECT, WebPageNamespace*, HWND parentWindow, InjectedBundleVisibility);
+    WebView(RECT, WebContext*, WebPageGroup*, HWND parentWindow);
 
     virtual Type type() const { return TypeView; }
 
@@ -83,6 +78,18 @@ private:
     LRESULT onTimerEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
     LRESULT onShowWindowEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
     LRESULT onSetCursor(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
+    bool onIMEStartComposition();
+    bool onIMEComposition(LPARAM);
+    bool onIMEEndComposition();
+    LRESULT onIMERequest(WPARAM, LPARAM);
+    bool onIMESelect(WPARAM, LPARAM);
+    bool onIMESetContext(WPARAM, LPARAM);
+    void resetIME();
+    void setInputMethodState(bool);
+    HIMC getIMMContext();
+    void prepareCandidateWindow(HIMC);
+    LRESULT onIMERequestCharPosition(IMECHARPOSITION*);
+    LRESULT onIMERequestReconvertString(RECONVERTSTRING*);
 
     bool isActive();
     void updateActiveState();
@@ -111,15 +118,19 @@ private:
     virtual WebCore::FloatRect convertToUserSpace(const WebCore::FloatRect&);
     virtual void didNotHandleKeyEvent(const NativeWebKeyboardEvent&);
     virtual void selectionChanged(bool, bool, bool, bool);
-    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy();
+    virtual void compositionSelectionChanged(bool);
+    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*);
     virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*);
     virtual void setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut);
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual void pageDidEnterAcceleratedCompositing();
     virtual void pageDidLeaveAcceleratedCompositing();
-    void switchToDrawingAreaTypeIfNecessary(DrawingAreaProxy::Type);
+    void switchToDrawingAreaTypeIfNecessary(DrawingAreaInfo::Type);
 #endif
+
+    void didCommitLoadForMainFrame(bool useCustomRepresentation);
+    void didFinishLoadingDataForCustomRepresentation(const CoreIPC::DataReference&);
 
     virtual HWND nativeWindow();
 
@@ -139,6 +150,13 @@ private:
     bool m_isBeingDestroyed;
 
     RefPtr<WebPageProxy> m_page;
+
+    // Text input state values
+    bool m_selectionIsNone;
+    bool m_selectionIsEditable;
+    bool m_selectionInPasswordField;
+    bool m_hasMarkedText;
+    unsigned m_inIMEComposition;
 };
 
 } // namespace WebKit
