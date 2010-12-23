@@ -1,3 +1,317 @@
+2010-12-22  Anders Carlsson  <andersca@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        Webkit2: WebProcess crashes when Private browsing is turned on on yahoo.com
+        https://bugs.webkit.org/show_bug.cgi?id=51516
+        <rdar://problem/8766995>
+
+        * WebProcess/Plugins/Netscape/NetscapePlugin.cpp:
+        (WebKit::NetscapePlugin::NPP_SetValue):
+        Add a null check for NPP_SetValue.
+
+2010-12-22  Anders Carlsson  <andersca@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        REGRESSION (WK2): Plugins swallow CMD-W, CMD-Q, and probably other shortcuts
+        https://bugs.webkit.org/show_bug.cgi?id=51515
+        <rdar://problem/8740926>
+
+        Always return false for keyboard events where the command key is down.
+
+        * WebProcess/Plugins/Netscape/mac/NetscapePluginMac.mm:
+        (WebKit::NetscapePlugin::platformHandleKeyboardEvent):
+
+2010-12-22  Sam Weinig  <sam@webkit.org>
+
+        Reviewed by Darin Adler.
+
+        WebProcess should be terminated if invalid frameIDs are
+        passed to the UIProcess.
+        https://bugs.webkit.org/show_bug.cgi?id=51508
+
+        - Introduce a mechanism to mark a messages as invalid due to
+          reasons other than in ability to decode the message, eg. an
+          invalid frameID is passed in a message.
+
+        * Platform/CoreIPC/Connection.cpp:
+        (CoreIPC::Connection::Connection):
+        (CoreIPC::Connection::markCurrentlyDispatchedMessageAsInvalid): Sets
+        the m_didReceiveInvalidMessage bit so that it can be picked up in 
+        (CoreIPC::Connection::dispatchMessages): Check for m_didReceiveInvalidMessage in
+        addition to tainted arguments.
+        * Platform/CoreIPC/Connection.h:
+        Add base macro for others to extend, that calls markCurrentlyDispatchedMessageAsInvalid()
+        ASSERTs, and returns.
+
+        * UIProcess/WebPageProxy.cpp:
+        Add Message checks for all WebFrameProxy's gotten from frameIDs passed
+        over the wire.
+        * UIProcess/WebProcessProxy.cpp:
+        (WebKit::isGoodMapKey):
+        Checks that the key can be inserted safely into a map (eg. not the empty or deleted value).
+
+        (WebKit::WebProcessProxy::webFrame):
+        Return null for bad keys (eg. 0 or -1).
+
+        (WebKit::WebProcessProxy::canCreateFrame):
+        Added. Checks that the ID is good and not in the map yet. Used
+        as a consistency check before creating frames.
+
+        (WebKit::WebProcessProxy::frameCreated): 
+        ASSERT that the key is good, in addition to not in the map yet.
+
+        (WebKit::WebProcessProxy::didDestroyFrame):
+        ASSERT that the key is good.
+
+        * UIProcess/WebProcessProxy.h:
+        Move WebFrameProxy HashMap type into a typedef.
+
+2010-12-22  Darin Adler  <darin@apple.com>
+
+        Reviewed by Anders Carlsson.
+
+        WebKit2 needs a way to return the main resource data
+        https://bugs.webkit.org/show_bug.cgi?id=51510
+
+        * UIProcess/API/C/WKFrame.cpp:
+        (WKFrameGetMainResourceData): Added.
+        (callGetMainResourceDataBlockAndDispose): Added.
+        (WKFrameGetMainResourceData_b): Added.
+        * UIProcess/API/C/WKFrame.h: Added WKFrameGetMainResourceData.
+
+        * UIProcess/WebFrameProxy.cpp:
+        (WebKit::WebFrameProxy::getMainResourceData): Added.
+        * UIProcess/WebFrameProxy.h: Ditto.
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::getMainResourceDataOfFrame): Added.
+        (WebKit::WebPageProxy::dataCallback): Replaced the individual callbacks
+        with just these two.
+        (WebKit::WebPageProxy::stringCallback): Ditto.
+        * UIProcess/WebPageProxy.h: Ditto.
+        * UIProcess/WebPageProxy.messages.in: Ditto.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::runJavaScriptInMainFrame): Send the string callback
+        message instead of a specific one.
+        (WebKit::WebPage::getContentsAsString): Ditto.
+        (WebKit::WebPage::getRenderTreeExternalRepresentation): Ditto.
+        (WebKit::WebPage::getSelectionOrContentsAsString): Ditto.
+        (WebKit::WebPage::getSourceForFrame): Ditto.
+        (WebKit::WebPage::getMainResourceDataOfFrame): Added.
+        (WebKit::WebPage::getWebArchiveOfFrame): Send the data callback message
+        instead of a specific one.
+        * WebProcess/WebPage/WebPage.h: Added getMainResourceDataOfFrame.
+        * WebProcess/WebPage/WebPage.messages.in: Ditto.
+
+2010-12-22  Darin Adler  <darin@apple.com>
+
+        * WebProcess/WebPage/WebPage.cpp: Add #if to try to fix non-Mac builds.
+
+2010-12-22  Darin Adler  <darin@apple.com>
+
+        Reviewed by Anders Carlsson.
+
+        Make Speech menu items work in WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=51504
+
+        * UIProcess/API/C/WKFrame.cpp:
+        (WKFrameGetWebArchive): Updated to use new-named typedef.
+        * UIProcess/API/C/WKPage.cpp:
+        (WKPageRunJavaScriptInMainFrame): Ditto.
+        (WKPageRenderTreeExternalRepresentation): Ditto.
+        (WKPageGetSourceForFrame): Ditto.
+        (WKPageGetContentsAsString): Ditto.
+
+        * UIProcess/API/mac/WKView.mm:
+        (menuItem): Added. Helper function to make it easy to call menu item
+        functions on arbitrary user interface items.
+        (toolbarItem): Ditto.
+        (-[WKView validateUserInterfaceItem:]): Added validation for startSpeaking
+        and stopSpeaking commands. Reworked the code to fix a bug where
+        toggleContinuousSpellChecking would always be enabled even when it should
+        be disabled. Reworked the asynchronous validation code so it works for
+        items other than menu items and can also handle more than one item for the
+        same command. Added some comments.
+        (speakString): Added. Helper function to be used as a callback when we
+        get the selection or contents to speak.
+        (-[WKView startSpeaking:]): Added. Uses getSelectionOrContentsAsString.
+        (-[WKView stopSpeaking:]): Added.
+        (-[WKView _setUserInterfaceItemState:enabled:state:]): Reworked to work
+        with the changes to validateUserInterfaceItem above.
+
+        * UIProcess/WebFrameProxy.cpp:
+        (WebKit::WebFrameProxy::isDisplayingMarkupDocument): Added a FIXME about
+        a problem I noticed.
+        (WebKit::WebFrameProxy::didCommitLoad): Tweaked argument name.
+        (WebKit::WebFrameProxy::getWebArchive): Changed to use new-named typedef.
+        * UIProcess/WebFrameProxy.h: Changed WebArchiveCallback to DataCallaback.
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::close): Invalidate the two callback maps since
+        we only have two now.
+        (WebKit::WebPageProxy::runJavaScriptInMainFrame): Changed to use merged
+        maps and typedefs so we don't need a separate callback map for each function.
+        (WebKit::WebPageProxy::getRenderTreeExternalRepresentation): Ditto.
+        (WebKit::WebPageProxy::getSourceForFrame): Ditto.
+        (WebKit::WebPageProxy::getContentsAsString): Ditto.
+        (WebKit::WebPageProxy::getSelectionOrContentsAsString): Added.
+        (WebKit::WebPageProxy::getWebArchiveOfFrame): Ditto.
+        (WebKit::WebPageProxy::didGetContentsAsString): Ditto.
+        (WebKit::WebPageProxy::didGetSelectionOrContentsAsString): Ditto.
+        (WebKit::WebPageProxy::didRunJavaScriptInMainFrame): Ditto.
+        (WebKit::WebPageProxy::didGetRenderTreeExternalRepresentation): Ditto.
+        (WebKit::WebPageProxy::didGetSourceForFrame): Ditto.
+        (WebKit::WebPageProxy::didGetWebArchiveOfFrame): Ditto.
+        (WebKit::WebPageProxy::processDidCrash): Ditto.
+
+        * UIProcess/WebPageProxy.h: Updated for changes above.
+
+        * UIProcess/WebPageProxy.messages.in: Added DidGetSelectionOrContentsAsString,
+        GetIsSpeaking, Speak, and StopSpeaking.
+
+        * UIProcess/mac/WebPageProxyMac.mm:
+        (WebKit::WebPageProxy::getIsSpeaking): Added.
+        (WebKit::WebPageProxy::speak): Added.
+        (WebKit::WebPageProxy::stopSpeaking): Added.
+
+        * WebProcess/WebCoreSupport/mac/WebContextMenuClientMac.mm:
+        (WebKit::WebContextMenuClient::isSpeaking): Call WebPage instead of doing
+        the work directly, so it can run in the UI process.
+        (WebKit::WebContextMenuClient::speak): Ditto.
+        (WebKit::WebContextMenuClient::stopSpeaking): Ditto.
+        (WebKit::WebContextMenuClient::searchWithSpotlight): Added FIXME comment and
+        changed code to avoid a C-style cast.
+
+        * WebProcess/WebPage/WebFrame.cpp:
+        (WebKit::WebFrame::selectionAsString): Added.
+        * WebProcess/WebPage/WebFrame.h: Ditto.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::changeAcceleratedCompositingMode): Use sendSync in the
+        modern way instead of explicitly calling WebProcess.
+        (WebKit::WebPage::getSelectionOrContentsAsString): Added.
+        (WebKit::WebPage::isSpeaking): Added.
+        (WebKit::WebPage::speak): Added.
+        (WebKit::WebPage::stopSpeaking): Added.
+        * WebProcess/WebPage/WebPage.h: Added functions.
+
+        * WebProcess/WebPage/WebPage.messages.in: Added GetSelectionOrContentsAsString.
+
+2010-12-22  Anders Carlsson  <andersca@apple.com>
+
+        Fix build.
+
+        * Platform/mac/MachUtilities.cpp:
+
+2010-12-22  Anders Carlsson  <andersca@apple.com>
+
+        Reviewed by Darin Adler.
+
+        Detect WebProcess crashes sooner, without waiting for ReportCrash to finish
+        https://bugs.webkit.org/show_bug.cgi?id=51505
+
+        * Platform/CoreIPC/CoreIPCMessageKinds.h:
+        Add SetExceptionPort.
+
+        * Platform/CoreIPC/mac/ConnectionMac.cpp:
+        (CoreIPC::Connection::platformInvalidate):
+        If we have an exception port, unregister it.
+
+        (CoreIPC::Connection::platformInitialize):
+        Set m_exceptionPort to null.
+
+        (CoreIPC::Connection::open):
+        If we have an exception port, register an event handler for it and send it over
+        to the other side.
+
+        (CoreIPC::Connection::receiveSourceEventHandler):
+        Handle the SetExceptionPort message.
+
+        (CoreIPC::Connection::exceptionSourceEventHandler):
+        Receive the message, forward it to the real exception handler and call connectionDidClose.
+
+        (CoreIPC::Connection::setShouldCloseConnectionOnMachExceptions):
+        Create an exception port.
+
+        * Platform/mac/MachUtilities.cpp:
+        (machExceptionPort):
+        (setMachExceptionPort):
+        * Platform/mac/MachUtilities.h:
+        Add helper functions for getting and setting the mach exception port.
+
+        * UIProcess/WebProcessProxy.cpp:
+        (WebKit::WebProcessProxy::didFinishLaunching):
+        Call setShouldCloseConnectionOnMachExceptions on Mac.
+
+2010-12-22  Anders Carlsson  <andersca@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        Move Mach message receiving code out into a new function
+        https://bugs.webkit.org/show_bug.cgi?id=51502
+
+        * Platform/CoreIPC/mac/ConnectionMac.cpp:
+        (CoreIPC::readFromMachPort):
+        (CoreIPC::Connection::receiveSourceEventHandler):
+
+2010-12-22  Jeff Miller  <jeffm@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        InjectedBundle methods should  use the relative URL constructor for KURL instead of the ParsedURLStringTag version
+        https://bugs.webkit.org/show_bug.cgi?id=51491
+        
+        The url passed to various InjectedBundle methods is not from KURL::string(), i.e. it has not already been parsed by KURL,
+        so we have to use the relative URL constructor for KURL instead of the ParsedURLStringTag version.
+
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::addUserScript):
+        (WebKit::InjectedBundle::addUserStyleSheet):
+        (WebKit::InjectedBundle::removeUserScript):
+        (WebKit::InjectedBundle::removeUserStyleSheet):
+
+2010-12-22  Darin Adler  <darin@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        Move more of WebPageProxy::didCommitLoadForFrame into WebFrameProxy::didCommitLoad.
+
+        * UIProcess/WebFrameProxy.cpp:
+        (WebKit::WebFrameProxy::didCommitLoad): Added type and certificate info arguments,
+        and set m_MIMEType, m_isFrameSet, and m_certificateInfo.
+        * UIProcess/WebFrameProxy.h: Removed setMIMEType and setCertificateInfo and added
+        arguments to didCommitLoad.
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::didCommitLoadForFrame): Removed code that is now inside the
+        WebFrameProxy::didCommitLoad function.
+
+2010-12-21  Darin Adler  <darin@apple.com>
+
+        Reviewed by Brady Eidson and Sam Weinig.
+
+        Add a way to get a web archive in WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=51437
+
+        * UIProcess/API/C/WKFrame.cpp:
+        (WKFrameGetWebArchive): Added.
+        (callGetWebArchiveBlockAndDispose): Added.
+        (WKFrameGetWebArchive_b): Added.
+        * UIProcess/API/C/WKFrame.h: Added functions above.
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::close): Clear out m_webArchiveCallbacks.
+        (WebKit::WebPageProxy::getWebArchiveOfFrame): Added.
+        (WebKit::WebPageProxy::didGetWebArchiveOfFrame): Added.
+        (WebKit::WebPageProxy::processDidCrash): Clear out m_webArchiveCallbacks.
+        * UIProcess/WebPageProxy.h: Added functions above.
+        * UIProcess/WebPageProxy.messages.in: Added DidGetWebArchiveOfFrame.
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::getWebArchiveOfFrame): Added.
+        * WebProcess/WebPage/WebPage.h: Added function above.
+        * WebProcess/WebPage/WebPage.messages.in: Added GetWebArchiveOfFrame.
+
 2010-12-21  Siddharth Mathur  <siddharth.mathur@nokia.com>
 
         Reviewed by Laszlo Gombos.

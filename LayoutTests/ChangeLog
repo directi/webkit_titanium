@@ -1,3 +1,237 @@
+2010-12-22  Mihai Parparita  <mihaip@chromium.org>
+
+        Reviewed by Simon Fraser.
+
+        the shadow direction is negated in canvas context shadowOffsetY.
+        https://bugs.webkit.org/show_bug.cgi?id=25619
+        
+        Add test to verify that shadowOffsetY is handled correctly.
+
+        * fast/canvas/fillText-shadow-expected.txt: Added.
+        * fast/canvas/fillText-shadow.html: Added.
+
+2010-12-22  Ariya Hidayat  <ariya@sencha.com>
+
+        Reviewed by Simon Fraser.
+
+        Transform applied via CSSMatrix does not take full page zoom into account
+        https://bugs.webkit.org/show_bug.cgi?id=24808
+
+        The bug has been fixed with r74430 and r74451.
+        These two are just the tests.
+
+        * transforms/2d/cssmatrix-2d-zoom-expected.checksum: Added.
+        * transforms/2d/cssmatrix-2d-zoom-expected.png: Added.
+        * transforms/2d/cssmatrix-2d-zoom-expected.txt: Added.
+        * transforms/2d/cssmatrix-2d-zoom.html: Added.
+        * transforms/3d/general/cssmatrix-3d-zoom-expected.checksum: Added.
+        * transforms/3d/general/cssmatrix-3d-zoom-expected.png: Added.
+        * transforms/3d/general/cssmatrix-3d-zoom-expected.txt: Added.
+        * transforms/3d/general/cssmatrix-3d-zoom.html: Added.
+
+2010-12-22  Jian Li  <jianli@chromium.org>
+
+        Reviewed by David Levin.
+
+        Tests that File.type returns empty string for file with invalid extension.
+        https://bugs.webkit.org/show_bug.cgi?id=51501
+
+        * editing/pasteboard/file-input-files-access-expected.txt:
+        * editing/pasteboard/resources/file.invalidext: Added.
+        * editing/pasteboard/script-tests/file-input-files-access.js:
+
+2010-12-22  Steve Lacey  <sjl@chromium.org>
+
+        Reviewed by David Levin.
+
+        [chromium] Rebaseline chromium media/controls-styling layout test and re-enable.
+        https://bugs.webkit.org/show_bug.cgi?id=51427
+
+        * platform/chromium-linux/media/controls-styling-expected.checksum: Added.
+        * platform/chromium-linux/media/controls-styling-expected.png: Added.
+        * platform/chromium-mac/media/controls-styling-expected.checksum: Added.
+        * platform/chromium-mac/media/controls-styling-expected.png: Added.
+        * platform/chromium-mac/media/controls-styling-expected.txt: Added.
+        * platform/chromium-win/media/controls-styling-expected.checksum: Added.
+        * platform/chromium-win/media/controls-styling-expected.png: Added.
+        * platform/chromium-win/media/controls-styling-expected.txt:
+        * platform/chromium/test_expectations.txt:
+
+2010-12-22  Shane Stephens  <shanestephens@google.com>
+
+        Reviewed by David Levin.
+
+        [Chromium] SLOW lines in chromium test_expectations.txt for svg tests which are no longer slow.
+        https://bugs.webkit.org/show_bug.cgi?id=51429
+
+        * platform/chromium/test_expectations.txt:
+
+2010-12-22  Kenneth Russell  <kbr@google.com>
+
+        Reviewed by David Levin.
+
+        Update fast/canvas/webgl/gl-uniform-arrays.html to bring in sync with Khronos
+        https://bugs.webkit.org/show_bug.cgi?id=51489
+
+        * fast/canvas/webgl/gl-uniform-arrays-expected.txt:
+        * fast/canvas/webgl/gl-uniform-arrays.html:
+
+2010-12-22  Zhenyao Mo  <zmo@google.com>
+
+        Reviewed by Kenneth Russell.
+
+        CopyTex{Sub}Image2D check always if the bound fbo's internal color format is compatible
+        https://bugs.webkit.org/show_bug.cgi?id=51423
+
+        * fast/canvas/webgl/tex-input-validation-expected.txt: Add test cases for copying from webgl's internal FBO.
+        * fast/canvas/webgl/tex-input-validation.html: Ditto.
+
+2010-12-22  Chris Fleizach  <cfleizach@apple.com>
+
+        Reviewed by Darin Adler.
+
+        WAI-ARIA menubar role mapped to AXGroup, should be AXMenuBar
+        https://bugs.webkit.org/show_bug.cgi?id=51488
+
+        * platform/mac/accessibility/aria-menubar-expected.txt: Added.
+        * platform/mac/accessibility/aria-menubar.html: Added.
+
+2010-12-22  Chris Fleizach  <cfleizach@apple.com>
+
+        Reviewed by Sam Weining.
+
+        AX: WAI-ARIA textbox role needs different AXRole, depending on value of aria-multiline property
+        https://bugs.webkit.org/show_bug.cgi?id=51481
+
+        * platform/mac/accessibility/aria-multiline-expected.txt: Added.
+        * platform/mac/accessibility/aria-multiline.html: Added.
+
+2010-12-22  Simon Fraser  <simon.fraser@apple.com>
+
+        Reviewed by Dan Bernstein.
+
+        CSS 2.1 failure: counter-increment-013 fails
+        https://bugs.webkit.org/show_bug.cgi?id=51483
+        
+        Layout test version of CSS 2.1 counter-increment-013 test.
+
+        * fast/css/counters/counter-increment-overflow-expected.txt: Added.
+        * fast/css/counters/counter-increment-overflow.html: Added.
+
+2010-12-22  Chang Shu  <chang.shu@nokia.com>
+
+        Unreviewed layout test fix.
+
+        Revert changeset 74481: http://trac.webkit.org/changeset/74481,
+        as it causes regression on layout tests.
+
+        * platform/qt/Skipped:
+
+2010-12-22  Tony Gentilcore  <tonyg@chromium.org>
+
+        Unreviewed build fix.
+
+        [chromium] console-websocket-error sometimes times out
+        https://bugs.webkit.org/show_bug.cgi?id=51482
+
+        * platform/chromium/test_expectations.txt:
+
+2010-12-21  Vangelis Kokkevis  <vangelis@chromium.org>
+
+        Reviewed by Kenneth Russell.
+
+        [chromium] Enabling layout tests in platform/chromium/compositing
+        and adding new layout test to check for crash on empty render surfaces.
+        https://bugs.webkit.org/show_bug.cgi?id=51432
+
+        * platform/chromium-gpu/test_expectations.txt:
+        * platform/chromium/compositing/empty-render-surface-crasher-expected.txt: Added.
+        * platform/chromium/compositing/empty-render-surface-crasher.html: Added.
+
+2010-12-22  Krithigassree Sambamurthy  <krithigassree.sambamurthy@nokia.com>
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        [Qt] LayoutTests/http/tests/appcache/auth.html failed and skipped
+        https://bugs.webkit.org/show_bug.cgi?id=36688
+
+        * platform/qt/Skipped: Unskip auth.html which now passes.
+        Using Qt4.7.
+
+2010-12-22  Jessie Berlin  <jberlin@apple.com>
+
+        Add Windows-specific expected results for fast/js/large-expressions.html in order to get
+        the Windows 7 Release test bot green again. Unreviewed.
+        https://bugs.webkit.org/show_bug.cgi?id=51469
+
+        * platform/win/fast/js/large-expressions-expected.txt: Added.
+
+2010-12-21  Pavel Podivilov  <podivilov@chromium.org>
+
+        Reviewed by Yury Semikhatsky.
+
+        Web Inspector: persist JavaScript breakpoints in frontend settings.
+        https://bugs.webkit.org/show_bug.cgi?id=48434
+
+        * http/tests/inspector/debugger-test2.js:
+        (initialize_DebuggerTest.InspectorTest.setBreakpoint):
+        * inspector/debugger-breakpoints-not-activated-on-reload.html:
+        * inspector/debugger-pause-on-breakpoint.html:
+        * inspector/report-protocol-errors-expected.txt:
+        * inspector/report-protocol-errors.html:
+
+2010-12-20  Antti Koivisto  <antti@apple.com>
+
+        Reviewed by Alexey Proskuryakov.
+
+        https://bugs.webkit.org/show_bug.cgi?id=51354
+        Don't block rendering and script execution on deferred stylesheets
+
+        * http/tests/local/link-stylesheet-load-order-expected.txt:
+        * http/tests/local/link-stylesheet-load-order-preload-expected.txt:
+        * http/tests/local/resources/check-stylesheet-not-loaded.js: Added.
+        * http/tests/local/stylesheet-and-script-load-order-media-print-expected.txt: Added.
+        * http/tests/local/stylesheet-and-script-load-order-media-print.html: Added.
+
+2010-12-22  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r74473.
+        http://trac.webkit.org/changeset/74473
+        https://bugs.webkit.org/show_bug.cgi?id=51463
+
+        broke compilation on leopard intel release (Requested by
+        podivilov on #webkit).
+
+        * http/tests/inspector/debugger-test2.js:
+        * inspector/debugger-breakpoints-not-activated-on-reload.html:
+        * inspector/debugger-pause-on-breakpoint.html:
+        * inspector/report-protocol-errors-expected.txt:
+        * inspector/report-protocol-errors.html:
+
+2010-12-21  Pavel Podivilov  <podivilov@chromium.org>
+
+        Reviewed by Yury Semikhatsky.
+
+        Web Inspector: persist JavaScript breakpoints in frontend settings.
+        https://bugs.webkit.org/show_bug.cgi?id=48434
+
+        * http/tests/inspector/debugger-test2.js:
+        (initialize_DebuggerTest.InspectorTest.setBreakpoint):
+        * inspector/debugger-breakpoints-not-activated-on-reload.html:
+        * inspector/debugger-pause-on-breakpoint.html:
+        * inspector/report-protocol-errors-expected.txt:
+        * inspector/report-protocol-errors.html:
+
+2010-12-22  Andrei Popescu  <andreip@google.com>
+
+        Unreviewed buildfix.
+
+        [v8] trunk/LayoutTests/fast/js/large-expressions.html fails since r74402
+        https://bugs.webkit.org/show_bug.cgi?id=51391
+
+        * platform/chromium-mac/fast/js/large-expressions-expected.txt:
+        * platform/chromium-win/fast/js/large-expressions-expected.txt:
+
 2010-12-22  Dai Mikurube  <dmikurube@google.com>
 
         Reviewed by Kent Tamura.

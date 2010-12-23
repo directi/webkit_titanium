@@ -2,7 +2,7 @@ AC_PREREQ(2.59)
 
 m4_define([webkit_major_version], [1])
 m4_define([webkit_minor_version], [3])
-m4_define([webkit_micro_version], [8])
+m4_define([webkit_micro_version], [9])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
@@ -35,7 +35,7 @@ AC_CONFIG_SRCDIR([WebCore/config.h])
 
 dnl # Libtool library version, not to confuse with API version
 dnl # see http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-LIBWEBKITGTK_VERSION=5:0:5
+LIBWEBKITGTK_VERSION=5:1:5
 AC_SUBST([LIBWEBKITGTK_VERSION])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects tar-ustar])
@@ -199,7 +199,7 @@ case "$with_gtk" in
           GAIL_PC_NAME=gail
           GAIL_REQUIRED_VERSION=1.8
           ;;
-     3.0) GTK_REQUIRED_VERSION=2.91
+     3.0) GTK_REQUIRED_VERSION=2.91.7
           GTK_API_VERSION=3.0
           WEBKITGTK_API_MAJOR_VERSION=3
           WEBKITGTK_API_MINOR_VERSION=0

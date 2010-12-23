@@ -50,17 +50,24 @@ void Connection::platformInvalidate()
 
     ASSERT(m_sendPort);
     ASSERT(m_receivePort);
-    
+
     // Unregister our ports.
     m_connectionQueue.unregisterMachPortEventHandler(m_sendPort);
     m_sendPort = MACH_PORT_NULL;
 
     m_connectionQueue.unregisterMachPortEventHandler(m_receivePort);
     m_receivePort = MACH_PORT_NULL;
+
+    if (m_exceptionPort) {
+        m_connectionQueue.unregisterMachPortEventHandler(m_exceptionPort);
+        m_exceptionPort = MACH_PORT_NULL;
+    }
 }
 
 void Connection::platformInitialize(Identifier identifier)
 {
+    m_exceptionPort = MACH_PORT_NULL;
+
     if (m_isServer) {
         m_receivePort = identifier;
         m_sendPort = MACH_PORT_NULL;
@@ -96,8 +103,14 @@ bool Connection::open()
     setMachPortQueueLength(m_receivePort, MACH_PORT_QLIMIT_LARGE);
 
     // Register the data available handler.
-    m_connectionQueue.registerMachPortEventHandler(m_receivePort, WorkQueue::MachPortDataAvailable, 
-                                                   WorkItem::create(this, &Connection::receiveSourceEventHandler));
+    m_connectionQueue.registerMachPortEventHandler(m_receivePort, WorkQueue::MachPortDataAvailable, WorkItem::create(this, &Connection::receiveSourceEventHandler));
+
+    // If we have an exception port, register the data available handler and send over the port to the other end.
+    if (m_exceptionPort) {
+        m_connectionQueue.registerMachPortEventHandler(m_exceptionPort, WorkQueue::MachPortDataAvailable, WorkItem::create(this, &Connection::exceptionSourceEventHandler));
+
+        send(CoreIPCMessage::SetExceptionPort, 0, MachPort(m_exceptionPort, MACH_MSG_TYPE_MAKE_SEND));
+    }
 
     return true;
 }
@@ -284,33 +297,43 @@ static PassOwnPtr<ArgumentDecoder> createArgumentDecoder(mach_msg_header_t* head
     return adoptPtr(new ArgumentDecoder(messageBody, messageBodySize, attachments));
 }
 
-void Connection::receiveSourceEventHandler()
-{
-    // The receive buffer size should always include the maximum trailer size.
-    static const size_t receiveBufferSize = inlineMessageMaxSize + MAX_TRAILER_SIZE;
+// The receive buffer size should always include the maximum trailer size.
+static const size_t receiveBufferSize = inlineMessageMaxSize + MAX_TRAILER_SIZE;
+typedef Vector<char, receiveBufferSize> ReceiveBuffer;
 
-    Vector<char, receiveBufferSize> buffer(receiveBufferSize);
-    
+static mach_msg_header_t* readFromMachPort(mach_port_t machPort, ReceiveBuffer& buffer)
+{
+    buffer.resize(receiveBufferSize);
+
     mach_msg_header_t* header = reinterpret_cast<mach_msg_header_t*>(buffer.data());
-    
-    kern_return_t kr = mach_msg(header, MACH_RCV_MSG | MACH_RCV_LARGE | MACH_RCV_TIMEOUT, 0, buffer.size(), m_receivePort, 0, MACH_PORT_NULL);
+    kern_return_t kr = mach_msg(header, MACH_RCV_MSG | MACH_RCV_LARGE | MACH_RCV_TIMEOUT, 0, buffer.size(), machPort, 0, MACH_PORT_NULL);
     if (kr == MACH_RCV_TIMED_OUT)
-        return;
+        return 0;
 
     if (kr == MACH_RCV_TOO_LARGE) {
         // The message was too large, resize the buffer and try again.
         buffer.resize(header->msgh_size + MAX_TRAILER_SIZE);
-        
         header = reinterpret_cast<mach_msg_header_t*>(buffer.data());
         
-        kr = mach_msg(header, MACH_RCV_MSG | MACH_RCV_LARGE | MACH_RCV_TIMEOUT, 0, buffer.size(), m_receivePort, 0, MACH_PORT_NULL);
+        kr = mach_msg(header, MACH_RCV_MSG | MACH_RCV_LARGE | MACH_RCV_TIMEOUT, 0, buffer.size(), machPort, 0, MACH_PORT_NULL);
         ASSERT(kr != MACH_RCV_TOO_LARGE);
     }
 
     if (kr != MACH_MSG_SUCCESS) {
         ASSERT_NOT_REACHED();
-        return;
+        return 0;
     }
+
+    return header;
+}
+
+void Connection::receiveSourceEventHandler()
+{
+    ReceiveBuffer buffer;
+
+    mach_msg_header_t* header = readFromMachPort(m_receivePort, buffer);
+    if (!header)
+        return;
 
     MessageID messageID = MessageID::fromInt(header->msgh_id);
     OwnPtr<ArgumentDecoder> arguments = createArgumentDecoder(header);
@@ -340,8 +363,62 @@ void Connection::receiveSourceEventHandler()
         
         return;
     }
-    
+
+    if (messageID == MessageID(CoreIPCMessage::SetExceptionPort)) {
+        MachPort exceptionPort;
+        if (!arguments->decode(exceptionPort))
+            return;
+
+        setMachExceptionPort(exceptionPort.port());
+        return;
+    }
+
     processIncomingMessage(messageID, arguments.release());
 }    
+
+void Connection::exceptionSourceEventHandler()
+{
+    ReceiveBuffer buffer;
+
+    mach_msg_header_t* header = readFromMachPort(m_exceptionPort, buffer);
+    if (!header)
+        return;
+
+    // We've read the exception message. Now send it on to the real exception port.
+
+    // The remote port should have a send once right.
+    ASSERT(MACH_MSGH_BITS_REMOTE(header->msgh_bits) == MACH_MSG_TYPE_MOVE_SEND_ONCE);
+
+    // Now get the real exception port.
+    mach_port_t exceptionPort = machExceptionPort();
+
+    // First, get the complex bit from the source message.
+    mach_msg_bits_t messageBits = header->msgh_bits & MACH_MSGH_BITS_COMPLEX;
+    messageBits |= MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, MACH_MSG_TYPE_MOVE_SEND_ONCE);
+
+    header->msgh_bits = messageBits;
+    header->msgh_local_port = header->msgh_remote_port;
+    header->msgh_remote_port = exceptionPort;
+
+    // Now send along the message.
+    kern_return_t kr = mach_msg(header, MACH_SEND_MSG, header->msgh_size, 0, MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
+    if (kr != KERN_SUCCESS) {
+        LOG_ERROR("Failed to send message to real exception port, error %x", kr);
+        ASSERT_NOT_REACHED();
+    }
+
+    connectionDidClose();
+}
+
+void Connection::setShouldCloseConnectionOnMachExceptions()
+{
+    ASSERT(m_exceptionPort == MACH_PORT_NULL);
+
+    if (mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &m_exceptionPort) != KERN_SUCCESS)
+        ASSERT_NOT_REACHED();
+
+    if (mach_port_insert_right(mach_task_self(), m_exceptionPort, m_exceptionPort, MACH_MSG_TYPE_MAKE_SEND) != KERN_SUCCESS)
+        ASSERT_NOT_REACHED();
+}
 
 } // namespace CoreIPC

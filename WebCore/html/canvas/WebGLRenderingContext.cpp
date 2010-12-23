@@ -140,6 +140,7 @@ WebGLRenderingContext::WebGLRenderingContext(HTMLCanvasElement* passedCanvas, Pa
 
 void WebGLRenderingContext::initializeNewContext()
 {
+    ASSERT(!m_contextLost);
     m_needsUpdate = true;
     m_markedCanvasDirty = false;
     m_activeTextureUnit = 0;
@@ -637,13 +638,9 @@ void WebGLRenderingContext::copyTexImage2D(unsigned long target, long level, uns
     WebGLTexture* tex = validateTextureBinding(target, true);
     if (!tex)
         return;
-    if (!isGLES2Compliant()) {
-        if (m_framebufferBinding && m_framebufferBinding->object()
-            && !isTexInternalFormatColorBufferCombinationValid(internalformat,
-                                                               m_framebufferBinding->getColorBufferFormat())) {
-            m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
-            return;
-        }
+    if (!isTexInternalFormatColorBufferCombinationValid(internalformat, getBoundFramebufferColorFormat())) {
+        m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
+        return;
     }
     if (!isGLES2NPOTStrict() && level && WebGLTexture::isNPOT(width, height)) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_VALUE);
@@ -666,13 +663,9 @@ void WebGLRenderingContext::copyTexSubImage2D(unsigned long target, long level, 
     WebGLTexture* tex = validateTextureBinding(target, true);
     if (!tex)
         return;
-    if (!isGLES2Compliant()) {
-        if (m_framebufferBinding && m_framebufferBinding->object()
-            && !isTexInternalFormatColorBufferCombinationValid(tex->getInternalFormat(level),
-                                                               m_framebufferBinding->getColorBufferFormat())) {
-            m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
-            return;
-        }
+    if (!isTexInternalFormatColorBufferCombinationValid(tex->getInternalFormat(level), getBoundFramebufferColorFormat())) {
+        m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
+        return;
     }
     if (m_framebufferBinding && !m_framebufferBinding->onAccess(!isResourceSafe())) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_FRAMEBUFFER_OPERATION);
@@ -3333,8 +3326,8 @@ void WebGLRenderingContext::restoreContext()
         return;
 
     m_context = context;
-    initializeNewContext();
     m_contextLost = false;
+    initializeNewContext();
     canvas()->dispatchEvent(WebGLContextEvent::create(eventNames().webglcontextrestoredEvent, false, true, ""));
 }
 
@@ -3569,6 +3562,15 @@ bool WebGLRenderingContext::isTexInternalFormatColorBufferCombinationValid(unsig
         return true;
     }
     return false;
+}
+
+unsigned long WebGLRenderingContext::getBoundFramebufferColorFormat()
+{
+    if (m_framebufferBinding && m_framebufferBinding->object())
+        return m_framebufferBinding->getColorBufferFormat();
+    if (m_attributes.alpha)
+        return GraphicsContext3D::RGBA;
+    return GraphicsContext3D::RGB;
 }
 
 WebGLTexture* WebGLRenderingContext::validateTextureBinding(unsigned long target, bool useSixEnumsForCubeMap)

@@ -1,3 +1,706 @@
+2010-12-22  Mihai Parparita  <mihaip@chromium.org>
+
+        Reviewed by Simon Fraser.
+
+        the shadow direction is negated in canvas context shadowOffsetY.
+        https://bugs.webkit.org/show_bug.cgi?id=25619
+        
+        Invert shadow offset Y direction in 0-blur path in FontMac::drawGlyps
+        if we're not transforming shadows (i.e. are rendering in a canvas). Also
+        use CG shadows if there's a non-translate/flip transform applied
+        (shadow offsets are supposed to ignore transforms, but the naive/simple
+        implementation was taking them into account).
+        
+        Also does the equivalent changes to FontCGWin.
+
+        Test: fast/canvas/fillText-shadow.html
+
+        * platform/graphics/GraphicsContext.cpp:
+        (WebCore::GraphicsContext::shadowsIgnoreTransforms):
+        * platform/graphics/GraphicsContext.h:
+        * platform/graphics/mac/FontMac.mm:
+        (WebCore::Font::drawGlyphs):
+        * platform/graphics/win/FontCGWin.cpp:
+        (WebCore::Font::drawGlyphs):
+
+2010-12-22  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r74503.
+        http://trac.webkit.org/changeset/74503
+        https://bugs.webkit.org/show_bug.cgi?id=51513
+
+        breaks chromium mac debug compile (Requested by tonyg-cr on
+        #webkit).
+
+        * platform/graphics/chromium/ImageLayerChromium.cpp:
+        (WebCore::ImageLayerChromium::updateContentsIfDirty):
+        * platform/graphics/skia/GraphicsContext3DSkia.cpp:
+        (WebCore::GraphicsContext3D::getImageData):
+
+2010-12-22  Dan Bernstein  <mitz@apple.com>
+
+        Reviewed by Darin Adler.
+
+        Replace runtime checks for hyphenation API availability with compile-time checks.
+
+        * platform/text/cf/HyphenationCF.cpp:
+        (WebCore::::createValueForNullKey): Changed to use CFLocaleCopyCurrent() instead of using the
+        search locale, which is empty on Windows. On Mac, this is equivalent to using the search locale.
+        (WebCore::canHyphenate): Added this implementation for when the hyphenation API is not available.
+        It is identical to the implementation in Hyphenation.cpp.
+        (WebCore::lastHyphenLocation): Ditto.
+
+2010-12-22  Simon Fraser  <simon.fraser@apple.com>
+
+        Reviewed by Darin Adler.
+
+        Cache snapshots of plug-ins before painting, to avoid script running during painting
+        https://bugs.webkit.org/show_bug.cgi?id=51493
+        
+        When FrameView is asked to do a flattening paint (e.g. when Safari snapshots,
+        or when printing), plug-ins which otherwise use the CA rendering model
+        are sent a paint event. Some plug-ins may run script while handling this event,
+        or out of process plug-ins may process queued requests at this time. Running
+        script while inside layout or painting can have bad consequences, because it
+        can result in arbitrary changes to the render tree.
+        
+        This patch avoids sending plug-ins paint events inside of painting. Instead,
+        we ask the plug-ins to cache a snapshot before we paint, and then the software
+        paint simply draws that snapshot.
+        
+        Requires manual test, because the bug happens when Safari does
+        a page snapshot. It's not possible to tell the Test Netscape Plug-in
+        to paint without laying out, making an automated test impossible.
+
+        * manual-tests/plugins/plugin-paint-causes-layout.html: Added.
+
+        * page/FrameView.h:
+        * page/FrameView.cpp:
+        (WebCore::FrameView::paintContents): Notify all enclosed widgets
+        that a flattening paint is going to happen.
+        (WebCore::FrameView::notifyWidgetsInAllFrames): Utility method 
+        that tells the RenderView in all subframes to notify their widgets.
+
+        * platform/Widget.h:
+        (WebCore::Widget::notifyWidget): Generic method that can be used
+        to send messages to widgets. Current messages are just 'before flattening paint'
+        and 'after flattening paint'. Message has no payload.
+
+        * rendering/RenderView.h:
+        * rendering/RenderView.cpp:
+        (WebCore::RenderView::getRetainedWidgets):
+        (WebCore::RenderView::releaseWidgets): Factor code out of updateWidgetPositions(),
+        since we use it in two places now.
+        
+        (WebCore::RenderView::updateWidgetPositions): Use getRetainedWidgets() etc.
+        (WebCore::RenderView::notifyWidgets): Retain all the widgets, then send
+        them all the message.
+
+        * rendering/RenderWidget.h:
+        * rendering/RenderWidget.cpp:
+        (WebCore::RenderWidget::notifyWidget): Pass the message to the widget.
+
+2010-12-22  Adrienne Walker  <enne@google.com>
+
+        Reviewed by Kenneth Russell.
+
+        Fix null pointer deref when restoring a lost WebGL context.
+        https://bugs.webkit.org/show_bug.cgi?id=51494
+
+        No new tests, as context restored events are not currently testable.
+
+        * html/canvas/WebGLRenderingContext.cpp:
+        (WebCore::WebGLRenderingContext::initializeNewContext):
+        (WebCore::WebGLRenderingContext::restoreContext):
+
+2010-12-22  Adam Bergkvist  <adam.bergkvist@ericsson.com>
+
+        Reviewed by Martin Robinson.
+
+        [GTK] Building with Blob support fails again
+        https://bugs.webkit.org/show_bug.cgi?id=51392
+
+        Build fix.
+
+        * GNUmakefile.am:
+
+2010-12-22  Dan Bernstein  <mitz@apple.com>
+
+        Reviewed by Anders Carlsson.
+
+        canHyphenate() always returns true for the default locale
+        https://bugs.webkit.org/show_bug.cgi?id=51506
+
+        No test, since this change only affects performance.
+
+        * platform/text/cf/HyphenationCF.cpp:
+        (WebCore::::createValueForNullKey): Return 0 if hyphenation is not supported for the default locale.
+        (WebCore::::createValueForKey): Removed whitespace.
+
+2010-12-22  Yury Semikhatsky  <yurys@chromium.org>
+
+        Reviewed by Joseph Pecoraro.
+
+        Web Inspector: script name gets parsed as HTML in Call stack panel
+        https://bugs.webkit.org/show_bug.cgi?id=51468
+
+        * inspector/front-end/Placard.js:
+        (WebInspector.Placard.prototype.set subtitle):
+
+2010-12-22  Eric Carlson  <eric.carlson@apple.com>
+
+        Reviewed by Darin Adler.
+
+        MediaPlayer should look for MIME type in data: URL
+        https://bugs.webkit.org/show_bug.cgi?id=51195
+
+        If no MIME type is passed from the media element for a data: URL, try to get it from
+        the URL itself.
+
+        No new tests are possible because the MIME type is just passed to the media engine.
+
+        * platform/graphics/MediaPlayer.cpp:
+        (WebCore::MediaPlayer::load):
+
+2010-12-22  W. James MacLean  <wjmaclean@chromium.org>
+
+        Reviewed by Kenneth Russell.
+
+        [chromium] Add asserts to test for contiguous-pixel Skia bitmaps.
+        https://bugs.webkit.org/show_bug.cgi?id=51186
+
+        No new tests. Behaviour not changed, but need the asserts to detect when assumptions violated.
+
+        * platform/graphics/chromium/ImageLayerChromium.cpp:
+        (WebCore::ImageLayerChromium::updateContentsIfDirty):
+        * platform/graphics/skia/GraphicsContext3DSkia.cpp:
+        (WebCore::GraphicsContext3D::getImageData):
+
+2010-12-22  Chris Fleizach  <cfleizach@apple.com>
+
+        Reviewed by Darin Adler.
+
+        WAI-ARIA menubar role mapped to AXGroup, should be AXMenuBar
+        https://bugs.webkit.org/show_bug.cgi?id=51488
+
+        Test: platform/mac/accessibility/aria-menubar.html
+
+        * accessibility/AccessibilityObject.cpp:
+        (WebCore::createARIARoleMap):
+
+2010-12-22  Zhenyao Mo  <zmo@google.com>
+
+        Reviewed by Kenneth Russell.
+
+        CopyTex{Sub}Image2D check always if the bound fbo's internal color format is compatible
+        https://bugs.webkit.org/show_bug.cgi?id=51423
+
+        * html/canvas/WebGLRenderingContext.cpp:
+        (WebCore::WebGLRenderingContext::copyTexImage2D): Remove the isGLES2Compliant flag around format compatibility checking.
+        (WebCore::WebGLRenderingContext::copyTexSubImage2D): Ditto.
+        (WebCore::WebGLRenderingContext::getBoundFramebufferColorFormat): Helper function to get bound framebuffer's color format; deal with the case of webgl's internal fbo.
+        * html/canvas/WebGLRenderingContext.h:
+
+2010-12-22  Xan Lopez  <xlopez@igalia.com>
+
+        Reviewed by Gustavo Noronha.
+
+        [GTK] Compilation fixes with GTK+ 2.91.7
+        https://bugs.webkit.org/show_bug.cgi?id=51487
+
+        * platform/gtk/GtkVersioning.h: do not define GDK_DISPLAY for
+        backwards compatibility, it's now defined again in GTK+ 3.x.
+        * platform/gtk/PasteboardHelper.cpp: do not call GDK functions to
+        initialize global static variables (!). These are called when the
+        .so is loaded, and they now require GType to be initialized and
+        will crash. Initialize them once from the ctor, which is a more
+        common pattern anyway.
+        (WebCore::initGdkAtoms): new method to initialize static variables.
+        (WebCore::PasteboardHelper::PasteboardHelper): call it.
+        * plugins/gtk/PluginViewGtk.cpp: do not include gdkconfig.h when
+        using GTK+ 3.x, since it's no longer installed.
+
+2010-12-22  Dirk Schulze  <krit@wbekit.org>
+
+        Reviewed by Nikolas Zimmermann.
+
+        Cleanup SVG code according to the webkit style rules 2
+        https://bugs.webkit.org/show_bug.cgi?id=51461
+
+        Second patch to fix indention and other style issues according to the WebKit style rules in the SVG code.
+
+        No changes of functionality, so no new tests. 
+
+        * svg/SVGFEDisplacementMapElement.cpp:
+        (WebCore::SVGFEDisplacementMapElement::stringToChannel):
+        * svg/SVGFEDistantLightElement.h:
+        * svg/SVGFEFuncAElement.h:
+        * svg/SVGFEFuncBElement.h:
+        * svg/SVGFEFuncGElement.h:
+        * svg/SVGFEFuncRElement.h:
+        * svg/SVGFEMergeElement.cpp:
+        (WebCore::SVGFEMergeElement::build):
+        * svg/SVGFEMorphologyElement.cpp:
+        * svg/SVGFEPointLightElement.h:
+        * svg/SVGFESpecularLightingElement.cpp:
+        (WebCore::SVGFESpecularLightingElement::findLights):
+        * svg/SVGFESpotLightElement.h:
+        * svg/SVGFitToViewBox.cpp:
+        (WebCore::SVGFitToViewBox::parseViewBox):
+        (WebCore::SVGFitToViewBox::isKnownAttribute):
+        * svg/SVGFontFaceElement.cpp:
+        (WebCore::cssPropertyIdForSVGAttributeName):
+        * svg/SVGFontFaceElement.h:
+        (WebCore::SVGFontFaceElement::associatedFontElement):
+        * svg/SVGFontFaceNameElement.h:
+        * svg/SVGFontFaceSrcElement.cpp:
+        * svg/SVGFontFaceSrcElement.h:
+        * svg/SVGFontFaceUriElement.h:
+        * svg/SVGForeignObjectElement.h:
+        * svg/SVGGlyphElement.cpp:
+        (WebCore::parseArabicForm):
+        (WebCore::parseOrientation):
+        * svg/SVGGlyphElement.h:
+        (WebCore::SVGGlyphIdentifier::SVGGlyphIdentifier):
+        (WebCore::SVGGlyphIdentifier::inheritedValue):
+        (WebCore::SVGGlyphIdentifier::operator==):
+        (WebCore::SVGGlyphElement::rendererIsNeeded):
+        * svg/SVGGlyphMap.h:
+        (WebCore::GlyphMapNode::GlyphMapNode):
+        (WebCore::GlyphMapNode::create):
+        (WebCore::SVGGlyphMap::SVGGlyphMap):
+        (WebCore::SVGGlyphMap::add):
+        (WebCore::SVGGlyphMap::compareGlyphPriority):
+        (WebCore::SVGGlyphMap::get):
+        (WebCore::SVGGlyphMap::clear):
+        * svg/SVGGradientElement.cpp:
+        * svg/SVGHKernElement.cpp:
+        * svg/SVGHKernElement.h:
+        (WebCore::SVGHKernElement::rendererIsNeeded):
+        * svg/SVGImageElement.h:
+        * svg/SVGImageLoader.cpp:
+        * svg/SVGImageLoader.h:
+        * svg/SVGLangSpace.cpp:
+        (WebCore::SVGLangSpace::parseMappedAttribute):
+        (WebCore::SVGLangSpace::isKnownAttribute):
+        * svg/SVGLangSpace.h:
+        (WebCore::SVGLangSpace::xmllang):
+        * svg/SVGMetadataElement.h:
+        * svg/SVGMissingGlyphElement.h:
+        (WebCore::SVGMissingGlyphElement::rendererIsNeeded):
+        * svg/SVGPaint.cpp:
+        (WebCore::SVGPaint::cssText):
+        * svg/SVGPaint.h:
+        (WebCore::SVGPaint::create):
+        (WebCore::SVGPaint::paintType):
+        (WebCore::SVGPaint::isSVGPaint):
+        * svg/SVGParserUtilities.cpp:
+        * svg/SVGParserUtilities.h:
+        (WebCore::isWhitespace):
+        (WebCore::skipOptionalSpaces):
+        (WebCore::skipOptionalSpacesOrDelimiter):
+        * svg/SVGPathElement.cpp:
+        * svg/SVGPathParserFactory.h:
+        * svg/SVGPathSegList.h:
+
+2010-12-22  Chris Fleizach  <cfleizach@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        AX: WAI-ARIA textbox role needs different AXRole, depending on value of aria-multiline property
+        https://bugs.webkit.org/show_bug.cgi?id=51481
+
+        Support aria-multiline and use it to change the role of an ARIA "textbox" 
+        from AXTextArea to AXTextField.
+
+        Test: platform/mac/accessibility/aria-multiline.html
+
+        * accessibility/AccessibilityObject.cpp:
+        (WebCore::AccessibilityObject::ariaIsMultiline):
+        * accessibility/AccessibilityObject.h:
+        (WebCore::AccessibilityObject::isPasswordField):
+        (WebCore::AccessibilityObject::isTextControl):
+        * accessibility/AccessibilityRenderObject.cpp:
+        (WebCore::AccessibilityRenderObject::determineAriaRoleAttribute):
+        * accessibility/AccessibilityRenderObject.h:
+        * html/HTMLAttributeNames.in:
+
+2010-12-22  Simon Fraser  <simon.fraser@apple.com>
+
+        Reviewed by Dan Bernstein.
+
+        CSS 2.1 failure: counter-increment-013 fails
+        https://bugs.webkit.org/show_bug.cgi?id=51483
+        
+        Clamp the counter-increment property to the valid range of signed
+        integers.
+
+        Test: fast/css/counters/counter-increment-overflow.html
+
+        * css/CSSParser.cpp:
+        (WebCore::clampToSignedInteger):
+        (WebCore::CSSParser::parseCounter):
+
+2010-12-22  Dan Bernstein  <mitz@apple.com>
+
+        Rubber-stamped by Mark Rowe.
+
+        Changed WebKitTools to Tools in script build phases.
+
+        * WebCore.xcodeproj/project.pbxproj:
+
+2010-12-21  Vangelis Kokkevis  <vangelis@chromium.org>
+
+        Reviewed by Kenneth Russell.
+
+        [chromium] Fixing crash with empty render surfaces.
+        https://bugs.webkit.org/show_bug.cgi?id=51432
+
+        Test: platform/chromium/compositing/empty-render-surface-crasher.html
+
+        * platform/graphics/chromium/RenderSurfaceChromium.cpp:
+        (WebCore::RenderSurfaceChromium::draw):
+
+2010-12-21  Pavel Podivilov  <podivilov@chromium.org>
+
+        Reviewed by Yury Semikhatsky.
+
+        Web Inspector: persist JavaScript breakpoints in frontend settings.
+        https://bugs.webkit.org/show_bug.cgi?id=48434
+
+        * bindings/js/ScriptDebugServer.cpp:
+        (WebCore::ScriptDebugServer::setBreakpoint):
+        (WebCore::ScriptDebugServer::removeBreakpoint):
+        * bindings/js/ScriptDebugServer.h:
+        * bindings/v8/DebuggerScript.js:
+        ():
+        * bindings/v8/ScriptDebugServer.cpp:
+        (WebCore::ScriptDebugServer::setBreakpoint):
+        (WebCore::ScriptDebugServer::removeBreakpoint):
+        * bindings/v8/ScriptDebugServer.h:
+        * inspector/Inspector.idl:
+        * inspector/InspectorBackend.cpp:
+        * inspector/InspectorController.cpp:
+        (WebCore::InspectorController::InspectorController):
+        (WebCore::InspectorController::enableDebuggerFromFrontend):
+        (WebCore::InspectorController::setStickyBreakpoints):
+        (WebCore::InspectorController::restoreStickyBreakpoint):
+        * inspector/InspectorController.h:
+        * inspector/InspectorDebuggerAgent.cpp:
+        (WebCore::InspectorDebuggerAgent::InspectorDebuggerAgent):
+        (WebCore::InspectorDebuggerAgent::setStickyBreakpoint):
+        (WebCore::InspectorDebuggerAgent::setBreakpoint):
+        (WebCore::InspectorDebuggerAgent::removeBreakpoint):
+        (WebCore::InspectorDebuggerAgent::restoreBreakpoint):
+        (WebCore::InspectorDebuggerAgent::clearForPageNavigation):
+        (WebCore::InspectorDebuggerAgent::didParseSource):
+        * inspector/InspectorDebuggerAgent.h:
+        * inspector/front-end/Breakpoint.js:
+        (WebInspector.Breakpoint):
+        (WebInspector.Breakpoint.prototype.remove):
+        * inspector/front-end/BreakpointManager.js:
+        (WebInspector.BreakpointManager):
+        (WebInspector.DOMBreakpoint.prototype._serializeToJSON):
+        (WebInspector.JavaScriptBreakpoint):
+        (WebInspector.XHRBreakpoint.prototype._serializeToJSON):
+        * inspector/front-end/DebuggerModel.js:
+        (WebInspector.DebuggerModel):
+        * inspector/front-end/ScriptsPanel.js:
+        (WebInspector.ScriptsPanel.prototype._debuggerPaused):
+        * inspector/front-end/SourceFrame.js:
+
+2010-12-20  Antti Koivisto  <antti@apple.com>
+
+        Reviewed by Alexey Proskuryakov.
+
+        https://bugs.webkit.org/show_bug.cgi?id=51354
+        Don't block rendering and script execution on deferred stylesheets
+        
+        - Don't add low priority stylesheets to the document pending sheet count.
+        - Resolve media attribute fully for the link element stylesheet load.
+
+        Test: http/tests/local/stylesheet-and-script-load-order-media-print.html
+
+        * html/HTMLLinkElement.cpp:
+        (WebCore::HTMLLinkElement::HTMLLinkElement):
+        (WebCore::HTMLLinkElement::~HTMLLinkElement):
+        (WebCore::HTMLLinkElement::setDisabledState):
+        (WebCore::HTMLLinkElement::process):
+        (WebCore::HTMLLinkElement::sheetLoaded):
+        (WebCore::HTMLLinkElement::addPendingSheet):
+        (WebCore::HTMLLinkElement::removePendingSheet):
+        * html/HTMLLinkElement.h:
+
+2010-12-22  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r74473.
+        http://trac.webkit.org/changeset/74473
+        https://bugs.webkit.org/show_bug.cgi?id=51463
+
+        broke compilation on leopard intel release (Requested by
+        podivilov on #webkit).
+
+        * bindings/js/ScriptDebugServer.cpp:
+        (WebCore::ScriptDebugServer::setBreakpoint):
+        (WebCore::ScriptDebugServer::removeBreakpoint):
+        * bindings/js/ScriptDebugServer.h:
+        * bindings/v8/DebuggerScript.js:
+        ():
+        * bindings/v8/ScriptDebugServer.cpp:
+        (WebCore::ScriptDebugServer::setBreakpoint):
+        (WebCore::ScriptDebugServer::removeBreakpoint):
+        * bindings/v8/ScriptDebugServer.h:
+        * inspector/Inspector.idl:
+        * inspector/InspectorBackend.cpp:
+        * inspector/InspectorController.cpp:
+        (WebCore::InspectorController::InspectorController):
+        (WebCore::InspectorController::enableDebuggerFromFrontend):
+        (WebCore::InspectorController::setStickyBreakpoints):
+        (WebCore::InspectorController::restoreStickyBreakpoint):
+        (WebCore::InspectorController::breakpointsSettingKey):
+        (WebCore::InspectorController::loadBreakpoints):
+        (WebCore::InspectorController::saveBreakpoints):
+        * inspector/InspectorController.h:
+        * inspector/InspectorDebuggerAgent.cpp:
+        (WebCore::formatBreakpointId):
+        (WebCore::InspectorDebuggerAgent::InspectorDebuggerAgent):
+        (WebCore::InspectorDebuggerAgent::setBreakpoint):
+        (WebCore::InspectorDebuggerAgent::removeBreakpoint):
+        (WebCore::InspectorDebuggerAgent::clearForPageNavigation):
+        (WebCore::InspectorDebuggerAgent::md5Base16):
+        (WebCore::InspectorDebuggerAgent::loadBreakpoints):
+        (WebCore::InspectorDebuggerAgent::saveBreakpoints):
+        (WebCore::InspectorDebuggerAgent::didParseSource):
+        * inspector/InspectorDebuggerAgent.h:
+        * inspector/front-end/Breakpoint.js:
+        (WebInspector.Breakpoint):
+        (WebInspector.Breakpoint.jsBreakpointId):
+        (WebInspector.Breakpoint.prototype.set enabled):
+        (WebInspector.Breakpoint.prototype.get id):
+        (WebInspector.Breakpoint.prototype.set condition):
+        (WebInspector.Breakpoint.prototype.remove):
+        * inspector/front-end/BreakpointManager.js:
+        (WebInspector.BreakpointManager):
+        (WebInspector.BreakpointManager.prototype._createDOMBreakpoint):
+        (WebInspector.BreakpointManager.prototype._createEventListenerBreakpoint):
+        (WebInspector.BreakpointManager.prototype._createXHRBreakpoint):
+        (WebInspector.BreakpointManager.prototype._setNativeBreakpoint):
+        (WebInspector.BreakpointManager.prototype._setNativeBreakpointEnabled):
+        (WebInspector.BreakpointManager.prototype._removeNativeBreakpoint):
+        (WebInspector.BreakpointManager.prototype.breakpointViewForEventData):
+        (WebInspector.BreakpointManager.prototype._projectChanged):
+        (WebInspector.BreakpointManager.prototype.restoreDOMBreakpoints):
+        (WebInspector.BreakpointManager.prototype._saveBreakpoints):
+        (WebInspector.BreakpointManager.prototype._validateBreakpoints):
+        (WebInspector.DOMBreakpoint.prototype._serializeToJSON):
+        (WebInspector.EventListenerBreakpoint.prototype._serializeToJSON):
+        (WebInspector.XHRBreakpoint.prototype._serializeToJSON):
+        (WebInspector.NativeBreakpointView.prototype.set enabled):
+        (WebInspector.NativeBreakpointView.prototype.remove):
+        * inspector/front-end/DebuggerModel.js:
+        (WebInspector.DebuggerModel):
+        (WebInspector.DebuggerModel.prototype.setOneTimeBreakpoint):
+        (WebInspector.DebuggerModel.prototype.removeOneTimeBreakpoint):
+        (WebInspector.DebuggerModel.prototype.setBreakpoint):
+        (WebInspector.DebuggerModel.prototype.findBreakpoint):
+        (WebInspector.DebuggerModel.prototype.reset):
+        (WebInspector.DebuggerModel.prototype._setBreakpoint):
+        (WebInspector.DebuggerModel.prototype._breakpointRemoved):
+        (WebInspector.DebuggerModel.prototype._setBreakpointOnBackend):
+        (WebInspector.DebuggerModel.prototype.breakpointRestored):
+        (WebInspector.DebuggerModel.prototype.pausedScript):
+        (WebInspector.DebuggerModel.prototype.resumedScript):
+        * inspector/front-end/ScriptsPanel.js:
+        (WebInspector.ScriptsPanel.prototype.continueToLine):
+        (WebInspector.ScriptsPanel.prototype._debuggerPaused):
+        * inspector/front-end/SourceFrame.js:
+        (WebInspector.SourceFrame.prototype._contextMenu.addConditionalBreakpoint.didEditBreakpointCondition):
+        (WebInspector.SourceFrame.prototype._contextMenu.addConditionalBreakpoint):
+        (WebInspector.SourceFrame.prototype._contextMenu.else.editBreakpointCondition.didEditBreakpointCondition):
+        (WebInspector.SourceFrame.prototype._contextMenu.else.editBreakpointCondition):
+        (WebInspector.SourceFrame.prototype._contextMenu):
+        (WebInspector.SourceFrame.prototype._mouseDown):
+        (WebInspector.SourceFrame.prototype._continueToLine):
+        (WebInspector.SourceFrame.prototype._setBreakpoint):
+
+2010-12-21  Pavel Podivilov  <podivilov@chromium.org>
+
+        Reviewed by Yury Semikhatsky.
+
+        Web Inspector: persist JavaScript breakpoints in frontend settings.
+        https://bugs.webkit.org/show_bug.cgi?id=48434
+
+        * bindings/js/ScriptDebugServer.cpp:
+        (WebCore::ScriptDebugServer::setBreakpoint):
+        (WebCore::ScriptDebugServer::removeBreakpoint):
+        * bindings/js/ScriptDebugServer.h:
+        * bindings/v8/DebuggerScript.js:
+        ():
+        * bindings/v8/ScriptDebugServer.cpp:
+        (WebCore::ScriptDebugServer::setBreakpoint):
+        (WebCore::ScriptDebugServer::removeBreakpoint):
+        * bindings/v8/ScriptDebugServer.h:
+        * inspector/Inspector.idl:
+        * inspector/InspectorBackend.cpp:
+        * inspector/InspectorController.cpp:
+        (WebCore::InspectorController::InspectorController):
+        (WebCore::InspectorController::enableDebuggerFromFrontend):
+        (WebCore::InspectorController::setStickyBreakpoints):
+        (WebCore::InspectorController::restoreStickyBreakpoint):
+        * inspector/InspectorController.h:
+        * inspector/InspectorDebuggerAgent.cpp:
+        (WebCore::InspectorDebuggerAgent::InspectorDebuggerAgent):
+        (WebCore::InspectorDebuggerAgent::setStickyBreakpoint):
+        (WebCore::InspectorDebuggerAgent::setBreakpoint):
+        (WebCore::InspectorDebuggerAgent::removeBreakpoint):
+        (WebCore::InspectorDebuggerAgent::restoreBreakpoint):
+        (WebCore::InspectorDebuggerAgent::clearForPageNavigation):
+        (WebCore::InspectorDebuggerAgent::didParseSource):
+        * inspector/InspectorDebuggerAgent.h:
+        * inspector/front-end/Breakpoint.js:
+        (WebInspector.Breakpoint):
+        (WebInspector.Breakpoint.prototype.remove):
+        * inspector/front-end/BreakpointManager.js:
+        (WebInspector.BreakpointManager):
+        (WebInspector.DOMBreakpoint.prototype._serializeToJSON):
+        (WebInspector.JavaScriptBreakpoint):
+        (WebInspector.XHRBreakpoint.prototype._serializeToJSON):
+        * inspector/front-end/DebuggerModel.js:
+        (WebInspector.DebuggerModel):
+        * inspector/front-end/ScriptsPanel.js:
+        (WebInspector.ScriptsPanel.prototype._debuggerPaused):
+        * inspector/front-end/SourceFrame.js:
+
+2010-12-22  Dirk Schulze  <krit@wbekit.org>
+
+        Reviewed by Nikolas Zimmermann.
+
+        Cleanup SVG code according to the webkit style rules 1
+        https://bugs.webkit.org/show_bug.cgi?id=51411
+
+        First patch to fix indention and other style issues according to the WebKit style rules in the SVG code.
+
+        No change of functionality. 
+
+        * svg/ColorDistance.cpp:
+        (WebCore::ColorDistance::isZero):
+        * svg/ColorDistance.h:
+        * svg/ElementTimeControl.h:
+        (WebCore::ElementTimeControl::~ElementTimeControl):
+        * svg/LinearGradientAttributes.h:
+        (WebCore::LinearGradientAttributes::LinearGradientAttributes):
+        (WebCore::LinearGradientAttributes::x1):
+        (WebCore::LinearGradientAttributes::y1):
+        (WebCore::LinearGradientAttributes::x2):
+        (WebCore::LinearGradientAttributes::y2):
+        (WebCore::LinearGradientAttributes::setX1):
+        (WebCore::LinearGradientAttributes::setY1):
+        (WebCore::LinearGradientAttributes::setX2):
+        (WebCore::LinearGradientAttributes::setY2):
+        (WebCore::LinearGradientAttributes::hasX1):
+        (WebCore::LinearGradientAttributes::hasY1):
+        (WebCore::LinearGradientAttributes::hasX2):
+        (WebCore::LinearGradientAttributes::hasY2):
+        * svg/RadialGradientAttributes.h:
+        (WebCore::RadialGradientAttributes::RadialGradientAttributes):
+        (WebCore::RadialGradientAttributes::cx):
+        (WebCore::RadialGradientAttributes::cy):
+        (WebCore::RadialGradientAttributes::r):
+        (WebCore::RadialGradientAttributes::fx):
+        (WebCore::RadialGradientAttributes::fy):
+        (WebCore::RadialGradientAttributes::setCx):
+        (WebCore::RadialGradientAttributes::setCy):
+        (WebCore::RadialGradientAttributes::setR):
+        (WebCore::RadialGradientAttributes::setFx):
+        (WebCore::RadialGradientAttributes::setFy):
+        (WebCore::RadialGradientAttributes::hasCx):
+        (WebCore::RadialGradientAttributes::hasCy):
+        (WebCore::RadialGradientAttributes::hasR):
+        (WebCore::RadialGradientAttributes::hasFx):
+        (WebCore::RadialGradientAttributes::hasFy):
+        * svg/SVGAngle.cpp:
+        * svg/SVGAnimateColorElement.h:
+        * svg/SVGAnimateElement.cpp:
+        (WebCore::SVGAnimateElement::calculateAnimatedValue):
+        (WebCore::SVGAnimateElement::calculateDistance):
+        * svg/SVGAnimateElement.h:
+        * svg/SVGAnimateMotionElement.cpp:
+        * svg/SVGAnimateMotionElement.h:
+        * svg/SVGAnimatedNumber.h:
+        * svg/SVGAnimationElement.cpp:
+        (WebCore::parseKeyTimes):
+        (WebCore::SVGAnimationElement::currentValuesForValuesAnimation):
+        (WebCore::SVGAnimationElement::updateAnimation):
+        * svg/SVGClipPathElement.cpp:
+        (WebCore::SVGClipPathElement::svgAttributeChanged):
+        * svg/SVGColor.h:
+        (WebCore::SVGColor::create):
+        (WebCore::SVGColor::createCurrentColor):
+        (WebCore::SVGColor::colorType):
+        (WebCore::SVGColor::setRGBColor):
+        (WebCore::SVGColor::color):
+        (WebCore::SVGColor::isSVGColor):
+        * svg/SVGCursorElement.cpp:
+        (WebCore::SVGCursorElement::svgAttributeChanged):
+        * svg/SVGCursorElement.h:
+        * svg/SVGDescElement.h:
+        (WebCore::SVGDescElement::rendererIsNeeded):
+        * svg/SVGDocument.cpp:
+        * svg/SVGDocument.h:
+        (WebCore::SVGDocument::create):
+        (WebCore::SVGDocument::isSVGDocument):
+        * svg/SVGElement.h:
+        (WebCore::SVGElement::isStyled):
+        (WebCore::SVGElement::isStyledTransformable):
+        (WebCore::SVGElement::isStyledLocatable):
+        (WebCore::SVGElement::isSVG):
+        (WebCore::SVGElement::isFilterEffect):
+        (WebCore::SVGElement::isGradientStop):
+        (WebCore::SVGElement::isTextContent):
+        (WebCore::SVGElement::isValid):
+        (WebCore::SVGElement::svgAttributeChanged):
+        (WebCore::SVGElement::synchronizeProperty):
+        (WebCore::SVGElement::supplementalTransform):
+        (WebCore::SVGElement::invalidateSVGAttributes):
+        (WebCore::SVGElement::rendererIsNeeded):
+        (WebCore::SVGElement::needsPendingResourceHandling):
+        (WebCore::SVGElement::buildPendingResource):
+        * svg/SVGElementInstance.h:
+        (WebCore::SVGElementInstance::create):
+        (WebCore::SVGElementInstance::correspondingElement):
+        (WebCore::SVGElementInstance::correspondingUseElement):
+        (WebCore::SVGElementInstance::shadowTreeElement):
+        (WebCore::SVGElementInstance::parentNode):
+        (WebCore::SVGElementInstance::previousSibling):
+        (WebCore::SVGElementInstance::nextSibling):
+        (WebCore::SVGElementInstance::firstChild):
+        (WebCore::SVGElementInstance::lastChild):
+        (WebCore::SVGElementInstance::ownerDocument):
+        (WebCore::SVGElementInstance::toNode):
+        (WebCore::SVGElementInstance::toSVGElementInstance):
+        (WebCore::SVGElementInstance::hasChildNodes):
+        (WebCore::SVGElementInstance::setFirstChild):
+        (WebCore::SVGElementInstance::setLastChild):
+        (WebCore::SVGElementInstance::setNextSibling):
+        (WebCore::SVGElementInstance::setPreviousSibling):
+        (WebCore::SVGElementInstance::refEventTarget):
+        (WebCore::SVGElementInstance::derefEventTarget):
+        * svg/SVGElementInstanceList.h:
+        (WebCore::SVGElementInstanceList::create):
+        * svg/SVGException.h:
+        (WebCore::SVGException::create):
+        (WebCore::SVGException::SVGException):
+        * svg/SVGFEColorMatrixElement.cpp:
+        (WebCore::SVGFEColorMatrixElement::parseMappedAttribute):
+        * svg/SVGFEComponentTransferElement.cpp:
+        (WebCore::SVGFEComponentTransferElement::build):
+        * svg/SVGFEDiffuseLightingElement.cpp:
+        (WebCore::SVGFEDiffuseLightingElement::findLights):
+        * svg/SVGFont.cpp:
+        (WebCore::convertEmUnitToPixel):
+        * svg/SVGUseElement.cpp:
+        (WebCore::isDirectReference):
+
 2010-12-22  Dai Mikurube  <dmikurube@google.com>
 
         Reviewed by Kent Tamura.

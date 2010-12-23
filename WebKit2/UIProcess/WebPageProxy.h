@@ -28,7 +28,6 @@
 
 #include "APIObject.h"
 #include "DrawingAreaProxy.h"
-#include "GenericCallback.h"
 #include "SharedMemory.h"
 #include "WKBase.h"
 #include "WebContextMenuItemData.h"
@@ -97,10 +96,7 @@ struct PlatformPopupMenuData;
 struct WebPageCreationParameters;
 struct WebPopupItem;
 
-typedef GenericCallback<WKStringRef, StringImpl*> FrameSourceCallback;
-typedef GenericCallback<WKStringRef, StringImpl*> RenderTreeExternalRepresentationCallback;
-typedef GenericCallback<WKStringRef, StringImpl*> ScriptReturnValueCallback;
-typedef GenericCallback<WKStringRef, StringImpl*> ContentsAsStringCallback;
+typedef GenericCallback<WKStringRef, StringImpl*> StringCallback;
 
 class WebPageProxy : public APIObject, public WebPopupMenuProxy::Client {
 public:
@@ -241,10 +237,13 @@ public:
     void hideFindUI();
     void countStringMatches(const String&, FindOptions, unsigned maxMatchCount);
 
-    void runJavaScriptInMainFrame(const String&, PassRefPtr<ScriptReturnValueCallback>);
-    void getRenderTreeExternalRepresentation(PassRefPtr<RenderTreeExternalRepresentationCallback>);
-    void getSourceForFrame(WebFrameProxy*, PassRefPtr<FrameSourceCallback>);
-    void getContentsAsString(PassRefPtr<ContentsAsStringCallback>);
+    void getContentsAsString(PassRefPtr<StringCallback>);
+    void getMainResourceDataOfFrame(WebFrameProxy*, PassRefPtr<DataCallback>);
+    void getRenderTreeExternalRepresentation(PassRefPtr<StringCallback>);
+    void getSelectionOrContentsAsString(PassRefPtr<StringCallback>);
+    void getSourceForFrame(WebFrameProxy*, PassRefPtr<StringCallback>);
+    void getWebArchiveOfFrame(WebFrameProxy*, PassRefPtr<DataCallback>);
+    void runJavaScriptInMainFrame(const String&, PassRefPtr<StringCallback>);
 
     void receivedPolicyDecision(WebCore::PolicyAction, WebFrameProxy*, uint64_t listenerID);
 
@@ -395,8 +394,8 @@ private:
     void registerEditCommandForUndo(uint64_t commandID, uint32_t editAction);
     void clearAllEditCommands();
 
-#if PLATFORM(MAC)
     // Keyboard handling
+#if PLATFORM(MAC)
     void interpretKeyEvent(uint32_t eventType, Vector<WebCore::KeypressCommand>&, uint32_t selectionStart, uint32_t selectionEnd, Vector<WebCore::CompositionUnderline>& underlines);
 #endif
     
@@ -413,6 +412,13 @@ private:
     // Context Menu.
     void showContextMenu(const WebCore::IntPoint&, const Vector<WebContextMenuItemData>&, CoreIPC::ArgumentDecoder*);
 
+    // Speech.
+#if PLATFORM(MAC)
+    void getIsSpeaking(bool&);
+    void speak(const String&);
+    void stopSpeaking();
+#endif
+
     void takeFocus(bool direction);
     void setToolTip(const String&);
     void setCursor(const WebCore::Cursor&);
@@ -420,10 +426,8 @@ private:
 
     void didReceiveEvent(uint32_t opaqueType, bool handled);
 
-    void didGetContentsAsString(const String&, uint64_t);
-    void didRunJavaScriptInMainFrame(const String&, uint64_t);
-    void didGetRenderTreeExternalRepresentation(const String&, uint64_t);
-    void didGetSourceForFrame(const String&, uint64_t);
+    void dataCallback(const CoreIPC::DataReference&, uint64_t);
+    void stringCallback(const String&, uint64_t);
 
     void focusedFrameChanged(uint64_t frameID);
 
@@ -466,10 +470,8 @@ private:
     RefPtr<WebInspectorProxy> m_inspector;
 #endif
 
-    HashMap<uint64_t, RefPtr<ContentsAsStringCallback> > m_contentsAsStringCallbacks;
-    HashMap<uint64_t, RefPtr<FrameSourceCallback> > m_frameSourceCallbacks;
-    HashMap<uint64_t, RefPtr<RenderTreeExternalRepresentationCallback> > m_renderTreeExternalRepresentationCallbacks;
-    HashMap<uint64_t, RefPtr<ScriptReturnValueCallback> > m_scriptReturnValueCallbacks;
+    HashMap<uint64_t, RefPtr<DataCallback> > m_dataCallbacks;
+    HashMap<uint64_t, RefPtr<StringCallback> > m_stringCallbacks;
 
     HashSet<WebEditCommandProxy*> m_editCommandSet;
 

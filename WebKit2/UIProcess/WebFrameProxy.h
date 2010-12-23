@@ -27,6 +27,7 @@
 #define WebFrameProxy_h
 
 #include "APIObject.h"
+#include "GenericCallback.h"
 #include "WebFrameListenerProxy.h"
 #include <WebCore/FrameLoaderTypes.h>
 #include <wtf/Forward.h>
@@ -46,6 +47,8 @@ class WebCertificateInfo;
 class WebFormSubmissionListenerProxy;
 class WebFramePolicyListenerProxy;
 class WebPageProxy;
+
+typedef GenericCallback<WKDataRef> DataCallback;
 
 class WebFrameProxy : public APIObject {
 public:
@@ -81,12 +84,10 @@ public:
     void setUnreachableURL(const String& unreachableURL) { m_unreachableURL = unreachableURL; }
     const String& unreachableURL() const { return m_unreachableURL; }
 
-    void setMIMEType(const String& mimeType) { m_MIMEType = mimeType; }
     const String& mimeType() const { return m_MIMEType; }
 
     const String& title() const { return m_title; }
 
-    void setCertificateInfo(PassRefPtr<WebCertificateInfo>);
     WebCertificateInfo* certificateInfo() const { return m_certificateInfo.get(); }
 
     bool canProvideSource() const;
@@ -95,10 +96,13 @@ public:
     bool isDisplayingStandaloneImageDocument() const;
     bool isDisplayingMarkupDocument() const;
 
+    void getWebArchive(PassRefPtr<DataCallback>);
+    void getMainResourceData(PassRefPtr<DataCallback>);
+
     void didStartProvisionalLoad(const String& url);
     void didReceiveServerRedirectForProvisionalLoad(const String& url);
     void didFailProvisionalLoad();
-    void didCommitLoad();
+    void didCommitLoad(const String& contentType, const PlatformCertificateInfo&);
     void didFinishLoad();
     void didFailLoad();
     void didSameDocumentNavigation(const String&); // eg. anchor navigation, session state change.

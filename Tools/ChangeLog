@@ -1,3 +1,143 @@
+2010-12-22  Dirk Pranke  <dpranke@chromium.org>
+
+        Reviewed by Ojan Vafai.
+
+        This change splits out the TestRunner class into its own file.
+        When we fork the code for message passing, we will create a new
+        TestRunner, and this change will allow that to be more modular.
+
+        While we're at it, split out TestInput and ResultSummary into
+        their own files, to reduce the size of run_webkit_tests to
+        something more managable.
+
+        https://bugs.webkit.org/show_bug.cgi?id=51092
+
+        * Scripts/webkitpy/layout_tests/layout_package/printing_unittest.py:
+        * Scripts/webkitpy/layout_tests/layout_package/result_summary.py:
+        * Scripts/webkitpy/layout_tests/layout_package/test_runner.py:
+        * Scripts/webkitpy/layout_tests/layout_package/test_runner_unittest.py:
+        * Scripts/webkitpy/layout_tests/layout_package/test_input.py:
+        * Scripts/webkitpy/layout_tests/run_webkit_tests.py:
+        * Scripts/webkitpy/layout_tests/run_webkit_tests_unittest.py:
+
+ 2010-12-22  Dirk Pranke  <dpranke@chromium.org>
+
+        Reviewed by Ojan Vafai.
+
+        nrwt multiprocessing - start over, prepare to fork the code
+ 
+        This code cleans up the signatures and implementation of the
+        TestRunner class so we can easily fork it to run either the
+        stable implementation or the new, unstable message-passing
+        implementation. The two variants will have different
+        implementations of the run_tests() method. We will switch
+        between the two based on the setting for the '--worker-model'
+        switch. We rename the two currently valid values to 'old-inline'
+        and 'old-threads'.
+
+        https://bugs.webkit.org/show_bug.cgi?id=51081
+
+        * Scripts/webkitpy/layout_tests/run_webkit_tests.py:
+        * Scripts/webkitpy/layout_tests/run_webkit_tests_unittest.py:
+
+2010-12-22  Victor Wang  <victorw@chromium.org>
+
+        Reviewed by Darin Fisher.
+
+        [Chromium] Update chromium archive test result url in rebaseline script.
+
+        https://bugs.webkit.org/show_bug.cgi?id=51503
+
+        * Scripts/webkitpy/layout_tests/rebaseline_chromium_webkit_tests.py:
+
+2010-12-22  Lucas Forschler  <lforschler@apple.com>
+
+        Reviewed by Alice Liu.
+
+        <rdar://problem/8633222> record-memory-win needs to record memory used by the webprocess.
+        Verified on Chrome, Safari, and IE.
+        With this change, we will record memory from a parent browser window and all child processes.
+
+        * record-memory-win/main.cpp:
+        (ProcessArgs):
+        (PrintUsage):
+        (getMemoryInfo):
+        (printProcessInfo):
+        (evalProcesses):
+        (UseImage):
+        (QueryContinuously):
+        (ElapsedTime):
+
+2010-12-22  Lucas Forschler  <lforschler@apple.com>
+
+        Unreviewed rollout r74489, because it was missing changelog.
+
+        * record-memory-win/main.cpp:
+        
+2010-12-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Adding myself as a reviewer.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2010-12-22  Andrew Scherkus  <scherkus@chromium.org>
+
+        Unreviewed.  Adding myself to committers.py.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2010-12-22  Ariya Hidayat  <ariya@sencha.com>
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        TestNetscapePlugIn should use #if defined
+        https://bugs.webkit.org/show_bug.cgi?id=51471
+
+        * DumpRenderTree/TestNetscapePlugIn/main.cpp:
+        (NP_Initialize):
+        (NPP_New):
+
+2010-12-22  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        Reviewed by Yury Semikhatsky.
+
+        Web Inspector: [chromium] DRT inspector layout tests are flaky in debug.
+
+        DevTools window should be closed explicitly because it has custom deinitialization code.
+
+        https://bugs.webkit.org/show_bug.cgi?id=50722
+
+        * DumpRenderTree/chromium/TestShell.cpp:
+        (TestShell::closeRemainingWindows):
+
+2010-12-22  David Levin  <levin@chromium.org>
+
+        Reviewed by Shinichiro Hamaji.
+
+        check-webkit-style shouldn't complaint about underscores in variables in objective C files.
+        https://bugs.webkit.org/show_bug.cgi?id=51452
+
+        * Scripts/webkitpy/style/checkers/cpp.py:
+        (_FileState.__init__): Added the information to determine if a file is C or Objective C.
+        Using the file extension if possible but falling back to the file contents if we have a header file.
+        (_FileState.is_objective_c): Determine if we have an Objective C by examining the file contents if needed.
+        (_FileState.is_c_or_objective_c):
+        (check_using_std): Changed to using _FileState to determine the file type.
+        (check_max_min_macros): Ditto.
+        (check_for_null): Ditto.
+        (check_style): Changed the parameters to various calls since they now need _FileState
+        to determine the file type.
+        (check_language): Added the file_state parameter so it could be passed
+        to check_identifier_name_in_declaration.
+        (check_identifier_name_in_declaration): Don't warn about underscores in variables if
+        this is an Objective C file.
+        (_process_lines): Added information for the _FileState constructor (and moved the
+        call to a place that had the information).
+        * Scripts/webkitpy/style/checkers/cpp_unittest.py:
+        (CppFunctionsTest.test_is_c_or_objective_c): Changed the tests to use FileState and exercise
+        its functionality.
+        (WebKitStyleTest.test_names): Add tests for underscores in Objective C files.
+
 2010-12-21  Andy Estes  <aestes@apple.com>
 
         Reviewed by Mark Rowe.

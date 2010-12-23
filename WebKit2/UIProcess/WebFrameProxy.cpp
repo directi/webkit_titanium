@@ -69,11 +69,6 @@ bool WebFrameProxy::isMainFrame() const
     return this == m_page->mainFrame();
 }
 
-void WebFrameProxy::setCertificateInfo(PassRefPtr<WebCertificateInfo> certificateInfo)
-{
-    m_certificateInfo = certificateInfo;
-}
-
 bool WebFrameProxy::canProvideSource() const
 {
     return isDisplayingMarkupDocument();
@@ -103,7 +98,8 @@ bool WebFrameProxy::isDisplayingStandaloneImageDocument() const
 
 bool WebFrameProxy::isDisplayingMarkupDocument() const
 {
-    // FIXME: This check should be moved to somewhere in WebCore. 
+    // FIXME: This check should be moved to somewhere in WebCore.
+    // FIXME: This returns false when displaying a web archive.
     return m_MIMEType == "text/html" || m_MIMEType == "image/svg+xml" || DOMImplementation::isXMLMIMEType(m_MIMEType);
 }
 
@@ -132,7 +128,7 @@ void WebFrameProxy::didFailProvisionalLoad()
     m_provisionalURL = String();
 }
 
-void WebFrameProxy::didCommitLoad()
+void WebFrameProxy::didCommitLoad(const String& contentType, const PlatformCertificateInfo& certificateInfo)
 {
     ASSERT(m_loadState == LoadStateProvisional);
     ASSERT(!m_provisionalURL.isEmpty());
@@ -140,6 +136,9 @@ void WebFrameProxy::didCommitLoad()
     m_url = m_provisionalURL;
     m_provisionalURL = String();
     m_title = String();
+    m_MIMEType = contentType;
+    m_isFrameSet = false;
+    m_certificateInfo = WebCertificateInfo::create(certificateInfo);
 }
 
 void WebFrameProxy::didFinishLoad()
@@ -193,6 +192,26 @@ WebFormSubmissionListenerProxy* WebFrameProxy::setUpFormSubmissionListenerProxy(
         m_activeListener->invalidate();
     m_activeListener = WebFormSubmissionListenerProxy::create(this, listenerID);
     return static_cast<WebFormSubmissionListenerProxy*>(m_activeListener.get());
+}
+
+void WebFrameProxy::getWebArchive(PassRefPtr<DataCallback> callback)
+{
+    if (!m_page) {
+        callback->invalidate();
+        return;
+    }
+
+    m_page->getWebArchiveOfFrame(this, callback);
+}
+
+void WebFrameProxy::getMainResourceData(PassRefPtr<DataCallback> callback)
+{
+    if (!m_page) {
+        callback->invalidate();
+        return;
+    }
+
+    m_page->getMainResourceDataOfFrame(this, callback);
 }
 
 } // namespace WebKit

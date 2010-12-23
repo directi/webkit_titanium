@@ -60,6 +60,14 @@ enum SyncReplyMode {
     ManualReply
 };
 
+#define MESSAGE_CHECK_BASE(assertion, connection) do \
+    if (!(assertion)) { \
+        ASSERT(assertion); \
+        (connection)->markCurrentlyDispatchedMessageAsInvalid(); \
+        return; \
+    } \
+while (0)
+
 class Connection : public ThreadSafeShared<Connection> {
 public:
     class MessageReceiver {
@@ -99,8 +107,13 @@ public:
     static PassRefPtr<Connection> createClientConnection(Identifier, Client*, RunLoop* clientRunLoop);
     ~Connection();
 
+#if PLATFORM(MAC)
+    void setShouldCloseConnectionOnMachExceptions();
+#endif
+
     bool open();
     void invalidate();
+    void markCurrentlyDispatchedMessageAsInvalid();
 
     // FIXME: This variant of send is deprecated, all clients should move to the overload that takes a message.
     template<typename E, typename T> bool send(E messageID, uint64_t destinationID, const T& arguments);
@@ -185,6 +198,9 @@ private:
     WorkQueue m_connectionQueue;
     RunLoop* m_clientRunLoop;
 
+    uint32_t m_inDispatchMessageCount;
+    bool m_didReceiveInvalidMessage;
+
     // Incoming messages.
     typedef Message<ArgumentDecoder> IncomingMessage;
 
@@ -245,9 +261,15 @@ private:
     // Called on the connection queue.
     void receiveSourceEventHandler();
     void initializeDeadNameSource();
+    void exceptionSourceEventHandler();
 
     mach_port_t m_sendPort;
     mach_port_t m_receivePort;
+
+    // If setShouldCloseConnectionOnMachExceptions has been called, this has
+    // the exception port that exceptions from the other end will be sent on.
+    mach_port_t m_exceptionPort;
+
 #elif PLATFORM(WIN)
     // Called on the connection queue.
     void readEventHandler();

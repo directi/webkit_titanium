@@ -73,6 +73,8 @@
 // This controls what strategy we use for mouse wheel coalesing.
 #define MERGE_WHEEL_EVENTS 0
 
+#define MESSAGE_CHECK(assertion) MESSAGE_CHECK_BASE(assertion, process()->connection())
+
 using namespace WebCore;
 
 namespace WebKit {
@@ -245,10 +247,8 @@ void WebPageProxy::close()
 
     m_toolTip = String();
 
-    invalidateCallbackMap(m_contentsAsStringCallbacks);
-    invalidateCallbackMap(m_frameSourceCallbacks);
-    invalidateCallbackMap(m_renderTreeExternalRepresentationCallbacks);
-    invalidateCallbackMap(m_scriptReturnValueCallbacks);
+    invalidateCallbackMap(m_dataCallbacks);
+    invalidateCallbackMap(m_stringCallbacks);
 
     Vector<WebEditCommandProxy*> editCommandVector;
     copyToVector(m_editCommandSet, editCommandVector);
@@ -783,36 +783,60 @@ void WebPageProxy::countStringMatches(const String& string, FindOptions options,
     process()->send(Messages::WebPage::CountStringMatches(string, options, maxMatchCount), m_pageID);
 }
     
-void WebPageProxy::runJavaScriptInMainFrame(const String& script, PassRefPtr<ScriptReturnValueCallback> prpCallback)
+void WebPageProxy::runJavaScriptInMainFrame(const String& script, PassRefPtr<StringCallback> prpCallback)
 {
-    RefPtr<ScriptReturnValueCallback> callback = prpCallback;
+    RefPtr<StringCallback> callback = prpCallback;
     uint64_t callbackID = callback->callbackID();
-    m_scriptReturnValueCallbacks.set(callbackID, callback.get());
+    m_stringCallbacks.set(callbackID, callback.get());
     process()->send(Messages::WebPage::RunJavaScriptInMainFrame(script, callbackID), m_pageID);
 }
 
-void WebPageProxy::getRenderTreeExternalRepresentation(PassRefPtr<RenderTreeExternalRepresentationCallback> prpCallback)
+void WebPageProxy::getRenderTreeExternalRepresentation(PassRefPtr<StringCallback> prpCallback)
 {
-    RefPtr<RenderTreeExternalRepresentationCallback> callback = prpCallback;
+    RefPtr<StringCallback> callback = prpCallback;
     uint64_t callbackID = callback->callbackID();
-    m_renderTreeExternalRepresentationCallbacks.set(callbackID, callback.get());
+    m_stringCallbacks.set(callbackID, callback.get());
     process()->send(Messages::WebPage::GetRenderTreeExternalRepresentation(callbackID), m_pageID);
 }
 
-void WebPageProxy::getSourceForFrame(WebFrameProxy* frame, PassRefPtr<FrameSourceCallback> prpCallback)
+void WebPageProxy::getSourceForFrame(WebFrameProxy* frame, PassRefPtr<StringCallback> prpCallback)
 {
-    RefPtr<FrameSourceCallback> callback = prpCallback;
+    RefPtr<StringCallback> callback = prpCallback;
     uint64_t callbackID = callback->callbackID();
-    m_frameSourceCallbacks.set(callbackID, callback.get());
+    m_stringCallbacks.set(callbackID, callback.get());
     process()->send(Messages::WebPage::GetSourceForFrame(frame->frameID(), callbackID), m_pageID);
 }
 
-void WebPageProxy::getContentsAsString(PassRefPtr<ContentsAsStringCallback> prpCallback)
+void WebPageProxy::getContentsAsString(PassRefPtr<StringCallback> prpCallback)
 {
-    RefPtr<ContentsAsStringCallback> callback = prpCallback;
+    RefPtr<StringCallback> callback = prpCallback;
     uint64_t callbackID = callback->callbackID();
-    m_contentsAsStringCallbacks.set(callbackID, callback.get());
+    m_stringCallbacks.set(callbackID, callback.get());
     process()->send(Messages::WebPage::GetContentsAsString(callbackID), m_pageID);
+}
+
+void WebPageProxy::getSelectionOrContentsAsString(PassRefPtr<StringCallback> prpCallback)
+{
+    RefPtr<StringCallback> callback = prpCallback;
+    uint64_t callbackID = callback->callbackID();
+    m_stringCallbacks.set(callbackID, callback.get());
+    process()->send(Messages::WebPage::GetSelectionOrContentsAsString(callbackID), m_pageID);
+}
+
+void WebPageProxy::getMainResourceDataOfFrame(WebFrameProxy* frame, PassRefPtr<DataCallback> prpCallback)
+{
+    RefPtr<DataCallback> callback = prpCallback;
+    uint64_t callbackID = callback->callbackID();
+    m_dataCallbacks.set(callbackID, callback.get());
+    process()->send(Messages::WebPage::GetMainResourceDataOfFrame(frame->frameID(), callbackID), m_pageID);
+}
+
+void WebPageProxy::getWebArchiveOfFrame(WebFrameProxy* frame, PassRefPtr<DataCallback> prpCallback)
+{
+    RefPtr<DataCallback> callback = prpCallback;
+    uint64_t callbackID = callback->callbackID();
+    m_dataCallbacks.set(callbackID, callback.get());
+    process()->send(Messages::WebPage::GetWebArchiveOfFrame(frame->frameID(), callbackID), m_pageID);
 }
 
 void WebPageProxy::preferencesDidChange()
@@ -879,16 +903,24 @@ void WebPageProxy::interpretKeyEvent(uint32_t type, Vector<KeypressCommand>& com
 
 void WebPageProxy::didCreateMainFrame(uint64_t frameID)
 {
-    ASSERT(!m_mainFrame);
+    MESSAGE_CHECK(!m_mainFrame);
+    MESSAGE_CHECK(process()->canCreateFrame(frameID));
 
     m_mainFrame = WebFrameProxy::create(this, frameID);
+
+    // Add the frame to the process wide map.
     process()->frameCreated(frameID, m_mainFrame.get());
 }
 
 void WebPageProxy::didCreateSubFrame(uint64_t frameID)
 {
-    ASSERT(m_mainFrame);
-    process()->frameCreated(frameID, WebFrameProxy::create(this, frameID).get());
+    MESSAGE_CHECK(m_mainFrame);
+    MESSAGE_CHECK(process()->canCreateFrame(frameID));
+    
+    RefPtr<WebFrameProxy> subFrame = WebFrameProxy::create(this, frameID);
+
+    // Add the frame to the process wide map.
+    process()->frameCreated(frameID, subFrame.get());
 }
 
 void WebPageProxy::didStartProgress()
@@ -920,6 +952,7 @@ void WebPageProxy::didStartProvisionalLoadForFrame(uint64_t frameID, const Strin
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     if (!loadingSubstituteDataForUnreachableURL)
         frame->setUnreachableURL(String());
@@ -936,8 +969,10 @@ void WebPageProxy::didReceiveServerRedirectForProvisionalLoadForFrame(uint64_t f
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     frame->didReceiveServerRedirectForProvisionalLoad(url);
+
     m_loaderClient.didReceiveServerRedirectForProvisionalLoadForFrame(this, frame, userData.get());
 }
 
@@ -949,8 +984,10 @@ void WebPageProxy::didFailProvisionalLoadForFrame(uint64_t frameID, const Resour
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     frame->didFailProvisionalLoad();
+
     m_loaderClient.didFailProvisionalLoadWithErrorForFrame(this, frame, error, userData.get());
 }
 
@@ -962,11 +999,9 @@ void WebPageProxy::didCommitLoadForFrame(uint64_t frameID, const String& mimeTyp
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
-    frame->setMIMEType(mimeType);
-    frame->setIsFrameSet(false);
-    frame->setCertificateInfo(WebCertificateInfo::create(certificateInfo));
-    frame->didCommitLoad();
+    frame->didCommitLoad(mimeType, certificateInfo);
 
     if (frame->isMainFrame()) {
         m_mainFrameHasCustomRepresentation = frameHasCustomRepresentation;
@@ -984,6 +1019,7 @@ void WebPageProxy::didFinishDocumentLoadForFrame(uint64_t frameID, CoreIPC::Argu
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_loaderClient.didFinishDocumentLoadForFrame(this, frame, userData.get());
 }
@@ -996,8 +1032,10 @@ void WebPageProxy::didFinishLoadForFrame(uint64_t frameID, CoreIPC::ArgumentDeco
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     frame->didFinishLoad();
+
     m_loaderClient.didFinishLoadForFrame(this, frame, userData.get());
 }
 
@@ -1009,6 +1047,8 @@ void WebPageProxy::didFailLoadForFrame(uint64_t frameID, const ResourceError& er
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
     frame->didFailLoad();
 
     m_loaderClient.didFailLoadWithErrorForFrame(this, frame, error, userData.get());
@@ -1022,6 +1062,8 @@ void WebPageProxy::didSameDocumentNavigationForFrame(uint64_t frameID, uint32_t 
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
     frame->didSameDocumentNavigation(url);
 
     m_loaderClient.didSameDocumentNavigationForFrame(this, frame, static_cast<SameDocumentNavigationType>(opaqueSameDocumentNavigationType), userData.get());
@@ -1035,6 +1077,8 @@ void WebPageProxy::didReceiveTitleForFrame(uint64_t frameID, const String& title
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
     frame->didChangeTitle(title);
     
     m_loaderClient.didReceiveTitleForFrame(this, title, frame, userData.get());
@@ -1048,6 +1092,7 @@ void WebPageProxy::didFirstLayoutForFrame(uint64_t frameID, CoreIPC::ArgumentDec
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_loaderClient.didFirstLayoutForFrame(this, frame, userData.get());
 }
@@ -1060,6 +1105,7 @@ void WebPageProxy::didFirstVisuallyNonEmptyLayoutForFrame(uint64_t frameID, Core
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_loaderClient.didFirstVisuallyNonEmptyLayoutForFrame(this, frame, userData.get());
 }
@@ -1072,6 +1118,7 @@ void WebPageProxy::didRemoveFrameFromHierarchy(uint64_t frameID, CoreIPC::Argume
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_loaderClient.didRemoveFrameFromHierarchy(this, frame, userData.get());
 }
@@ -1084,6 +1131,7 @@ void WebPageProxy::didDisplayInsecureContentForFrame(uint64_t frameID, CoreIPC::
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_loaderClient.didDisplayInsecureContentForFrame(this, frame, userData.get());
 }
@@ -1096,6 +1144,7 @@ void WebPageProxy::didRunInsecureContentForFrame(uint64_t frameID, CoreIPC::Argu
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_loaderClient.didRunInsecureContentForFrame(this, frame, userData.get());
 }
@@ -1103,6 +1152,7 @@ void WebPageProxy::didRunInsecureContentForFrame(uint64_t frameID, CoreIPC::Argu
 void WebPageProxy::frameDidBecomeFrameSet(uint64_t frameID, bool value)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     frame->setIsFrameSet(value);
 }
@@ -1112,6 +1162,8 @@ void WebPageProxy::frameDidBecomeFrameSet(uint64_t frameID, bool value)
 void WebPageProxy::decidePolicyForNavigationAction(uint64_t frameID, uint32_t opaqueNavigationType, uint32_t opaqueModifiers, int32_t opaqueMouseButton, const String& url, uint64_t listenerID)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
     NavigationType navigationType = static_cast<NavigationType>(opaqueNavigationType);
     WebEvent::Modifiers modifiers = static_cast<WebEvent::Modifiers>(opaqueModifiers);
     WebMouseEvent::Button mouseButton = static_cast<WebMouseEvent::Button>(opaqueMouseButton);
@@ -1124,6 +1176,8 @@ void WebPageProxy::decidePolicyForNavigationAction(uint64_t frameID, uint32_t op
 void WebPageProxy::decidePolicyForNewWindowAction(uint64_t frameID, uint32_t opaqueNavigationType, uint32_t opaqueModifiers, int32_t opaqueMouseButton, const String& url, uint64_t listenerID)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
     NavigationType navigationType = static_cast<NavigationType>(opaqueNavigationType);
     WebEvent::Modifiers modifiers = static_cast<WebEvent::Modifiers>(opaqueModifiers);
     WebMouseEvent::Button mouseButton = static_cast<WebMouseEvent::Button>(opaqueMouseButton);
@@ -1136,6 +1190,8 @@ void WebPageProxy::decidePolicyForNewWindowAction(uint64_t frameID, uint32_t opa
 void WebPageProxy::decidePolicyForMIMEType(uint64_t frameID, const String& MIMEType, const String& url, uint64_t listenerID, bool& receivedPolicyAction, uint64_t& policyAction, uint64_t& downloadID)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
     RefPtr<WebFramePolicyListenerProxy> listener = frame->setUpPolicyListenerProxy(listenerID);
 
     ASSERT(!m_inDecidePolicyForMIMEType);
@@ -1166,7 +1222,10 @@ void WebPageProxy::willSubmitForm(uint64_t frameID, uint64_t sourceFrameID, cons
         return;
 
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
     WebFrameProxy* sourceFrame = process()->webFrame(sourceFrameID);
+    MESSAGE_CHECK(sourceFrame);
 
     RefPtr<WebFormSubmissionListenerProxy> listener = frame->setUpFormSubmissionListenerProxy(listenerID);
     if (!m_formClient.willSubmitForm(this, frame, sourceFrame, textFieldValues.stringPairVector(), userData.get(), listener.get()))
@@ -1178,6 +1237,7 @@ void WebPageProxy::willSubmitForm(uint64_t frameID, uint64_t sourceFrameID, cons
 void WebPageProxy::didInitiateLoadForResource(uint64_t frameID, uint64_t resourceIdentifier, const ResourceRequest& request)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_resourceLoadClient.didInitiateLoadForResource(this, frame, resourceIdentifier, request);
 }
@@ -1185,6 +1245,7 @@ void WebPageProxy::didInitiateLoadForResource(uint64_t frameID, uint64_t resourc
 void WebPageProxy::didSendRequestForResource(uint64_t frameID, uint64_t resourceIdentifier, const ResourceRequest& request, const ResourceResponse& redirectResponse)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_resourceLoadClient.didSendRequestForResource(this, frame, resourceIdentifier, request, redirectResponse);
 }
@@ -1192,6 +1253,7 @@ void WebPageProxy::didSendRequestForResource(uint64_t frameID, uint64_t resource
 void WebPageProxy::didReceiveResponseForResource(uint64_t frameID, uint64_t resourceIdentifier, const ResourceResponse& response)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_resourceLoadClient.didReceiveResponseForResource(this, frame, resourceIdentifier, response);
 }
@@ -1199,6 +1261,7 @@ void WebPageProxy::didReceiveResponseForResource(uint64_t frameID, uint64_t reso
 void WebPageProxy::didReceiveContentLengthForResource(uint64_t frameID, uint64_t resourceIdentifier, uint64_t contentLength)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_resourceLoadClient.didReceiveContentLengthForResource(this, frame, resourceIdentifier, contentLength);
 }
@@ -1206,6 +1269,7 @@ void WebPageProxy::didReceiveContentLengthForResource(uint64_t frameID, uint64_t
 void WebPageProxy::didFinishLoadForResource(uint64_t frameID, uint64_t resourceIdentifier)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_resourceLoadClient.didFinishLoadForResource(this, frame, resourceIdentifier);
 }
@@ -1213,10 +1277,10 @@ void WebPageProxy::didFinishLoadForResource(uint64_t frameID, uint64_t resourceI
 void WebPageProxy::didFailLoadForResource(uint64_t frameID, uint64_t resourceIdentifier, const ResourceError& error)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
 
     m_resourceLoadClient.didFailLoadForResource(this, frame, resourceIdentifier, error);
 }
-
 
 // UIClient
 
@@ -1243,17 +1307,26 @@ void WebPageProxy::closePage()
 
 void WebPageProxy::runJavaScriptAlert(uint64_t frameID, const String& message)
 {
-    m_uiClient.runJavaScriptAlert(this, message, process()->webFrame(frameID));
+    WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
+    m_uiClient.runJavaScriptAlert(this, message, frame);
 }
 
 void WebPageProxy::runJavaScriptConfirm(uint64_t frameID, const String& message, bool& result)
 {
-    result = m_uiClient.runJavaScriptConfirm(this, message, process()->webFrame(frameID));
+    WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
+    result = m_uiClient.runJavaScriptConfirm(this, message, frame);
 }
 
 void WebPageProxy::runJavaScriptPrompt(uint64_t frameID, const String& message, const String& defaultValue, String& result)
 {
-    result = m_uiClient.runJavaScriptPrompt(this, message, defaultValue, process()->webFrame(frameID));
+    WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
+    result = m_uiClient.runJavaScriptPrompt(this, message, defaultValue, frame);
 }
 
 void WebPageProxy::setStatusText(const String& text)
@@ -1335,7 +1408,10 @@ void WebPageProxy::canRunBeforeUnloadConfirmPanel(bool& canRun)
 
 void WebPageProxy::runBeforeUnloadConfirmPanel(const String& message, uint64_t frameID, bool& shouldClose)
 {
-    shouldClose = m_uiClient.runBeforeUnloadConfirmPanel(this, message, process()->webFrame(frameID));
+    WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
+    shouldClose = m_uiClient.runBeforeUnloadConfirmPanel(this, message, frame);
 }
 
 #if ENABLE(TILED_BACKING_STORE)
@@ -1362,9 +1438,12 @@ void WebPageProxy::runOpenPanel(uint64_t frameID, const WebOpenPanelParameters::
         m_openPanelResultListener = 0;
     }
 
+    WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
     m_openPanelResultListener = WebOpenPanelResultListenerProxy::create(this);
 
-    if (!m_uiClient.runOpenPanel(this, process()->webFrame(frameID), data, m_openPanelResultListener.get()))
+    if (!m_uiClient.runOpenPanel(this, frame, data, m_openPanelResultListener.get()))
         didCancelForOpenPanel();
 }
 
@@ -1689,7 +1768,8 @@ void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
     case WebEvent::RawKeyDown:
     case WebEvent::Char: {
         NativeWebKeyboardEvent event = m_keyEventQueue.first();
-        ASSERT(type == event.type());
+        MESSAGE_CHECK(type == event.type());
+
         m_keyEventQueue.removeFirst();
 
         if (handled)
@@ -1702,42 +1782,24 @@ void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
     }
 }
 
-void WebPageProxy::didGetContentsAsString(const String& resultString, uint64_t callbackID)
+void WebPageProxy::dataCallback(const CoreIPC::DataReference& dataReference, uint64_t callbackID)
 {
-    RefPtr<ContentsAsStringCallback> callback = m_contentsAsStringCallbacks.take(callbackID);
+    RefPtr<DataCallback> callback = m_dataCallbacks.take(callbackID);
     if (!callback) {
         // FIXME: Log error or assert.
         return;
     }
 
-    callback->performCallbackWithReturnValue(resultString.impl());
+    RefPtr<WebData> data;
+    if (size_t size = dataReference.size())
+        data = WebData::create(dataReference.data(), size);
+
+    callback->performCallbackWithReturnValue(data.get());
 }
 
-void WebPageProxy::didRunJavaScriptInMainFrame(const String& resultString, uint64_t callbackID)
+void WebPageProxy::stringCallback(const String& resultString, uint64_t callbackID)
 {
-    RefPtr<ScriptReturnValueCallback> callback = m_scriptReturnValueCallbacks.take(callbackID);
-    if (!callback) {
-        // FIXME: Log error or assert.
-        return;
-    }
-
-    callback->performCallbackWithReturnValue(resultString.impl());
-}
-
-void WebPageProxy::didGetRenderTreeExternalRepresentation(const String& resultString, uint64_t callbackID)
-{
-    RefPtr<RenderTreeExternalRepresentationCallback> callback = m_renderTreeExternalRepresentationCallbacks.take(callbackID);
-    if (!callback) {
-        // FIXME: Log error or assert.
-        return;
-    }
-
-    callback->performCallbackWithReturnValue(resultString.impl());
-}
-
-void WebPageProxy::didGetSourceForFrame(const String& resultString, uint64_t callbackID)
-{
-    RefPtr<FrameSourceCallback> callback = m_frameSourceCallbacks.take(callbackID);
+    RefPtr<StringCallback> callback = m_stringCallbacks.take(callbackID);
     if (!callback) {
         // FIXME: Log error or assert.
         return;
@@ -1748,7 +1810,15 @@ void WebPageProxy::didGetSourceForFrame(const String& resultString, uint64_t cal
 
 void WebPageProxy::focusedFrameChanged(uint64_t frameID)
 {
-    m_focusedFrame = frameID ? process()->webFrame(frameID) : 0;
+    if (!frameID) {
+        m_focusedFrame = 0;
+        return;
+    }
+
+    WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
+    m_focusedFrame = frame;
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -1798,10 +1868,8 @@ void WebPageProxy::processDidCrash()
 
     m_toolTip = String();
 
-    invalidateCallbackMap(m_contentsAsStringCallbacks);
-    invalidateCallbackMap(m_frameSourceCallbacks);
-    invalidateCallbackMap(m_renderTreeExternalRepresentationCallbacks);
-    invalidateCallbackMap(m_scriptReturnValueCallbacks);
+    invalidateCallbackMap(m_dataCallbacks);
+    invalidateCallbackMap(m_stringCallbacks);
 
     Vector<WebEditCommandProxy*> editCommandVector;
     copyToVector(m_editCommandSet, editCommandVector);
@@ -1856,6 +1924,8 @@ void WebPageProxy::backForwardClear()
 void WebPageProxy::canAuthenticateAgainstProtectionSpaceInFrame(uint64_t frameID, const WebCore::ProtectionSpace& coreProtectionSpace, bool& canAuthenticate)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
     RefPtr<WebProtectionSpace> protectionSpace = WebProtectionSpace::create(coreProtectionSpace);
     
     canAuthenticate = m_loaderClient.canAuthenticateAgainstProtectionSpaceInFrame(this, frame, protectionSpace.get());
@@ -1864,6 +1934,8 @@ void WebPageProxy::canAuthenticateAgainstProtectionSpaceInFrame(uint64_t frameID
 void WebPageProxy::didReceiveAuthenticationChallenge(uint64_t frameID, const WebCore::AuthenticationChallenge& coreChallenge, uint64_t challengeID)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
     RefPtr<AuthenticationChallengeProxy> authenticationChallenge = AuthenticationChallengeProxy::create(coreChallenge, challengeID, this);
     
     m_loaderClient.didReceiveAuthenticationChallengeInFrame(this, frame, authenticationChallenge.get());
@@ -1872,6 +1944,8 @@ void WebPageProxy::didReceiveAuthenticationChallenge(uint64_t frameID, const Web
 void WebPageProxy::exceededDatabaseQuota(uint64_t frameID, const String& originIdentifier, const String& databaseName, const String& displayName, uint64_t currentQuota, uint64_t currentUsage, uint64_t expectedUsage, uint64_t& newQuota)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
     RefPtr<WebSecurityOrigin> origin = WebSecurityOrigin::create(originIdentifier);
 
     newQuota = m_uiClient.exceededDatabaseQuota(this, frame, origin.get(), databaseName, displayName, currentQuota, currentUsage, expectedUsage);
