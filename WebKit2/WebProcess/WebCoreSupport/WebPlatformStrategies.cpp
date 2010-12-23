@@ -50,7 +50,7 @@ namespace WebKit {
 //  2) It doesn't handle the %2$d syntax.
 static String formatLocalizedString(const String& format, ...)
 {
-#if PLATFORM(CF)
+#if PLATFORM(CG)
     va_list arguments;
     va_start(arguments, format);
     RetainPtr<CFStringRef> formatCFString(AdoptCF, format.createCFString());

@@ -42,11 +42,5 @@ void BackingStore::paint(GraphicsContext&, const IntPoint&, const IntRect&)
 {
     notImplemented();
 }
-
-PassOwnPtr<GraphicsContext> BackingStore::createFlippedGraphicsContext()
-{
-    notImplemented();
-	return 0;
-}
         
 } // namespace WebKit
