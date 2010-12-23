@@ -1,3 +1,79 @@
+2010-12-22  Simon Fraser  <simon.fraser@apple.com>
+
+        Reviewed by Dan Bernstein.
+
+        Support unprefixed box-shadow property
+        https://bugs.webkit.org/show_bug.cgi?id=51448
+        
+        Add box-shadow to getComputedStyle tests, and add new pixel test
+        for box-shadow. (This test will be updated when the shadow radius is fixed via
+        bug 22102).
+
+        * fast/css/box-shadow.html: Added.
+        * fast/css/getComputedStyle/computed-style-expected.txt:
+        * fast/css/getComputedStyle/computed-style-without-renderer-expected.txt:
+        * platform/mac/fast/css/box-shadow-expected.checksum: Added.
+        * platform/mac/fast/css/box-shadow-expected.png: Added.
+        * platform/mac/fast/css/box-shadow-expected.txt: Added.
+        * platform/mac/fast/css/getComputedStyle/computed-style-without-renderer-expected.txt:
+        * svg/css/getComputedStyle-basic-expected.txt:
+
+2010-12-22  Michael Saboff  <msaboff@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        REGRESSION: Can't shadow/overwrite window.constructor 
+        (causes TypeError exception)
+        https://bugs.webkit.org/show_bug.cgi?id=48953
+
+        Changed cross-frame-access-put test results to reflect that setting
+        the window constructor will be disallowed due to cross frame security
+        checking.
+        Added a new test to check that we can change window.constructor.
+
+        * fast/dom/Window/window-constructor-settable-expected.txt: Added.
+        * fast/dom/Window/window-constructor-settable.html: Added.
+        * http/tests/security/cross-frame-access-put-expected.txt:
+
+2010-12-22  Mihai Parparita  <mihaip@chromium.org>
+
+        Unreviewed test expectations update. fast/canvas/fillText-shadow.html
+        fails with Skia in the GPU suite too.
+
+        * platform/chromium-gpu/test_expectations.txt:
+
+2010-12-22  Steve Lacey  <sjl@chromium.org>
+
+        Reviewed by David Levin.
+
+        Change css for chromium media controls to deal with the timeline
+        not expanding when the current time disappears. This happens when
+        the width of the control drops below 240px.
+
+        This change results in a minor pixel difference - the timebar now
+        aligns better with the time and when the time is not displayed is
+        now perfectly centered. Disabling the affected tests for now
+        and will rebaseline.
+
+        https://bugs.webkit.org/show_bug.cgi?id=51500
+
+        * platform/chromium/test_expectations.txt:
+
+2010-12-22  Mihai Parparita  <mihaip@chromium.org>
+
+        Unreviewed test expectations update. fast/canvas/fillText-shadow.html
+        fails with Skia.
+
+        * platform/chromium/test_expectations.txt:
+
+2010-12-22  Jessie Berlin  <jberlin@apple.com>
+
+        Add Windows-specific (failing) expected results for media/audio-data-url.html in order to get
+        the Windows 7 Release test bot green again. Unreviewed.
+        https://bugs.webkit.org/show_bug.cgi?id=51518
+
+        * platform/win/media/audio-data-url-expected.txt: Added.
+
 2010-12-22  Mihai Parparita  <mihaip@chromium.org>
 
         Reviewed by Simon Fraser.
