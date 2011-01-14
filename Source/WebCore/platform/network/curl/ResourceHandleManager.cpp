@@ -122,7 +122,7 @@ ResourceHandleManager::ResourceHandleManager()
     , m_cookieJarFileName(0)
     , m_certificatePath (certificatePath())
     , m_runningJobs(0)
-
+	, m_ProxyCallback(0)
 {
     curl_global_init(CURL_GLOBAL_ALL);
     m_curlMultiHandle = curl_multi_init();
@@ -320,6 +320,11 @@ size_t readCallback(void* ptr, size_t size, size_t nmemb, void* data)
         job->cancel();
 
     return sent;
+}
+
+void ResourceHandleManager::setProxyCallback(ProxyForURLCallback cb) 
+{
+	m_ProxyCallback = cb;
 }
 
 void ResourceHandleManager::downloadTimerCallback(Timer<ResourceHandleManager>* timer)
@@ -733,10 +738,47 @@ void ResourceHandleManager::initializeHandle(ResourceHandle* job)
     }
 
     // Set proxy options if we have them.
-    if (m_proxy.length()) {
+    if (m_proxy.length()) 
+	{
         curl_easy_setopt(d->m_handle, CURLOPT_PROXY, m_proxy.utf8().data());
         curl_easy_setopt(d->m_handle, CURLOPT_PROXYTYPE, m_proxyType);
-    }
+	} 
+	else 
+	{
+		String proxy("");
+		if(m_ProxyCallback) 
+		{
+			char* buff = new char[4096];
+			m_ProxyCallback(url.utf8().data(), buff, 4096);
+			proxy = String::fromUTF8(buff);
+			delete [] buff;
+		}
+		
+		if (proxy.length() > 0 && !proxy.startsWith("direct")) 
+		{
+			proxy = proxy.lower().stripWhiteSpace();
+			if (proxy.startsWith("socks"))
+				curl_easy_setopt(d->m_handle, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS4);
+			else if(proxy.startsWith("socks4a"))
+				curl_easy_setopt(d->m_handle, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS4A);
+			else if(proxy.startsWith("socks5"))
+				curl_easy_setopt(d->m_handle, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5);
+
+			int schemeEnd = proxy.find("://");
+			if (schemeEnd != -1)
+				proxy = proxy.substring(schemeEnd + 3);
+			int credentialsEnd = proxy.find('@');
+			if (credentialsEnd != -1 && credentialsEnd > 0 && proxy.length() > 1)
+			{
+				String usernamePassword = proxy.substring(0, credentialsEnd);
+				proxy = proxy.substring(credentialsEnd + 1);
+				curl_easy_setopt(d->m_handle, CURLOPT_PROXYUSERPWD, usernamePassword.utf8().data());
+				curl_easy_setopt(d->m_handle, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
+			}
+
+			curl_easy_setopt(d->m_handle, CURLOPT_PROXY, proxy.utf8().data());
+		}
+	}
 }
 
 void ResourceHandleManager::cancel(ResourceHandle* job)

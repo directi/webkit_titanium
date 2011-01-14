@@ -44,6 +44,8 @@
 
 namespace WebCore {
 
+typedef void(*ProxyForURLCallback)(const char*, char*, int);
+
 class ResourceHandleManager {
 public:
     enum ProxyType {
@@ -69,6 +71,8 @@ public:
                       const String& username = "",
                       const String& password = "");
 
+	void setProxyCallback(ProxyForURLCallback cb);
+
 private:
     ResourceHandleManager();
     ~ResourceHandleManager();
@@ -91,6 +95,7 @@ private:
     
     String m_proxy;
     ProxyType m_proxyType;
+	ProxyForURLCallback m_ProxyCallback;
 };
 
 }
