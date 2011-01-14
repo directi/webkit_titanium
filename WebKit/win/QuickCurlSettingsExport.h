@@ -10,18 +10,13 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-	QUICKCURLSETTINGS_API typedef void(*ProxyForURLCallback)(const char*, char*, int);
-	QUICKCURLSETTINGS_API typedef void(*TitaniumProtocolResolver)(const char*, char*, int);
+	typedef void(*ProxyForURLCallback)(const char*, char*, int);
+	typedef void(*TitaniumProtocolResolver)(const char*, char*, int);
 	QUICKCURLSETTINGS_API void setProxyCallback(ProxyForURLCallback cb);
 	QUICKCURLSETTINGS_API void setCookieJarFileName(const char* filename);
-<<<<<<< HEAD
+    QUICKCURLSETTINGS_API void setTitaniumProtocolResolver(TitaniumProtocolResolver p);
 #ifdef __cplusplus
 }
-=======
-	QUICKCURLSETTINGS_API void setTitaniumProtocolResolver(TitaniumProtocolResolver p);
-#ifdef __cplusplus
-}
->>>>>>> 29f868e... Readded the app:// and ti:// protocol hack inside curl.
 #endif
 
 #endif

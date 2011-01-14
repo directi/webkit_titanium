@@ -21,8 +21,3 @@ QUICKCURLSETTINGS_API void setTitaniumProtocolResolver(TitaniumProtocolResolver 
 {
 	WebCore::ResourceHandleManager::sharedInstance()->setTitaniumProtocolResolver(p);
 }
-
-QUICKCURLSETTINGS_API void setTitaniumProtocolResolver(TitaniumProtocolResolver p)
-{
-	WebCore::ResourceHandleManager::sharedInstance()->setTitaniumProtocolResolver(p);
-}
