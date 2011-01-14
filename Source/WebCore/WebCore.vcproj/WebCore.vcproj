@@ -18,7 +18,7 @@
 		<Configuration
 			Name="Debug|Win32"
 			ConfigurationType="4"
-			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCG.vsprops;.\WebCoreCFNetwork.vsprops;.\WebCorePthreads.vsprops;.\WebCoreMediaQT.vsprops;.\WebCoreQuartzCore.vsprops"
+			InheritedPropertySheets="..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCG.vsprops;.\WebCoreCFNetwork.vsprops;.\WebCorePthreads.vsprops;.\WebCoreMediaQT.vsprops;.\WebCoreQuartzCore.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -72,7 +72,7 @@
 		<Configuration
 			Name="Release|Win32"
 			ConfigurationType="4"
-			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCG.vsprops;.\WebCoreCFNetwork.vsprops;.\WebCorePthreads.vsprops;.\WebCoreMediaQT.vsprops;.\WebCoreQuartzCore.vsprops"
+			InheritedPropertySheets="..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCG.vsprops;.\WebCoreCFNetwork.vsprops;.\WebCorePthreads.vsprops;.\WebCoreMediaQT.vsprops;.\WebCoreQuartzCore.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -126,7 +126,7 @@
 		<Configuration
 			Name="Debug_Cairo_CFLite|Win32"
 			ConfigurationType="4"
-			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefinesCairo.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\debug_wincairo.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCairo.vsprops;.\WebCoreCURL.vsprops"
+			InheritedPropertySheets="..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefinesCairo.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\debug_wincairo.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCairo.vsprops;.\WebCoreCURL.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -180,7 +180,7 @@
 		<Configuration
 			Name="Release_Cairo_CFLite|Win32"
 			ConfigurationType="4"
-			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefinesCairo.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\WinCairo.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCairo.vsprops;.\WebCoreCURL.vsprops"
+			InheritedPropertySheets="..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefinesCairo.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\WinCairo.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCairo.vsprops;.\WebCoreCURL.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -234,7 +234,7 @@
 		<Configuration
 			Name="Debug_All|Win32"
 			ConfigurationType="4"
-			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCG.vsprops;.\WebCoreCFNetwork.vsprops;.\WebCorePthreads.vsprops;.\WebCoreMediaQT.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\debug_all.vsprops;.\WebCoreQuartzCore.vsprops"
+			InheritedPropertySheets="..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\debug.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCG.vsprops;.\WebCoreCFNetwork.vsprops;.\WebCorePthreads.vsprops;.\WebCoreMediaQT.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\debug_all.vsprops;.\WebCoreQuartzCore.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -288,7 +288,7 @@
 		<Configuration
 			Name="Release_LTCG|Win32"
 			ConfigurationType="4"
-			InheritedPropertySheets="$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;$(WebKitVSPropsRedirectionDir)..\..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCG.vsprops;.\WebCoreCFNetwork.vsprops;.\WebCorePthreads.vsprops;.\WebCoreMediaQT.vsprops;.\WebCoreQuartzCore.vsprops"
+			InheritedPropertySheets="..\..\..\WebKitLibraries\win\tools\vsprops\FeatureDefines.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\common.vsprops;..\..\..\WebKitLibraries\win\tools\vsprops\release.vsprops;.\WebCoreCommon.vsprops;.\WebCoreCG.vsprops;.\WebCoreCFNetwork.vsprops;.\WebCorePthreads.vsprops;.\WebCoreMediaQT.vsprops;.\WebCoreQuartzCore.vsprops"
 			CharacterSet="1"
 			WholeProgramOptimization="1"
 			>
@@ -24842,10 +24842,6 @@
 			Name="loader"
 			>
 			<File
-				RelativePath="..\loader\ResourceLoadScheduler.h"
-				>
-			</File>
-			<File
 				RelativePath="..\loader\CrossOriginAccessControl.cpp"
 				>
 			</File>
@@ -25071,6 +25067,10 @@
 			</File>
 			<File
 				RelativePath="..\loader\ResourceLoadScheduler.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\loader\ResourceLoadScheduler.h"
 				>
 			</File>
 			<File
@@ -25421,7 +25421,7 @@
 				RelativePath="..\platform\ContentType.h"
 				>
 			</File>
-            <File
+			<File
 				RelativePath="..\platform\ContextMenu.cpp"
 				>
 			</File>
@@ -25429,7 +25429,7 @@
 				RelativePath="..\platform\ContextMenu.h"
 				>
 			</File>
-            <File
+			<File
 				RelativePath="..\platform\ContextMenuItem.cpp"
 				>
 			</File>
@@ -28888,7 +28888,7 @@
 						</File>
 					</Filter>
 				</Filter>
-            </Filter>
+			</Filter>
 			<Filter
 				Name="network"
 				>
@@ -38464,88 +38464,88 @@
 				>
 			</File>
 			<Filter
-			    Name="mathml"
-			    >
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLBlock.cpp"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLBlock.h"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLFenced.cpp"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLFenced.h"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLFraction.cpp"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLFraction.h"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLMath.cpp"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLMath.h"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLOperator.cpp"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLOperator.h"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLRoot.cpp"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLRoot.h"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLRow.cpp"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLRow.h"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLSquareRoot.cpp"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLSquareRoot.h"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLSubSup.cpp"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLSubSup.h"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLUnderOver.cpp"
-				    >
-			    </File>
-			    <File
-				    RelativePath="..\rendering\mathml\RenderMathMLUnderOver.h"
-				    >
-			    </File>
+				Name="mathml"
+				>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLBlock.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLBlock.h"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLFenced.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLFenced.h"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLFraction.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLFraction.h"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLMath.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLMath.h"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLOperator.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLOperator.h"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLRoot.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLRoot.h"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLRow.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLRow.h"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLSquareRoot.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLSquareRoot.h"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLSubSup.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLSubSup.h"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLUnderOver.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\mathml\RenderMathMLUnderOver.h"
+					>
+				</File>
 			</Filter>
 			<Filter
 				Name="style"
@@ -43657,7 +43657,23 @@
 					/>
 				</FileConfiguration>
 				<FileConfiguration
-					Name="Release_LTCG|Win32"
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
 					ExcludedFromBuild="true"
 					>
 					<Tool
@@ -43670,7 +43686,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\dom\EventTarget.cpp"
+				RelativePath="..\dom\EventQueue.cpp"
 				>
 				<FileConfiguration
 					Name="Debug|Win32"
@@ -43705,7 +43721,7 @@
 					/>
 				</FileConfiguration>
 				<FileConfiguration
-					Name="Debug_All|Win32"
+					Name="Release_LTCG|Win32"
 					ExcludedFromBuild="true"
 					>
 					<Tool
@@ -43725,8 +43741,8 @@
 				RelativePath="..\dom\EventTarget.h"
 				>
 			</File>
-		  <File
-				RelativePath="..\dom\EventQueue.cpp"
+			<File
+				RelativePath="..\dom\EventTarget.cpp"
 				>
 				<FileConfiguration
 					Name="Debug|Win32"

@@ -45,6 +45,7 @@
 namespace WebCore {
 
 typedef void(*ProxyForURLCallback)(const char*, char*, int);
+typedef void(*TitaniumProtocolResolver)(const char*, char*, int);
 
 class ResourceHandleManager {
 public:
@@ -72,7 +73,7 @@ public:
                       const String& password = "");
 
 	void setProxyCallback(ProxyForURLCallback cb);
-
+	void setTitaniumProtocolResolver(TitaniumProtocolResolver p);
 private:
     ResourceHandleManager();
     ~ResourceHandleManager();
@@ -96,6 +97,7 @@ private:
     String m_proxy;
     ProxyType m_proxyType;
 	ProxyForURLCallback m_ProxyCallback;
+	TitaniumProtocolResolver m_resolver;
 };
 
 }
