@@ -28,6 +28,6 @@
 
 # Updates a development environment to the new WebKitAuxiliaryLibrary
 
-my $auxilaryLibsURL = "http://developer.apple.com/opensource/internet/WebKitAuxiliaryLibrary.zip";
+my $cairoLibsURL = "http://idisk.mac.com/bfulgham-Public/requirements.zip";
 
-system("perl", "Tools/Scripts/update-webkit-dependancy", $auxilaryLibsURL, "win") == 0 or die;
+system("perl", "Tools/Scripts/update-webkit-dependancy", $cairoLibsURL, ".") == 0 or die;
