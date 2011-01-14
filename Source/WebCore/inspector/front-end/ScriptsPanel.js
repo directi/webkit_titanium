@@ -372,7 +372,9 @@ WebInspector.ScriptsPanel.prototype = {
 
     _debuggerPaused: function(event)
     {
-        var callFrames = event.data.callFrames;
+	InjectedScriptAccess.getDefault().evaluate('if(typeof(pauseDebugger) == "function") pauseDebugger();', "window", function(a){});
+        
+	var callFrames = event.data.callFrames;
 
         this._paused = true;
         this._waitingToPause = false;
@@ -391,6 +393,8 @@ WebInspector.ScriptsPanel.prototype = {
 
     _debuggerResumed: function()
     {
+	InjectedScriptAccess.getDefault().evaluate('if(typeof(resumeDebugger) == "function") resumeDebugger(' + this._stepping + ');', "window", function(a){});
+
         this._paused = false;
         this._waitingToPause = false;
         this._stepping = false;
