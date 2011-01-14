@@ -1,5 +1,6 @@
 mkdir 2>NUL "%CONFIGURATIONBUILDDIR%\include\WebKit"
 
+xcopy /y /d "%PROJECTDIR%\..\QuickCurlSettingsExport.h" "%CONFIGURATIONBUILDDIR%\include\WebKit"
 xcopy /y /d "%PROJECTDIR%\..\WebLocalizableStrings.h" "%CONFIGURATIONBUILDDIR%\include\WebKit"
 xcopy /y /d "%PROJECTDIR%\..\WebKitGraphics.h" "%CONFIGURATIONBUILDDIR%\include\WebKit"
 xcopy /y /d "%PROJECTDIR%\..\WebKitCOMAPI.h" "%CONFIGURATIONBUILDDIR%\include\WebKit"
